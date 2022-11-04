@@ -5,8 +5,6 @@ This program runs a sequence of python programs to analyze capillaries
 By: Marcus Forst
 """
 
-# import correlation_with_cap_selection
-
 import time
 import os
 import auto_corr
@@ -14,6 +12,8 @@ import correlation
 import pic2vid
 import chop_top
 import write_background_file
+# import correlation_with_cap_selection
+
 
 
 
@@ -36,6 +36,10 @@ THRESHOLD_PKL = 'C:\\Users\\gt8mar\\PycharmProjects\\capillaries\\pipeline_01\\t
 
 def service_function():
     print('service function')
+def a_preprocess(path):
+    pass
+def b_stabilize(path):
+    pass
 
 """
 -----------------------------------------------------------------------------
@@ -48,31 +52,22 @@ if __name__ == "__main__":
     ticks_first = time.time()
     ticks = time.time()
 
-    # """ A_check_in """
+    """ Step A: Preprocess """
+    a_preprocess()
     # chop_top.main(UMBRELLA_FOLDER, DATE, PARTICIPANT)
     # print("-------------------------------------")
     # print("Chop Top Runtime: " + str(time.time() - ticks))
     # ticks = time.time()
 
 
-    """ Stabilize using CaImAn """
-
-
-
+    """ Step B: Stabilize using CaImAn """
+    b_stabilize()
 
     """ Pic2Vid """
-    # for folder in os.listdir(UMBRELLA_FOLDER):
-    #     print(folder)
-    #     path = os.path.join(UMBRELLA_FOLDER, folder)
-    #     pic2vid.main(path, folder = folder, date = DATE, participant = PARTICIPANT)
+    # pic2vid.main(path, folder = folder, date = DATE, participant = PARTICIPANT)
     # print("-------------------------------------")
     # print("pic2vid Runtime: " + str(time.time() - ticks))
     # ticks = time.time()
-
-
-
-    # TODO: imagej stuff, not clear if this is possible
-    service_function()
 
     """ Write Background """
     # for folder in os.listdir(UMBRELLA_FOLDER):
