@@ -1,6 +1,6 @@
 {
     "python.analysis.extraPaths": [
-        "./src",
-        "./src/tools"
+        "./capillary-flow",
+        "./capillary-flow/tools"
     ]
 }

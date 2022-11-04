@@ -7,11 +7,11 @@ By: Marcus Forst
 
 import time
 import os
-import auto_corr
-import correlation
-import pic2vid
-import chop_top
-import write_background_file
+from src import auto_corr
+from src import correlation
+from src.tools import pic2vid
+from src import chop_top
+from src import write_background_file
 # import correlation_with_cap_selection
 
 
