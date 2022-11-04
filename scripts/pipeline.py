@@ -5,14 +5,15 @@ This program runs a sequence of python programs to analyze capillaries
 By: Marcus Forst
 """
 
-import correlation_with_cap_selection
-import chop_top
-import write_background_file
+# import correlation_with_cap_selection
+
 import time
 import os
 import auto_corr
 import correlation
 import pic2vid
+import chop_top
+import write_background_file
 
 
 
@@ -47,6 +48,13 @@ if __name__ == "__main__":
     ticks_first = time.time()
     ticks = time.time()
 
+    # """ A_check_in """
+    # chop_top.main(UMBRELLA_FOLDER, DATE, PARTICIPANT)
+    # print("-------------------------------------")
+    # print("Chop Top Runtime: " + str(time.time() - ticks))
+    # ticks = time.time()
+
+
     """ Stabilize using CaImAn """
 
 
@@ -61,11 +69,7 @@ if __name__ == "__main__":
     # print("pic2vid Runtime: " + str(time.time() - ticks))
     # ticks = time.time()
 
-    # """ Chop Top """
-    # chop_top.main(UMBRELLA_FOLDER, DATE, PARTICIPANT)
-    # print("-------------------------------------")
-    # print("Chop Top Runtime: " + str(time.time() - ticks))
-    # ticks = time.time()
+
 
     # TODO: imagej stuff, not clear if this is possible
     service_function()

@@ -7,12 +7,13 @@ sort_nicely credit: Ned B (https://nedbatchelder.com/blog/200712/human_sorting.h
 """
 
 
-import cv2
 import os
 import glob
 import re
 import time
 import numpy as np
+import cv2
+
 
 UMBRELLA_FOLDER = 'C:\\Users\\gt8mar\\Desktop\\data\\221010'
 DATE = "221010"
