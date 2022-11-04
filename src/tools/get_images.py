@@ -6,7 +6,7 @@ by: Marcus Forst
 """
 
 import os
-import sort_nicely
+from src.tools import sort_nicely
 
 def main(filefolder):
     """

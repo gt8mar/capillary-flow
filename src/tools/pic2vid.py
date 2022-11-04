@@ -10,7 +10,7 @@ import os
 import time
 import numpy as np
 import cv2
-import get_images
+from src.tools import get_images
 
 # UMBRELLA_FOLDER = 'C:\\Users\\gt8mar\\Desktop\\data\\221010'
 FILEFOLDER_PATH = "C:\\Users\\gt8mar\\Desktop\\data\\221019\\raw\\vid12"

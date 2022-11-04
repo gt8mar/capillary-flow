@@ -14,9 +14,6 @@ from src import chop_top
 from src import write_background_file
 # import correlation_with_cap_selection
 
-
-
-
 UMBRELLA_FOLDER = 'C:\\Users\\gt8mar\\Desktop\\data\\221010'
 # VIDEO_FOLDER = 'C:\\Users\\gt8mar\\Desktop\\data\\221010\\vid4_chopped_10'
 VIDEO_FOLDER = 'C:\\Users\\gt8mar\\PycharmProjects\\bluud\\dual_camera\\221010\\221010_vid4.avi'
@@ -52,8 +49,9 @@ if __name__ == "__main__":
     ticks_first = time.time()
     ticks = time.time()
 
+    path = "path"
     """ Step A: Preprocess """
-    a_preprocess()
+    a_preprocess(path)
     # chop_top.main(UMBRELLA_FOLDER, DATE, PARTICIPANT)
     # print("-------------------------------------")
     # print("Chop Top Runtime: " + str(time.time() - ticks))
@@ -61,7 +59,7 @@ if __name__ == "__main__":
 
 
     """ Step B: Stabilize using CaImAn """
-    b_stabilize()
+    b_stabilize(path)
 
     """ Pic2Vid """
     # pic2vid.main(path, folder = folder, date = DATE, participant = PARTICIPANT)
