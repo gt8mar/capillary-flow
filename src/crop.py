@@ -12,6 +12,7 @@ import time
 import numpy as np
 import tifffile
 from src.tools import get_images
+from skimage.transform import resize, rescale, downscale_local_mean     # can use any of these to downscale image
 
 def main(SET='set_01', sample = 'sample_000'):
     input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\raw', str(SET), str(sample), 'vid')              # 'C:\\Users\\gt8mar\\Desktop\\data\\221010'
@@ -26,8 +27,9 @@ def main(SET='set_01', sample = 'sample_000'):
     for i in range(len(images)):
         image = tifffile.imread(os.path.join(input_folder, images[i]))
         # # This chops the image into smaller pieces (important if there has been motion correction)
-        cropped_image = image[15:]
-        image_stack.append(cropped_image)
+        cropped_image = image[14:]
+        resized_image = downscale_local_mean(cropped_image, (2, 2))
+        image_stack.append(resized_image.astype('uint8'))
     image_stack = np.array(image_stack)
     print(image_stack.shape)
     stack_name = f'{SET}_{sample}_stack.tif'
