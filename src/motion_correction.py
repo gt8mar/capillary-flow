@@ -71,20 +71,20 @@ def main():
     m_rig = cm.load(mc.mmap_file)
     bord_px_rig = np.ceil(np.max(mc.shifts_rig)).astype(int)
 
-    plt.figure(figsize = (20,10))
-    plt.imshow(mc.total_template_rig)
-    plt.show()
+    # plt.figure(figsize = (20,10))
+    # plt.imshow(mc.total_template_rig)
+    # plt.show()
 
     m_rig.resize(1, 1, downsample_ratio).play(
         q_max=99.5, fr=30, magnification=2, bord_px = 0*bord_px_rig) # press q to exit
     # m_rig.play(q_max=99.5, fr=60, magnification=2, bord_px = 0*bord_px_rig) # press q to exit
 
-    plt.figure(figsize = (20,10))
-    plt.plot(mc.shifts_rig)
-    plt.legend(['x shifts','y shifts'])
-    plt.xlabel('frames')
-    plt.ylabel('pixels')
-    plt.show()
+    # plt.figure(figsize = (20,10))
+    # plt.plot(mc.shifts_rig)
+    # plt.legend(['x shifts','y shifts'])
+    # plt.xlabel('frames')
+    # plt.ylabel('pixels')
+    # plt.show()
     return 0
 
 """

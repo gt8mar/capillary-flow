@@ -6,15 +6,13 @@ by: Marcus Forst
 """
 
 import os
-import glob
-import re
 import time
 import numpy as np
 import tifffile
 from src.tools import get_images
 from skimage.transform import resize, rescale, downscale_local_mean     # can use any of these to downscale image
 
-def main(SET='set_01', sample = 'sample_000'):
+def main(SET='set_01', sample = 'sample_000', downsample = False):
     input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\raw', str(SET), str(sample), 'vid')              # 'C:\\Users\\gt8mar\\Desktop\\data\\221010'
     processed_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample))
     output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'A_cropped')
@@ -24,15 +22,16 @@ def main(SET='set_01', sample = 'sample_000'):
         os.mkdir(output_folder)
     images = get_images.main(input_folder)
     image_stack = []
-    for i in range(len(images)):
+    for i in range(100):
         image = tifffile.imread(os.path.join(input_folder, images[i]))
         # # This chops the image into smaller pieces (important if there has been motion correction)
         cropped_image = image[14:]
-        resized_image = downscale_local_mean(cropped_image, (2, 2))
-        image_stack.append(resized_image.astype('uint8'))
+        if downsample:
+            cropped_image = downscale_local_mean(cropped_image, (2, 2))
+        image_stack.append(cropped_image.astype('uint8'))
     image_stack = np.array(image_stack)
     print(image_stack.shape)
-    stack_name = f'{SET}_{sample}_stack.tif'
+    stack_name = f'{SET}_{sample}_stack_100test.tif'
     tifffile.imwrite(os.path.join(output_folder, stack_name), image_stack, photometric='minisblack')  # minisblack means grayscale with 0 as black
     print(f"finished cropping {SET} {sample}")
     return 0
