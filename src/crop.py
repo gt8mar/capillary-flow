@@ -22,16 +22,19 @@ def main(SET='set_01', sample = 'sample_000', downsample = False):
         os.mkdir(output_folder)
     images = get_images.main(input_folder)
     image_stack = []
-    for i in range(100):
-        image = tifffile.imread(os.path.join(input_folder, images[i]))
-        # # This chops the image into smaller pieces (important if there has been motion correction)
+    for i in range(len(images)):
+        image = tifffile.imread(os.path.join(input_folder, images[i])).astype('int_')
+        # This chops the image into smaller pieces (important if there has been motion correction)
         cropped_image = image[14:]
         if downsample:
-            cropped_image = downscale_local_mean(cropped_image, (2, 2))
-        image_stack.append(cropped_image.astype('uint8'))
+            cropped_image = downscale_local_mean(cropped_image, (7, 7))
+            print(cropped_image)
+            cropped_image = cropped_image.astype('int_')
+            print(cropped_image)
+        image_stack.append(cropped_image)
     image_stack = np.array(image_stack)
     print(image_stack.shape)
-    stack_name = f'{SET}_{sample}_stack_100test.tif'
+    stack_name = f'{SET}_{sample}_stack_downsample7test.tif'
     tifffile.imwrite(os.path.join(output_folder, stack_name), image_stack, photometric='minisblack')  # minisblack means grayscale with 0 as black
     print(f"finished cropping {SET} {sample}")
     return 0
@@ -43,6 +46,6 @@ def main(SET='set_01', sample = 'sample_000', downsample = False):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main()
+    main(downsample=True)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
