@@ -8,34 +8,29 @@ by: Marcus Forst
 import os
 import time
 import numpy as np
-import tifffile
+import cv2
 from src.tools import get_images
 from skimage.transform import resize, rescale, downscale_local_mean     # can use any of these to downscale image
 
 def main(SET='set_01', sample = 'sample_000', downsample = False):
     input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\raw', str(SET), str(sample), 'vid')              # 'C:\\Users\\gt8mar\\Desktop\\data\\221010'
     processed_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample))
-    output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'A_cropped')
-    print(f'the input folder is {input_folder}')
-    print(f'the output folder is {output_folder}')
-    if 'A_cropped' not in os.listdir(processed_folder):
-        os.mkdir(output_folder)
+    output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'A_cropped\\vid2')
+    # todo: fix this
+    # if 'A_cropped' not in os.listdir(processed_folder):
+    #     if 'vid2' not in os.listdir(os.path.join(processed_folder, 'A_cropped')):
+    #         os.mkdir(output_folder)
     images = get_images.main(input_folder)
-    image_stack = []
     for i in range(len(images)):
-        image = tifffile.imread(os.path.join(input_folder, images[i])).astype('int_')
+        image = np.array(cv2.imread(os.path.join(input_folder, images[i]), cv2.IMREAD_GRAYSCALE))
         # This chops the image into smaller pieces (important if there has been motion correction)
-        cropped_image = image[290:890,360:960]
+        cropped_image = image[14:]
         if downsample:
-            cropped_image = downscale_local_mean(cropped_image, (7, 7))
+            cropped_image = downscale_local_mean(cropped_image, (2,2))
             print(cropped_image)
-            cropped_image = cropped_image.astype('int_')
+            cropped_image = cropped_image.astype(int)
             print(cropped_image)
-        image_stack.append(cropped_image)
-    image_stack = np.array(image_stack)
-    print(image_stack.shape)
-    stack_name = f'{SET}_{sample}_stack_squaretest.tif'
-    tifffile.imwrite(os.path.join(output_folder, stack_name), image_stack, photometric='minisblack')  # minisblack means grayscale with 0 as black
+        cv2.imwrite(os.path.join(output_folder, images[i]), cropped_image.astype('uint8'))    # minisblack means grayscale with 0 as black
     print(f"finished cropping {SET} {sample}")
     return 0
 
