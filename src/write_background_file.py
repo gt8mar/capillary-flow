@@ -7,116 +7,85 @@ By: Marcus Forst
 sort_nicely credit: Ned B (https://nedbatchelder.com/blog/200712/human_sorting.html)
 """
 
+import os
+import time
 import numpy as np
+import pandas as pd
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.pyplot as plt
 import cv2
-import os
-import re
-import time
+from src.tools import get_images
+from src.tools import pic2vid
 
-FILEFOLDER_PATH = 'C:\\Users\\gt8mar\\Desktop\\data\\221010\\vid4_moco'
-DATE = "221010"
-PARTICIPANT = "Participant3"
+# def make_short_vid(image_files, SET, sample):
+#     video_name = f'{SET}_{sample}.avi'
+#     frame = image_files[0]
+#     video = cv2.VideoWriter(video_name, 0, 60, (frame.shape[1], frame.shape[0]))
+#     print(frame.shape)
+#     for i in range(len(image_files)):
+#         timecode = frames_to_timecode(i, frame_rate)
+#         img = cv2.imread(os.path.join(filefolder, images[i]))
+#         focus_measure = calculate_focus_measure(img)
+#         # add pressure overlay
+#         add_overlay(img, 'P: 1.2 psi', (1050, 50))
+#         # add frame counter
+#         add_overlay(img, timecode, (200, 50))
+#         # add set and sample overlay
+#         add_overlay(img, f'{SET}.{SAMPLE}:', (50, 50))
+#         # add version overlay
+#         add_overlay(img, "HW: 01", (50, 80))
+#         add_overlay(img, "SW: 01", (50, 110))
+#         # TODO: add focus bar
+#         add_focus_bar(img, focus_measure)
+#         video.write(img)
+#     cv2.destroyAllWindows()
+#     video.release()
 
-def tryint(s):
-    try:
-        return int(s)
-    except:
-        return s
-def alphanum_key(s):
-    """ Turn a string into a list of string and number chunks.
-        "z23a" -> ["z", 23, "a"]
-    """
-    return [tryint(c) for c in re.split('([0-9]+)', s)]
-def sort_nicely(l):
-    """ Sort the given list in the way that humans expect.
-    """
-    l.sort(key=alphanum_key)
-def get_images(FILEFOLDER):
-    """
-    this function grabs image names, sorts them, and puts them in a list.
-    :param FILEFOLDER: string
-    :return: images: list of images
-    """
-    images = [img for img in os.listdir(FILEFOLDER) if img.endswith(".tif") or img.endswith(
-        ".tiff")]  # if this came out of moco the file suffix is .tif otherwise it's tiff
-    sort_nicely(images)
-    return images
-
-def main(folder_name = 'folder', filefolder_path = FILEFOLDER_PATH, date = DATE, participant = PARTICIPANT, verbose = False, subtracted = False):
-    images = get_images(filefolder_path)
-    # Here we make a list of image files
+def main(SET='set_01', sample = 'sample_000'):    
+    input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
+    shifts = pd.read_csv(os.path.join(input_folder, 'Results.csv'))
+    print(shifts.head)
+    gap_left = shifts['x'].max()
+    gap_right = shifts['x'].min()
+    gap_bottom = shifts['y'].min()
+    gap_top = shifts['y'].max()
+    print(f'gap left is {gap_left}')
+    print(f'gap right is {gap_right}')
+    print(f'gap bottom is {gap_bottom}')
+    print(f'gap top is {gap_top}')
+    images = get_images.main(os.path.join(input_folder, 'vid'))
     image_files = []
     for i in range(len(images)):
-        picture = np.array(cv2.imread(os.path.join(filefolder_path, images[i]), cv2.IMREAD_GRAYSCALE))
-        # # This chops the image into smaller pieces (important if there has been motion correction)
-        new_new_picture = picture[15:-25, 25:-25]
-        # new_new_picture[new_new_picture > 5] = 5
-        image_files.append(new_new_picture)
+        image = np.array(cv2.imread(os.path.join(input_folder, images[i]), cv2.IMREAD_GRAYSCALE))
+        cropped_image = image[gap_top:gap_bottom, gap_left:gap_right]
+        image_files.append(cropped_image)
     image_files = np.array(image_files)
     ROWS, COLS = image_files[0].shape
     background = np.mean(image_files, axis=0)
-    if verbose:
-        ax = plt.subplot()
-        im = ax.imshow(background)
-
-        # create an axes on the right side of ax. The width of cax will be 5%
-        # of ax and the padding between cax and ax will be fixed at 0.05 inch.
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        plt.colorbar(im, cax=cax)
-        plt.show()
 
 
     """
     Extra functions
     -----------------------------------------------------------------------------------------
     """
-    if subtracted:
-        # Enhance contrast
-        image_files = image_files - background
-        print(np.max(image_files))
-        print(np.min(image_files))
+    # if subtracted:
+    #     # Enhance contrast
+    #     image_files = image_files - background
+    #     print(np.max(image_files))
+    #     print(np.min(image_files))
 
-        image_files = image_files - np.min(image_files)
-        image_files = image_files / np.max(image_files)
-        image_files = np.array(image_files * 255, dtype=np.uint8)
-        print('the following should never be less than 0')
-        print(np.min(image_files))
+    #     image_files = image_files - np.min(image_files)
+    #     image_files = image_files / np.max(image_files)
+    #     image_files = np.array(image_files * 255, dtype=np.uint8)
+    #     print('the following should never be less than 0')
+    #     print(np.min(image_files))
 
-    if verbose:
-        # Plot with newly enhanced contrast
-        ax = plt.subplot()
-        im = ax.imshow(image_files[10])
-        # create an axes on the right side of ax. The width of cax will be 5%
-        # of ax and the padding between cax and ax will be fixed at 0.05 inch.
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        plt.colorbar(im, cax=cax)
-        plt.show()
-
-
-    # write new folder of reduced images:
-    cwd = os.getcwd()
-    folder = folder_name + "_background"
-    path = os.path.join(cwd, folder)
-    if folder not in os.listdir(cwd):
-        os.mkdir(path)
-    if subtracted:
-        for i in range(len(image_files)):
-            file = image_files[i]
-            filename = images[i]
-
-            # write to new folder
-            cv2.imwrite(os.path.join(path, filename), file)
-
-    # Add background file
-    background = background.astype('uint8')
-    bkgd_name = str(images[0].strip("."))
-    bkgd_name += "_background"
-    bkgd_name += ".tiff"
-    cv2.imwrite(os.path.join(path, bkgd_name), background)
+    # # Add background file
+    # background = background.astype('uint8')
+    # bkgd_name = str(images[0].strip("."))
+    # bkgd_name += "_background"
+    # bkgd_name += ".tiff"
+    # cv2.imwrite(os.path.join(path, bkgd_name), background)
     return 0
 
 """
@@ -126,6 +95,6 @@ def main(folder_name = 'folder', filefolder_path = FILEFOLDER_PATH, date = DATE,
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main()
+    main('set_01', 'sample_011')
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))

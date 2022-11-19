@@ -21,13 +21,14 @@ from src import write_background_file
 
 SET = "set_01"
 SAMPLE = "sample_000"
+processed_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', SET)
 
-def service_function():
-    print('service function')
-def a_preprocess():
-    crop.main(SET, SAMPLE)
-def b_stabilize():
-    pass
+def C_write_background():
+    for i in range(11):
+        sample = 'sample_' + str(i+1).zfill(3)
+        os.makedirs(os.path.join(processed_folder, sample, "C_background_file"))
+        write_background_file.main(SET, SAMPLE)
+
 
 """
 -----------------------------------------------------------------------------
@@ -41,14 +42,10 @@ if __name__ == "__main__":
     ticks = time.time()
 
     """ Step A: Preprocess """
-    a_preprocess()
-    print("-------------------------------------")
-    print(f"Step A: Preprocess Runtime: {time.time() - ticks}")
-    ticks = time.time()
+    # done in preprocess.py
 
-
-    """ Step B: Stabilize using CaImAn """
-    b_stabilize()
+    """ Step B: Stabilize using moco in imagej """
+    # done in imagej
 
     """ Pic2Vid """
     # pic2vid.main(path, folder = folder, date = DATE, participant = PARTICIPANT)
