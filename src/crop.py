@@ -15,11 +15,9 @@ from skimage.transform import resize, rescale, downscale_local_mean     # can us
 def main(SET='set_01', sample = 'sample_000', downsample = False):
     input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\raw', str(SET), str(sample), 'vid')              # 'C:\\Users\\gt8mar\\Desktop\\data\\221010'
     processed_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample))
-    output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'A_cropped\\vid2')
-    # todo: fix this
-    # if 'A_cropped' not in os.listdir(processed_folder):
-    #     if 'vid2' not in os.listdir(os.path.join(processed_folder, 'A_cropped')):
-    #         os.mkdir(output_folder)
+    output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'A_cropped\\vid')
+    if 'A_cropped' not in os.listdir(processed_folder):
+        os.makedirs(os.path.join(processed_folder, "A_cropped", "vid"))
     images = get_images.main(input_folder)
     for i in range(len(images)):
         image = np.array(cv2.imread(os.path.join(input_folder, images[i]), cv2.IMREAD_GRAYSCALE))
