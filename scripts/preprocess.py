@@ -9,7 +9,7 @@ import time
 import os
 from src import auto_corr
 from src import correlation
-from src.tools import pic2vid
+from src.tools import pic2vid_stand_alone
 from src import crop
 from src import write_background_file
 # import correlation_with_cap_selection
