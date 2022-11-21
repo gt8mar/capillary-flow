@@ -8,8 +8,18 @@ sort_nicely credit: Ned B (https://nedbatchelder.com/blog/200712/human_sorting.h
 
 import os
 import time
-from cv2 import VideoWriter, destroyAllWindows
-import pandas as pd
+import numpy as np
+import cv2
+from src.tools import get_images
+
+# UMBRELLA_FOLDER = 'C:\\Users\\gt8mar\\Desktop\\data\\221010'
+FILEFOLDER_PATH = "C:\\Users\\gt8mar\\Desktop\\data\\221019\\raw\\vid12"
+DATE = "221101"
+PARTICIPANT = "Participant4"
+FOLDER_NAME = 'vid12'
+SET = '01'
+SAMPLE = '0002'
+FRAME_RATE = 169
 
 def frames_to_timecode(frame_number, frame_rate):
     """
@@ -53,60 +63,43 @@ def calculate_focus_measure(image,method='LAPE'):
         focus_measure = np.std(image,axis=None)# GLVA
     return focus_measure
 
-def main(images, SET = 'set_01', sample = 'sample_001'):
+def main(filefolder = FILEFOLDER_PATH, folder = FOLDER_NAME, date = DATE,
+         participant = PARTICIPANT, frame_rate = FRAME_RATE):
     """
     this takes an image folder and a list of image files and makes a movie
-    :param images: list of images or numpy array of images
-    :param SET: string
-    :param sample: string
-    :return: 0
+    :param image_folder: string
+    :param images: list of image filenames (strings)
+    :return:
     """
-    metadata_path = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\raw', str(SET), str(sample), 'metadata.txt')
-    output_path = 'C:\\Users\\gt8mar\\capillary-flow\\results'
-    shifts = pd.read_csv(metadata_path)
-    print(shifts.head)
-
-    # # TODO 
-    # frame_rate = 98
-    # pressure = 98
-    # video_name = f'{SET}_{sample}.avi'
-    # frame = images[0]
-    # video = VideoWriter(os.path.join(output_path, video_name), 
-    #                     0, 60, (frame.shape[1], frame.shape[0]))
-    # print(frame.shape)
-    # for i in range(len(images)):
-    #     timecode = frames_to_timecode(i, frame_rate)
-    #     img = images[i]
-    #     focus_measure = calculate_focus_measure(img)
-    #     # add pressure overlay
-    #     add_overlay(img, 'P: {pressure}', (1050, 50))
-    #     # add frame counter
-    #     add_overlay(img, timecode, (200, 50))
-    #     # add set and sample overlay
-    #     add_overlay(img, f'{SET}.{sample}:', (50, 50))
-    #     # add version overlay
-    #     add_overlay(img, "HW: 01", (50, 80))
-    #     add_overlay(img, "SW: 01", (50, 110))
-    #     # TODO: add focus bar
-    #     add_focus_bar(img, focus_measure)
-    #     video.write(img)
-    # destroyAllWindows()
-    # video.release()
+    images = get_images.main(filefolder)
+    video_name = f'{date}_{participant}_{folder}.avi'
+    frame = cv2.imread(os.path.join(filefolder, images[0]))
+    video = cv2.VideoWriter(video_name, 0, 60, (frame.shape[1], frame.shape[0]))
+    print(frame.shape)
+    for i in range(len(images)):
+        timecode = frames_to_timecode(i, frame_rate)
+        img = cv2.imread(os.path.join(filefolder, images[i]))
+        focus_measure = calculate_focus_measure(img)
+        # add pressure overlay
+        add_overlay(img, 'P: 1.2 psi', (1050, 50))
+        # add frame counter
+        add_overlay(img, timecode, (200, 50))
+        # add set and sample overlay
+        add_overlay(img, f'{SET}.{SAMPLE}:', (50, 50))
+        # add version overlay
+        add_overlay(img, "HW: 01", (50, 80))
+        add_overlay(img, "SW: 01", (50, 110))
+        # TODO: add focus bar
+        add_focus_bar(img, focus_measure)
+        video.write(img)
+    cv2.destroyAllWindows()
+    video.release()
     return 0
 
 # This provided line is required at the end of a Python file
 # to call the main() function.
 if __name__ == "__main__":
-    from src.tools import get_image_paths
-    from cv2 import imread
     ticks = time.time()
-    SET = 'set_01'
-    sample = 'sample_001'
-    input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
-    images = get_image_paths.main(input_folder)
-    image_files = []
-    for i in range(len(images)):
-        image_files.append(imread(images[i]))
-    main(image_files, SET, sample)
+    main()
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))

@@ -12,7 +12,7 @@ def main(filefolder):
     """
     Grabs image names, sorts them, and puts them in a list.
     :param filefolder: string
-    :return: images: list of images
+    :return: images: list of image names
     """
     images = [img for img in os.listdir(filefolder) if img.endswith(".tif") or img.endswith(
         ".tiff")]  # if this came out of moco the file suffix is .tif otherwise it's tiff

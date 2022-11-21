@@ -17,30 +17,6 @@ import cv2
 from src.tools import get_images
 from src.tools import pic2vid
 
-# def make_short_vid(image_files, SET, sample):
-#     video_name = f'{SET}_{sample}.avi'
-#     frame = image_files[0]
-#     video = cv2.VideoWriter(video_name, 0, 60, (frame.shape[1], frame.shape[0]))
-#     print(frame.shape)
-#     for i in range(len(image_files)):
-#         timecode = frames_to_timecode(i, frame_rate)
-#         img = cv2.imread(os.path.join(filefolder, images[i]))
-#         focus_measure = calculate_focus_measure(img)
-#         # add pressure overlay
-#         add_overlay(img, 'P: 1.2 psi', (1050, 50))
-#         # add frame counter
-#         add_overlay(img, timecode, (200, 50))
-#         # add set and sample overlay
-#         add_overlay(img, f'{SET}.{SAMPLE}:', (50, 50))
-#         # add version overlay
-#         add_overlay(img, "HW: 01", (50, 80))
-#         add_overlay(img, "SW: 01", (50, 110))
-#         # TODO: add focus bar
-#         add_focus_bar(img, focus_measure)
-#         video.write(img)
-#     cv2.destroyAllWindows()
-#     video.release()
-
 def main(SET='set_01', sample = 'sample_000'):    
     input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
     shifts = pd.read_csv(os.path.join(input_folder, 'Results.csv'))
@@ -59,6 +35,7 @@ def main(SET='set_01', sample = 'sample_000'):
         image = np.array(cv2.imread(os.path.join(input_folder, images[i]), cv2.IMREAD_GRAYSCALE))
         cropped_image = image[gap_top:gap_bottom, gap_left:gap_right]
         image_files.append(cropped_image)
+    pic2vid.main(image_files, SET, sample) 
     image_files = np.array(image_files)
     ROWS, COLS = image_files[0].shape
     background = np.mean(image_files, axis=0)
