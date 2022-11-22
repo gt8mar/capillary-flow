@@ -1,15 +1,19 @@
 """
 Filename: pic2vid.py
 -------------------------------------------------------------
-This file turns a group of files into a video. It correctly orders misordered files.
+This file turns a group of images into a video. it is primarily used as a
+function but can be run in standalone versions by using the command 
+line or an IDE. 
 by: Marcus Forst
-sort_nicely credit: Ned B (https://nedbatchelder.com/blog/200712/human_sorting.html)
 """
 
 import os
 import time
-from cv2 import VideoWriter, destroyAllWindows
+import numpy as np
+import cv2
 import pandas as pd
+from src.tools import get_images
+import matplotlib.pyplot as plt
 
 def frames_to_timecode(frame_number, frame_rate):
     """
@@ -52,61 +56,68 @@ def calculate_focus_measure(image,method='LAPE'):
     else:
         focus_measure = np.std(image,axis=None)# GLVA
     return focus_measure
+def extract_metadata(path):
+    """input path: string; outputs pressure: string, frame rate: integer"""
+    shifts = pd.read_csv(path, header=None).transpose()
+    shifts.columns  = shifts.iloc[0]
+    shifts = shifts.drop(shifts.index[0])
+    pressure = shifts['Pressure'][1].strip(';')
+    exposure = int(shifts['Exposure'][1].strip(';'))
+    frame_rate = 100000//int(exposure)  # this rounds the frame-rate
+    return pressure, frame_rate
 
 def main(images, SET = 'set_01', sample = 'sample_001'):
     """
-    this takes an image folder and a list of image files and makes a movie
+    takes a list of image files or numpy array and makes a movie with overlays
     :param images: list of images or numpy array of images
     :param SET: string
     :param sample: string
     :return: 0
     """
+    images = np.array(images)
     metadata_path = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\raw', str(SET), str(sample), 'metadata.txt')
     output_path = 'C:\\Users\\gt8mar\\capillary-flow\\results'
-    shifts = pd.read_csv(metadata_path)
-    print(shifts.head)
-
-    # # TODO 
-    # frame_rate = 98
-    # pressure = 98
-    # video_name = f'{SET}_{sample}.avi'
-    # frame = images[0]
-    # video = VideoWriter(os.path.join(output_path, video_name), 
-    #                     0, 60, (frame.shape[1], frame.shape[0]))
-    # print(frame.shape)
-    # for i in range(len(images)):
-    #     timecode = frames_to_timecode(i, frame_rate)
-    #     img = images[i]
-    #     focus_measure = calculate_focus_measure(img)
-    #     # add pressure overlay
-    #     add_overlay(img, 'P: {pressure}', (1050, 50))
-    #     # add frame counter
-    #     add_overlay(img, timecode, (200, 50))
-    #     # add set and sample overlay
-    #     add_overlay(img, f'{SET}.{sample}:', (50, 50))
-    #     # add version overlay
-    #     add_overlay(img, "HW: 01", (50, 80))
-    #     add_overlay(img, "SW: 01", (50, 110))
-    #     # TODO: add focus bar
-    #     add_focus_bar(img, focus_measure)
-    #     video.write(img)
-    # destroyAllWindows()
-    # video.release()
+    pressure, frame_rate = extract_metadata(metadata_path)
+    print(frame_rate)
+    video_name = f'{SET}_{sample}.avi'
+    frame = images[0]
+    # fourcc = cv2.VideoWriter_fourcc(*'XVID') # avi compression
+    fourcc = 0 # no compression
+    video = cv2.VideoWriter(os.path.join(output_path, video_name), fourcc, 60, (frame.shape[1], frame.shape[0]), False)    
+    print(frame.shape)
+    for i in range(images.shape[0]):
+        timecode = frames_to_timecode(i, frame_rate)
+        img = images[i]
+        focus_measure = calculate_focus_measure(img)
+        # add pressure overlay
+        add_overlay(img, 'P: {pressure}', (1050, 50))
+        # add frame counter
+        add_overlay(img, timecode, (200, 50))
+        # add set and sample overlay
+        add_overlay(img, f'{SET}.{sample}:', (50, 50))
+        # add version overlay
+        add_overlay(img, "HW: 01", (50, 80))
+        add_overlay(img, "SW: 01", (50, 110))
+        # TODO: add focus bar
+        add_focus_bar(img, focus_measure)
+        # TODO: add scale bar
+        video.write(img.astype('uint8'))
+    cv2.destroyAllWindows()
+    video.release()
     return 0
 
 # This provided line is required at the end of a Python file
 # to call the main() function.
 if __name__ == "__main__":
-    from src.tools import get_image_paths
-    from cv2 import imread
     ticks = time.time()
     SET = 'set_01'
     sample = 'sample_001'
-    input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
-    images = get_image_paths.main(input_folder)
+    input_folder = str(os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized\\vid'))
+    images = get_images.main(input_folder)
     image_files = []
     for i in range(len(images)):
-        image_files.append(imread(images[i]))
+        image = np.array(cv2.imread(os.path.join(input_folder, images[i]), cv2.IMREAD_GRAYSCALE))
+        image_files.append(image)
     main(image_files, SET, sample)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))

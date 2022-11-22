@@ -35,8 +35,8 @@ def main(SET='set_01', sample = 'sample_000'):
         image = np.array(cv2.imread(os.path.join(input_folder, images[i]), cv2.IMREAD_GRAYSCALE))
         cropped_image = image[gap_top:gap_bottom, gap_left:gap_right]
         image_files.append(cropped_image)
-    pic2vid.main(image_files, SET, sample) 
     image_files = np.array(image_files)
+    pic2vid.main(image_files, SET, sample) 
     ROWS, COLS = image_files[0].shape
     background = np.mean(image_files, axis=0)
 
