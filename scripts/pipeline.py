@@ -24,10 +24,11 @@ SAMPLE = "sample_000"
 processed_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', SET)
 
 def C_write_background():
-    for i in range(11):
-        sample = 'sample_' + str(i+1).zfill(3)
-        os.makedirs(os.path.join(processed_folder, sample, "C_background_file"))
-        write_background_file.main(SET, SAMPLE)
+    for i in range(12):
+        sample = 'sample_' + str(i).zfill(3)
+        os.makedirs(os.path.join(processed_folder, sample, "C_background"))
+        write_background_file.main(SET, sample)
+
 
 
 """
@@ -47,19 +48,14 @@ if __name__ == "__main__":
     """ Step B: Stabilize using moco in imagej """
     # done in imagej
 
-    """ Pic2Vid """
-    # pic2vid.main(path, folder = folder, date = DATE, participant = PARTICIPANT)
-    # print("-------------------------------------")
-    # print("pic2vid Runtime: " + str(time.time() - ticks))
-    # ticks = time.time()
-
     """ Write Background """
     # for folder in os.listdir(UMBRELLA_FOLDER):
     #     path = os.path.join(UMBRELLA_FOLDER, folder)
     #     write_background_file.main(folder, path, DATE, PARTICIPANT)
-    # print("-------------------------------------")
-    # print("Background Runtime: " + str(time.time() - ticks))
-    # ticks = time.time()
+    C_write_background()
+    print("-------------------------------------")
+    print("Background Runtime: " + str(time.time() - ticks))
+    ticks = time.time()
 
 
     """ Correlation files """

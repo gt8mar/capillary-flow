@@ -39,7 +39,7 @@ def add_overlay(img, text, location):
     cv2.putText(img, text, location, font, font_scale, font_color, thickness, line_type)
 def add_focus_bar(img, focus):
     """ Add focus bar to video (work in progress)"""
-    add_overlay(img, f'F:{focus}', (1050, 900))
+    add_overlay(img, f'F:{round(focus, 1)}', (img.shape[1] - 175, 900))
     return 0
 def calculate_focus_measure(image,method='LAPE'):
     """ Quantify the focus of an image using the laplacian transform """
@@ -90,12 +90,14 @@ def main(images, SET = 'set_01', sample = 'sample_001'):
         img = images[i]
         focus_measure = calculate_focus_measure(img)
         # add pressure overlay
-        add_overlay(img, f'P:{pressure}', (1050, 50))
+        add_overlay(img, f'P:{pressure}', (frame.shape[1]-150, 50))
         # add frame counter
-        add_overlay(img, timecode, (525, 50))
+        add_overlay(img, timecode, (frame.shape[1]//2 - 100, 50))
         # add set and sample overlay
-        add_overlay(img, f'{SET}', (50, 50))
-        add_overlay(img, f'{sample}', (50, 80))
+        set_string = str(SET).split('_')[0] + ": " + str(SET).split('_')[1]
+        sample_string = str(sample).split('_')[0] + ": " + str(sample).split('_')[1]
+        add_overlay(img, f'{set_string}', (50, 50))
+        add_overlay(img, f'{sample_string}', (50, 80))
         # add version overlay
         add_overlay(img, "HW: 01", (50, 110))
         add_overlay(img, "SW: 01", (50, 140))

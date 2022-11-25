@@ -19,6 +19,7 @@ from src.tools import pic2vid
 
 def main(SET='set_01', sample = 'sample_000'):    
     input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
+    output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'C_background')
     shifts = pd.read_csv(os.path.join(input_folder, 'Results.csv'))
     print(shifts.head)
     gap_left = shifts['x'].max()
@@ -38,19 +39,18 @@ def main(SET='set_01', sample = 'sample_000'):
     image_files = np.array(image_files)
     pic2vid.main(image_files, SET, sample) 
     ROWS, COLS = image_files[0].shape
-    background = np.mean(image_files, axis=0)
+    background = np.mean(image_files, axis=0).astype('uint8')
 
 
-    """
-    Extra functions
-    -----------------------------------------------------------------------------------------
-    """
+    # """
+    # Extra functions
+    # -----------------------------------------------------------------------------------------
+    # """
     # if subtracted:
     #     # Enhance contrast
     #     image_files = image_files - background
     #     print(np.max(image_files))
     #     print(np.min(image_files))
-
     #     image_files = image_files - np.min(image_files)
     #     image_files = image_files / np.max(image_files)
     #     image_files = np.array(image_files * 255, dtype=np.uint8)
@@ -59,10 +59,8 @@ def main(SET='set_01', sample = 'sample_000'):
 
     # # Add background file
     # background = background.astype('uint8')
-    # bkgd_name = str(images[0].strip("."))
-    # bkgd_name += "_background"
-    # bkgd_name += ".tiff"
-    # cv2.imwrite(os.path.join(path, bkgd_name), background)
+    bkgd_name = f'{SET}_{sample}_background.tiff'
+    cv2.imwrite(os.path.join(output_folder, bkgd_name), background)
     return 0
 
 """
