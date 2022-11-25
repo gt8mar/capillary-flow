@@ -28,7 +28,7 @@ def frames_to_timecode(frame_number, frame_rate):
     hours = int(frame_number / (3600 * fps_int) % 24)
     minutes = int((frame_number / (60 * fps_int)) % 60)
     seconds = int((frame_number / fps_int) % 60)
-    return f'{str(hours).zfill(2)}:{str(minutes).zfill(2)}:{str(seconds).zfill(2)}:{frame_number}'
+    return f'{str(hours).zfill(2)}:{str(minutes).zfill(2)}:{str(seconds).zfill(2)}:{str(frame_number).zfill(4)}'
 def add_overlay(img, text, location):
     """ Add overlay to video frame with specific style"""
     font = cv2.FONT_HERSHEY_SIMPLEX
@@ -90,14 +90,15 @@ def main(images, SET = 'set_01', sample = 'sample_001'):
         img = images[i]
         focus_measure = calculate_focus_measure(img)
         # add pressure overlay
-        add_overlay(img, f'P: {pressure}', (1050, 50))
+        add_overlay(img, f'P:{pressure}', (1050, 50))
         # add frame counter
-        add_overlay(img, timecode, (550, 50))
+        add_overlay(img, timecode, (525, 50))
         # add set and sample overlay
-        add_overlay(img, f'{SET}.{sample}:', (50, 50))
+        add_overlay(img, f'{SET}', (50, 50))
+        add_overlay(img, f'{sample}', (50, 80))
         # add version overlay
-        add_overlay(img, "HW: 01", (50, 80))
-        add_overlay(img, "SW: 01", (50, 110))
+        add_overlay(img, "HW: 01", (50, 110))
+        add_overlay(img, "SW: 01", (50, 140))
         # TODO: add focus bar
         add_focus_bar(img, focus_measure)
         # TODO: add scale bar
