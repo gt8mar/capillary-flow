@@ -28,7 +28,7 @@ def frames_to_timecode(frame_number, frame_rate):
     hours = int(frame_number / (3600 * fps_int) % 24)
     minutes = int((frame_number / (60 * fps_int)) % 60)
     seconds = int((frame_number / fps_int) % 60)
-    return f'{hours}:{minutes}:{seconds}:{frame_number}'
+    return f'{str(hours).zfill(2)}:{str(minutes).zfill(2)}:{str(seconds).zfill(2)}:{frame_number}'
 def add_overlay(img, text, location):
     """ Add overlay to video frame with specific style"""
     font = cv2.FONT_HERSHEY_SIMPLEX
@@ -81,8 +81,8 @@ def main(images, SET = 'set_01', sample = 'sample_001'):
     print(frame_rate)
     video_name = f'{SET}_{sample}.avi'
     frame = images[0]
-    # fourcc = cv2.VideoWriter_fourcc(*'XVID') # avi compression
-    fourcc = 0 # no compression
+    fourcc = cv2.VideoWriter_fourcc(*'XVID') # avi compression
+    # fourcc = 0 # no compression
     video = cv2.VideoWriter(os.path.join(output_path, video_name), fourcc, 60, (frame.shape[1], frame.shape[0]), False)    
     print(frame.shape)
     for i in range(images.shape[0]):
@@ -90,9 +90,9 @@ def main(images, SET = 'set_01', sample = 'sample_001'):
         img = images[i]
         focus_measure = calculate_focus_measure(img)
         # add pressure overlay
-        add_overlay(img, 'P: {pressure}', (1050, 50))
+        add_overlay(img, f'P: {pressure}', (1050, 50))
         # add frame counter
-        add_overlay(img, timecode, (200, 50))
+        add_overlay(img, timecode, (550, 50))
         # add set and sample overlay
         add_overlay(img, f'{SET}.{sample}:', (50, 50))
         # add version overlay
