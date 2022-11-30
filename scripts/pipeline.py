@@ -1,7 +1,8 @@
 """
 Filename: pipeline.py
 ------------------------------------------------------
-This program runs a sequence of python programs to analyze capillaries
+This program runs a sequence of python programs to write a background
+file and corresponding video.
 By: Marcus Forst
 """
 
@@ -27,6 +28,7 @@ def C_write_background():
     for i in range(12):
         sample = 'sample_' + str(i).zfill(3)
         os.makedirs(os.path.join(processed_folder, sample, "C_background"))
+        os.makedirs(os.path.join(processed_folder, sample, "D_stabilized"))
         write_background_file.main(SET, sample)
         print(f'finished sample {i}')
 
