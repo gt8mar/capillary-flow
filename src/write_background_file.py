@@ -21,7 +21,6 @@ def main(SET='set_01', sample = 'sample_000'):
     input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
     output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'C_background')
     shifts = pd.read_csv(os.path.join(input_folder, 'Results.csv'))
-    print(shifts.head)
     gap_left = shifts['x'].max()
     gap_right = shifts['x'].min()
     gap_bottom = shifts['y'].min()
@@ -33,7 +32,7 @@ def main(SET='set_01', sample = 'sample_000'):
     images = get_images.main(os.path.join(input_folder, 'vid'))
     image_files = []
     for i in range(len(images)):
-        image = np.array(cv2.imread(os.path.join(input_folder, images[i]), cv2.IMREAD_GRAYSCALE))
+        image = np.array(cv2.imread(os.path.join(input_folder, 'vid', images[i]), cv2.IMREAD_GRAYSCALE))
         cropped_image = image[gap_top:gap_bottom, gap_left:gap_right]
         image_files.append(cropped_image)
     image_files = np.array(image_files)
@@ -57,8 +56,7 @@ def main(SET='set_01', sample = 'sample_000'):
     #     print('the following should never be less than 0')
     #     print(np.min(image_files))
 
-    # # Add background file
-    # background = background.astype('uint8')
+    # Add background file
     bkgd_name = f'{SET}_{sample}_background.tiff'
     cv2.imwrite(os.path.join(output_folder, bkgd_name), background)
     return 0
@@ -70,6 +68,6 @@ def main(SET='set_01', sample = 'sample_000'):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main('set_01', 'sample_011')
+    main('set_01', 'sample_009')
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))

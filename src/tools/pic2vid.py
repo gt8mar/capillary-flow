@@ -62,7 +62,7 @@ def extract_metadata(path):
     shifts.columns  = shifts.iloc[0]
     shifts = shifts.drop(shifts.index[0])
     pressure = shifts['Pressure'][1].strip(';')
-    exposure = int(shifts['Exposure'][1].strip(';'))
+    exposure = shifts['Exposure'][1].strip(';')
     frame_rate = 100000//int(exposure)  # this rounds the frame-rate
     return pressure, frame_rate
 

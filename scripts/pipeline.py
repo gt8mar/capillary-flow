@@ -28,6 +28,7 @@ def C_write_background():
         sample = 'sample_' + str(i).zfill(3)
         os.makedirs(os.path.join(processed_folder, sample, "C_background"))
         write_background_file.main(SET, sample)
+        print(f'finished sample {i}')
 
 
 
