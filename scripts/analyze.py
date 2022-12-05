@@ -10,6 +10,7 @@ import os
 from src import auto_corr
 from src import correlation
 from src import blood_flow_linear
+from src import find_centerline
 
 # CAPILLARY_ROW = 565
 # CAPILLARY_COL = 590
@@ -24,7 +25,17 @@ def E_centerline():
     for i in range(12):
         sample = 'sample_' + str(i).zfill(3)
         os.makedirs(os.path.join(processed_folder, sample, "E_centerline"))
+        find_centerline.main(SET, sample, write = True)
         print(f'finished sample {i}')
+    return 0
+
+def F_blood_velocity():
+    for i in range(12):
+        sample = 'sample_' + str(i).zfill(3)
+        os.makedirs(os.path.join(processed_folder, sample, "F_blood_flow"))
+        # blood_flow_linear.main()
+        print(f'finished sample {i}')
+    return 0
 
 def G_correlation():
     for i in range(12):
@@ -36,6 +47,7 @@ def G_correlation():
     #     auto_corr.main(UMBRELLA_FOLDER_MOCO, CAPILLARY_ROW, CAPILLARY_COL, BKGD_ROW, BKGD_COL)
     #     correlation.main(UMBRELLA_FOLDER_MOCO)
         print(f'finished sample {i}')
+    return 0
 
 
 
@@ -65,6 +77,9 @@ if __name__ == "__main__":
 
     """ Step E: Find centerline """
     E_centerline()
+
+    """ Step F: Calculate blood-velocity """
+    F_blood_velocity()
     
     print("-------------------------------------")
     print("Centerline Runtime: " + str(time.time() - ticks))
