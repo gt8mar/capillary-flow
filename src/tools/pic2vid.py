@@ -14,6 +14,7 @@ import cv2
 import pandas as pd
 from src.tools import get_images
 import matplotlib.pyplot as plt
+from matplotlib.pylab import cm
 
 def frames_to_timecode(frame_number, frame_rate):
     """
@@ -66,7 +67,7 @@ def extract_metadata(path):
     frame_rate = 100000//int(exposure)  # this rounds the frame-rate
     return pressure, frame_rate
 
-def main(images, SET = 'set_01', sample = 'sample_001'):
+def main(images, SET = 'set_01', sample = 'sample_001', color = False):
     """
     takes a list of image files or numpy array and makes a movie with overlays
     :param images: list of images or numpy array of images
@@ -104,7 +105,11 @@ def main(images, SET = 'set_01', sample = 'sample_001'):
         # TODO: add focus bar
         add_focus_bar(img, focus_measure)
         # TODO: add scale bar
-        video.write(img.astype('uint8'))
+        if color:
+            # colorized =  colo
+            video.write(img.astype('uint8'))
+        else:
+            video.write(img.astype('uint8'))
     cv2.destroyAllWindows()
     video.release()
     return 0

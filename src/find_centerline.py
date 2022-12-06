@@ -192,9 +192,13 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
         plt.show()
         # Plot all capillaries together
         for i in range(len(capillary_distances)):
-            plt.plot(capillary_distances[i])
-        plt.title('Capillary radii')
-        plt.show()
+            if i==14:
+                np.savetxt(os.path.join(output_folder, f'{SET}_{sample}_capillary_distances_{str(i).zfill(2)}.csv'), 
+                    capillary_distances[i], delimiter=',')
+
+            # plt.plot(capillary_distances[i])
+            # plt.title(f'Capillary {i} radii')
+            # plt.show()
 
     if write:
         for i in range(len(skeleton_coords)):
