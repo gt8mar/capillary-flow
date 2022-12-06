@@ -46,9 +46,16 @@ if __name__ == "__main__":
     folder = 'C:\\Users\\gt8mar\\capillary-flow\\data\\processed\\set_01\\sample_009\\F_blood_flow'
     images = load_csv_list(folder)
     for i in range(len(images)):
-        norm_image = normalize_rows_mean_division(images[i])
+        norm_image_div = normalize_rows_mean_division(images[i])
+        norm_image_z = normalize_rows(images[i])
+        fig, ax = plt.subplots(2, 1)
+        ax[0].imshow(norm_image_z)
+        ax[0].set_xlabel('Time')
+        ax[0].set_ylabel('Centerline (0.5um)')
+        ax[1].imshow(norm_image_div)
+        ax[1].set_xlabel('Time')
+        ax[1].set_ylabel('Centerline (0.5um)')
         plt.title(f"Capillary {i}")
-        plt.imshow(norm_image)
         plt.show()
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
