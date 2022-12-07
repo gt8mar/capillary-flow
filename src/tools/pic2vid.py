@@ -67,12 +67,14 @@ def extract_metadata(path):
     frame_rate = 100000//int(exposure)  # this rounds the frame-rate
     return pressure, frame_rate
 
-def main(images, SET = 'set_01', sample = 'sample_001', color = False):
+def main(images, SET = 'set_01', sample = 'sample_001', color = False, compress = True):
     """
     takes a list of image files or numpy array and makes a movie with overlays
     :param images: list of images or numpy array of images
     :param SET: string
     :param sample: string
+    :param color: bool
+    :param compress: bool, whether to compress the video or not
     :return: 0
     """
     images = np.array(images)
@@ -82,9 +84,15 @@ def main(images, SET = 'set_01', sample = 'sample_001', color = False):
     print(frame_rate)
     video_name = f'{SET}_{sample}.avi'
     frame = images[0]
-    fourcc = cv2.VideoWriter_fourcc(*'XVID') # avi compression
-    # fourcc = 0 # no compression
-    video = cv2.VideoWriter(os.path.join(output_path, video_name), fourcc, 60, (frame.shape[1], frame.shape[0]), False)    
+    if compress:
+        fourcc = cv2.VideoWriter_fourcc(*'XVID') # avi compression
+    else: 
+        fourcc = 0
+    if color:
+        video = cv2.VideoWriter(os.path.join(output_path, video_name), fourcc, 60, (frame.shape[1], frame.shape[0]), True)    
+    else: 
+        video = cv2.VideoWriter(os.path.join(output_path, video_name), fourcc, 60, (frame.shape[1], frame.shape[0]), False)    
+
     print(frame.shape)
     for i in range(images.shape[0]):
         timecode = frames_to_timecode(i, frame_rate)
@@ -106,8 +114,10 @@ def main(images, SET = 'set_01', sample = 'sample_001', color = False):
         add_focus_bar(img, focus_measure)
         # TODO: add scale bar
         if color:
-            # colorized =  colo
-            video.write(img.astype('uint8'))
+            img_color = cv2.applyColorMap(img, cv2.COLORMAP_VIRIDIS)
+            video.write(img_color.astype('uint8'))
+            # plt.imshow(img_color)
+            # plt.show()
         else:
             video.write(img.astype('uint8'))
     cv2.destroyAllWindows()
@@ -126,6 +136,6 @@ if __name__ == "__main__":
     for i in range(len(images)):
         image = np.array(cv2.imread(os.path.join(input_folder, images[i]), cv2.IMREAD_GRAYSCALE))
         image_files.append(image)
-    main(image_files, SET, sample)
+    main(image_files, SET, sample, color= True)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
