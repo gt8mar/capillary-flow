@@ -3,7 +3,6 @@ Filename: correlation.py
 ------------------------------------------------------
 TBD
 By: Marcus Forst
-sort_nicely credit: Ned B (https://nedbatchelder.com/blog/200712/human_sorting.html)
 """
 
 import numpy as np
@@ -23,8 +22,6 @@ BIN_FACTOR = 4
 
 # SECTION_START = 138
 # SECTION_END = 984
-
-# Sort images first
 
 def bin_image_by_2_space(image):
     return (image[:, :-1:2, :-1:2] + image[:, 1::2, :-1:2]
