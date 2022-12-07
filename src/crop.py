@@ -9,7 +9,7 @@ import os
 import time
 import numpy as np
 import cv2
-from src.tools import get_images
+from src.tools.get_images import get_images
 from skimage.transform import resize, rescale, downscale_local_mean     # can use any of these to downscale image
 
 def main(SET='set_01', sample = 'sample_000', downsample = False):
@@ -18,7 +18,7 @@ def main(SET='set_01', sample = 'sample_000', downsample = False):
     output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'A_cropped\\vid')
     if 'A_cropped' not in os.listdir(processed_folder):
         os.makedirs(os.path.join(processed_folder, "A_cropped", "vid"))
-    images = get_images.main(input_folder)
+    images = get_images(input_folder)
     for i in range(len(images)):
         image = np.array(cv2.imread(os.path.join(input_folder, images[i]), cv2.IMREAD_GRAYSCALE))
         # This chops the image into smaller pieces (important if there has been motion correction)

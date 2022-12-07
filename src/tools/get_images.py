@@ -6,9 +6,9 @@ by: Marcus Forst
 """
 
 import os
-from src.tools import sort_nicely
+from src.tools.sort_nicely import sort_nicely
 
-def main(filefolder):
+def get_images(filefolder):
     """
     Grabs image names, sorts them, and puts them in a list.
     :param filefolder: string
@@ -16,10 +16,10 @@ def main(filefolder):
     """
     images = [img for img in os.listdir(filefolder) if img.endswith(".tif") or img.endswith(
         ".tiff")]  # if this came out of moco the file suffix is .tif otherwise it's tiff
-    sort_nicely.main(images)
+    sort_nicely(images)
     return images
 
 # This provided line is required at the end of a Python file
 # to call the main() function.
 if __name__ == "__main__":
-    main()
+    get_images()

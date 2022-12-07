@@ -10,7 +10,7 @@ import os
 import time
 import numpy as np
 import cv2
-from src.tools import get_images
+from src.tools.get_images import get_images
 
 # UMBRELLA_FOLDER = 'C:\\Users\\gt8mar\\Desktop\\data\\221010'
 FILEFOLDER_PATH = "C:\\Users\\gt8mar\\Desktop\\data\\221019\\raw\\vid12"
@@ -71,7 +71,7 @@ def main(filefolder = FILEFOLDER_PATH, folder = FOLDER_NAME, date = DATE,
     :param images: list of image filenames (strings)
     :return:
     """
-    images = get_images.main(filefolder)
+    images = get_images(filefolder)
     video_name = f'{date}_{participant}_{folder}.avi'
     frame = cv2.imread(os.path.join(filefolder, images[0]))
     video = cv2.VideoWriter(video_name, 0, 60, (frame.shape[1], frame.shape[0]))

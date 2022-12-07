@@ -12,9 +12,8 @@ import time
 import numpy as np
 import cv2
 import pandas as pd
-from src.tools import get_images
+from src.tools.get_images import get_images
 import matplotlib.pyplot as plt
-from matplotlib.pylab import cm
 
 def frames_to_timecode(frame_number, frame_rate):
     """
@@ -67,7 +66,7 @@ def extract_metadata(path):
     frame_rate = 100000//int(exposure)  # this rounds the frame-rate
     return pressure, frame_rate
 
-def main(images, SET = 'set_01', sample = 'sample_001', color = False, compress = True):
+def pic2vid(images, SET = 'set_01', sample = 'sample_001', color = False, compress = True):
     """
     takes a list of image files or numpy array and makes a movie with overlays
     :param images: list of images or numpy array of images
@@ -131,11 +130,11 @@ if __name__ == "__main__":
     SET = 'set_01'
     sample = 'sample_001'
     input_folder = str(os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized\\vid'))
-    images = get_images.main(input_folder)
+    images = get_images(input_folder)
     image_files = []
     for i in range(len(images)):
         image = np.array(cv2.imread(os.path.join(input_folder, images[i]), cv2.IMREAD_GRAYSCALE))
         image_files.append(image)
-    main(image_files, SET, sample, color= True)
+    pic2vid(image_files, SET, sample, color= True)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))

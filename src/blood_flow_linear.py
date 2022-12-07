@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import cv2
 import pandas as pd
 from PIL import Image
-from src.tools import get_images
+from src.tools.get_images import get_images
 from src.tools.load_image_array import load_image_array
 from src.tools.load_csv_list import load_csv_list
 
@@ -129,7 +129,7 @@ def main(SET = 'set_01', sample = 'sample_009', write = False):
     gap_bottom = shifts['y'].min()
     gap_top = shifts['y'].max()
     # Import images
-    images = get_images.main(os.path.join(input_folder,'vid'))
+    images = get_images(os.path.join(input_folder,'vid'))
     image_array = load_image_array(images, input_folder)      # this has the shape (frames, row, col)
     # Crop array based on shifts
     image_array = image_array[:, gap_top:gap_bottom, gap_left:gap_right] 

@@ -14,8 +14,8 @@ import pandas as pd
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.pyplot as plt
 import cv2
-from src.tools import get_images
-from src.tools import pic2vid
+from src.tools.get_images import get_images
+from src.tools.pic2vid import pic2vid
 
 def main(SET='set_01', sample = 'sample_000'):    
     input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
@@ -29,7 +29,7 @@ def main(SET='set_01', sample = 'sample_000'):
     print(f'gap right is {gap_right}')
     print(f'gap bottom is {gap_bottom}')
     print(f'gap top is {gap_top}')
-    images = get_images.main(os.path.join(input_folder, 'vid'))
+    images = get_images(os.path.join(input_folder, 'vid'))
     image_files = []
     for i in range(len(images)):
         image = np.array(cv2.imread(os.path.join(input_folder, 'vid', images[i]), cv2.IMREAD_GRAYSCALE))

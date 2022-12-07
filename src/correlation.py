@@ -14,6 +14,8 @@ import re
 import time
 from PIL import Image
 from skimage.measure import block_reduce
+from src.tools.get_images import get_images
+from src.tools.load_image_array import load_image_array
 
 # FILEFOLDER = 'C:\\Users\\gt8mar\\Desktop\\data\\220513\\pointer2'
 FILEFOLDER = 'C:\\Users\\gt8mar\\Desktop\\data\\221010\\stupid2'
@@ -23,45 +25,7 @@ BIN_FACTOR = 4
 # SECTION_END = 984
 
 # Sort images first
-def tryint(s):
-    try:
-        return int(s)
-    except:
-        return s
-def alphanum_key(s):
-    """ Turn a string into a list of string and number chunks.
-        "z23a" -> ["z", 23, "a"]
-    """
-    return [tryint(c) for c in re.split('([0-9]+)', s)]
-def sort_nicely(l):
-    """ Sort the given list in the way that humans expect.
-    """
-    l.sort(key=alphanum_key)
-def get_images(FILEFOLDER):
-    """
-    this function grabs image names, sorts them, and puts them in a list.
-    :param FILEFOLDER: string
-    :return: images: list of images
-    """
-    images = [img for img in os.listdir(FILEFOLDER) if img.endswith(".tif") or img.endswith(
-        ".tiff")]  # if this came out of moco the file suffix is .tif otherwise it's tiff
-    sort_nicely(images)
-    return images
-def load_image_array(image_list):
-    """
-    This function loads images into a numpy array.
-    :param image_list: List of images
-    :return: image_array: 3D numpy array
-    """
-    # Initialize array for images
-    z_time = len(image_list)
-    image_example = cv2.imread(os.path.join(FILEFOLDER, image_list[0]))
-    rows, cols, layers = image_example.shape
-    image_array = np.zeros((z_time, rows, cols), dtype='uint16')
-    # loop to populate array
-    for i in range(z_time):
-        image_array[i] = cv2.imread(os.path.join(FILEFOLDER, image_list[i]), cv2.IMREAD_GRAYSCALE)
-    return image_array
+
 def bin_image_by_2_space(image):
     return (image[:, :-1:2, :-1:2] + image[:, 1::2, :-1:2]
             + image[:, :-1:2, 1::2] + image[:, 1::2, 1::2])//4
