@@ -12,16 +12,13 @@ import os
 import time
 import numpy as np
 import matplotlib.pyplot as plt
-import cv2
 import pandas as pd
 from PIL import Image
 from src.tools.get_images import get_images
 from src.tools.load_image_array import load_image_array
 from src.tools.load_csv_list import load_csv_list
+from src.tools.get_shifts import get_shifts
 
-FILEFOLDER = 'C:\\Users\\gt8mar\\Desktop\\data\\221010\\vid4_moco'
-SKELETON_FILE = 'vid4_test_skeleton_coords_7.csv'
-# SKELETON_FILE_LIST = ['test_skeleton_coords_2.csv','test_skeleton_coords_3.csv','test_skeleton_coords_4.csv','test_skeleton_coords_5.csv','test_skeleton_coords_7.csv']
 PIXELS_PER_UM = 2
 
 def average_array(array):
@@ -34,7 +31,7 @@ def average_array(array):
         return (array[::2] + array[1::2]) // 2
     else:
         return (array[:-1:2] + array[1::2]) // 2
-def build_centerline_vs_time(image, skeleton_coords, long = False, offset = False):
+def build_centerline_vs_time(image, skeleton_coords, radii, long = False, offset = False):
     """
     This function takes an image and text file (default: csv) of the coordinates of a
     skeleton and outputs an image of the centerline pixel values vs time.
@@ -42,37 +39,38 @@ def build_centerline_vs_time(image, skeleton_coords, long = False, offset = Fals
     :param skeleton_txt: 2D text file to be read into the function
     :return: centerline_array: 2D numpy array that shows the pixels of the centerline vs time.
     """
-    # if offset:
-    #     row_offset = np.full((skeleton_coords.shape[0], 1), 0)
-    #     col_offset = np.full((skeleton_coords.shape[0], 1), -100)
-    #     offset_array = np.hstack((row_offset, col_offset))
-    #     skeleton_coords = skeleton_coords + offset_array
     centerline_array = np.zeros((skeleton_coords.shape[0], image.shape[0]))
     if long == False:
         for i in range(skeleton_coords.shape[0]):
-            for j in range(image.shape[0]):
-                centerline_array[i][j] = image[j][skeleton_coords[i][0]][skeleton_coords[i][1]]
+            row = skeleton_coords[i][0]         # skeleton coords is a list of (row, col) objects
+            col = skeleton_coords[i][1]
+            centerline_array[i] = image[:, row, col]
     if long == True:
         for i in range(skeleton_coords.shape[0]):
-            for j in range(image.shape[0]):
-                centerline_array[i][j] = average_in_circle(image[j], skeleton_coords[i][0], skeleton_coords[i][1], radius=5)
+            row = skeleton_coords[i][0]         # skeleton coords is a list of (row, col) objects
+            col = skeleton_coords[i][1]
+            radius = int(radii[i])
+            centerline_array[i] = average_in_circle(image, row, col, radius)
     return centerline_array
 def average_in_circle(image, row, col, radius = 5):
     """
     This function inputs an image and a coordinate and outputs the average of a circle of
     pixels surrounding the coordinate with specified radius.
-    :param image: 2D numpy array
+    :param image: 3D numpy array
     :param row: integer, the row coordinate you want to average around
     :param col: integer, the column coordinate you want to average around
     :param radius: the radius you want to average over
-    :return averaged_value: the averaged pixel value.
+    :return circle_values_list: a numpy array of the averaged values of a (row, col) time-slice.
     """
-    x = np.arange(0, image.shape[1])
-    y = np.arange(0, image.shape[0])
+    x = np.arange(0, image.shape[2])
+    y = np.arange(0, image.shape[1])
 
     mask = (x[np.newaxis, :] - col) ** 2 + (y[:, np.newaxis] - row) ** 2 < radius ** 2
-    circle_values = image[mask].reshape(1,-1)
-    return np.mean(circle_values)
+    mask = np.dstack([mask]*image.shape[0])
+    mask = mask.transpose(2, 0, 1)
+    circle_values_list = image[mask].reshape(image.shape[0],-1)
+    circle_values_list = circle_values_list.mean(axis = 1)
+    return circle_values_list
 def normalize_image(image):
     image = image - np.min(image)
     image = image / np.max(image)
@@ -89,10 +87,11 @@ def normalize_rows(image):
     subtracted_image = (image - big_average)/big_std
     new_image = normalize_image(subtracted_image)
     return new_image
-def test(row, col, radius = 5):
+def test(row = 16, col = 12, radius = 5):
     x = np.arange(0, 32)
     y = np.arange(0, 32)
-    arr = np.zeros((y.size, x.size))
+    z = np.arange(0, 40)
+    arr = np.zeros((z.size, y.size, x.size))
 
     col = 12.
     row = 16.
@@ -101,14 +100,22 @@ def test(row, col, radius = 5):
     # The two lines below could be merged, but I stored the mask
     # for code clarity.
     mask = (x[np.newaxis, :] - col) ** 2 + (y[:, np.newaxis] - row) ** 2 < r ** 2
-    print(mask)
-    arr[mask] = 123
-
-    # This plot shows that only within the circle the value is set to 123.
-    plt.figure(figsize=(6, 6))
-    plt.pcolormesh(x, y, arr)
-    plt.colorbar()
-    plt.show()
+    mask_array = np.dstack([mask]*arr.shape[0])
+    mask_array = mask_array.transpose(2, 0, 1)
+    arr[mask_array] = 123
+    print(np.sum(mask))
+    print(mask.shape)
+    print(mask_array.shape)
+    print(arr[mask_array].shape)
+    new = arr[mask_array].reshape(arr.shape[0],-1)
+    print(new.shape)
+    print(new[0])
+    print(new.mean(axis=1))
+    # # This plot shows that only within the circle the value is set to 123.
+    # plt.figure(figsize=(6, 6))
+    # plt.pcolormesh(x, y, arr[0])
+    # plt.colorbar()
+    # plt.show()
 def test2():
     image = np.loadtxt('C:\\Users\\gt8mar\\capillary-flow\\tests\\vid4_centerline_array_long_7.csv', delimiter=',', dtype = int)
     # image = np.random.randint(size = (100,100), low=0, high = 255)
@@ -123,29 +130,28 @@ def main(SET = 'set_01', sample = 'sample_009', write = False):
     input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
     skeleton_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'E_centerline')
     output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'F_blood_flow')
-    shifts = pd.read_csv(os.path.join(input_folder, 'Results.csv'))
-    gap_left = shifts['x'].max()
-    gap_right = shifts['x'].min()
-    gap_bottom = shifts['y'].min()
-    gap_top = shifts['y'].max()
+    gap_left, gap_right, gap_bottom, gap_top = get_shifts(input_folder)
     # Import images
     images = get_images(os.path.join(input_folder,'vid'))
     image_array = load_image_array(images, input_folder)      # this has the shape (frames, row, col)
     # Crop array based on shifts
     image_array = image_array[:, gap_top:gap_bottom, gap_left:gap_right] 
     skeletons = load_csv_list(skeleton_folder)
-    max = np.max(image_array)
+    path = str(os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'D_segmented'))
+    centerline_radii = load_csv_list(path, float)
+    centerline_radii = centerline_radii[0]          # this has the same length as  
     print("The size of the array is " + str(image_array.shape))
 
     if write:
-        for i in range(len(skeletons)): 
-            centerline_array = build_centerline_vs_time(image_array, skeletons[i], long=True, offset=False)
+        for j in range(1): #len(skeletons)
+            i = 14
+            centerline_array = build_centerline_vs_time(image_array, skeletons[i], centerline_radii, long=True, offset=False)
             # centerline_array = normalize_rows(centerline_array)
             centerline_array = normalize_image(centerline_array)
-            np.savetxt(os.path.join(output_folder, f'{SET}_{sample}_blood_flow_{str(i).zfill(2)}.csv'), 
+            np.savetxt(os.path.join(output_folder, f'{SET}_{sample}_blood_flow_{str(i).zfill(2)}_v2.csv'), 
                     centerline_array, delimiter=',')
             im = Image.fromarray(centerline_array)
-            im.save(os.path.join(output_folder, f'{SET}_{sample}_blood_flow_{str(i).zfill(2)}.tiff'))
+            im.save(os.path.join(output_folder, f'{SET}_{sample}_blood_flow_{str(i).zfill(2)}_v2.tiff'))
 
 
     
@@ -164,8 +170,9 @@ def main(SET = 'set_01', sample = 'sample_009', write = False):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(write=False)
+    main(write=True)
     # test2()
+    # test()
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
 

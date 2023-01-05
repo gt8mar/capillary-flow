@@ -1,7 +1,7 @@
 """
 Filename: correlation.py
 ------------------------------------------------------
-TBD
+Calculates the correlation between pixels and their nearest neighbors. 
 By: Marcus Forst
 """
 
@@ -15,6 +15,7 @@ from PIL import Image
 from skimage.measure import block_reduce
 from src.tools.get_images import get_images
 from src.tools.load_image_array import load_image_array
+from src.tools.get_shifts import get_shifts
 
 # FILEFOLDER = 'C:\\Users\\gt8mar\\Desktop\\data\\220513\\pointer2'
 FILEFOLDER = 'C:\\Users\\gt8mar\\Desktop\\data\\221010\\stupid2'
@@ -23,11 +24,6 @@ BIN_FACTOR = 4
 # SECTION_START = 138
 # SECTION_END = 984
 
-def bin_image_by_2_space(image):
-    return (image[:, :-1:2, :-1:2] + image[:, 1::2, :-1:2]
-            + image[:, :-1:2, 1::2] + image[:, 1::2, 1::2])//4
-def bin_image_by_2_time(image):
-    return (image[:-1:2,:,:] + image[1::2, :, :])//2
 def make_correlation_matrix(image_array_binned):
     # Initialize correlation matrix
     up_left = image_array_binned[:-1, 1:-1, 1:-1] * image_array_binned[1:, :-2, :-2]
@@ -58,30 +54,43 @@ def make_correlation_matrix(image_array_binned):
     # corr_y /= 5000
     return corr_x, corr_y
 
-def main(filefolder = FILEFOLDER, bin_factor = BIN_FACTOR):
-    images = get_images(filefolder)
-    image_array = load_image_array(images)
-    # image_array = image_array2[SECTION_START:SECTION_END]
-    background = np.mean(image_array, axis=0)
+def main(SET = 'set_01', sample = 'sample_009', mask = False, write = False, bin_factor = 4):
+    input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
+    mask_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'D_segmented')
+    images = get_images(os.path.join(input_folder, 'vid'))
+    image_array = load_image_array(images, input_folder)
+    gap_left, gap_right, gap_bottom, gap_top = get_shifts(input_folder)
+    # Crop array based on shifts
+    image_array = image_array[:, gap_top:gap_bottom, gap_left:gap_right] 
+    # Read in the masks
+    segmented = cv2.imread(os.path.join(mask_folder, f'{SET}_{sample}_background.png'), cv2.IMREAD_GRAYSCALE)
+    # Make mask either 1 or 0
+    segmented[segmented != 0] = 1
+    if mask:
+        image_array = segmented * image_array
     print(image_array.shape)
 
     # """Bin images to conserve memory and improve resolution"""
     image_array_binned = block_reduce(image_array, (2,2,2), func= np.mean)
+    mask_binned = block_reduce(segmented, (2, 2), func=np.mean)
 
     print(image_array_binned.shape)
+    print(mask_binned.shape)
     # plt.imshow(np.mean(image_array_binned, axis = 0))
     # plt.show()
 
-    # max = np.max(image_array_binned)
     corr_x, corr_y = make_correlation_matrix(image_array_binned)
     # Plot a subset of this array
-    corr_x_slice = corr_x[10:-10:bin_factor, 10:-10:bin_factor]
-    corr_y_slice = corr_y[10:-10:bin_factor, 10:-10:bin_factor]
+    corr_x_slice = corr_x[::bin_factor, ::bin_factor]
+    corr_y_slice = corr_y[::bin_factor, ::bin_factor]
+    # mask_slice = mask_binned[::bin_factor, ::bin_factor] 
+    # mask_slice = mask_slice[:,:-1]  # this -1 is a result of the make_corr_matrix shift
+    mask_slice = 1
     print(corr_y_slice.shape)
 
     # y, x = np.meshgrid(np.arange(0, rows // (BIN_FACTOR*2), 1), np.arange(0, cols // (BIN_FACTOR*2), 1))
     # plt.quiver(x, y, corr_x_slice, corr_y_slice)
-    plt.quiver(corr_y_slice, corr_x_slice, angles = 'xy')
+    plt.quiver(corr_y_slice*mask_slice, corr_x_slice*mask_slice, angles = 'xy')
     plt.gca().invert_yaxis()
     plt.show()
     return 0
