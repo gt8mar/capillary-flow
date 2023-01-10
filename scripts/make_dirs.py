@@ -21,16 +21,20 @@ SET = "set_01"
 sample = "sample_000"
 processed_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', SET)
 
-
-
-def G_correlation():
-    # path = os.path.join(UMBRELLA_FOLDER, folder)
-    # segmented_file_name = folder + '0000segmented'
-    # correlation_with_cap_selection.main(path, UMBRELLA_FOLDER_MOCO, segmented_file_name)
-    # auto_corr.main(UMBRELLA_FOLDER_MOCO, CAPILLARY_ROW, CAPILLARY_COL, BKGD_ROW, BKGD_COL)
-    # correlation.main(UMBRELLA_FOLDER_MOCO)
-    # print(f'finished correlation')
+def make_dirs():
+    for i in range(12):
+        sample = 'sample_' + str(i).zfill(3)
+        os.makedirs(os.path.join(processed_folder, sample, "A_cropped", "vid"))
+        os.makedirs(os.path.join(processed_folder, sample, "B_stabilized", "vid")) 
+        os.makedirs(os.path.join(processed_folder, sample, "C_background"))
+        os.makedirs(os.path.join(processed_folder, sample, "D_stabilized"))
+        os.makedirs(os.path.join(processed_folder, sample, "E_centerline"))
+        os.makedirs(os.path.join(processed_folder, sample, "F_blood_flow"))
+        os.makedirs(os.path.join(processed_folder, sample, "G_correlation"))
+        os.makedirs(os.path.join(processed_folder, sample, "H_turbulence"))
     return 0
+
+
 
 
 
@@ -45,19 +49,20 @@ if __name__ == "__main__":
     print("-------------------------------------")
     ticks_first = time.time()
     ticks = time.time()
-    for i in range(0,9):
-        sample = 'sample_' + str(i).zfill(3)
 
-        find_centerline.main(SET, sample, write = True)
-        print("-------------------------------------")
-        print(f"{sample} Centerline Runtime: {time.time() - ticks}")
-        ticks = time.time()
+    """ Make directories """
 
-        blood_flow_linear.main(SET, sample, write = True)    
-        print("-------------------------------------")
-        print(f"{sample} Blood-Flow Runtime: {time.time() - ticks}")
-        ticks = time.time()
-        correlation.main(SET, sample, verbose = False, write = True)
+
+    print("-------------------------------------")
+    print("Correlation Runtime: " + str(time.time() - ticks))
+    ticks = time.time()
+
+    """ """
+
+
+
+
+
     print("-------------------------------------")
     print("Total Pipeline Runtime: " + str(time.time() - ticks_first))
 

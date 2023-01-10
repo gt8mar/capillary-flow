@@ -24,9 +24,6 @@ processed_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\proces
 def a_preprocess():
     for i in range(12):
         sample = 'sample_' + str(i+1).zfill(3)
-        if sample not in os.listdir(processed_folder):
-            os.makedirs(os.path.join(processed_folder, sample, "A_cropped", "vid"))
-            os.makedirs(os.path.join(processed_folder, sample, "B_stabilized", "vid")) 
         crop.main(SET, sample)
 
 

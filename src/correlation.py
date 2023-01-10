@@ -54,9 +54,10 @@ def make_correlation_matrix(image_array_binned):
     # corr_y /= 5000
     return corr_x, corr_y
 
-def main(SET = 'set_01', sample = 'sample_009', mask = False, write = False, bin_factor = 4):
+def main(SET = 'set_01', sample = 'sample_009', mask = False, verbose = True, write = False, bin_factor = 4):
     input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
     mask_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'D_segmented')
+    output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'G_correlation')
     images = get_images(os.path.join(input_folder, 'vid'))
     image_array = load_image_array(images, input_folder)
     gap_left, gap_right, gap_bottom, gap_top = get_shifts(input_folder)
@@ -92,7 +93,10 @@ def main(SET = 'set_01', sample = 'sample_009', mask = False, write = False, bin
     # plt.quiver(x, y, corr_x_slice, corr_y_slice)
     plt.quiver(corr_y_slice*mask_slice, corr_x_slice*mask_slice, angles = 'xy')
     plt.gca().invert_yaxis()
-    plt.show()
+    if verbose:
+        plt.show()
+    if write:
+        plt.imsave()
     return 0
 
 """

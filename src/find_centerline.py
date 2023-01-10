@@ -30,7 +30,7 @@ def test():
     print(a)
     print(b)
     return 0
-def enumerate_capillaries(image, short = False, verbose = False, write = False, write_path = None):
+def enumerate_capillaries(image, test = False, verbose = False, write = False, write_path = None):
     """
     This function finds the number of capillaries and returns an array of images with one
     capillary per image.
@@ -42,31 +42,28 @@ def enumerate_capillaries(image, short = False, verbose = False, write = False, 
     print(row, col)
     contours = measure.find_contours(image, 0.8)
     print("The number of capillaries is: " + str(len(contours)))
-    if short == False:
-        contour_array = np.zeros((len(contours), row, col))
-        for i in range(len(contours)):
-            grid = np.array(measure.grid_points_in_poly((row, col), contours[i]))
-            contour_array[i] = grid
-            if verbose == True:
-                plt.plot(contours[i][:, 1], contours[i][:, 0], linewidth=2, label = "capilary " + str(i)) #plt.imshow(contour_array[i])   # plt.plot(contours[i][:, 1], contours[i][:, 0], linewidth=2) this shows all of the enumerated capillaries
-                # plt.show()
-            else:
-                pass
-        plt.gca().invert_yaxis()
-        plt.legend()
-        if write:
-            plt.imsave(write_path)
-        plt.show()
-        return contour_array
-    # This is only used if we don't want to iterate through the whole set of contours.
-    # This is for testing.
-    else:
+    if test:
         contour_array = np.zeros((1, row, col))
         for i in range(1):
             grid = np.array(measure.grid_points_in_poly((row, col), contours[i]))
             contour_array[i] = grid
             # plt.plot(contours[i][:, 1], contours[i][:, 0], linewidth=2)   # this shows all of the enumerated capillaries
         # plt.show()
+        return contour_array
+    else:
+        contour_array = np.zeros((len(contours), row, col))
+        for i in range(len(contours)):
+            grid = np.array(measure.grid_points_in_poly((row, col), contours[i]))
+            contour_array[i] = grid
+            if verbose:
+                plt.plot(contours[i][:, 1], contours[i][:, 0], linewidth=2, label = "capillary " + str(i)) #plt.imshow(contour_array[i])   # plt.plot(contours[i][:, 1], contours[i][:, 0], linewidth=2) this shows all of the enumerated capillaries
+                # plt.show()
+        if verbose:
+            plt.gca().invert_yaxis()
+            plt.legend()
+            if write:
+                plt.imsave(write_path)
+            plt.show()
         return contour_array
 def make_skeletons(image, verbose = True, write = False, write_path = None):
     """
@@ -177,25 +174,20 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
                                                      write_path=os.path.join(output_folder, f'{SET}_{sample}_background_skeletons.png'))
 
     # Make a numpy array of images with isolated capillaries. The mean/sum of this is segmented_2D.
-    contours = enumerate_capillaries(segmented, short=False, verbose=verbose)
+    contours = enumerate_capillaries(segmented, verbose=False, write=False)
     capillary_distances = []
     skeleton_coords = []
     flattened_distances = []
     for i in range(contours.shape[0]):
         skeleton, distances = make_skeletons(contours[i], verbose=False)     # Skeletons come out in the shape
-        sorted_skeleton_coords, optimal_order = sort_continuous(np.asarray(np.nonzero(skeleton)), verbose= False)
+        sorted_skeleton_coords, optimal_order = sort_continuous(np.asarray(np.nonzero(skeleton)), verbose=False)
         ordered_distances = distances[optimal_order]
         capillary_distances.append(ordered_distances)
         flattened_distances += list(distances)
         skeleton_coords.append(sorted_skeleton_coords)
     if verbose:
         plt.show()
-        # Plot all capillaries together
-        for i in range(len(capillary_distances)):
-            if i==14:
-                np.savetxt(os.path.join(output_folder, f'{SET}_{sample}_capillary_distances_{str(i).zfill(2)}.csv'), 
-                    capillary_distances[i], delimiter=',')
-
+        # Plot all capillaries together      
             # plt.plot(capillary_distances[i])
             # plt.title(f'Capillary {i} radii')
             # plt.show()
@@ -204,13 +196,15 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
         for i in range(len(skeleton_coords)):
             np.savetxt(os.path.join(output_folder, f'{SET}_{sample}_skeleton_coords_{str(i).zfill(2)}.csv'), 
                     skeleton_coords[i], delimiter=',')
+            np.savetxt(os.path.join(input_folder, f'{SET}_{sample}_capillary_distances_{str(i).zfill(2)}.csv'), 
+                    capillary_distances[i], delimiter=',')
 
 
     # Make overall histogram
     # plt.hist(flattened_distances)
     # plt.show()
 
-    # TODO: Write program to register radii maps with each other :)
+    # TODO: Write program to register radii maps with each other 
     # TODO: Abnormal capillaries, how do.
 
     return 0

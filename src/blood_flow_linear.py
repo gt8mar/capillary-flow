@@ -31,12 +31,34 @@ def average_array(array):
         return (array[::2] + array[1::2]) // 2
     else:
         return (array[:-1:2] + array[1::2]) // 2
-def build_centerline_vs_time(image, skeleton_coords, radii, long = False, offset = False):
+def build_centerline_vs_time(image, skeleton_coords, long = True):
     """
     This function takes an image and text file (default: csv) of the coordinates of a
     skeleton and outputs an image of the centerline pixel values vs time.
     :param image: 3D numpy array (time, row, col)
     :param skeleton_txt: 2D text file to be read into the function
+    :return: centerline_array: 2D numpy array that shows the pixels of the centerline vs time.
+    """
+    centerline_array = np.zeros((skeleton_coords.shape[0], image.shape[0]))
+    if long == False:
+        for i in range(skeleton_coords.shape[0]):
+            row = skeleton_coords[i][0]         # skeleton coords is a list of (row, col) objects
+            col = skeleton_coords[i][1]
+            centerline_array[i] = image[:, row, col]
+    if long == True:
+        for i in range(skeleton_coords.shape[0]):
+            row = skeleton_coords[i][0]         # skeleton coords is a list of (row, col) objects
+            col = skeleton_coords[i][1]
+            radius = 5
+            centerline_array[i] = average_in_circle(image, row, col, radius)
+    return centerline_array
+def build_centerline_vs_time_variable_radii(image, skeleton_coords, radii, long = False, offset = False):
+    """
+    This function takes an image and text file (default: csv) of the coordinates of a
+    skeleton and outputs an image of the centerline pixel values vs time.
+    :param image: 3D numpy array (time, row, col)
+    :param skeleton_coords: 2D array of coordinates for the centerline of the capillary
+    :param radii: 1D numpy array of the radii of the capillary
     :return: centerline_array: 2D numpy array that shows the pixels of the centerline vs time.
     """
     centerline_array = np.zeros((skeleton_coords.shape[0], image.shape[0]))
@@ -111,11 +133,12 @@ def test(row = 16, col = 12, radius = 5):
     print(new.shape)
     print(new[0])
     print(new.mean(axis=1))
-    # # This plot shows that only within the circle the value is set to 123.
+    # This plot shows that only within the circle the value is set to 123.
     # plt.figure(figsize=(6, 6))
     # plt.pcolormesh(x, y, arr[0])
     # plt.colorbar()
     # plt.show()
+    return 0
 def test2():
     image = np.loadtxt('C:\\Users\\gt8mar\\capillary-flow\\tests\\vid4_centerline_array_long_7.csv', delimiter=',', dtype = int)
     # image = np.random.randint(size = (100,100), low=0, high = 255)
@@ -126,7 +149,7 @@ def test2():
     plt.imshow(new_image)
     plt.show()
 
-def main(SET = 'set_01', sample = 'sample_009', write = False):
+def main(SET = 'set_01', sample = 'sample_000', write = False, variable_radii = False):
     input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
     skeleton_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'E_centerline')
     output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'F_blood_flow')
@@ -137,21 +160,23 @@ def main(SET = 'set_01', sample = 'sample_009', write = False):
     # Crop array based on shifts
     image_array = image_array[:, gap_top:gap_bottom, gap_left:gap_right] 
     skeletons = load_csv_list(skeleton_folder)
-    path = str(os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'D_segmented'))
-    centerline_radii = load_csv_list(path, float)
-    centerline_radii = centerline_radii[0]          # this has the same length as  
+    if variable_radii:
+        centerline_radii = load_csv_list(skeleton_folder, float)
+        centerline_radii = centerline_radii[0]          # this has the same length as skeletons
     print("The size of the array is " + str(image_array.shape))
 
     if write:
-        for j in range(1): #len(skeletons)
-            i = 14
-            centerline_array = build_centerline_vs_time(image_array, skeletons[i], centerline_radii, long=True, offset=False)
+        for i in range(len(skeletons)):
+            if variable_radii: 
+                centerline_array = build_centerline_vs_time_variable_radii(image_array, skeletons[i], centerline_radii[i], long=True, offset=False)
+            else:
+                centerline_array = build_centerline_vs_time(image_array, skeletons[i], long = True)
             # centerline_array = normalize_rows(centerline_array)
             centerline_array = normalize_image(centerline_array)
-            np.savetxt(os.path.join(output_folder, f'{SET}_{sample}_blood_flow_{str(i).zfill(2)}_v2.csv'), 
+            np.savetxt(os.path.join(output_folder, f'{SET}_{sample}_blood_flow_{str(i).zfill(2)}.csv'), 
                     centerline_array, delimiter=',')
             im = Image.fromarray(centerline_array)
-            im.save(os.path.join(output_folder, f'{SET}_{sample}_blood_flow_{str(i).zfill(2)}_v2.tiff'))
+            im.save(os.path.join(output_folder, f'{SET}_{sample}_blood_flow_{str(i).zfill(2)}.tiff'))
 
 
     
