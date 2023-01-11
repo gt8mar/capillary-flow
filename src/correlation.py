@@ -96,7 +96,7 @@ def main(SET = 'set_01', sample = 'sample_009', mask = False, verbose = True, wr
     if verbose:
         plt.show()
     if write:
-        plt.imsave()
+        plt.imsave(os.path.join(output_folder, "correlation.png"))
     return 0
 
 """

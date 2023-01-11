@@ -45,7 +45,7 @@ if __name__ == "__main__":
     print("-------------------------------------")
     ticks_first = time.time()
     ticks = time.time()
-    for i in range(0,9):
+    for i in range(1,9):
         sample = 'sample_' + str(i).zfill(3)
 
         find_centerline.main(SET, sample, write = True)
@@ -57,7 +57,7 @@ if __name__ == "__main__":
         print("-------------------------------------")
         print(f"{sample} Blood-Flow Runtime: {time.time() - ticks}")
         ticks = time.time()
-        correlation.main(SET, sample, verbose = False, write = True)
+        # correlation.main(SET, sample, verbose = False, write = True)
     print("-------------------------------------")
     print("Total Pipeline Runtime: " + str(time.time() - ticks_first))
 
