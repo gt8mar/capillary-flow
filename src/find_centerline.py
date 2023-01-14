@@ -23,6 +23,7 @@ from sklearn.neighbors import NearestNeighbors
 import networkx as nx
 
 BRANCH_THRESH = 40
+MIN_CAP_LEN = 150
 
 def test():
     a = np.arange(6).reshape((2, 3))
@@ -131,7 +132,6 @@ def sort_continuous(array_2D, verbose = False):
     :return opt_order: something that slices into the correct order when given a 1D array
     """
     if isinstance(array_2D, (list, np.ndarray)):
-
         points = np.c_[array_2D[0], array_2D[1]]
         neighbors = NearestNeighbors(n_neighbors=2).fit(points)
         graph = neighbors.kneighbors_graph()
@@ -180,11 +180,17 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
     flattened_distances = []
     for i in range(contours.shape[0]):
         skeleton, distances = make_skeletons(contours[i], verbose=False)     # Skeletons come out in the shape
-        sorted_skeleton_coords, optimal_order = sort_continuous(np.asarray(np.nonzero(skeleton)), verbose=False)
-        ordered_distances = distances[optimal_order]
-        capillary_distances.append(ordered_distances)
-        flattened_distances += list(distances)
-        skeleton_coords.append(sorted_skeleton_coords)
+        skeleton_nums = np.asarray(np.nonzero(skeleton))
+        # omit small capillaries
+        if skeleton_nums.shape[1] <= MIN_CAP_LEN:
+            pass
+        else:
+            sorted_skeleton_coords, optimal_order = sort_continuous(skeleton_nums, verbose=False)
+            ordered_distances = distances[optimal_order]
+            capillary_distances.append(ordered_distances)
+            flattened_distances += list(distances)
+            skeleton_coords.append(sorted_skeleton_coords)
+    print(f"{len(skeleton_coords)}/{contours.shape[0]} capillaries used")
     if verbose:
         plt.show()
         # Plot all capillaries together      
