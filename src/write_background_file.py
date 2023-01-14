@@ -33,7 +33,7 @@ def main(SET='set_01', sample = 'sample_000'):
     image_files = []
     for i in range(len(images)):
         image = np.array(cv2.imread(os.path.join(input_folder, 'vid', images[i]), cv2.IMREAD_GRAYSCALE))
-        cropped_image = image[gap_top:gap_bottom, gap_left:gap_right]
+        cropped_image = image[gap_top:image.shape[0] + gap_bottom, gap_left:image.shape[1] + gap_right]
         image_files.append(cropped_image)
     image_files = np.array(image_files)
     pic2vid.main(image_files, SET, sample) 
