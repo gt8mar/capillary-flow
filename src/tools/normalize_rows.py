@@ -43,7 +43,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     from src.tools.load_csv_list import load_csv_list
     ticks = time.time()
-    folder = 'C:\\Users\\gt8mar\\capillary-flow\\data\\processed\\set_01\\sample_009\\F_blood_flow'
+    folder = 'C:\\Users\\ejerison\\capillary-flow\\data\\processed\\set_01\\sample_009\\F_blood_flow'
     images = load_csv_list(folder)
     for i in range(len(images)):
         norm_image_div = normalize_rows_mean_division(images[i])

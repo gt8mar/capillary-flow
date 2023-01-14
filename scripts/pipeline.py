@@ -8,30 +8,11 @@ By: Marcus Forst
 
 import time
 import os
-from src import auto_corr
-from src import correlation
-from src import crop
 from src import write_background_file
-# import correlation_with_cap_selection
-
-# CAPILLARY_ROW = 565
-# CAPILLARY_COL = 590
-# BKGD_COL = 669
-# BKGD_ROW = 570
 
 SET = "set_01"
 SAMPLE = "sample_000"
-processed_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', SET)
-
-def C_write_background():
-    for i in range(12):
-        sample = 'sample_' + str(i).zfill(3)
-        os.makedirs(os.path.join(processed_folder, sample, "C_background"))
-        os.makedirs(os.path.join(processed_folder, sample, "D_stabilized"))
-        write_background_file.main(SET, sample)
-        print(f'finished sample {i}')
-
-
+processed_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', SET)
 
 """
 -----------------------------------------------------------------------------
@@ -54,7 +35,9 @@ if __name__ == "__main__":
     # for folder in os.listdir(UMBRELLA_FOLDER):
     #     path = os.path.join(UMBRELLA_FOLDER, folder)
     #     write_background_file.main(folder, path, DATE, PARTICIPANT)
-    C_write_background()
+    for i in range(12,21):
+        sample = 'sample_' + str(i).zfill(3)
+        write_background_file.main(SET, sample, color = True)    
     print("-------------------------------------")
     print("Background Runtime: " + str(time.time() - ticks))
     ticks = time.time()

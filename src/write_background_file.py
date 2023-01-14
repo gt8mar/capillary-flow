@@ -17,9 +17,10 @@ import cv2
 from src.tools.get_images import get_images
 from src.tools.pic2vid import pic2vid
 
-def main(SET='set_01', sample = 'sample_000'):    
-    input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
-    output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'C_background')
+def main(SET='set_01', sample = 'sample_000', color = False):    
+    input_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
+    output_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'C_background')
+    results_folder = 'C:\\Users\\ejerison\\capillary-flow\\results\\backgrounds'  # I want to save all the backgrounds to the same folder for easy transfer to hasty.ai
     shifts = pd.read_csv(os.path.join(input_folder, 'Results.csv'))
     gap_left = shifts['x'].max()
     gap_right = shifts['x'].min()
@@ -33,10 +34,10 @@ def main(SET='set_01', sample = 'sample_000'):
     image_files = []
     for i in range(len(images)):
         image = np.array(cv2.imread(os.path.join(input_folder, 'vid', images[i]), cv2.IMREAD_GRAYSCALE))
-        cropped_image = image[gap_top:gap_bottom, gap_left:gap_right]
+        cropped_image = image[gap_top:image.shape[0] + gap_bottom, gap_left:image.shape[1] + gap_right]
         image_files.append(cropped_image)
     image_files = np.array(image_files)
-    pic2vid.main(image_files, SET, sample) 
+    pic2vid(image_files, SET, sample, color=color) 
     ROWS, COLS = image_files[0].shape
     background = np.mean(image_files, axis=0).astype('uint8')
 
@@ -59,6 +60,7 @@ def main(SET='set_01', sample = 'sample_000'):
     # Add background file
     bkgd_name = f'{SET}_{sample}_background.tiff'
     cv2.imwrite(os.path.join(output_folder, bkgd_name), background)
+    cv2.imwrite(os.path.join(results_folder, bkgd_name), background)
     return 0
 
 """

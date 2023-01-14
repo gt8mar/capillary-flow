@@ -1,0 +1,12 @@
+Set, set_XX;
+Sample, sample_XXX;
+Date, YYMMDD;
+Participant, X;
+Filename, filename;
+Finger, pointer;
+Pressure, 0.X;
+Exposure, X (in milliseconds);
+BP, 120 over 80;
+Pulse, 60;
+PulseOx, 99;
+Ref, reference frame number;

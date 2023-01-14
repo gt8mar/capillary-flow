@@ -17,8 +17,6 @@ from src.tools.get_images import get_images
 from src.tools.load_image_array import load_image_array
 from src.tools.get_shifts import get_shifts
 
-# FILEFOLDER = 'C:\\Users\\gt8mar\\Desktop\\data\\220513\\pointer2'
-FILEFOLDER = 'C:\\Users\\gt8mar\\Desktop\\data\\221010\\stupid2'
 BIN_FACTOR = 4
 
 # SECTION_START = 138
@@ -55,9 +53,9 @@ def make_correlation_matrix(image_array_binned):
     return corr_x, corr_y
 
 def main(SET = 'set_01', sample = 'sample_009', mask = False, verbose = True, write = False, bin_factor = 4):
-    input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
-    mask_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'D_segmented')
-    output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'G_correlation')
+    input_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
+    mask_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'D_segmented')
+    output_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'G_correlation')
     images = get_images(os.path.join(input_folder, 'vid'))
     image_array = load_image_array(images, input_folder)
     gap_left, gap_right, gap_bottom, gap_top = get_shifts(input_folder)

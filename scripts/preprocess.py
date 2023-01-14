@@ -19,11 +19,11 @@ from src import write_background_file
 # BKGD_ROW = 570
 
 SET = "set_01"
-processed_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', SET)
+processed_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', SET)
 
 def a_preprocess():
-    for i in range(12):
-        sample = 'sample_' + str(i+1).zfill(3)
+    for i in range(12,21):
+        sample = 'sample_' + str(i).zfill(3)
         crop.main(SET, sample)
 
 
