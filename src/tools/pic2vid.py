@@ -39,7 +39,11 @@ def add_overlay(img, text, location):
     cv2.putText(img, text, location, font, font_scale, font_color, thickness, line_type)
 def add_focus_bar(img, focus):
     """ Add focus bar to video (work in progress)"""
-    add_overlay(img, f'F:{round(focus, 1)}', (img.shape[1] - 175, 900))
+    add_overlay(img, f'F:{round(focus, 1)}', (img.shape[1] - 175, 80))
+    return 0
+def add_scale_bar(img):
+    add_overlay(img, f'100 um', (img.shape[1] -250, img.shape[0]-50))
+    img[-100:-85,-274:-100] = 255
     return 0
 def calculate_focus_measure(image,method='LAPE'):
     """ Quantify the focus of an image using the laplacian transform """
@@ -112,6 +116,7 @@ def pic2vid(images, SET = 'set_01', sample = 'sample_001', color = False, compre
         # TODO: add focus bar
         add_focus_bar(img, focus_measure)
         # TODO: add scale bar
+        add_scale_bar(img)
         if color:
             img_color = cv2.applyColorMap(img, cv2.COLORMAP_VIRIDIS)
             video.write(img_color.astype('uint8'))
@@ -132,7 +137,7 @@ if __name__ == "__main__":
     input_folder = str(os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized\\vid'))
     images = get_images(input_folder)
     image_files = []
-    for i in range(len(images)):
+    for i in range(len(images)): 
         image = np.array(cv2.imread(os.path.join(input_folder, images[i]), cv2.IMREAD_GRAYSCALE))
         image_files.append(image)
     pic2vid(image_files, SET, sample, color= True)
