@@ -9,5 +9,4 @@ Exposure, X (in milliseconds);
 BP, 120 over 80;
 Pulse, 60;
 PulseOx, 99;
-Ref, page##;
-
+Ref, reference frame number;

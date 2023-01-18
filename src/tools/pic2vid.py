@@ -81,11 +81,14 @@ def pic2vid(images, SET = 'set_01', sample = 'sample_001', color = False, compre
     :return: 0
     """
     images = np.array(images)
-    metadata_path = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\raw', str(SET), str(sample), 'metadata.txt')
-    output_path = 'C:\\Users\\gt8mar\\capillary-flow\\results'
+    metadata_path = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\raw', str(SET), str(sample), 'metadata.txt')
+    output_path = 'C:\\Users\\ejerison\\capillary-flow\\results'
     pressure, frame_rate = extract_metadata(metadata_path)
     print(frame_rate)
-    video_name = f'{SET}_{sample}.avi'
+    if color:
+        video_name = f'{SET}_{sample}_color.avi'
+    else:
+        video_name = f'{SET}_{sample}.avi'
     frame = images[0]
     if compress:
         fourcc = cv2.VideoWriter_fourcc(*'XVID') # avi compression
@@ -134,7 +137,7 @@ if __name__ == "__main__":
     ticks = time.time()
     SET = 'set_01'
     sample = 'sample_001'
-    input_folder = str(os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized\\vid'))
+    input_folder = str(os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized\\vid'))
     images = get_images(input_folder)
     image_files = []
     for i in range(len(images)): 

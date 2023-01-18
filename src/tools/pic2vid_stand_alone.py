@@ -12,8 +12,8 @@ import numpy as np
 import cv2
 from src.tools.get_images import get_images
 
-# UMBRELLA_FOLDER = 'C:\\Users\\gt8mar\\Desktop\\data\\221010'
-FILEFOLDER_PATH = "C:\\Users\\gt8mar\\Desktop\\data\\221019\\raw\\vid12"
+# UMBRELLA_FOLDER = 'C:\\Users\\ejerison\\Desktop\\data\\221010'
+FILEFOLDER_PATH = "C:\\Users\\ejerison\\Desktop\\data\\221019\\raw\\vid12"
 DATE = "221101"
 PARTICIPANT = "Participant4"
 FOLDER_NAME = 'vid12'

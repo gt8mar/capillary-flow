@@ -13,9 +13,9 @@ from src.tools.get_images import get_images
 from skimage.transform import resize, rescale, downscale_local_mean     # can use any of these to downscale image
 
 def main(SET='set_01', sample = 'sample_000', downsample = False):
-    input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\raw', str(SET), str(sample), 'vid')              # 'C:\\Users\\gt8mar\\Desktop\\data\\221010'
-    processed_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample))
-    output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'A_cropped\\vid')
+    input_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\raw', str(SET), str(sample), 'vid')              # 'C:\\Users\\ejerison\\Desktop\\data\\221010'
+    processed_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample))
+    output_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'A_cropped\\vid')
     if 'A_cropped' not in os.listdir(processed_folder):
         os.makedirs(os.path.join(processed_folder, "A_cropped", "vid"))
     images = get_images(input_folder)

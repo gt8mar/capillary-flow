@@ -140,7 +140,7 @@ def test(row = 16, col = 12, radius = 5):
     # plt.show()
     return 0
 def test2():
-    image = np.loadtxt('C:\\Users\\gt8mar\\capillary-flow\\tests\\vid4_centerline_array_long_7.csv', delimiter=',', dtype = int)
+    image = np.loadtxt('C:\\Users\\ejerison\\capillary-flow\\tests\\vid4_centerline_array_long_7.csv', delimiter=',', dtype = int)
     # image = np.random.randint(size = (100,100), low=0, high = 255)
     print(image)
     new_image = normalize_rows(image)
@@ -150,9 +150,9 @@ def test2():
     plt.show()
 
 def main(SET = 'set_01', sample = 'sample_000', write = False, variable_radii = False):
-    input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
-    skeleton_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'E_centerline')
-    output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'F_blood_flow')
+    input_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
+    skeleton_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'E_centerline')
+    output_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'F_blood_flow')
     gap_left, gap_right, gap_bottom, gap_top = get_shifts(input_folder)
     # Import images
     images = get_images(os.path.join(input_folder,'vid'))
