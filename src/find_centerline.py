@@ -53,18 +53,22 @@ def enumerate_capillaries(image, test = False, verbose = False, write = False, w
         return contour_array
     else:
         contour_array = np.zeros((len(contours), row, col))
+        if  verbose or write:
+            fig = plt.figure(figsize = (12,10))
+            ax = fig.add_subplot(111)
         for i in range(len(contours)):
             grid = np.array(measure.grid_points_in_poly((row, col), contours[i]))
             contour_array[i] = grid
-            if verbose:
-                plt.plot(contours[i][:, 1], contours[i][:, 0], linewidth=2, label = "capillary " + str(i)) #plt.imshow(contour_array[i])   # plt.plot(contours[i][:, 1], contours[i][:, 0], linewidth=2) this shows all of the enumerated capillaries
+            if verbose or write:
+                ax.plot(contours[i][:, 1], contours[i][:, 0], linewidth=2, label = "capillary " + str(i)) #plt.imshow(contour_array[i])   # plt.plot(contours[i][:, 1], contours[i][:, 0], linewidth=2) this shows all of the enumerated capillaries
                 # plt.show()
-        if verbose:
-            plt.gca().invert_yaxis()
-            plt.legend()
+        if verbose or write:
+            ax.invert_yaxis()
+            ax.legend(loc = 'center left')
             if write:
-                plt.imsave(write_path)
-            plt.show()
+                fig.savefig(write_path)
+            if verbose:
+                plt.show()
         return contour_array
 def make_skeletons(image, verbose = True, write = False, write_path = None):
     """
@@ -162,8 +166,8 @@ def sort_continuous(array_2D, verbose = False):
         raise Exception('wrong type')
 
 def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
-    input_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'D_segmented')
-    output_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'E_centerline')
+    input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'D_segmented')
+    output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'E_centerline')
     # Read in the mask
     segmented = cv2.imread(os.path.join(input_folder, f'{SET}_{sample}_background.png'), cv2.IMREAD_GRAYSCALE)
     # Make mask either 1 or 0
@@ -174,17 +178,22 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
                                                      write_path=os.path.join(output_folder, f'{SET}_{sample}_background_skeletons.png'))
 
     # Make a numpy array of images with isolated capillaries. The mean/sum of this is segmented_2D.
-    contours = enumerate_capillaries(segmented, verbose=False, write=False)
+    contours = enumerate_capillaries(segmented, verbose=False, write=True, write_path = os.path.join(input_folder, f"{SET}_{sample}_cap_map.png"))
     capillary_distances = []
     skeleton_coords = []
     flattened_distances = []
+    used_capillaries = []
+    j = 0
     for i in range(contours.shape[0]):
         skeleton, distances = make_skeletons(contours[i], verbose=False)     # Skeletons come out in the shape
         skeleton_nums = np.asarray(np.nonzero(skeleton))
         # omit small capillaries
         if skeleton_nums.shape[1] <= MIN_CAP_LEN:
+            used_capillaries.append("small")
             pass
         else:
+            used_capillaries.append(f"new_capillary_{j}")
+            j += 1
             sorted_skeleton_coords, optimal_order = sort_continuous(skeleton_nums, verbose=False)
             ordered_distances = distances[optimal_order]
             capillary_distances.append(ordered_distances)
@@ -199,19 +208,22 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
             # plt.show()
 
     if write:
+        np.savetxt(os.path.join(input_folder, f'{SET}_{sample}_cap_cut.csv'),
+                            np.array(used_capillaries), delimiter = ',',
+                            fmt = '%s')
         for i in range(len(skeleton_coords)):
-            np.savetxt(os.path.join(output_folder, f'{SET}_{sample}_skeleton_coords_{str(i).zfill(2)}.csv'), 
+            np.savetxt(os.path.join(output_folder, "coords", f'{SET}_{sample}_skeleton_coords_{str(i).zfill(2)}.csv'), 
                     skeleton_coords[i], delimiter=',')
-            np.savetxt(os.path.join(input_folder, f'{SET}_{sample}_capillary_distances_{str(i).zfill(2)}.csv'), 
+            np.savetxt(os.path.join(output_folder, "distances", f'{SET}_{sample}_capillary_distances_{str(i).zfill(2)}.csv'), 
                     capillary_distances[i], delimiter=',')
 
 
-    # Make overall histogram
-    # plt.hist(flattened_distances)
-    # plt.show()
+    # # Make overall histogram
+    # # plt.hist(flattened_distances)
+    # # plt.show()
 
-    # TODO: Write program to register radii maps with each other 
-    # TODO: Abnormal capillaries, how do.
+    # # TODO: Write program to register radii maps with each other 
+    # # TODO: Abnormal capillaries, how do.
 
     return 0
 
@@ -224,6 +236,6 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main("set_01", "sample_009", write = False, verbose=True)
+    main("set_01", "sample_009", write = False, verbose=False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
