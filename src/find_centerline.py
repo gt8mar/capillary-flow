@@ -23,7 +23,7 @@ from sklearn.neighbors import NearestNeighbors
 import networkx as nx
 
 BRANCH_THRESH = 40
-MIN_CAP_LEN = 150
+MIN_CAP_LEN = 100
 
 def test():
     a = np.arange(6).reshape((2, 3))
@@ -189,10 +189,10 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
         skeleton_nums = np.asarray(np.nonzero(skeleton))
         # omit small capillaries
         if skeleton_nums.shape[1] <= MIN_CAP_LEN:
-            used_capillaries.append("small")
+            used_capillaries.append(["small", str(skeleton_nums.shape[1])])
             pass
         else:
-            used_capillaries.append(f"new_capillary_{j}")
+            used_capillaries.append([f"new_capillary_{j}", str(skeleton_nums.shape[1])])
             j += 1
             sorted_skeleton_coords, optimal_order = sort_continuous(skeleton_nums, verbose=False)
             ordered_distances = distances[optimal_order]
