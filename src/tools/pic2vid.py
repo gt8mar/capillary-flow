@@ -70,7 +70,7 @@ def extract_metadata(path):
     frame_rate = 100000//int(exposure)  # this rounds the frame-rate
     return pressure, frame_rate
 
-def pic2vid(images, SET = 'set_01', sample = 'sample_001', color = False, compress = True):
+def pic2vid(images, SET = 'set_01', sample = 'sample_000', color = False, compress = True):
     """
     takes a list of image files or numpy array and makes a movie with overlays
     :param images: list of images or numpy array of images
@@ -81,8 +81,8 @@ def pic2vid(images, SET = 'set_01', sample = 'sample_001', color = False, compre
     :return: 0
     """
     images = np.array(images)
-    metadata_path = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\raw', str(SET), str(sample), 'metadata.txt')
-    output_path = 'C:\\Users\\ejerison\\capillary-flow\\results'
+    metadata_path = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\raw', str(SET), str(sample), 'metadata.txt')
+    output_path = 'C:\\Users\\gt8mar\\capillary-flow\\results'
     pressure, frame_rate = extract_metadata(metadata_path)
     print(frame_rate)
     if color:
@@ -136,8 +136,8 @@ def pic2vid(images, SET = 'set_01', sample = 'sample_001', color = False, compre
 if __name__ == "__main__":
     ticks = time.time()
     SET = 'set_01'
-    sample = 'sample_001'
-    input_folder = str(os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized\\vid'))
+    sample = 'sample_000'
+    input_folder = str(os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized\\vid'))
     images = get_images(input_folder)
     image_files = []
     for i in range(len(images)): 

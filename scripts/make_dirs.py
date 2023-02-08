@@ -15,11 +15,11 @@ import os
 
 SET = "set_01"
 # sample = "sample_000"
-processed_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', SET)
-results_folder = 'C:\\Users\\ejerison\\capillary-flow\\results'
+processed_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', SET)
+results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results'
 
 def make_dirs():
-    for i in range(12,21):
+    for i in range(10,11):
         sample = 'sample_' + str(i).zfill(3)
         os.makedirs(os.path.join(processed_folder, sample, "A_cropped", "vid"))
         os.makedirs(os.path.join(processed_folder, sample, "B_stabilized", "vid")) 

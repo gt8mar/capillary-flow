@@ -45,7 +45,7 @@ if __name__ == "__main__":
     print("-------------------------------------")
     ticks_first = time.time()
     ticks = time.time()
-    for i in range(1,9):
+    for i in range(10,11):
         sample = 'sample_' + str(i).zfill(3)
 
         find_centerline.main(SET, sample, write = True)
