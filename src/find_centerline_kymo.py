@@ -167,14 +167,15 @@ def sort_continuous(array_2D, verbose = False):
         raise Exception('wrong type')
 
 def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
-    input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), 'participant_04_cap_04', "blood_flow_segmentations","part_04_cap_04\\masks")
+    input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), 'participant_04_cap_04', "blood_flow_segmentations","part_04_cap_04")
+    mask_folder = os.path.join(input_folder, "masks")
     # input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'D_segmented')
     # output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'E_centerline')
     output_folder = os.path.join(input_folder, "flow_lines")
     # Read in the mask
-    images = get_images(input_folder, "png")
+    images = get_images(mask_folder, "png")
     for image in images: 
-        segmented = cv2.imread(os.path.join(input_folder, image), cv2.IMREAD_GRAYSCALE)
+        segmented = cv2.imread(os.path.join(mask_folder, image), cv2.IMREAD_GRAYSCALE)
         # Make mask either 1 or 0
         segmented[segmented != 0] = 1
 
@@ -183,7 +184,7 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
                                                         write_path=os.path.join(output_folder, f'{image}_background_skeletons.png'))
 
         # Make a numpy array of images with isolated capillaries. The mean/sum of this is segmented_2D.
-        contours = enumerate_capillaries(segmented, verbose=False, write=True, write_path = os.path.join(input_folder, f"{image}_cap_map.png"))
+        contours = enumerate_capillaries(segmented, verbose=False, write=True, write_path = os.path.join(output_folder, f"{image}_cap_map.png"))
         capillary_distances = {}
         skeleton_coords = {}
         flattened_distances = []
@@ -194,10 +195,10 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
             skeleton_nums = np.asarray(np.nonzero(skeleton))
             # omit small capillaries
             if skeleton_nums.shape[1] <= MIN_CAP_LEN:
-                used_capillaries.append(["small", str(skeleton_nums.shape[1])])
+                used_capillaries.append([i, "small", str(skeleton_nums.shape[1])])
                 pass
             else:
-                used_capillaries.append([f"new_capillary_{j}", str(skeleton_nums.shape[1])])
+                used_capillaries.append([i, f"new_capillary_{j}", str(skeleton_nums.shape[1])])
                 j += 1
                 sorted_skeleton_coords, optimal_order = sort_continuous(skeleton_nums, verbose=False)
                 ordered_distances = distances[optimal_order]
@@ -213,13 +214,13 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
                 # plt.show()
 
         if write:
-            np.savetxt(os.path.join(input_folder, f'{image}_cap_cut.csv'),
+            np.savetxt(os.path.join(output_folder, f'{image}_cap_cut.csv'),
                                 np.array(used_capillaries), delimiter = ',',
                                 fmt = '%s')
             for key in skeleton_coords:
-                np.savetxt(os.path.join(output_folder, "coords", f'{image}_skeleton_coords_{str(key).zfill(2)}.csv'), 
+                np.savetxt(os.path.join(input_folder, "coords", f'{image}_skeleton_coords_{str(key).zfill(2)}.csv'), 
                         skeleton_coords[key], delimiter=',', fmt = '%s')
-                np.savetxt(os.path.join(output_folder, "distances", f'{image}_capillary_distances_{str(key).zfill(2)}.csv'), 
+                np.savetxt(os.path.join(input_folder, "distances", f'{image}_capillary_distances_{str(key).zfill(2)}.csv'), 
                         capillary_distances[key], delimiter=',', fmt = '%s')
 
 
@@ -241,6 +242,6 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main("set_01", "sample_009", write = False, verbose=True)
+    main("set_01", "sample_009", write = True, verbose=False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
