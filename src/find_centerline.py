@@ -1,5 +1,5 @@
 """
-Filename: find_centerline_v3.py
+Filename: find_centerline.py
 -------------------------------------------------
 This file segments an image using ____ technique from scikit image
 
@@ -166,8 +166,8 @@ def sort_continuous(array_2D, verbose = False):
         raise Exception('wrong type')
 
 def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
-    input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'D_segmented')
-    output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'E_centerline')
+    input_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'D_segmented')
+    output_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'E_centerline')
     # Read in the mask
     segmented = cv2.imread(os.path.join(input_folder, f'{SET}_{sample}_background.png'), cv2.IMREAD_GRAYSCALE)
     # Make mask either 1 or 0

@@ -1,7 +1,8 @@
 """
 Filename: analyze.py
 ------------------------------------------------------
-This program runs a sequence of python programs to analyze capillaries
+This program runs a sequence of python programs to analyze capillaries.
+It requires segmented capillaries to run. 
 By: Marcus Forst
 """
 
@@ -19,9 +20,7 @@ from src import find_centerline
 
 SET = "set_01"
 sample = "sample_000"
-processed_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', SET)
-
-
+processed_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', SET)
 
 def G_correlation():
     # path = os.path.join(UMBRELLA_FOLDER, folder)
@@ -31,9 +30,6 @@ def G_correlation():
     # correlation.main(UMBRELLA_FOLDER_MOCO)
     # print(f'finished correlation')
     return 0
-
-
-
 
 """
 -----------------------------------------------------------------------------
@@ -45,7 +41,7 @@ if __name__ == "__main__":
     print("-------------------------------------")
     ticks_first = time.time()
     ticks = time.time()
-    for i in range(1,9):
+    for i in range(12,21):
         sample = 'sample_' + str(i).zfill(3)
 
         find_centerline.main(SET, sample, write = True)
