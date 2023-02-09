@@ -24,7 +24,7 @@ import networkx as nx
 from src.tools.get_images import get_images
 
 BRANCH_THRESH = 40
-MIN_CAP_LEN = 100
+MIN_CAP_LEN = 50
 
 def test():
     a = np.arange(6).reshape((2, 3))
@@ -167,10 +167,10 @@ def sort_continuous(array_2D, verbose = False):
         raise Exception('wrong type')
 
 def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
-    input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), 'participant_04_cap_04', "blood_flow_segmentations","part_04_cap_04")
+    input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), 'participant_04_cap_04', "blood_flow_segmentations","part_04_cap_04\\masks")
     # input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'D_segmented')
     # output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'E_centerline')
-    output_folder = input_folder
+    output_folder = os.path.join(input_folder, "flow_lines")
     # Read in the mask
     images = get_images(input_folder, "png")
     for image in images: 
@@ -180,12 +180,12 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
 
         # save to results
         total_skeleton, total_distances = make_skeletons(segmented, verbose = False, write = write, 
-                                                        write_path=os.path.join(output_folder, f'{SET}_{sample}_background_skeletons.png'))
+                                                        write_path=os.path.join(output_folder, f'{image}_background_skeletons.png'))
 
         # Make a numpy array of images with isolated capillaries. The mean/sum of this is segmented_2D.
-        contours = enumerate_capillaries(segmented, verbose=False, write=True, write_path = os.path.join(input_folder, f"{SET}_{sample}_cap_map.png"))
-        capillary_distances = []
-        skeleton_coords = []
+        contours = enumerate_capillaries(segmented, verbose=False, write=True, write_path = os.path.join(input_folder, f"{image}_cap_map.png"))
+        capillary_distances = {}
+        skeleton_coords = {}
         flattened_distances = []
         used_capillaries = []
         j = 0
@@ -201,10 +201,10 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
                 j += 1
                 sorted_skeleton_coords, optimal_order = sort_continuous(skeleton_nums, verbose=False)
                 ordered_distances = distances[optimal_order]
-                capillary_distances.append(ordered_distances)
+                capillary_distances[str(i)] = ordered_distances
                 flattened_distances += list(distances)
-                skeleton_coords.append(sorted_skeleton_coords)
-        print(f"{len(skeleton_coords)}/{contours.shape[0]} capillaries used")
+                skeleton_coords[str(i)] = sorted_skeleton_coords
+        print(f"{len(skeleton_coords.keys())}/{contours.shape[0]} capillaries used")
         if verbose:
             plt.show()
             # Plot all capillaries together      
@@ -213,14 +213,14 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
                 # plt.show()
 
         if write:
-            np.savetxt(os.path.join(input_folder, f'{SET}_{sample}_cap_cut.csv'),
+            np.savetxt(os.path.join(input_folder, f'{image}_cap_cut.csv'),
                                 np.array(used_capillaries), delimiter = ',',
                                 fmt = '%s')
-            for i in range(len(skeleton_coords)):
-                np.savetxt(os.path.join(output_folder, "coords", f'{SET}_{sample}_skeleton_coords_{str(i).zfill(2)}.csv'), 
-                        skeleton_coords[i], delimiter=',')
-                np.savetxt(os.path.join(output_folder, "distances", f'{SET}_{sample}_capillary_distances_{str(i).zfill(2)}.csv'), 
-                        capillary_distances[i], delimiter=',')
+            for key in skeleton_coords:
+                np.savetxt(os.path.join(output_folder, "coords", f'{image}_skeleton_coords_{str(key).zfill(2)}.csv'), 
+                        skeleton_coords[key], delimiter=',', fmt = '%s')
+                np.savetxt(os.path.join(output_folder, "distances", f'{image}_capillary_distances_{str(key).zfill(2)}.csv'), 
+                        capillary_distances[key], delimiter=',', fmt = '%s')
 
 
         # # Make overall histogram
@@ -241,6 +241,6 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main("set_01", "sample_009", write = True, verbose=False)
+    main("set_01", "sample_009", write = False, verbose=True)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
