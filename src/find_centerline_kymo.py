@@ -1,5 +1,5 @@
 """
-Filename: find_centerline.py
+Filename: find_centerline_v3.py
 -------------------------------------------------
 This file segments an image using ____ technique from scikit image
 
@@ -21,9 +21,10 @@ import astropy.units as u
 import time
 from sklearn.neighbors import NearestNeighbors
 import networkx as nx
+from src.tools.get_images import get_images
 
 BRANCH_THRESH = 40
-MIN_CAP_LEN = 150
+MIN_CAP_LEN = 50
 
 def test():
     a = np.arange(6).reshape((2, 3))
@@ -70,7 +71,7 @@ def enumerate_capillaries(image, test = False, verbose = False, write = False, w
             if verbose:
                 plt.show()
         return contour_array
-def make_skeletons(image, verbose = True, histograms = False, write = False, write_path = None):
+def make_skeletons(image, verbose = True, write = False, write_path = None):
     """
     This function uses the FilFinder package to find and prune skeletons of images.
     :param image: 2D numpy array or list of points that make up polygon mask
@@ -94,9 +95,8 @@ def make_skeletons(image, verbose = True, histograms = False, write = False, wri
     overlay = distance_on_skeleton + image
     # This plots the histogram of the capillary and the capillary with distance values.
     if verbose:
-        if histograms:
-            plt.hist(distances)
-            plt.show()
+        plt.hist(distances)
+        plt.show()
         plt.imshow(distance_on_skeleton, cmap='magma')
         plt.show()
     if write:
@@ -167,64 +167,69 @@ def sort_continuous(array_2D, verbose = False):
         raise Exception('wrong type')
 
 def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
-    input_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'D_segmented')
-    output_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'E_centerline')
+    input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), 'participant_04_cap_04', "blood_flow_segmentations","part_04_cap_04")
+    mask_folder = os.path.join(input_folder, "masks")
+    # input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'D_segmented')
+    # output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'E_centerline')
+    output_folder = os.path.join(input_folder, "flow_lines")
     # Read in the mask
-    segmented = cv2.imread(os.path.join(input_folder, f'{SET}_{sample}_background.png'), cv2.IMREAD_GRAYSCALE)
-    # Make mask either 1 or 0
-    segmented[segmented != 0] = 1
+    images = get_images(mask_folder, "png")
+    for image in images: 
+        segmented = cv2.imread(os.path.join(mask_folder, image), cv2.IMREAD_GRAYSCALE)
+        # Make mask either 1 or 0
+        segmented[segmented != 0] = 1
 
-    # save to results
-    total_skeleton, total_distances = make_skeletons(segmented, verbose = verbose, write = write, 
-                                                     write_path=os.path.join(output_folder, f'{SET}_{sample}_background_skeletons.png'))
+        # save to results
+        total_skeleton, total_distances = make_skeletons(segmented, verbose = False, write = write, 
+                                                        write_path=os.path.join(output_folder, f'{image}_background_skeletons.png'))
 
-    # Make a numpy array of images with isolated capillaries. The mean/sum of this is segmented_2D.
-    contours = enumerate_capillaries(segmented, verbose=False, write=write, write_path = os.path.join(input_folder, f"{SET}_{sample}_cap_map.png"))
-    capillary_distances = []
-    skeleton_coords = []
-    flattened_distances = []
-    used_capillaries = []
-    j = 0
-    for i in range(contours.shape[0]):
-        skeleton, distances = make_skeletons(contours[i], verbose=False, histograms = False)     # Skeletons come out in the shape
-        skeleton_nums = np.asarray(np.nonzero(skeleton))
-        # omit small capillaries
-        if skeleton_nums.shape[1] <= MIN_CAP_LEN:
-            used_capillaries.append(["small", str(skeleton_nums.shape[1])])
-            pass
-        else:
-            used_capillaries.append([f"new_capillary_{j}", str(skeleton_nums.shape[1])])
-            j += 1
-            sorted_skeleton_coords, optimal_order = sort_continuous(skeleton_nums, verbose=False)
-            ordered_distances = distances[optimal_order]
-            capillary_distances.append(ordered_distances)
-            flattened_distances += list(distances)
-            skeleton_coords.append(sorted_skeleton_coords)
-    print(f"{len(skeleton_coords)}/{contours.shape[0]} capillaries used")
-    if verbose:
-        plt.show()
-        # Plot all capillaries together      
-            # plt.plot(capillary_distances[i])
-            # plt.title(f'Capillary {i} radii')
-            # plt.show()
+        # Make a numpy array of images with isolated capillaries. The mean/sum of this is segmented_2D.
+        contours = enumerate_capillaries(segmented, verbose=False, write=True, write_path = os.path.join(output_folder, f"{image}_cap_map.png"))
+        capillary_distances = {}
+        skeleton_coords = {}
+        flattened_distances = []
+        used_capillaries = []
+        j = 0
+        for i in range(contours.shape[0]):
+            skeleton, distances = make_skeletons(contours[i], verbose=False)     # Skeletons come out in the shape
+            skeleton_nums = np.asarray(np.nonzero(skeleton))
+            # omit small capillaries
+            if skeleton_nums.shape[1] <= MIN_CAP_LEN:
+                used_capillaries.append([i, "small", str(skeleton_nums.shape[1])])
+                pass
+            else:
+                used_capillaries.append([i, f"new_capillary_{j}", str(skeleton_nums.shape[1])])
+                j += 1
+                sorted_skeleton_coords, optimal_order = sort_continuous(skeleton_nums, verbose=False)
+                ordered_distances = distances[optimal_order]
+                capillary_distances[str(i)] = ordered_distances
+                flattened_distances += list(distances)
+                skeleton_coords[str(i)] = sorted_skeleton_coords
+        print(f"{len(skeleton_coords.keys())}/{contours.shape[0]} capillaries used")
+        if verbose:
+            plt.show()
+            # Plot all capillaries together      
+                # plt.plot(capillary_distances[i])
+                # plt.title(f'Capillary {i} radii')
+                # plt.show()
 
-    if write:
-        np.savetxt(os.path.join(input_folder, f'{SET}_{sample}_cap_cut.csv'),
-                            np.array(used_capillaries), delimiter = ',',
-                            fmt = '%s')
-        for i in range(len(skeleton_coords)):
-            np.savetxt(os.path.join(output_folder, "coords", f'{SET}_{sample}_skeleton_coords_{str(i).zfill(2)}.csv'), 
-                    skeleton_coords[i], delimiter=',', fmt = "%s")
-            np.savetxt(os.path.join(output_folder, "distances", f'{SET}_{sample}_capillary_distances_{str(i).zfill(2)}.csv'), 
-                    capillary_distances[i], delimiter=',', fmt = '%s')
+        if write:
+            np.savetxt(os.path.join(output_folder, f'{image}_cap_cut.csv'),
+                                np.array(used_capillaries), delimiter = ',',
+                                fmt = '%s')
+            for key in skeleton_coords:
+                np.savetxt(os.path.join(input_folder, "coords", f'{image}_skeleton_coords_{str(key).zfill(2)}.csv'), 
+                        skeleton_coords[key], delimiter=',', fmt = '%s')
+                np.savetxt(os.path.join(input_folder, "distances", f'{image}_capillary_distances_{str(key).zfill(2)}.csv'), 
+                        capillary_distances[key], delimiter=',', fmt = '%s')
 
 
-    # # Make overall histogram
-    # # plt.hist(flattened_distances)
-    # # plt.show()
+        # # Make overall histogram
+        # # plt.hist(flattened_distances)
+        # # plt.show()
 
-    # # TODO: Write program to register radii maps with each other 
-    # # TODO: Abnormal capillaries, how do.
+        # # TODO: Write program to register radii maps with each other 
+        # # TODO: Abnormal capillaries, how do.
 
     return 0
 
@@ -237,7 +242,6 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    for i in range(1,6):
-        main("set_01", "sample_00"+ str(i), write = False, verbose=True)
+    main("set_01", "sample_009", write = True, verbose=False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))

@@ -18,9 +18,9 @@ from src.tools.get_images import get_images
 from src.tools.pic2vid import pic2vid
 
 def main(SET='set_01', sample = 'sample_000', color = False):    
-    input_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
-    output_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'C_background')
-    results_folder = 'C:\\Users\\ejerison\\capillary-flow\\results\\backgrounds'  # I want to save all the backgrounds to the same folder for easy transfer to hasty.ai
+    input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
+    output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'C_background')
+    results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\backgrounds'  # I want to save all the backgrounds to the same folder for easy transfer to hasty.ai
     shifts = pd.read_csv(os.path.join(input_folder, 'Results.csv'))
     gap_left = shifts['x'].max()
     gap_right = shifts['x'].min()
@@ -70,6 +70,6 @@ def main(SET='set_01', sample = 'sample_000', color = False):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main('set_01', 'sample_009')
+    main('set_01', 'sample_000')
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
