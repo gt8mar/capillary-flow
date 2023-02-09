@@ -23,7 +23,7 @@ from sklearn.neighbors import NearestNeighbors
 import networkx as nx
 
 BRANCH_THRESH = 40
-MIN_CAP_LEN = 100
+MIN_CAP_LEN = 150
 
 def test():
     a = np.arange(6).reshape((2, 3))
@@ -70,7 +70,7 @@ def enumerate_capillaries(image, test = False, verbose = False, write = False, w
             if verbose:
                 plt.show()
         return contour_array
-def make_skeletons(image, verbose = True, write = False, write_path = None):
+def make_skeletons(image, verbose = True, histograms = False, write = False, write_path = None):
     """
     This function uses the FilFinder package to find and prune skeletons of images.
     :param image: 2D numpy array or list of points that make up polygon mask
@@ -94,8 +94,9 @@ def make_skeletons(image, verbose = True, write = False, write_path = None):
     overlay = distance_on_skeleton + image
     # This plots the histogram of the capillary and the capillary with distance values.
     if verbose:
-        plt.hist(distances)
-        plt.show()
+        if histograms:
+            plt.hist(distances)
+            plt.show()
         plt.imshow(distance_on_skeleton, cmap='magma')
         plt.show()
     if write:
@@ -174,18 +175,18 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
     segmented[segmented != 0] = 1
 
     # save to results
-    total_skeleton, total_distances = make_skeletons(segmented, verbose = False, write = write, 
+    total_skeleton, total_distances = make_skeletons(segmented, verbose = verbose, write = write, 
                                                      write_path=os.path.join(output_folder, f'{SET}_{sample}_background_skeletons.png'))
 
     # Make a numpy array of images with isolated capillaries. The mean/sum of this is segmented_2D.
-    contours = enumerate_capillaries(segmented, verbose=False, write=True, write_path = os.path.join(input_folder, f"{SET}_{sample}_cap_map.png"))
+    contours = enumerate_capillaries(segmented, verbose=False, write=write, write_path = os.path.join(input_folder, f"{SET}_{sample}_cap_map.png"))
     capillary_distances = []
     skeleton_coords = []
     flattened_distances = []
     used_capillaries = []
     j = 0
     for i in range(contours.shape[0]):
-        skeleton, distances = make_skeletons(contours[i], verbose=False)     # Skeletons come out in the shape
+        skeleton, distances = make_skeletons(contours[i], verbose=False, histograms = False)     # Skeletons come out in the shape
         skeleton_nums = np.asarray(np.nonzero(skeleton))
         # omit small capillaries
         if skeleton_nums.shape[1] <= MIN_CAP_LEN:
@@ -213,9 +214,9 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
                             fmt = '%s')
         for i in range(len(skeleton_coords)):
             np.savetxt(os.path.join(output_folder, "coords", f'{SET}_{sample}_skeleton_coords_{str(i).zfill(2)}.csv'), 
-                    skeleton_coords[i], delimiter=',')
+                    skeleton_coords[i], delimiter=',', fmt = "%s")
             np.savetxt(os.path.join(output_folder, "distances", f'{SET}_{sample}_capillary_distances_{str(i).zfill(2)}.csv'), 
-                    capillary_distances[i], delimiter=',')
+                    capillary_distances[i], delimiter=',', fmt = '%s')
 
 
     # # Make overall histogram
@@ -236,6 +237,7 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main("set_01", "sample_009", write = False, verbose=False)
+    for i in range(1,6):
+        main("set_01", "sample_00"+ str(i), write = False, verbose=True)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
