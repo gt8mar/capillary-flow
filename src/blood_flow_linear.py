@@ -174,7 +174,7 @@ def main(SET = 'set_01', sample = 'sample_000', write = False, variable_radii = 
             # centerline_array = normalize_rows(centerline_array)
             centerline_array = normalize_image(centerline_array)
             np.savetxt(os.path.join(output_folder, f'{SET}_{sample}_blood_flow_{str(i).zfill(2)}.csv'), 
-                    centerline_array, delimiter=',')
+                    centerline_array, delimiter=',', fmt = '%s')
             im = Image.fromarray(centerline_array)
             im.save(os.path.join(output_folder, f'{SET}_{sample}_blood_flow_{str(i).zfill(2)}.tiff'))
 
