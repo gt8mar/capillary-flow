@@ -199,13 +199,14 @@ def watershed_seg(image, verbose = False):
     fig.tight_layout()
     plt.show()
     return 0
-def find_lines(image, method = 'ridge'):
+def find_slopes(image, method = 'ridge', verbose = False):
     edges = cv2.Canny(image, 50, 110)
-    print(edges.shape)
+    print(f"the shape of the file is {edges.shape}")
     # Find contours of the edges
     contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
     # Iterate through the contours
+    slopes = []
     for contour in contours:
         if method == 'ridge':
             # Fit a line to the contour using least squares regression
@@ -214,8 +215,8 @@ def find_lines(image, method = 'ridge'):
             # Compute the start and end points of the line
             lefty = int((-x*vy/vx) + y)
             righty = int(((image.shape[1]-x)*vy/vx)+y)
-            print(lefty)
-            print(righty)
+            print(f"lefty is {lefty}")
+            print(f"righty is {righty}")
             # Draw the line on the original image
             cv2.line(image, (image.shape[1]-1,righty), (0,lefty), (0,255,0), 2)
         if method == 'lasso':
@@ -223,22 +224,28 @@ def find_lines(image, method = 'ridge'):
             x, y = contour[:, 0, 0], contour[:, 0, 1]
             
             # Fit a Lasso regression model to the contour
-            lasso = Lasso(alpha=0.1)
+            lasso = Lasso(alpha=0.1, tol = 0.0001)
             X = x.reshape(-1, 1) # Reshape the x array into a 2D array
             lasso.fit(X, y)
             
             # Compute the start and end points of the line
             start_x, end_x = 0, image.shape[1]-1
             start_y, end_y = lasso.predict([[start_x]]), lasso.predict([[end_x]])
-            
+            slope = (end_y-start_y)/(end_x-start_x)
+
             # Draw the line on the original image
             cv2.line(image, (int(start_x), int(start_y)), (int(end_x), int(end_y)), (0,255,0), 2)
 
+            # Add line to list of lines
+            slopes.append(slope)
 
-
+    average_slope = np.mean(np.array(slopes, dtype = float))
+    
     # Display the original image with lines drawn on it
-    cv2.imshow('Lines', image)
-    cv2.waitKey(0)
+    if verbose:
+        cv2.line(image, (int(image.shape[1]/2), 0), (int((image.shape[0]-1)/average_slope) + int(image.shape[1]/2), image.shape[0]-1), (255,255,0), 2)
+        cv2.imshow('Lines', image)
+        cv2.waitKey(0)
     cv2.destroyAllWindows()
     # cedges = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
     # lines = cv2.HoughLines(edges, 1, np.pi/180, 200)
@@ -256,7 +263,7 @@ def find_lines(image, method = 'ridge'):
     #         cv2.line(cedges, pt1, pt2, (0,0,255), 3, cv2.LINE_AA)
     # cv2.imshow("title", cedges)
     # cv2.waitKey()
-    return 0
+    return slopes
 
 def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
     input_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), 'participant_04_cap_04', "blood_flow")
@@ -284,16 +291,11 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
         # plt.imshow(kymo_despeckle)
         # plt.show()
         # kymo_watershed = watershed_seg(kymo_despeckle, verbose = True)
-        find_lines(kymo_blur, method = 'lasso')
-        
-        
-        
-
-
-        
-
-
-
+        slopes = find_slopes(kymo_blur, method = 'lasso', verbose = True)
+        print(slopes)
+        print(f"The average slope for {image} is {np.mean(np.array(slopes, dtype = float))}")
+           
+     
         # Make mask either 1 or 0
         
 
