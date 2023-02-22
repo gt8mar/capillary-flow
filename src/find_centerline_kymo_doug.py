@@ -307,11 +307,16 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
     data = []
     for image in images: 
         kymo_raw = cv2.imread(os.path.join(input_folder, image), cv2.IMREAD_GRAYSCALE)
-        # Normalize rows of image
-        norms = np.linalg.norm(kymo_raw, axis=1)
-        normalized_rows = kymo_raw / norms[:, np.newaxis]
-        print(np.mean(kymo_raw))
-        kymo_blur = gaussian_filter(normalized_rows, sigma = 2)
+
+        # # Normalize rows of image
+        # norms = np.linalg.norm(kymo_raw, axis=1)
+        # normalized_rows = (kymo_raw / norms[:, np.newaxis])*255
+        # norm_blur = gaussian_filter(normalized_rows, sigma=2)
+        # plt.imshow(norm_blur)
+        # plt.show()
+        # print(np.mean(normalized_rows))
+        
+        kymo_blur = gaussian_filter(kymo_raw, sigma = 2)
         kymo_high_pass = kymo_raw - kymo_blur
         kymo_hp_blur = gaussian_filter(kymo_high_pass, sigma = 1) 
         # fig, (ax1,ax2,ax3) = plt.subplots(1,3)
@@ -330,6 +335,7 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
         # plt.show()
         # kymo_watershed = watershed_seg(kymo_despeckle, verbose = True)
         slopes = find_slopes(kymo_blur, method = 'lasso', verbose = False)
+        # slopes = find_slopes(norm_blur, method = 'lasso', verbose = False)
         data.append(np.absolute(slopes))
         print(slopes)
         print(f"The average slope for {image} is {np.mean(np.array(slopes, dtype = float))}")
@@ -347,6 +353,6 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main("set_01", "sample_009", write = True, verbose=False)
+    main("set_01", "sample_009", write = False, verbose=True)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
