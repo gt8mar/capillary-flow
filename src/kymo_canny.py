@@ -200,7 +200,7 @@ def watershed_seg(image, verbose = False):
     fig.tight_layout()
     plt.show()
     return 0
-def remove_outliers(data, lower_percentile = 10, upper_percentile = 90):
+def select_outliers(data, lower_percentile = 10, upper_percentile = 90):
     """
     This function removes outliers by percentile and returns
     both the clipped data and the outlier points. 
@@ -220,7 +220,7 @@ def remove_outliers(data, lower_percentile = 10, upper_percentile = 90):
         data_clipped.append(column[(column >= lower_bound) & (column <= upper_bound)]) 
         outlier_points.append(column[(column < lower_bound) | (column > upper_bound)])
     return data_clipped, outlier_points
-def plot_box_swarm(data, x_labels, y_axis_label,  plot_title, figure_name, verbose = True, write = False, remove_outliers = True):
+def plot_box_swarm(data, x_labels, y_axis_label,  plot_title, figure_name, verbose = True, write = False, remove_outliers = False):
     """Plot box-plot and swarm plot for data list.
  
     Args:
@@ -233,7 +233,7 @@ def plot_box_swarm(data, x_labels, y_axis_label,  plot_title, figure_name, verbo
     """
     if remove_outliers:
         # Remove outliers using the clip function
-        data_clipped, outliers = remove_outliers(data)
+        data_clipped, outliers = select_outliers(data)
         # initialize plot information:
         sns.set(color_codes=True)
         plt.figure(1, figsize=(9, 6))
@@ -243,9 +243,7 @@ def plot_box_swarm(data, x_labels, y_axis_label,  plot_title, figure_name, verbo
         ax = sns.boxplot(data=data_clipped)
         sns.swarmplot(data=data_clipped, color=".25")
         sns.swarmplot(data = outliers, color = "red")
-        if verbose:
-            plt.show()
-
+        if verbose: plt.show()
     else:
         # initialize plot information:
         sns.set(color_codes=True)
@@ -266,10 +264,11 @@ def plot_box_swarm(data, x_labels, y_axis_label,  plot_title, figure_name, verbo
         if write:
             # write figure file with quality 400 dpi
             plt.savefig(figure_name, bbox_inches='tight', dpi=400)
-        if verbose:
-            plt.show()
+            if verbose: plt.show()
+            else: plt.close()
+        if verbose: plt.show()
     return 0
-def find_slopes(image, method = 'ridge', verbose = False, write = False, plot_title = "Kymograph", filename = "kymograph_1.png", remove_outliers = True):
+def find_slopes(image, method = 'ridge', verbose = False, write = False, plot_title = "Kymograph", filename = "kymograph_1.png", remove_outliers = False):
     edges = cv2.Canny(image, 50, 110)
     print(f"the shape of the file is {edges.shape}")
     # Find contours of the edges
@@ -309,7 +308,7 @@ def find_slopes(image, method = 'ridge', verbose = False, write = False, plot_ti
             # Add line to list of lines
             slopes.append(slope[0])
     if remove_outliers:
-        slopes_clipped, outliers = remove_outliers(slopes)
+        slopes_clipped, outliers = select_outliers(slopes)
         average_slope = np.absolute(np.mean(np.array(slopes_clipped, dtype = float)))
     else:
         average_slope = np.mean(np.array(slopes, dtype = float))
@@ -320,12 +319,13 @@ def find_slopes(image, method = 'ridge', verbose = False, write = False, plot_ti
         cv2.imshow(plot_title, image)
         cv2.waitKey(0)
     if write:
-        input_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(set_01), 'participant_04_cap_04', "blood_flow")
+        input_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', "set_01", 'participant_04_cap_04', "blood_flow")
         cv2.line(image, (int(image.shape[1]/2), 0), (int((image.shape[0]-1)/average_slope) + int(image.shape[1]/2), image.shape[0]-1), (255,255,0), 2)
         plt.figure(1, figsize=(9, 6))
         plt.title(plot_title)
         plt.imshow(image)
         plt.savefig(os.path.join(input_folder, filename), bbox_inches='tight', dpi=400)
+        plt.close()
     cv2.destroyAllWindows()
     return slopes
 
@@ -389,6 +389,6 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main("set_01", "sample_009", write = False, verbose=True)
+    main("set_01", "sample_009", write = True, verbose=True)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
