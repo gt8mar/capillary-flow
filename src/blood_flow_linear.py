@@ -18,6 +18,7 @@ from src.tools.get_images import get_images
 from src.tools.load_image_array import load_image_array
 from src.tools.load_csv_list import load_csv_list
 from src.tools.get_shifts import get_shifts
+from scipy.ndimage import gaussian_filter
 
 PIXELS_PER_UM = 2
 
@@ -109,6 +110,34 @@ def normalize_rows(image):
     subtracted_image = (image - big_average)/big_std
     new_image = normalize_image(subtracted_image)
     return new_image
+def normalize_row_and_col(image):    
+    # Normalize rows
+    norms = np.linalg.norm(image, axis=1)
+    normalized_rows = image / norms[:, np.newaxis]
+    normalized_rows = gaussian_filter(normalized_rows, sigma = 2)
+
+    # Normalize columns
+    norms = np.linalg.norm(image, axis=0)
+    normalized_cols = image / norms
+    normalized_cols = gaussian_filter(normalized_cols, sigma = 2)
+
+
+    # Plot original image
+    plt.subplot(3, 1, 1)
+    plt.imshow(gaussian_filter(image, sigma = 2))
+    plt.title("Original image")
+
+    # Plot normalized rows
+    plt.subplot(3, 1, 2)
+    plt.imshow(normalized_rows)
+    plt.title("Normalized rows")
+
+    # Plot normalized columns
+    plt.subplot(3, 1, 3)
+    plt.imshow(normalized_cols)
+    plt.title("Normalized columns")
+
+    plt.show()
 def test(row = 16, col = 12, radius = 5):
     x = np.arange(0, 32)
     y = np.arange(0, 32)
@@ -140,7 +169,7 @@ def test(row = 16, col = 12, radius = 5):
     # plt.show()
     return 0
 def test2():
-    image = np.loadtxt('C:\\Users\\gt8mar\\capillary-flow\\tests\\vid4_centerline_array_long_7.csv', delimiter=',', dtype = int)
+    image = np.loadtxt('C:\\Users\\ejerison\\capillary-flow\\tests\\set_01_sample_003_blood_flow_00.csv', delimiter=',', dtype = int)
     # image = np.random.randint(size = (100,100), low=0, high = 255)
     print(image)
     new_image = normalize_rows(image)
@@ -148,6 +177,8 @@ def test2():
     plt.show()
     plt.imshow(new_image)
     plt.show()
+    new_new_image = normalize_row_and_col(image)
+    return 0
 
 def main(SET = 'set_01', sample = 'sample_000', write = False, variable_radii = False):
     input_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
@@ -195,8 +226,8 @@ def main(SET = 'set_01', sample = 'sample_000', write = False, variable_radii = 
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(write=True)
-    # test2()
+    # main(write=True)
+    test2()
     # test()
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
