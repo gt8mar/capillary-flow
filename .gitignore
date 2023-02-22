@@ -51,4 +51,14 @@ ffmpeg/presets/libvpx-720p50_60.ffpreset
 ffmpeg/presets/libvpx-1080p.ffpreset
 ffmpeg/presets/libvpx-1080p50_60.ffpreset
 results/set_01_sample_001.avi
+src/tools/__pycache__/get_images.cpython-39.pyc
+src/tools/__pycache__/get_shifts.cpython-39.pyc
+src/tools/__pycache__/load_image_array.cpython-39.pyc
+src/tools/__pycache__/sort_nicely.cpython-39.pyc
+src/tools/__pycache__/get_images.cpython-39.pyc
+src/tools/__pycache__/get_shifts.cpython-39.pyc
+src/tools/__pycache__/load_image_array.cpython-39.pyc
+src/tools/__pycache__/sort_nicely.cpython-39.pyc
+src/__pycache__/__init__.cpython-39.pyc
+tests/set_01_sample_003_blood_flow_00.csv
 figure 1.png
