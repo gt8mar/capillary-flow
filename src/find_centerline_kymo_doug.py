@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import cv2
 import os
 import math
+import seaborn as sb
 from skimage import measure
 from skimage.morphology import medial_axis
 from fil_finder import FilFinder2D
@@ -199,6 +200,39 @@ def watershed_seg(image, verbose = False):
     fig.tight_layout()
     plt.show()
     return 0
+def plot_box_swarm(data, x_labels, y_axis_label,  plot_title, figure_name):
+    """Plot box-plot and swarm plot for data list.
+ 
+    Args:
+        data (list of list): List of lists with data to be plotted.
+        y_axis_label (str): Y- axis label.
+        x_labels (list of str): List with labels of x-axis.
+        plot_title (str): Plot title.
+        figure_name (str): Path to output figure.
+         
+    """
+    sb.set(color_codes=True)
+    plt.figure(1, figsize=(9, 6))
+ 
+    # add title to plot
+    plt.title(plot_title)
+ 
+    # plot data on swarmplot and boxplot
+    sb.swarmplot(data=data, color=".25")
+    ax = sb.boxplot(data=data)
+ 
+    # y-axis label
+    ax.set(ylabel=y_axis_label)
+ 
+    # write labels with number of elements
+    ax.set_xticks(np.arange(4), labels = x_labels)
+    ax.legend()
+    
+    # ax.set_xticklabels(["{} (n={})".format(l, len(data[x])) for x, l in enumerate(x_labels)], rotation=10)
+ 
+    # write figure file with quality 400 dpi
+    # plt.savefig(figure_name, bbox_inches='tight', dpi=400)
+    plt.show()
 def find_slopes(image, method = 'ridge', verbose = False):
     edges = cv2.Canny(image, 50, 110)
     print(f"the shape of the file is {edges.shape}")
@@ -237,7 +271,7 @@ def find_slopes(image, method = 'ridge', verbose = False):
             cv2.line(image, (int(start_x), int(start_y)), (int(end_x), int(end_y)), (0,255,0), 2)
 
             # Add line to list of lines
-            slopes.append(slope)
+            slopes.append(slope[0])
 
     average_slope = np.mean(np.array(slopes, dtype = float))
     
@@ -270,10 +304,14 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
     output_folder = os.path.join(input_folder, "centerlines")
     # Read in the mask
     images = get_images(input_folder, "tiff")
+    data = []
     for image in images: 
         kymo_raw = cv2.imread(os.path.join(input_folder, image), cv2.IMREAD_GRAYSCALE)
+        # Normalize rows of image
+        norms = np.linalg.norm(kymo_raw, axis=1)
+        normalized_rows = kymo_raw / norms[:, np.newaxis]
         print(np.mean(kymo_raw))
-        kymo_blur = gaussian_filter(kymo_raw, sigma = 2)
+        kymo_blur = gaussian_filter(normalized_rows, sigma = 2)
         kymo_high_pass = kymo_raw - kymo_blur
         kymo_hp_blur = gaussian_filter(kymo_high_pass, sigma = 1) 
         # fig, (ax1,ax2,ax3) = plt.subplots(1,3)
@@ -291,66 +329,12 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
         # plt.imshow(kymo_despeckle)
         # plt.show()
         # kymo_watershed = watershed_seg(kymo_despeckle, verbose = True)
-        slopes = find_slopes(kymo_blur, method = 'lasso', verbose = True)
+        slopes = find_slopes(kymo_blur, method = 'lasso', verbose = False)
+        data.append(np.absolute(slopes))
         print(slopes)
         print(f"The average slope for {image} is {np.mean(np.array(slopes, dtype = float))}")
-           
-     
-        # Make mask either 1 or 0
-        
-
-
-    #     # save to results
-    #     total_skeleton, total_distances = make_skeletons(segmented, verbose = False, write = write, 
-    #                                                     write_path=os.path.join(output_folder, f'{image}_background_skeletons.png'))
-
-    #     # Make a numpy array of images with isolated capillaries. The mean/sum of this is segmented_2D.
-    #     contours = enumerate_capillaries(segmented, verbose=False, write=True, write_path = os.path.join(output_folder, f"{image}_cap_map.png"))
-    #     capillary_distances = {}
-    #     skeleton_coords = {}
-    #     flattened_distances = []
-    #     used_capillaries = []
-    #     j = 0
-    #     for i in range(contours.shape[0]):
-    #         skeleton, distances = make_skeletons(contours[i], verbose=False)     # Skeletons come out in the shape
-    #         skeleton_nums = np.asarray(np.nonzero(skeleton))
-    #         # omit small capillaries
-    #         if skeleton_nums.shape[1] <= MIN_CAP_LEN:
-    #             used_capillaries.append([i, "small", str(skeleton_nums.shape[1])])
-    #             pass
-    #         else:
-    #             used_capillaries.append([i, f"new_capillary_{j}", str(skeleton_nums.shape[1])])
-    #             j += 1
-    #             sorted_skeleton_coords, optimal_order = sort_continuous(skeleton_nums, verbose=False)
-    #             ordered_distances = distances[optimal_order]
-    #             capillary_distances[str(i)] = ordered_distances
-    #             flattened_distances += list(distances)
-    #             skeleton_coords[str(i)] = sorted_skeleton_coords
-    #     print(f"{len(skeleton_coords.keys())}/{contours.shape[0]} capillaries used")
-    #     if verbose:
-    #         plt.show()
-    #         # Plot all capillaries together      
-    #             # plt.plot(capillary_distances[i])
-    #             # plt.title(f'Capillary {i} radii')
-    #             # plt.show()
-
-    #     if write:
-    #         np.savetxt(os.path.join(output_folder, f'{image}_cap_cut.csv'),
-    #                             np.array(used_capillaries), delimiter = ',',
-    #                             fmt = '%s')
-    #         for key in skeleton_coords:
-    #             np.savetxt(os.path.join(input_folder, "coords", f'{image}_skeleton_coords_{str(key).zfill(2)}.csv'), 
-    #                     skeleton_coords[key], delimiter=',', fmt = '%s')
-    #             np.savetxt(os.path.join(input_folder, "distances", f'{image}_capillary_distances_{str(key).zfill(2)}.csv'), 
-    #                     capillary_distances[key], delimiter=',', fmt = '%s')
-
-
-    #     # # Make overall histogram
-    #     # # plt.hist(flattened_distances)
-    #     # # plt.show()
-
-    #     # # TODO: Write program to register radii maps with each other 
-    #     # # TODO: Abnormal capillaries, how do.
+    plot_box_swarm(data, ["0.2 psi", "0.4 psi", "0.6 psi", "0.8 psi"], 
+                   "flow (um^3/s)", "Flow vs pressure cap_4", "figure 1")
 
     return 0
 
