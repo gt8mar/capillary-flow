@@ -114,17 +114,17 @@ def normalize_row_and_col(image):
     # Normalize rows
     norms = np.linalg.norm(image, axis=1)
     normalized_rows = image / norms[:, np.newaxis]
-    normalized_rows = gaussian_filter(normalized_rows, sigma = 2)
+    # normalized_rows = gaussian_filter(normalized_rows, sigma = 2)
 
     # Normalize columns
     norms = np.linalg.norm(image, axis=0)
     normalized_cols = image / norms
-    normalized_cols = gaussian_filter(normalized_cols, sigma = 2)
+    # normalized_cols = gaussian_filter(normalized_cols, sigma = 2)
 
 
     # Plot original image
     plt.subplot(3, 1, 1)
-    plt.imshow(gaussian_filter(image, sigma = 2))
+    plt.imshow(image)
     plt.title("Original image")
 
     # Plot normalized rows
