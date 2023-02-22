@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import cv2
 import os
 import math
-import seaborn as sb
+import seaborn as sns
 from skimage import measure
 from skimage.morphology import medial_axis
 from fil_finder import FilFinder2D
@@ -200,7 +200,27 @@ def watershed_seg(image, verbose = False):
     fig.tight_layout()
     plt.show()
     return 0
-def plot_box_swarm(data, x_labels, y_axis_label,  plot_title, figure_name):
+def remove_outliers(data, lower_percentile = 10, upper_percentile = 90):
+    """
+    This function removes outliers by percentile and returns
+    both the clipped data and the outlier points. 
+    Args:
+        data (list of list): List of lists with data to be plotted.
+        lower_percentile (int): lower percentile to clip
+        upper_percentile (int): upper percentile to clip
+    """
+    data_clipped = []
+    outlier_points = []
+    for column in data:
+        q1 = np.percentile(column, lower_percentile)
+        q3 = np.percentile(column, upper_percentile)
+        iqr = q3 - q1
+        lower_bound = q1 - 1.5 * iqr
+        upper_bound = q3 + 1.5 * iqr
+        data_clipped.append(column[(column >= lower_bound) & (column <= upper_bound)]) 
+        outlier_points.append(column[(column < lower_bound) | (column > upper_bound)])
+    return data_clipped, outlier_points
+def plot_box_swarm(data, x_labels, y_axis_label,  plot_title, figure_name, verbose = True, write = False, remove_outliers = True):
     """Plot box-plot and swarm plot for data list.
  
     Args:
@@ -211,29 +231,45 @@ def plot_box_swarm(data, x_labels, y_axis_label,  plot_title, figure_name):
         figure_name (str): Path to output figure.
          
     """
-    sb.set(color_codes=True)
-    plt.figure(1, figsize=(9, 6))
- 
-    # add title to plot
-    plt.title(plot_title)
- 
-    # plot data on swarmplot and boxplot
-    sb.swarmplot(data=data, color=".25")
-    ax = sb.boxplot(data=data)
- 
-    # y-axis label
-    ax.set(ylabel=y_axis_label)
- 
-    # write labels with number of elements
-    ax.set_xticks(np.arange(4), labels = x_labels)
-    ax.legend()
+    if remove_outliers:
+        # Remove outliers using the clip function
+        data_clipped, outliers = remove_outliers(data)
+        # initialize plot information:
+        sns.set(color_codes=True)
+        plt.figure(1, figsize=(9, 6))
+        plt.title(plot_title)
+
+        # Create box and swarm plot with clipped data
+        ax = sns.boxplot(data=data_clipped)
+        sns.swarmplot(data=data_clipped, color=".25")
+        sns.swarmplot(data = outliers, color = "red")
+        if verbose:
+            plt.show()
+
+    else:
+        # initialize plot information:
+        sns.set(color_codes=True)
+        plt.figure(1, figsize=(9, 6))
+        plt.title(plot_title)
     
-    # ax.set_xticklabels(["{} (n={})".format(l, len(data[x])) for x, l in enumerate(x_labels)], rotation=10)
- 
-    # write figure file with quality 400 dpi
-    # plt.savefig(figure_name, bbox_inches='tight', dpi=400)
-    plt.show()
-def find_slopes(image, method = 'ridge', verbose = False):
+        # plot data on swarmplot and boxplot
+        ax = sns.boxplot(data=data)
+        sns.swarmplot(data=data, color=".25")
+        
+        # y-axis label
+        ax.set(ylabel=y_axis_label)
+    
+        # write labels with number of elements
+        ax.set_xticks(np.arange(4), labels = x_labels)
+        ax.legend()
+        
+        if write:
+            # write figure file with quality 400 dpi
+            plt.savefig(figure_name, bbox_inches='tight', dpi=400)
+        if verbose:
+            plt.show()
+    return 0
+def find_slopes(image, method = 'ridge', verbose = False, write = False, plot_title = "Kymograph", filename = "kymograph_1.png", remove_outliers = True):
     edges = cv2.Canny(image, 50, 110)
     print(f"the shape of the file is {edges.shape}")
     # Find contours of the edges
@@ -272,31 +308,25 @@ def find_slopes(image, method = 'ridge', verbose = False):
 
             # Add line to list of lines
             slopes.append(slope[0])
-
-    average_slope = np.mean(np.array(slopes, dtype = float))
+    if remove_outliers:
+        slopes_clipped, outliers = remove_outliers(slopes)
+        average_slope = np.absolute(np.mean(np.array(slopes_clipped, dtype = float)))
+    else:
+        average_slope = np.mean(np.array(slopes, dtype = float))
     
     # Display the original image with lines drawn on it
     if verbose:
         cv2.line(image, (int(image.shape[1]/2), 0), (int((image.shape[0]-1)/average_slope) + int(image.shape[1]/2), image.shape[0]-1), (255,255,0), 2)
-        cv2.imshow('Lines', image)
+        cv2.imshow(plot_title, image)
         cv2.waitKey(0)
+    if write:
+        input_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(set_01), 'participant_04_cap_04', "blood_flow")
+        cv2.line(image, (int(image.shape[1]/2), 0), (int((image.shape[0]-1)/average_slope) + int(image.shape[1]/2), image.shape[0]-1), (255,255,0), 2)
+        plt.figure(1, figsize=(9, 6))
+        plt.title(plot_title)
+        plt.imshow(image)
+        plt.savefig(os.path.join(input_folder, filename), bbox_inches='tight', dpi=400)
     cv2.destroyAllWindows()
-    # cedges = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
-    # lines = cv2.HoughLines(edges, 1, np.pi/180, 200)
-    # print(lines)
-    # if lines is not None:
-    #     for i in range(len(lines)):
-    #         rho = lines[i][0][0]
-    #         theta = lines[i][0][1]
-    #         a = math.cos(theta)
-    #         b = math.sin(theta)
-    #         x0 = a * rho
-    #         y0 = b * rho
-    #         pt1 = (int(x0 + 1000*(-b)), int(y0 + 1000*(a)))
-    #         pt2 = (int(x0 - 1000*(-b)), int(y0 - 1000*(a)))
-    #         cv2.line(cedges, pt1, pt2, (0,0,255), 3, cv2.LINE_AA)
-    # cv2.imshow("title", cedges)
-    # cv2.waitKey()
     return slopes
 
 def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
@@ -315,7 +345,7 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
         # plt.imshow(norm_blur)
         # plt.show()
         # print(np.mean(normalized_rows))
-        
+
         kymo_blur = gaussian_filter(kymo_raw, sigma = 2)
         kymo_high_pass = kymo_raw - kymo_blur
         kymo_hp_blur = gaussian_filter(kymo_high_pass, sigma = 1) 
@@ -334,7 +364,13 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
         # plt.imshow(kymo_despeckle)
         # plt.show()
         # kymo_watershed = watershed_seg(kymo_despeckle, verbose = True)
-        slopes = find_slopes(kymo_blur, method = 'lasso', verbose = False)
+        if write:
+            base_name, extension = os.path.splitext(image)
+            filename = base_name + "kymo_new_line.png"
+            slopes = find_slopes(kymo_blur, method = 'lasso', verbose = False, write=True, filename=filename)
+        else:
+            slopes = find_slopes(kymo_blur, method = 'lasso', verbose = False, write=False)
+
         # slopes = find_slopes(norm_blur, method = 'lasso', verbose = False)
         data.append(np.absolute(slopes))
         print(slopes)
