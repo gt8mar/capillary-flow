@@ -8,9 +8,9 @@ By: Marcus Forst
 
 import time
 import os
-from src import write_background_file
+from src import write_background_file_training
 
-SET = "set_01"
+SET = "set_02"
 SAMPLE = "sample_000"
 processed_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', SET)
 
@@ -35,9 +35,11 @@ if __name__ == "__main__":
     # for folder in os.listdir(UMBRELLA_FOLDER):
     #     path = os.path.join(UMBRELLA_FOLDER, folder)
     #     write_background_file.main(folder, path, DATE, PARTICIPANT)
-    for i in range(12,21):
+    for i in range(34,57):
         sample = 'sample_' + str(i).zfill(3)
-        write_background_file.main(SET, sample, color = True)    
+        write_background_file_training.main(SET, sample, color = True)
+        print('finished one')
+        print(str(ticks-time.time()))    
     print("-------------------------------------")
     print("Background Runtime: " + str(time.time() - ticks))
     ticks = time.time()
