@@ -35,7 +35,7 @@ if __name__ == "__main__":
     # for folder in os.listdir(UMBRELLA_FOLDER):
     #     path = os.path.join(UMBRELLA_FOLDER, folder)
     #     write_background_file.main(folder, path, DATE, PARTICIPANT)
-    for i in range(34,57):
+    for i in range(43,57):
         sample = 'sample_' + str(i).zfill(3)
         write_background_file_training.main(SET, sample, color = True)
         print('finished one')

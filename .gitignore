@@ -62,3 +62,4 @@ src/tools/__pycache__/sort_nicely.cpython-39.pyc
 src/__pycache__/__init__.cpython-39.pyc
 tests/set_01_sample_003_blood_flow_00.csv
 figure 1.png
+data/processed/set_02/230322_export.json
