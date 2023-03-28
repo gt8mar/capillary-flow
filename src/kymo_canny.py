@@ -86,7 +86,7 @@ def plot_box_swarm(data, x_labels, y_axis_label,  plot_title, figure_name, verbo
         ax.set(ylabel=y_axis_label)
     
         # write labels with number of elements
-        ax.set_xticks(np.arange(4), labels = x_labels)
+        ax.set_xticks(np.arange(len(data)), labels = x_labels)
         ax.legend()
         
         if write:
