@@ -33,7 +33,7 @@ def visc_vivo(diameter, hemocrit = 0.45):
     return visc
 
 def main():
-    visc = visc_vivo(8)
+    visc = visc_vivo(16)
     print(visc)
     return 0
 
