@@ -18,6 +18,9 @@ from scipy.ndimage import gaussian_filter
 from scipy.ndimage import median_filter
 from sklearn.linear_model import Lasso
 
+FPS = 169.3
+PIX_UM = 1.74
+
 def average_array(array):
     """
     This returns an averaged array with half length of the input 1d array
@@ -96,8 +99,18 @@ def plot_box_swarm(data, x_labels, y_axis_label,  plot_title, figure_name, verbo
             else: plt.close()
         if verbose: plt.show()
     return 0
-def find_slopes(image, method = 'ridge', verbose = False, write = False, plot_title = "Kymograph", filename = "kymograph_1.png", remove_outliers = False):
+def find_slopes(image, method = 'ridge', verbose = False, write = False, plot_title = "Kymograph", filename = "kymograph_1", remove_outliers = False):
     edges = cv2.Canny(image, 50, 110)
+    # To save edge images:
+    if write:
+        input_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', "set_01", 'participant_04_cap_04', "blood_flow", "prog_rep")
+        plt.title("Canny edge detection")
+        plt.imshow(edges)
+        plt.savefig(os.path.join(input_folder, filename+"edges.png"), bbox_inches='tight', dpi=400)
+        plt.close()
+    if verbose:    
+        plt.imshow(edges)
+        plt.show()
     print(f"the shape of the file is {edges.shape}")
     # Find contours of the edges
     contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
@@ -129,9 +142,11 @@ def find_slopes(image, method = 'ridge', verbose = False, write = False, plot_ti
             start_x, end_x = 0, image.shape[1]-1
             start_y, end_y = lasso.predict([[start_x]]), lasso.predict([[end_x]])
             slope = (end_y-start_y)/(end_x-start_x)
-
-            # Draw the line on the original image
-            cv2.line(image, (int(start_x), int(start_y)), (int(end_x), int(end_y)), (0,255,0), 2)
+            if np.absolute(slope) <= 1:
+                cv2.line(image, (int((end_x-start_x)//4), int((end_y-start_y)//4)), (int(3*(end_x-start_x)//4), int(3*(end_y-start_y)//4)), (0,255,0), 2)
+            else:
+                # Draw the line on the original image
+                cv2.line(image, (int(start_x), int(start_y)), (int(end_x), int(end_y)), (0,255,0), 2)
 
             # Add line to list of lines
             slopes.append(slope[0])
@@ -143,6 +158,7 @@ def find_slopes(image, method = 'ridge', verbose = False, write = False, plot_ti
     
     # Display the original image with lines drawn on it
     if verbose:
+        print(average_slope)
         cv2.line(image, (int(image.shape[1]/2), 0), (int((image.shape[0]-1)/average_slope) + int(image.shape[1]/2), image.shape[0]-1), (255,255,0), 2)
         cv2.imshow(plot_title, image)
         cv2.waitKey(0)
@@ -152,14 +168,14 @@ def find_slopes(image, method = 'ridge', verbose = False, write = False, plot_ti
         plt.figure(1, figsize=(9, 6))
         plt.title(plot_title)
         plt.imshow(image)
-        plt.savefig(os.path.join(input_folder, filename), bbox_inches='tight', dpi=400)
+        plt.savefig(os.path.join(input_folder, filename+".png"), bbox_inches='tight', dpi=400)
         plt.close()
     cv2.destroyAllWindows()
     return slopes
 
 def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
     input_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), 'participant_04_cap_04', "blood_flow")
-    output_folder = os.path.join(input_folder, "centerlines")
+    output_folder = os.path.join(input_folder, "prog_rep")
     # Read in the mask
     images = get_images(input_folder, "tiff")
     data = []
@@ -178,15 +194,17 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
 
         if write:
             base_name, extension = os.path.splitext(image)
-            filename = base_name + "kymo_new_line.png"
+            filename = base_name + "kymo_new_line"
             slopes = find_slopes(kymo_blur, method = 'lasso', verbose = False, write=True, filename=filename)
         else:
-            slopes = find_slopes(kymo_blur, method = 'lasso', verbose = False, write=False)
+            slopes = find_slopes(kymo_blur, method = 'lasso', verbose = verbose, write=False)
+        # transform slopes from pixels/frames into um/s:
+        slopes = np.absolute(slopes) *FPS/PIX_UM
         data.append(np.absolute(slopes))
         print(slopes)
         print(f"The average slope for {image} is {np.mean(np.array(slopes, dtype = float))}")
     plot_box_swarm(data, ["0.2 psi", "0.4 psi", "0.6 psi", "0.8 psi"], 
-                   "flow (um^3/s)", "Flow vs pressure cap_4", "figure 1")
+                   "velocity (um/s)", "Participant_4 cap_4", "figure 1")
 
     return 0
 
@@ -199,6 +217,6 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main("set_01", "sample_009", write = False, verbose=True)
+    main("set_01", "sample_009", write = True, verbose=False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
