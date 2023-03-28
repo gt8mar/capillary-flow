@@ -75,7 +75,7 @@ def main(SET, sample, write = False, verbose = True):
         means.append(mean)
     plot_box_swarm([medians, means], x_labels = ["medians", "means"], y_axis_label="diameter (um)", 
                     plot_title=f"{SET}_{sample} capillary diameters", figure_name="figure 1")
-    return 0
+    return np.mean(means)
 
 """
 -----------------------------------------------------------------------------
@@ -84,8 +84,12 @@ def main(SET, sample, write = False, verbose = True):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    for i in range(1,7):
+    means = []
+    for i in range(0,9):
         sample = 'sample_' + str(i).zfill(3)
-        main("set_01", sample, write = False, verbose=True)
+        mean = main("set_01", sample, write = False, verbose=True)
+        means.append(mean)
+    plt.plot(means)
+    plt.show()    
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
