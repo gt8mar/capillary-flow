@@ -62,6 +62,20 @@ src/tools/__pycache__/sort_nicely.cpython-39.pyc
 src/__pycache__/__init__.cpython-39.pyc
 tests/set_01_sample_003_blood_flow_00.csv
 figure 1.png
+data/processed/set_02/230322_export.json
 src/__pycache__/__init__.cpython-39.pyc
 src/tools/__pycache__/get_images.cpython-39.pyc
 src/tools/__pycache__/sort_nicely.cpython-39.pyc
+output/events.out.tfevents.1679625051.Quake-Blood.14192.0
+output/events.out.tfevents.1679681066.Quake-Blood.7704.0
+output/events.out.tfevents.1679681216.Quake-Blood.13260.0
+output/events.out.tfevents.1679681768.Quake-Blood.276.0
+output/events.out.tfevents.1679682186.Quake-Blood.2600.0
+output/events.out.tfevents.1679683695.Quake-Blood.5848.0
+output/events.out.tfevents.1679685031.Quake-Blood.796.0
+output/events.out.tfevents.1679701549.Quake-Blood.13668.0
+output/events.out.tfevents.1679701554.Quake-Blood.2532.0
+output/events.out.tfevents.1679701554.Quake-Blood.11704.0
+output/metrics.json
+tests/230323_train.json
+tests/230323_val.json
