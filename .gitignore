@@ -81,3 +81,8 @@ tests/230323_train.json
 tests/230323_val.json
 src/tools/__pycache__/load_csv_list.cpython-39.pyc
 src/tools/__pycache__/load_csv_list.cpython-39.pyc
+output/events.out.tfevents.1680133497.Quake-Blood.14760.0
+output/events.out.tfevents.1680133510.Quake-Blood.15064.0
+output/events.out.tfevents.1680133549.Quake-Blood.1712.0
+output/events.out.tfevents.1680133553.Quake-Blood.9628.0
+output/events.out.tfevents.1680133554.Quake-Blood.14992.0
