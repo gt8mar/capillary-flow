@@ -85,9 +85,9 @@ def main(SET, sample, write = False, verbose = True):
 if __name__ == "__main__":
     ticks = time.time()
     means = []
-    for i in range(0,9):
+    for i in range(1,9):
         sample = 'sample_' + str(i).zfill(3)
-        mean = main("set_01", sample, write = False, verbose=True)
+        mean = main("set_01", sample, write = False, verbose=False)
         means.append(mean)
     plt.plot(means)
     plt.show()    
