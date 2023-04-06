@@ -3,7 +3,6 @@ Filename: pic2vid.py
 -------------------------------------------------------------
 This file turns a group of files into a video. It correctly orders misordered files.
 by: Marcus Forst
-sort_nicely credit: Ned B (https://nedbatchelder.com/blog/200712/human_sorting.html)
 """
 
 import os
