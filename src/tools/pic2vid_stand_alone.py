@@ -12,13 +12,13 @@ import cv2
 from src.tools.get_images import get_images
 
 # UMBRELLA_FOLDER = 'C:\\Users\\ejerison\\Desktop\\data\\221010'
-FILEFOLDER_PATH = "C:\\Users\\ejerison\\Desktop\\data\\221019\\raw\\vid12"
-DATE = "221101"
-PARTICIPANT = "Participant4"
-FOLDER_NAME = 'vid12'
+FILEFOLDER_PATH = "C:\\Users\\gt8mar\\Desktop\\data\\data_gabby\\vid1"
+DATE = "230404"
+PARTICIPANT = "Participant2"
+FOLDER_NAME = 'vid1'
 SET = '01'
-SAMPLE = '0002'
-FRAME_RATE = 169
+SAMPLE = '0070'
+FRAME_RATE = 220
 
 def frames_to_timecode(frame_number, frame_rate):
     """
