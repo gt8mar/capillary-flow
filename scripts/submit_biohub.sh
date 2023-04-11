@@ -12,4 +12,4 @@
 
 srun hostname
 cd ~
-python segment_hpc.py
+python segment.py
