@@ -12,4 +12,6 @@
 
 srun hostname
 cd ~
+echo "begin training model"
 python segment.py
+echo "completed training model"
