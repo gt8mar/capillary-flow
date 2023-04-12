@@ -8,4 +8,7 @@
 #SBATCH --mem-per-cpu=2G
 
 srun hostname
-srun sleep 60
+# srun sleep 60
+echo "Current working directory: $PWD"
+ls -l
+cd /home/marcus.forst
