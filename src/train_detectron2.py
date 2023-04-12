@@ -1,8 +1,8 @@
 """
-Filename: segment.py
+Filename: train_detectron.py
 -------------------
-This file uses a detectron2 trained machine learning model to
-segment images using instance segmentation. 
+This file trains detectron2 to
+perform instance segmentation on capillary images. 
 By: Marcus Forst
 """
 
