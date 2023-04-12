@@ -18,6 +18,7 @@ from detectron2.utils.visualizer import Visualizer
 from detectron2.config import get_cfg
 from detectron2 import model_zoo
 from detectron2.engine import DefaultTrainer, DefaultPredictor
+from detectron2.utils.visualizer import ColorMode
 # from detectron2.data import MetadataCatalog
 
 def main():
@@ -42,6 +43,7 @@ def main():
 
 
     cfg = get_cfg()
+    cfg.INPUT.MASK_FORMAT = "bitmask" # This was a necessary addition for my segmentation files to run
     cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
     cfg.DATASETS.TRAIN = ("my_dataset_train",)
     cfg.DATASETS.TEST = ()
@@ -64,6 +66,22 @@ def main():
     trainer = DefaultTrainer(cfg) 
     trainer.resume_or_load(resume=False)
     trainer.train()
+
+    # # Inference should use the config with parameters that are used in training
+    # # cfg now already contains everything we've set previously. We changed it a little bit for inference:
+    # cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")  # path to the model we just trained
+    # cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.7   # set a custom testing threshold
+    # predictor = DefaultPredictor(cfg)
+    
+    # for d in dataset_val:    
+    #     im = cv2.imread(d["file_name"])
+    #     outputs = predictor(im)  # format is documented at https://detectron2.readthedocs.io/tutorials/models.html#model-output-format
+    #     v = Visualizer(im[:, :, ::-1],
+    #                 scale=0.5, 
+    #                 instance_mode=ColorMode.IMAGE_BW   # remove the colors of unsegmented pixels. This option is only available for segmentation models
+    #     )
+    #     out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
+    #     cv2.imshow(out.get_image()[:, :, ::-1])
 
 """
 -----------------------------------------------------------------------------
