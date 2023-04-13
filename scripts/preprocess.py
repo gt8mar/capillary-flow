@@ -7,9 +7,9 @@ By: Marcus Forst
 
 import time
 import os
-from src import auto_corr
-from src import correlation
-from src import crop
+from src.analysis import auto_corr
+from src.analysis import correlation
+from src.tools import crop
 from src import write_background_file
 # import correlation_with_cap_selection
 

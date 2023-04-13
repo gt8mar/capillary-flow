@@ -8,8 +8,8 @@ By: Marcus Forst
 
 import time
 import os
-from src import auto_corr
-from src import correlation
+from src.analysis import auto_corr
+from src.analysis import correlation
 from src import make_kymograph
 from src import find_centerline
 
