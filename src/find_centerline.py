@@ -167,6 +167,14 @@ def sort_continuous(array_2D, verbose = False):
         raise Exception('wrong type')
 
 def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
+    """ Isolates capillaries from segmented image and finds their centerlines and radii. 
+
+    Args: 
+
+    Returns: 0
+
+    Saves: Centerlines, radii, which capillaries are too small
+    """
     input_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'D_segmented')
     output_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'E_centerline')
     # Read in the mask
@@ -174,6 +182,7 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
     # Make mask either 1 or 0
     segmented[segmented != 0] = 1
 
+    # TODO: Check if this does anything
     # save to results
     total_skeleton, total_distances = make_skeletons(segmented, verbose = verbose, write = write, 
                                                      write_path=os.path.join(output_folder, f'{SET}_{sample}_background_skeletons.png'))
@@ -209,9 +218,11 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
             # plt.show()
 
     if write:
-        np.savetxt(os.path.join(input_folder, f'{SET}_{sample}_cap_cut.csv'),
+        # Save which capillaries were dropped out
+        np.savetxt(os.path.join(input_folder, f'{SET}_{sample}_cap_cut.csv'), 
                             np.array(used_capillaries), delimiter = ',',
                             fmt = '%s')
+        # Save centerline and radii information
         for i in range(len(skeleton_coords)):
             np.savetxt(os.path.join(output_folder, "coords", f'{SET}_{sample}_skeleton_coords_{str(i).zfill(2)}.csv'), 
                     skeleton_coords[i], delimiter=',', fmt = "%s")
