@@ -10,7 +10,7 @@ import time
 import os
 from src import auto_corr
 from src import correlation
-from src import blood_flow_linear
+from src import make_kymograph
 from src import find_centerline
 
 # CAPILLARY_ROW = 565
@@ -49,7 +49,7 @@ if __name__ == "__main__":
         print(f"{sample} Centerline Runtime: {time.time() - ticks}")
         ticks = time.time()
 
-        blood_flow_linear.main(SET, sample, write = True)    
+        make_kymograph.main(SET, sample, write = True)    
         print("-------------------------------------")
         print(f"{sample} Blood-Flow Runtime: {time.time() - ticks}")
         ticks = time.time()
