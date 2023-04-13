@@ -4,7 +4,6 @@ Filename: write_background_file_training.py
 This file takes a series of images, creates a background file, and creates a folder with
 background subtracted files.
 By: Marcus Forst
-sort_nicely credit: Ned B (https://nedbatchelder.com/blog/200712/human_sorting.html)
 """
 
 import os
