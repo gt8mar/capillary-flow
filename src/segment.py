@@ -50,7 +50,7 @@ def main():
     cfg = get_cfg()
     cfg.INPUT.MASK_FORMAT = "bitmask" # This was a necessary addition for my segmentation files to run
     cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
-    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.7
+    cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.1
     # This is different than in train_detectron2.py:
     cfg.MODEL.WEIGHTS = os.path.join(weights_path,"model_final.pth")  # original input: cfg.OUTPUT_DIR
     predictor = DefaultPredictor(cfg)
@@ -58,13 +58,16 @@ def main():
     for d in dataset_val:    
         im = cv2.imread(d["file_name"])
         outputs = predictor(im)  # format is documented at https://detectron2.readthedocs.io/tutorials/models.html#model-output-format
+        print(outputs["instances"].pred_classes)
+        print(outputs["instances"].pred_boxes)
         v = Visualizer(im[:, :, ::-1],
                     scale=0.5, 
                     instance_mode=ColorMode.IMAGE_BW   # remove the colors of unsegmented pixels. This option is only available for segmentation models
         )
         out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
-        plt.imshow(out.get_image()[:, :, ::-1])
-        plt.show()
+        print("finished one fig")
+        cv2.imshow("fig1",out.get_image()[:, :, ::-1])
+        cv2.waitKey()        
 
 """
 -----------------------------------------------------------------------------
