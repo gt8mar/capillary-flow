@@ -1,7 +1,7 @@
 """
 Filename: make_kymograph.py
 ------------------------------------------------------
-This file calculates the blood flow rate statistically using the centerline.
+This file creates kymographs (centerline vs time graphs) of each capillary.
 
 By: Marcus Forst
 sort_nicely credit: Ned B (https://nedbatchelder.com/blog/200712/human_sorting.html)
