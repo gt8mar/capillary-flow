@@ -1,5 +1,5 @@
 """
-Filename: write_background_file.py
+Filename: write_background_file_training.py
 ------------------------------------------------------
 This file takes a series of images, creates a background file, and creates a folder with
 background subtracted files.
@@ -17,7 +17,23 @@ import cv2
 from src.tools.get_images import get_images
 from src.tools.pic2vid_train import pic2vid
 
-def main(SET='set_01', sample = 'sample_000', color = False):    
+def main(SET='set_01', sample = 'sample_000', method = "median", color = False): 
+    """Takes a folder of stabilized images and takes their median or
+    mean to find the background of the video. 
+
+    Args:
+        SET (string): The set of the sample
+        sample (string): the sample number
+        method (string): Method to create background file
+        color (bool): color or grayscale video
+
+    Returns: 
+        0
+
+    Saves: 
+        background (tiff image): background of stabilized images
+        video (tiff image): video of stabilized images
+    """   
     input_folder = os.path.join('D:\\Marcus\\train', str(SET), str(sample))
     output_folder = input_folder
     results_folder = 'D:\\Marcus\\train_backgrounds'  # I want to save all the backgrounds to the same folder for easy transfer to hasty.ai
@@ -47,7 +63,12 @@ def main(SET='set_01', sample = 'sample_000', color = False):
     image_files = np.array(image_files)
     pic2vid(image_files, SET, sample, color=color) 
     ROWS, COLS = image_files[0].shape
-    background = np.median(image_files, axis=0).astype('uint8') # median instead of mean
+    if method == "mean":
+        background = np.mean(image_files, axis=0).astype('uint8') 
+    elif method =="median":
+        background = np.median(image_files, axis=0).astype('uint8') # median instead of mean
+    else:
+        raise ValueError("Invalid operation entered, please enter either 'median' or 'mean'.")
 
 
     # """
