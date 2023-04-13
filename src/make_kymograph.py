@@ -181,10 +181,13 @@ def test2():
     return 0
 
 def main(SET = 'set_01', sample = 'sample_000', write = False, variable_radii = False):
+    """
+    TODO: this
+    """
     input_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
     centerline_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'E_centerline')
     output_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'F_blood_flow')
-    gap_left, gap_right, gap_bottom, gap_top = get_shifts(input_folder)
+    gap_left, gap_right, gap_bottom, gap_top = get_shifts(input_folder) # get gaps from the metadata
     # Import images
     images = get_images(os.path.join(input_folder,'vid'))
     image_array = load_image_array(images, input_folder)      # this has the shape (frames, row, col)
