@@ -2,7 +2,8 @@
 Filename: segment.py
 -------------------
 This file uses a detectron2 trained machine learning model to
-segment images using instance segmentation. 
+segment images using instance segmentation on a hpc (high 
+performance computer). 
 By: Marcus Forst
 """
 

@@ -2,7 +2,7 @@
 Filename: train_detectron.py
 -------------------
 This file trains detectron2 to
-perform instance segmentation on capillary images. 
+perform instance segmentation on capillary images on an hpc.  
 By: Marcus Forst
 """
 
