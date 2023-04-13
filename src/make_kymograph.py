@@ -1,5 +1,5 @@
 """
-Filename: blood_flow_linear.py
+Filename: make_kymograph.py
 ------------------------------------------------------
 This file calculates the blood flow rate statistically using the centerline.
 
@@ -199,14 +199,14 @@ def main(SET = 'set_01', sample = 'sample_000', write = False, variable_radii = 
     if write:
         for i in range(len(skeletons)):
             if variable_radii: 
-                centerline_array = build_centerline_vs_time_variable_radii(image_array, skeletons[i], centerline_radii[i], long=True, offset=False)
+                kymograph = build_centerline_vs_time_variable_radii(image_array, skeletons[i], centerline_radii[i], long=True, offset=False)
             else:
-                centerline_array = build_centerline_vs_time(image_array, skeletons[i], long = True)
+                kymograph = build_centerline_vs_time(image_array, skeletons[i], long = True)
             # centerline_array = normalize_rows(centerline_array)
-            centerline_array = normalize_image(centerline_array)
+            kymograph = normalize_image(kymograph)
             np.savetxt(os.path.join(output_folder, f'{SET}_{sample}_blood_flow_{str(i).zfill(2)}.csv'), 
-                    centerline_array, delimiter=',', fmt = '%s')
-            im = Image.fromarray(centerline_array)
+                    kymograph, delimiter=',', fmt = '%s')
+            im = Image.fromarray(kymograph)
             im.save(os.path.join(output_folder, f'{SET}_{sample}_blood_flow_{str(i).zfill(2)}.tiff'))
 
 
