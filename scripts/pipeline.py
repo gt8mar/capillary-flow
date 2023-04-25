@@ -8,7 +8,7 @@ By: Marcus Forst
 
 import time
 import os
-from src import write_background_file_training
+from src import write_background_file
 
 SET = "set_02"
 SAMPLE = "sample_000"
@@ -37,7 +37,7 @@ if __name__ == "__main__":
     #     write_background_file.main(folder, path, DATE, PARTICIPANT)
     for i in range(43,57):
         sample = 'sample_' + str(i).zfill(3)
-        write_background_file_training.main(SET, sample, color = True)
+        write_background_file.main(SET, sample, color = True)
         print('finished one')
         print(str(ticks-time.time()))    
     print("-------------------------------------")

@@ -5,12 +5,12 @@ parentDirectory = getDirectory("Choose a parent directory");
 allFiles = getFileList(parentDirectory);
 
 // Loop through each file/folder in the list
-for (i=1; i<2; i++){ //allFiles.length
+for (i=0; i<allFiles.length; i++){ //allFiles.length
 	print(allFiles[i]);
 	vidFolder = parentDirectory + allFiles[i];
 	 if (File.isDirectory(vidFolder)) {
 	 	File.openSequence(vidFolder);
-//        // Get a list of all images in the current directory:
+        // Get a list of all images in the current directory:
         imageFiles = getFileList(vidFolder);
         open(vidFolder + imageFiles[0]);
         folderName = allFiles[i].substring(0, lengthOf(allFiles[i])-1);
@@ -18,8 +18,19 @@ for (i=1; i<2; i++){ //allFiles.length
         File.makeDirectory(vidFolder + "metadata");
         mocoInput = "value=50 downsample_value=2 template="+imageFiles[0]+" stack="+folderName+" log=[Generate log file] plot=[No plot]";
         run("moco ", mocoInput);
-		saveAs("Results", "C:/Users/gt8mar/Desktop/data/230414/vid10/metadata/Results.csv");
-		run("Image Sequence... ", "dir=C:/Users/gt8mar/Desktop/data/230414/vid10/moco/ format=TIFF name=vid10_moco_");
+        metadataPath = vidFolder+"metadata/Results.csv";
+        sequencePath = "dir="+vidFolder+"moco/ format=TIFF name="+folderName+"_moco_";
+		saveAs("Results", metadataPath);
+		run("Image Sequence... ", sequencePath);
+		
+		selectWindow(folderName);
+		close();
+		selectWindow(imageFiles[0]);
+		close();
+		selectWindow("New Stack");
+		close();
+		run("Clear Results");
+
 
 
 //inputFile = parentDirectory + allFiles[i]+imageFiles[i];

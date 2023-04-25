@@ -9,10 +9,10 @@ import time
 import shutil
 
 def main(vidnum_start = 0):
-    directory_path = 'D:\\data_gabby\\230413_test - Copy'
+    directory_path = 'C:\\Users\\gt8mar\\Desktop\\data\\230425'
     filenames = os.listdir(directory_path)
     filenames = sorted(filenames, key=lambda x: os.path.getctime(os.path.join(directory_path, x))) # TODO: i'm not sure we should use creation time
-    print(filenames)
+    # print(filenames)
     files = []
     for i in range(len(filenames)):
         imgnum = filenames[i].split('_')[-1]
@@ -34,6 +34,6 @@ def main(vidnum_start = 0):
 
 if __name__ == "__main__":
     ticks = time.time()
-    main()
+    main(vidnum_start=0)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
