@@ -32,7 +32,7 @@ def main():
     # folder_val = "D:\\Marcus\\val_export"
     # weights_path = "C:\\Users\\gt8mar\\capillary-flow\\output"
     
-    weights_path = "home/marcus.forst/output"
+    weights_path = "/home/marcus.forst/output"
     register_coco_instances("my_dataset_train", {}, json_train, folder_train)
     register_coco_instances("my_dataset_val", {}, json_val, folder_val)
 
@@ -54,7 +54,7 @@ def main():
     cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.7
     # This is different than in train_detectron2.py:
-    cfg.MODEL.WEIGHTS = cfg.OUTPUT_DIR #os.path.join(weights_path,"model_final.pth")  # original input: cfg.OUTPUT_DIR
+    cfg.MODEL.WEIGHTS = os.path.join(weights_path, "model_final.pth")  #os.path.join(weights_path,"model_final.pth")  # original input: cfg.OUTPUT_DIR
     predictor = DefaultPredictor(cfg)
     
     for d in dataset_val:    
