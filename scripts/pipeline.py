@@ -9,10 +9,9 @@ By: Marcus Forst
 import time
 import os
 from src import write_background_file
+from src import segment
 
-SET = "set_02"
-SAMPLE = "sample_000"
-processed_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', SET)
+SET = "set_01"
 
 """
 -----------------------------------------------------------------------------
@@ -32,12 +31,18 @@ if __name__ == "__main__":
     # done in imagej
 
     """ Write Background """
-    # for folder in os.listdir(UMBRELLA_FOLDER):
-    #     path = os.path.join(UMBRELLA_FOLDER, folder)
-    #     write_background_file.main(folder, path, DATE, PARTICIPANT)
+   # TODO: iterate through participants, dates, and vids
     for i in range(43,57):
-        sample = 'sample_' + str(i).zfill(3)
+        sample = # we probably want some participant date and vid info here. original: 'sample_' + str(i).zfill(3)
+        # TODO: refactor write_background_file to work with participant, date ,vid folder format
         write_background_file.main(SET, sample, color = True)
+        """ Segment capillaries using segment.py """
+        # TODO: marcus make this work
+        segment.main()
+        find_centerline.py
+        make_kymograph.py 
+
+
         print('finished one')
         print(str(ticks-time.time()))    
     print("-------------------------------------")
