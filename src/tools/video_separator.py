@@ -9,7 +9,8 @@ import time
 import shutil
 
 def main(vidnum_start = 0):
-    directory_path = 'C:\\Users\\gt8mar\\Desktop\\data\\230425'
+    directory_path = 'C:\\Users\\gt8mar\\Desktop\\data\\part19\\230503'
+
     filenames = os.listdir(directory_path)
     filenames = sorted(filenames, key=lambda x: os.path.getctime(os.path.join(directory_path, x))) # TODO: i'm not sure we should use creation time
     # print(filenames)
