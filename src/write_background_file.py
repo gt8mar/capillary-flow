@@ -17,16 +17,21 @@ from src.tools.parse_vid_path import parse_vid_path
 from src.tools.get_images import get_images
 from src.tools.pic2vid import pic2vid
 
-def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1', color = False):  
+def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1', method = "median", color = False):  
     """
     Writes a background file and a video into results and C_background.
 
     Args: 
         path (str): Path to the stabilized video folder.
-        color (bool): Whether to make a color video or not
+        method (string): Method to create background file
+        color (bool): Whether to make a color video or not (grayscale)
 
     Returns: 
         int: 0 if executed
+
+    Saves: 
+        background (tiff image): background of stabilized images
+        video (.avi): video of stabilized images
     """  
     input_folder = os.path.join(path, 'B_stabilized')
     output_folder = os.path.join(path, 'C_background')
@@ -53,7 +58,13 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1'
     image_files = np.array(image_files)
     pic2vid(image_files, SET, participant, date, video, color=color) 
     ROWS, COLS = image_files[0].shape
-    background = np.mean(image_files, axis=0).astype('uint8')
+    
+    if method == "mean":
+        background = np.mean(image_files, axis=0).astype('uint8') 
+    elif method =="median":
+        background = np.median(image_files, axis=0).astype('uint8') # median instead of mean
+    else:
+        raise ValueError("Invalid operation entered, please enter either 'median' or 'mean'.")
 
 
     # """
