@@ -4,7 +4,6 @@ Filename: write_background_file.py
 This file takes a series of images, creates a background file, and creates a folder with
 background subtracted files.
 By: Marcus Forst
-sort_nicely credit: Ned B (https://nedbatchelder.com/blog/200712/human_sorting.html)
 """
 
 import os
@@ -14,13 +13,27 @@ import pandas as pd
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.pyplot as plt
 import cv2
+from src.tools.parse_vid_path import parse_vid_path
 from src.tools.get_images import get_images
 from src.tools.pic2vid import pic2vid
 
-def main(SET='set_01', sample = 'sample_000', color = False):    
-    input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
-    output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'C_background')
+def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1', color = False):  
+    """
+    Writes a background file and a video into results and C_background.
+
+    Args: 
+        path (str): Path to the stabilized video folder.
+        color (bool): Whether to make a color video or not
+
+    Returns: 
+        int: 0 if executed
+    """  
+    input_folder = os.path.join(path, 'B_stabilized')
+    output_folder = os.path.join(path, 'C_background')
     results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\backgrounds'  # I want to save all the backgrounds to the same folder for easy transfer to hasty.ai
+    SET, participant, date, video = parse_vid_path(input_folder)
+
+    # Read in shift values from stabilization algorithm
     shifts = pd.read_csv(os.path.join(input_folder, 'Results.csv'))
     gap_left = shifts['x'].max()
     gap_right = shifts['x'].min()
@@ -34,6 +47,7 @@ def main(SET='set_01', sample = 'sample_000', color = False):
     image_files = []
     for i in range(len(images)):
         image = np.array(cv2.imread(os.path.join(input_folder, 'vid', images[i]), cv2.IMREAD_GRAYSCALE))
+        # Crop image using shifts so that there is not a black border around the outside of the video
         cropped_image = image[gap_top:image.shape[0] + gap_bottom, gap_left:image.shape[1] + gap_right]
         image_files.append(cropped_image)
     image_files = np.array(image_files)
@@ -58,7 +72,7 @@ def main(SET='set_01', sample = 'sample_000', color = False):
     #     print(np.min(image_files))
 
     # Add background file
-    bkgd_name = f'{SET}_{sample}_background.tiff'
+    bkgd_name = f'{SET}_{participant}_{date}_{video}_background.tiff'
     cv2.imwrite(os.path.join(output_folder, bkgd_name), background)
     cv2.imwrite(os.path.join(results_folder, bkgd_name), background)
     return 0
@@ -70,6 +84,6 @@ def main(SET='set_01', sample = 'sample_000', color = False):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main('set_01', 'sample_000')
+    main()
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
