@@ -70,12 +70,16 @@ def extract_metadata(path):
     frame_rate = 100000//int(exposure)  # this rounds the frame-rate
     return pressure, frame_rate
 
-def pic2vid(images, SET = 'set_01', sample = 'sample_000', color = False, compress = True):
+def pic2vid(images, SET = 'set_01', participant = 'part_11', date = '230427',
+            video = 'vid1', color = False, compress = True):
     """
     takes a list of image files or numpy array and makes a movie with overlays
-    :param images: list of images or numpy array of images
-    :param SET: string
-    :param sample: string
+    Args:
+        images (list/np.array): The image data to be made into a video.
+        SET (str): the set from which the data came
+        participant (str): the participant who made the videos
+        date (str): the date the data was collected
+        video (str): the video number for that day
     :param color: bool
     :param compress: bool, whether to compress the video or not
     :return: 0
@@ -86,9 +90,9 @@ def pic2vid(images, SET = 'set_01', sample = 'sample_000', color = False, compre
     pressure, frame_rate = extract_metadata(metadata_path)
     print(frame_rate)
     if color:
-        video_name = f'{SET}_{sample}_color.avi'
+        video_name = f'{SET}_{participant}_{date}_{video}_color.avi'
     else:
-        video_name = f'{SET}_{sample}.avi'
+        video_name = f'{SET}_{participant}_{date}_{video}_gray.avi'
     frame = images[0]
     if compress:
         fourcc = cv2.VideoWriter_fourcc(*'XVID') # avi compression
