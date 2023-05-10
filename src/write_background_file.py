@@ -51,7 +51,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1'
         cropped_image = image[gap_top:image.shape[0] + gap_bottom, gap_left:image.shape[1] + gap_right]
         image_files.append(cropped_image)
     image_files = np.array(image_files)
-    pic2vid(image_files, SET, sample, color=color) 
+    pic2vid(image_files, SET, participant, date, video, color=color) 
     ROWS, COLS = image_files[0].shape
     background = np.mean(image_files, axis=0).astype('uint8')
 
