@@ -21,14 +21,15 @@ from detectron2.engine import DefaultTrainer, DefaultPredictor
 from detectron2.utils.visualizer import ColorMode
 # from detectron2.data import MetadataCatalog
 
-def main():
+def main(path=None):
     json_train = "/hpc/mydata/marcus.forst/230323_train.json"
     json_val = "/hpc/mydata/marcus.forst/230323_val.json"
     folder_train = "/hpc/mydata/marcus.forst/train_backgrounds_export"
     folder_val = "/hpc/mydata/marcus.forst/val_export"
 
-    folder_seg = "/hpc/mydata/marcus.forst/capillary-flow/results/backgrounds"
-
+    # folder_seg = "/hpc/mydata/marcus.forst/capillary-flow/results/backgrounds"
+    folder_seg = path
+    
     # json_train = "D:\\Marcus\\segmentations\\230323_train.json"
     # json_val = "D:\\Marcus\\segmentations\\230323_val.json"
     # folder_train = "D:\\Marcus\\train_backgrounds_export"
@@ -84,9 +85,11 @@ def main():
         )
         print(outputs["instances"].pred_classes)
         print(outputs["instances"].pred_boxes)
+        print(im[:,:,-1])
         out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
         plt.imsave(os.path.join(cfg.OUTPUT_DIR, str(d["file_name"]) + "_segs.png"), 
                     out.get_image()[:, :, ::-1])
+    return im[:,:,-1]
 
 """
 -----------------------------------------------------------------------------
