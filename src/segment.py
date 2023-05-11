@@ -26,6 +26,9 @@ def main():
     json_val = "/hpc/mydata/marcus.forst/230323_val.json"
     folder_train = "/hpc/mydata/marcus.forst/train_backgrounds_export"
     folder_val = "/hpc/mydata/marcus.forst/val_export"
+
+    folder_seg = "/hpc/mydata/marcus.forst/capillary-flow/results/backgrounds"
+
     # json_train = "D:\\Marcus\\segmentations\\230323_train.json"
     # json_val = "D:\\Marcus\\segmentations\\230323_val.json"
     # folder_train = "D:\\Marcus\\train_backgrounds_export"
