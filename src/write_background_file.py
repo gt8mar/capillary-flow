@@ -17,9 +17,9 @@ import cv2
 from src.tools.get_images import get_images
 from src.tools.pic2vid import pic2vid
 
-def main(SET='set_01', sample = 'sample_000', color = False):    
-    input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
-    output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'C_background')
+def main(SET='set_01', participant = 'part11', date = "230427", video = "vid1", color = False):    
+    input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data', str(SET), str(participant), str(date), str(video), 'B_stabilized')
+    output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data', str(SET), str(participant), str(date), str(video), 'C_background')
     results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\backgrounds'  # I want to save all the backgrounds to the same folder for easy transfer to hasty.ai
     shifts = pd.read_csv(os.path.join(input_folder, 'Results.csv'))
     gap_left = shifts['x'].max()
@@ -37,7 +37,7 @@ def main(SET='set_01', sample = 'sample_000', color = False):
         cropped_image = image[gap_top:image.shape[0] + gap_bottom, gap_left:image.shape[1] + gap_right]
         image_files.append(cropped_image)
     image_files = np.array(image_files)
-    pic2vid(image_files, SET, sample, color=color) 
+    pic2vid(image_files, SET, participant, date, video, color=color) 
     ROWS, COLS = image_files[0].shape
     background = np.mean(image_files, axis=0).astype('uint8')
 
@@ -58,7 +58,7 @@ def main(SET='set_01', sample = 'sample_000', color = False):
     #     print(np.min(image_files))
 
     # Add background file
-    bkgd_name = f'{SET}_{sample}_background.tiff'
+    bkgd_name = f'{SET}_{participant}_background.tiff'
     cv2.imwrite(os.path.join(output_folder, bkgd_name), background)
     cv2.imwrite(os.path.join(results_folder, bkgd_name), background)
     return 0
@@ -70,6 +70,6 @@ def main(SET='set_01', sample = 'sample_000', color = False):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main('set_01', 'sample_000')
+    main('set_01', 'part11')
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
