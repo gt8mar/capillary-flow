@@ -4,7 +4,6 @@ Filename: write_background_file.py
 This file takes a series of images, creates a background file, and creates a folder with
 background subtracted files.
 By: Marcus Forst
-sort_nicely credit: Ned B (https://nedbatchelder.com/blog/200712/human_sorting.html)
 """
 
 import os
@@ -14,13 +13,32 @@ import pandas as pd
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.pyplot as plt
 import cv2
+from src.tools.parse_vid_path import parse_vid_path
 from src.tools.get_images import get_images
 from src.tools.pic2vid import pic2vid
 
-def main(SET='set_01', participant = 'part11', date = "230427", video = "vid1", color = False):    
-    input_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data', str(SET), str(participant), str(date), str(video), 'B_stabilized')
-    output_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data', str(SET), str(participant), str(date), str(video), 'C_background')
+def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1', method = "median", color = False):  
+    """
+    Writes a background file and a video into results and C_background.
+
+    Args: 
+        path (str): Path to the stabilized video folder.
+        method (string): Method to create background file
+        color (bool): Whether to make a color video or not (grayscale)
+
+    Returns: 
+        int: 0 if executed
+
+    Saves: 
+        background (tiff image): background of stabilized images
+        video (.avi): video of stabilized images
+    """  
+    input_folder = os.path.join(path, 'B_stabilized')
+    output_folder = os.path.join(path, 'C_background')
     results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\backgrounds'  # I want to save all the backgrounds to the same folder for easy transfer to hasty.ai
+    SET, participant, date, video = parse_vid_path(input_folder)
+
+    # Read in shift values from stabilization algorithm
     shifts = pd.read_csv(os.path.join(input_folder, 'Results.csv'))
     gap_left = shifts['x'].max()
     gap_right = shifts['x'].min()
@@ -34,12 +52,19 @@ def main(SET='set_01', participant = 'part11', date = "230427", video = "vid1", 
     image_files = []
     for i in range(len(images)):
         image = np.array(cv2.imread(os.path.join(input_folder, 'vid', images[i]), cv2.IMREAD_GRAYSCALE))
+        # Crop image using shifts so that there is not a black border around the outside of the video
         cropped_image = image[gap_top:image.shape[0] + gap_bottom, gap_left:image.shape[1] + gap_right]
         image_files.append(cropped_image)
     image_files = np.array(image_files)
     pic2vid(image_files, SET, participant, date, video, color=color) 
     ROWS, COLS = image_files[0].shape
-    background = np.mean(image_files, axis=0).astype('uint8')
+    
+    if method == "mean":
+        background = np.mean(image_files, axis=0).astype('uint8') 
+    elif method =="median":
+        background = np.median(image_files, axis=0).astype('uint8') # median instead of mean
+    else:
+        raise ValueError("Invalid operation entered, please enter either 'median' or 'mean'.")
 
 
     # """
@@ -58,7 +83,7 @@ def main(SET='set_01', participant = 'part11', date = "230427", video = "vid1", 
     #     print(np.min(image_files))
 
     # Add background file
-    bkgd_name = f'{SET}_{participant}_background.tiff'
+    bkgd_name = f'{SET}_{participant}_{date}_{video}_background.tiff'
     cv2.imwrite(os.path.join(output_folder, bkgd_name), background)
     cv2.imwrite(os.path.join(results_folder, bkgd_name), background)
     return 0
@@ -70,6 +95,6 @@ def main(SET='set_01', participant = 'part11', date = "230427", video = "vid1", 
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main('set_01', 'part11')
+    main('set_01', 'sample_000')
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))

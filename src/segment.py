@@ -21,11 +21,15 @@ from detectron2.engine import DefaultTrainer, DefaultPredictor
 from detectron2.utils.visualizer import ColorMode
 # from detectron2.data import MetadataCatalog
 
-def main():
+def main(path=None, verbose = False):
     json_train = "/hpc/mydata/marcus.forst/230323_train.json"
     json_val = "/hpc/mydata/marcus.forst/230323_val.json"
     folder_train = "/hpc/mydata/marcus.forst/train_backgrounds_export"
     folder_val = "/hpc/mydata/marcus.forst/val_export"
+
+    # folder_seg = "/hpc/mydata/marcus.forst/capillary-flow/results/backgrounds"
+    folder_seg = path
+    
     # json_train = "D:\\Marcus\\segmentations\\230323_train.json"
     # json_val = "D:\\Marcus\\segmentations\\230323_val.json"
     # folder_train = "D:\\Marcus\\train_backgrounds_export"
@@ -65,7 +69,7 @@ def main():
     cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = 512   # The "RoIHead batch size". 128 is faster, and good enough for this toy dataset (default: 512)
     cfg.MODEL.ROI_HEADS.NUM_CLASSES = 1  # only has one class (ballon). (see https://detectron2.readthedocs.io/tutorials/datasets.html#update-the-config-for-new-datasets)
     predictor = DefaultPredictor(cfg)
-    
+    mask_list = []
     for d in dataset_val:    
         im = cv2.imread(d["file_name"])
         # extract the filename from the path
@@ -75,15 +79,32 @@ def main():
         # extract the desired string from the filename
         sample = filename_without_ext.split('_background')[0]
         outputs = predictor(im)  # format is documented at https://detectron2.readthedocs.io/tutorials/models.html#model-output-format
-        v = Visualizer(im[:, :, ::-1],
-                    scale=0.5, 
-                    instance_mode=ColorMode.IMAGE_BW   # remove the colors of unsegmented pixels. This option is only available for segmentation models
-        )
-        print(outputs["instances"].pred_classes)
-        print(outputs["instances"].pred_boxes)
-        out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
-        plt.imsave(os.path.join(cfg.OUTPUT_DIR, str(d["file_name"]) + "_segs.png"), 
-                    out.get_image()[:, :, ::-1])
+        mask = outputs["instances"].pred_masks[0].cpu().numpy()
+        print(mask.shape)
+        print(np.count_nonzero(mask))
+        if verbose:
+            v = Visualizer(im[:, :, ::-1],
+                        scale=0.5, 
+                        instance_mode=ColorMode.IMAGE_BW   # remove the colors of unsegmented pixels. This option is only available for segmentation models
+            )
+            print(outputs["instances"].pred_classes)
+            print(outputs["instances"].pred_boxes)
+            print(im[:,:,-1])
+            out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
+            plt.imsave(os.path.join(cfg.OUTPUT_DIR, str(d["file_name"]) + "_fancy_segs.png"), 
+                        out.get_image()[:, :, ::-1])
+        
+        # Save the mask
+        plt.imsave(os.path.join(path, "C_segmented", str(d["file_name"]) + "_segs.png"), 
+                    mask)
+        # Convert boolean array to integer array
+        mask_int = mask.astype(int)
+        mask_list.append(mask_int)
+
+        # Save the integer array to a CSV file
+        np.savetxt(os.path.join(cfg.OUTPUT_DIR, str(d["file_name"]) + "_segs.csv"), mask_int, 
+                   delimiter=',', fmt='%s')
+    return mask_list
 
 """
 -----------------------------------------------------------------------------
