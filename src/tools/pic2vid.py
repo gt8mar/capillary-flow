@@ -73,16 +73,21 @@ def extract_metadata(path):
 def pic2vid(images, SET = 'set_01', participant = 'part_11', date = '230427',
             video = 'vid1', color = False, compress = True):
     """
-    takes a list of image files or numpy array and makes a movie with overlays
+    Takes a list of image files or numpy array and makes a movie with overlays
+    
     Args:
         images (list/np.array): The image data to be made into a video.
         SET (str): the set from which the data came
         participant (str): the participant who made the videos
         date (str): the date the data was collected
         video (str): the video number for that day
-    :param color: bool
-    :param compress: bool, whether to compress the video or not
-    :return: 0
+        color: bool
+        compress: bool, whether to compress the video or not
+
+    Returns: 
+        int: 0 if successful
+
+    Saves: video file in results folder
     """
     images = np.array(images)
     metadata_path = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data', SET, participant, date, video, 'metadata', 'metadata.txt')
