@@ -92,3 +92,4 @@ output/events.out.tfevents.1681280921.gpu-sm01-08.719383.0
 output/last_checkpoint
 src/tools/__pycache__/get_images.cpython-39.pyc
 src/tools/__pycache__/sort_nicely.cpython-39.pyc
+scripts/upload_data.sh
