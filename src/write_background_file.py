@@ -17,7 +17,8 @@ from src.tools.parse_vid_path import parse_vid_path
 from src.tools.get_images import get_images
 from src.tools.pic2vid import pic2vid
 
-def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1', method = "median", color = False):  
+def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1', 
+         method = "median", color = False):  
     """
     Writes a background file and a video into results and C_background.
 
