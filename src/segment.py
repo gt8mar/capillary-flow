@@ -9,6 +9,7 @@ By: Marcus Forst
 
 import torch
 import detectron2
+import numpy as np
 import os, time
 import cv2, json
 import random
@@ -22,6 +23,22 @@ from detectron2.utils.visualizer import ColorMode
 # from detectron2.data import MetadataCatalog
 
 def main(path=None, verbose = False):
+    """
+    Uses detectron2 to segment images using instance segmentation inference.
+    Saves the results to a folder called "segmentation_results" in the same
+    folder as the images.
+
+    Args:
+        path (str): Path to the folder containing the images to be segmented.
+        verbose (bool): Whether to plot the results or not.
+    
+    Returns:
+        mask_dict (dict): Dictionary containing the masks for each image.
+    
+    Saves:
+        segmentation_results (png): Segmented images
+    """
+
     json_train = "/hpc/mydata/marcus.forst/230323_train.json"
     json_val = "/hpc/mydata/marcus.forst/230323_val.json"
     folder_train = "/hpc/mydata/marcus.forst/train_backgrounds_export"
@@ -69,7 +86,7 @@ def main(path=None, verbose = False):
     cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = 512   # The "RoIHead batch size". 128 is faster, and good enough for this toy dataset (default: 512)
     cfg.MODEL.ROI_HEADS.NUM_CLASSES = 1  # only has one class (ballon). (see https://detectron2.readthedocs.io/tutorials/datasets.html#update-the-config-for-new-datasets)
     predictor = DefaultPredictor(cfg)
-    mask_list = []
+    mask_dict = {}
     for d in dataset_val:    
         im = cv2.imread(d["file_name"])
         # extract the filename from the path
@@ -99,12 +116,12 @@ def main(path=None, verbose = False):
                     mask)
         # Convert boolean array to integer array
         mask_int = mask.astype(int)
-        mask_list.append(mask_int)
+        mask_dict[sample] = mask_int
 
         # Save the integer array to a CSV file
         np.savetxt(os.path.join(cfg.OUTPUT_DIR, str(d["file_name"]) + "_segs.csv"), mask_int, 
                    delimiter=',', fmt='%s')
-    return mask_list
+    return mask_dict
 
 """
 -----------------------------------------------------------------------------
