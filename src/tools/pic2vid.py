@@ -90,8 +90,8 @@ def pic2vid(images, SET = 'set_01', participant = 'part_11', date = '230427',
     Saves: video file in results folder
     """
     images = np.array(images)
-    metadata_path = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data', SET, participant, date, video, 'metadata', 'metadata.txt')
-    output_path = 'C:\\Users\\gt8mar\\capillary-flow\\results'
+    metadata_path = os.path.join('hpc/projects/capillary-flow/data', participant, date, video, 'metadata', 'metadata.txt')
+    output_path = '/hpc/projects/capillary-flow/results/videos'
     pressure, frame_rate = extract_metadata(metadata_path)
     print(frame_rate)
     if color:
@@ -147,7 +147,7 @@ def pic2vid(images, SET = 'set_01', participant = 'part_11', date = '230427',
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    input_folder = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1\\B_stabilized'
+    input_folder = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1\\moco'
     images = get_images(input_folder)
     image_files = []
     for i in range(len(images)): 

@@ -6,6 +6,8 @@ This file takes in a path and returns the variables set, participant, date, and 
 By: Marcus Forst
 """
 
+import os
+
 def parse_vid_path(path):
     """
     This file takes in a path and returns the variables set, participant, date, and video.
@@ -22,8 +24,8 @@ def parse_vid_path(path):
     dir_names = path.split(os.path.sep)
     
     # Extract the variables from the directory names
-    set = dir_names[-4]
+    # set = dir_names[-4]
     participant = dir_names[-3]
     date = dir_names[-2]
     video = dir_names[-1]
-    return SET, participant, date, video
+    return participant, date, video  # SET,

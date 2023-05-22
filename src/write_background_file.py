@@ -22,7 +22,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1'
     Writes a background file and a video into results and C_background.
 
     Args: 
-        path (str): Path to the stabilized video folder.
+        path (str): Path to the umbrella video folder.
         method (string): Method to create background file
         color (bool): Whether to make a color video or not (grayscale)
 
@@ -33,10 +33,11 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1'
         background (tiff image): background of stabilized images
         video (.avi): video of stabilized images
     """  
-    input_folder = os.path.join(path, 'B_stabilized')
+    input_folder = os.path.join(path, 'moco')
+    os.makedirs(os.path.join(path, 'C_background'), exist_ok=True)
     output_folder = os.path.join(path, 'C_background')
-    results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\backgrounds'  # I want to save all the backgrounds to the same folder for easy transfer to hasty.ai
-    SET, participant, date, video = parse_vid_path(input_folder)
+    results_folder = '/hpc/projects/capillary-flow/results/backgrounds'  # I want to save all the backgrounds to the same folder for easy transfer to hasty.ai
+    participant, date, video = parse_vid_path(input_folder)
 
     # Read in shift values from stabilization algorithm
     shifts = pd.read_csv(os.path.join(input_folder, 'Results.csv'))
@@ -56,7 +57,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1'
         cropped_image = image[gap_top:image.shape[0] + gap_bottom, gap_left:image.shape[1] + gap_right]
         image_files.append(cropped_image)
     image_files = np.array(image_files)
-    pic2vid(image_files, SET, participant, date, video, color=color) 
+    pic2vid(image_files, participant, date, video, color=color) 
     ROWS, COLS = image_files[0].shape
     
     if method == "mean":
@@ -83,7 +84,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1'
     #     print(np.min(image_files))
 
     # Add background file
-    bkgd_name = f'{SET}_{participant}_{date}_{video}_background.tiff'
+    bkgd_name = f'set_01_{participant}_{date}_{video}_background.tiff'
     cv2.imwrite(os.path.join(output_folder, bkgd_name), background)
     cv2.imwrite(os.path.join(results_folder, bkgd_name), background)
     return 0
