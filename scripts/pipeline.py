@@ -10,7 +10,7 @@ By: Marcus Forst
 import time
 import os
 from src import write_background_file
-from src import segment
+# from src import segment
 
 SET = "set_01"
 
