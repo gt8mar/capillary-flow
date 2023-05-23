@@ -70,17 +70,16 @@ def extract_metadata(path):
     frame_rate = 100000//int(exposure)  # this rounds the frame-rate
     return pressure, frame_rate
 
-def pic2vid(images, SET = 'set_01', participant = 'part_11', date = '230427',
-            video = 'vid1', color = False, compress = True):
+def pic2vid(images, participant = 'part_11', date = '230427',
+            video_folder = 'vid1', color = False, compress = True):
     """
     Takes a list of image files or numpy array and makes a movie with overlays
     
     Args:
         images (list/np.array): The image data to be made into a video.
-        SET (str): the set from which the data came
         participant (str): the participant who made the videos
         date (str): the date the data was collected
-        video (str): the video number for that day
+        video_folder (str): the video number for that day
         color: bool
         compress: bool, whether to compress the video or not
 
@@ -89,15 +88,16 @@ def pic2vid(images, SET = 'set_01', participant = 'part_11', date = '230427',
 
     Saves: video file in results folder
     """
+    SET = 'set_01'
     images = np.array(images)
-    metadata_path = os.path.join('hpc/projects/capillary-flow/data', participant, date, video, 'metadata', 'metadata.txt')
+    metadata_path = os.path.join('hpc/projects/capillary-flow/data', participant, date, video_folder, 'metadata', 'metadata.txt')
     output_path = '/hpc/projects/capillary-flow/results/videos'
     pressure, frame_rate = extract_metadata(metadata_path)
     print(frame_rate)
     if color:
-        video_name = f'{SET}_{participant}_{date}_{video}_color.avi'
+        video_name = f'{SET}_{participant}_{date}_{video_folder}_color.avi'
     else:
-        video_name = f'{SET}_{participant}_{date}_{video}_gray.avi'
+        video_name = f'{SET}_{participant}_{date}_{video_folder}_gray.avi'
     frame = images[0]
     if compress:
         fourcc = cv2.VideoWriter_fourcc(*'XVID') # avi compression
@@ -121,7 +121,7 @@ def pic2vid(images, SET = 'set_01', participant = 'part_11', date = '230427',
         set_string = str(SET).split('_')[0] + ": " + str(SET).split('_')[1]
         participant_string = str(participant).split('_')[0] + ": " + str(participant).split('_')[1]
         date_string = str(date).split('_')[0] + ": " + str(date).split('_')[1]
-        video_string = str(video).split('_')[0] + ": " + str(video).split('_')[1]
+        video_string = str(video_folder).split('_')[0] + ": " + str(video_folder).split('_')[1]
 
         add_overlay(img, f'{set_string}', (50, 50))
         add_overlay(img, f'{participant_string}', (50, 80))
