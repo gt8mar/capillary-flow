@@ -18,10 +18,12 @@ import matplotlib.pyplot as plt
 def frames_to_timecode(frame_number, frame_rate):
     """
     Method that converts frames to SMPTE timecode.
-    :param frame_number: Number of frames
-    :param frame_rate: frames per second
-    :param drop: true if time code should drop frames, false if not
-    :returns: SMPTE timecode as string, e.g. '01:02:12:32' or '01:02:12;32'
+    Args:
+        frame_number (int): Number of frames
+        frame_rate (int/float): frames per second
+        drop (bool): true if time code should drop frames, false if not
+    
+    Returns: SMPTE timecode as string, e.g. '01:02:12:32' or '01:02:12;32'
     """
     fps_int = int(round(frame_rate))
     # now split our frames into time code
@@ -71,7 +73,7 @@ def extract_metadata(path):
     return pressure, frame_rate
 
 def pic2vid(images, participant = 'part_11', date = '230427',
-            video_folder = 'vid1', color = False, compress = True):
+            video_folder = 'vid1', color = False, compress = True, overlay = True):
     """
     Takes a list of image files or numpy array and makes a movie with overlays
     
@@ -90,10 +92,14 @@ def pic2vid(images, participant = 'part_11', date = '230427',
     """
     SET = 'set_01'
     images = np.array(images)
-    metadata_path = os.path.join('hpc/projects/capillary-flow/data', participant, date, video_folder, 'metadata', 'metadata.txt')
     output_path = '/hpc/projects/capillary-flow/results/videos'
-    pressure, frame_rate = extract_metadata(metadata_path)
-    print(frame_rate)
+    if overlay:
+        metadata_path = os.path.join('hpc/projects/capillary-flow/data', participant, date, video_folder, 'metadata', 'metadata.txt')
+        pressure, frame_rate = extract_metadata(metadata_path)
+        print(frame_rate)
+    else:
+        frame_rate = 227.8/2
+        pressure = 'TBD'
     if color:
         video_name = f'{SET}_{participant}_{date}_{video_folder}_color.avi'
     else:
@@ -119,9 +125,9 @@ def pic2vid(images, participant = 'part_11', date = '230427',
         add_overlay(img, timecode, (frame.shape[1]//2 - 100, 50))
         # add set and sample overlay details
         set_string = str(SET).split('_')[0] + ": " + str(SET).split('_')[1]
-        participant_string = str(participant).split('_')[0] + ": " + str(participant).split('_')[1]
-        date_string = str(date).split('_')[0] + ": " + str(date).split('_')[1]
-        video_string = str(video_folder).split('_')[0] + ": " + str(video_folder).split('_')[1]
+        participant_string = str(participant)
+        date_string = str(date)
+        video_string = str(video_folder)
 
         add_overlay(img, f'{set_string}', (50, 50))
         add_overlay(img, f'{participant_string}', (50, 80))
