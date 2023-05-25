@@ -170,8 +170,12 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
     """ Isolates capillaries from segmented image and finds their centerlines and radii. 
 
     Args: 
+        SET: string, name of set
+        sample: string, name of sample
+        verbose: bool, shows plots if true
+        write: bool, saves plots if true
 
-    Returns: 0
+    Returns: 0 if successful
 
     Saves: Centerlines, radii, which capillaries are too small
     """

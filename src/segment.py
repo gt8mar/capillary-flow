@@ -9,6 +9,7 @@ By: Marcus Forst
 
 import torch
 import detectron2
+import numpy as np
 import os, time
 import cv2, json
 import random
@@ -21,18 +22,38 @@ from detectron2.engine import DefaultTrainer, DefaultPredictor
 from detectron2.utils.visualizer import ColorMode
 # from detectron2.data import MetadataCatalog
 
-def main():
+def main(path=None, verbose = False):
+    """
+    Uses detectron2 to segment images using instance segmentation inference.
+    Saves the results to a folder called "segmentation_results" in the same
+    folder as the images.
+
+    Args:
+        path (str): Path to the folder containing the images to be segmented.
+        verbose (bool): Whether to plot the results or not.
+    
+    Returns:
+        mask_dict (dict): Dictionary containing the masks for each image.
+    
+    Saves:
+        segmentation_results (png): Segmented images
+    """
+
     json_train = "/hpc/mydata/marcus.forst/230323_train.json"
     json_val = "/hpc/mydata/marcus.forst/230323_val.json"
     folder_train = "/hpc/mydata/marcus.forst/train_backgrounds_export"
     folder_val = "/hpc/mydata/marcus.forst/val_export"
+
+    # folder_seg = "/hpc/mydata/marcus.forst/capillary-flow/results/backgrounds"
+    folder_seg = path
+    
     # json_train = "D:\\Marcus\\segmentations\\230323_train.json"
     # json_val = "D:\\Marcus\\segmentations\\230323_val.json"
     # folder_train = "D:\\Marcus\\train_backgrounds_export"
     # folder_val = "D:\\Marcus\\val_export"
     # weights_path = "C:\\Users\\gt8mar\\capillary-flow\\output"
     
-    weights_path = "home/marcus.forst/output"
+    weights_path = "/home/marcus.forst/output"
     register_coco_instances("my_dataset_train", {}, json_train, folder_train)
     register_coco_instances("my_dataset_val", {}, json_val, folder_val)
 
@@ -52,11 +73,20 @@ def main():
     cfg = get_cfg()
     cfg.INPUT.MASK_FORMAT = "bitmask" # This was a necessary addition for my segmentation files to run
     cfg.merge_from_file(model_zoo.get_config_file("COCO-InstanceSegmentation/mask_rcnn_R_50_FPN_3x.yaml"))
+    cfg.DATASETS.TRAIN = ("my_dataset_train",)
+    cfg.DATASETS.TEST = ()
+    cfg.DATALOADER.NUM_WORKERS = 2
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.7
     # This is different than in train_detectron2.py:
-    cfg.MODEL.WEIGHTS = cfg.OUTPUT_DIR #os.path.join(weights_path,"model_final.pth")  # original input: cfg.OUTPUT_DIR
+    cfg.MODEL.WEIGHTS = os.path.join(weights_path, "model_final.pth")  #os.path.join(weights_path,"model_final.pth")  # original input: cfg.OUTPUT_DIR
+    cfg.SOLVER.IMS_PER_BATCH = 2  # This is the real "batch size" commonly known to deep learning people
+    cfg.SOLVER.BASE_LR = 0.00025  # pick a good LR
+    cfg.SOLVER.MAX_ITER = 300    # 300 iterations seems good enough for this toy dataset; you will need to train longer for a practical dataset
+    cfg.SOLVER.STEPS = []        # do not decay learning rate
+    cfg.MODEL.ROI_HEADS.BATCH_SIZE_PER_IMAGE = 512   # The "RoIHead batch size". 128 is faster, and good enough for this toy dataset (default: 512)
+    cfg.MODEL.ROI_HEADS.NUM_CLASSES = 1  # only has one class (ballon). (see https://detectron2.readthedocs.io/tutorials/datasets.html#update-the-config-for-new-datasets)
     predictor = DefaultPredictor(cfg)
-    
+    mask_dict = {}
     for d in dataset_val:    
         im = cv2.imread(d["file_name"])
         # extract the filename from the path
@@ -66,15 +96,32 @@ def main():
         # extract the desired string from the filename
         sample = filename_without_ext.split('_background')[0]
         outputs = predictor(im)  # format is documented at https://detectron2.readthedocs.io/tutorials/models.html#model-output-format
-        v = Visualizer(im[:, :, ::-1],
-                    scale=0.5, 
-                    instance_mode=ColorMode.IMAGE_BW   # remove the colors of unsegmented pixels. This option is only available for segmentation models
-        )
-        print(outputs["instances"].pred_classes)
-        print(outputs["instances"].pred_boxes)
-        out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
-        plt.imsave(os.path.join("/hpc/mydata/marcus.forst/segmented", sample + "_segmented.png"), 
-                    out.get_image()[:, :, ::-1])
+        mask = outputs["instances"].pred_masks[0].cpu().numpy()
+        print(mask.shape)
+        print(np.count_nonzero(mask))
+        if verbose:
+            v = Visualizer(im[:, :, ::-1],
+                        scale=0.5, 
+                        instance_mode=ColorMode.IMAGE_BW   # remove the colors of unsegmented pixels. This option is only available for segmentation models
+            )
+            print(outputs["instances"].pred_classes)
+            print(outputs["instances"].pred_boxes)
+            print(im[:,:,-1])
+            out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
+            plt.imsave(os.path.join(cfg.OUTPUT_DIR, str(d["file_name"]) + "_fancy_segs.png"), 
+                        out.get_image()[:, :, ::-1])
+        
+        # Save the mask
+        plt.imsave(os.path.join(path, "C_segmented", str(d["file_name"]) + "_segs.png"), 
+                    mask)
+        # Convert boolean array to integer array
+        mask_int = mask.astype(int)
+        mask_dict[sample] = mask_int
+
+        # Save the integer array to a CSV file
+        np.savetxt(os.path.join(cfg.OUTPUT_DIR, str(d["file_name"]) + "_segs.csv"), mask_int, 
+                   delimiter=',', fmt='%s')
+    return mask_dict
 
 """
 -----------------------------------------------------------------------------

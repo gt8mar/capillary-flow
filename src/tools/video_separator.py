@@ -9,7 +9,18 @@ import time
 import shutil
 
 def main(vidnum_start = 0):
-    directory_path = 'C:\\Users\\gt8mar\\Desktop\\data\\230425'
+    """
+    This function takes a directory of images and separates them into video folders
+    based on the image number.
+
+    Args:
+        vidnum_start (int): the video number to start with
+    
+    Returns:
+        int: 0 if executed
+    """
+    directory_path = 'C:\\Users\\gt8mar\\Desktop\\data\\part20\\230516'
+
     filenames = os.listdir(directory_path)
     filenames = sorted(filenames, key=lambda x: os.path.getctime(os.path.join(directory_path, x))) # TODO: i'm not sure we should use creation time
     # print(filenames)
@@ -30,7 +41,9 @@ def main(vidnum_start = 0):
         else:
             source_path = os.path.join(directory_path, str(files[i][0]))
             dest_path = os.path.join(directory_path, "vid" + str(vidnum).zfill(2))
-            shutil.move(source_path, dest_path)        
+            shutil.move(source_path, dest_path)
+
+    return 0        
 
 if __name__ == "__main__":
     ticks = time.time()

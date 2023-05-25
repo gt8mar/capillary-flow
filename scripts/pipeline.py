@@ -2,52 +2,53 @@
 Filename: pipeline.py
 ------------------------------------------------------
 This program runs a sequence of python programs to write a background
-file and corresponding video.
+file, a corresponding video, segment capillaries, and calculate
+flow rates.
 By: Marcus Forst
 """
 
 import time
-import os
+import os, sys
 from src import write_background_file
-from src import segment
+# from src import segment
 
 SET = "set_01"
 
-"""
------------------------------------------------------------------------------
-"""
-# This provided line is required at the end of a Python file
-# to call the main() function.
-if __name__ == "__main__":
-    print("Run full pipeline")
-    print("-------------------------------------")
-    ticks_first = time.time()
-    ticks = time.time()
+def main():
+    """
+    Write background file, corresponding video, segment capillaries, and calculate flow rates.
 
-    """ Step A: Preprocess """
-    # done in preprocess.py
-
-    """ Step B: Stabilize using moco in imagej """
-    # done in imagej
+    Args:
+        None
+    Returns:
+        0 if successful
+    Saves:
+        background file
+        video
+        segmented file
+    """
 
     """ Write Background """
-   # TODO: iterate through participants, dates, and vids
-    for i in range(43,57):
-        sample = # we probably want some participant date and vid info here. original: 'sample_' + str(i).zfill(3)
-        # TODO: refactor write_background_file to work with participant, date ,vid folder format
-        write_background_file.main(SET, sample, color = True)
-        """ Segment capillaries using segment.py """
-        # TODO: marcus make this work
-        segment.main()
-        find_centerline.py
-        make_kymograph.py 
+    i = sys.argv[1]
+    ticks_total = time.time()
+    participant = 'part' + str(i).zfill(2) 
+    date = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant))
+    videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date[0]))
+    for video in videos:
+        ticks = time.time()
+        path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date[0], video)
+        write_background_file.main(path, color = True)
+        print(f'video {video}')
+        print(str(ticks-time.time()))
+    """ Segment capillaries using segment.py """
+    # TODO: make this work
+    # segment.main()
+    # find_centerline.py
+    # make_kymograph.py 
 
+    print(f'finished {participant} from the {date[0]}')
+    print(str(ticks_total-time.time()))    
 
-        print('finished one')
-        print(str(ticks-time.time()))    
-    print("-------------------------------------")
-    print("Background Runtime: " + str(time.time() - ticks))
-    ticks = time.time()
 
 
     """ Correlation files """
@@ -62,6 +63,20 @@ if __name__ == "__main__":
     # print("-------------------------------------")
     # print("Correlation Runtime: " + str(time.time() - ticks))
     # ticks = time.time()
+    return 0
+
+
+"""
+-----------------------------------------------------------------------------
+"""
+# This provided line is required at the end of a Python file
+# to call the main() function.
+if __name__ == "__main__":
+    print("Run full pipeline")
+    print("-------------------------------------")
+    ticks_first = time.time()
+    ticks = time.time()
+    main()  
 
     print("-------------------------------------")
     print("Total Pipeline Runtime: " + str(time.time() - ticks_first))

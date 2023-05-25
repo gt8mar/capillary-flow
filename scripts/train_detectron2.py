@@ -2,7 +2,7 @@
 Filename: train_detectron.py
 -------------------
 This file trains detectron2 to
-perform instance segmentation on capillary images on an hpc.  
+perform instance segmentation on capillary images. 
 By: Marcus Forst
 """
 
@@ -65,30 +65,28 @@ def main():
     trainer = DefaultTrainer(cfg) 
     trainer.resume_or_load(resume=False)
     trainer.train()
-
+    
+    print("ya mom's car")
     # Inference should use the config with parameters that are used in training
     # cfg now already contains everything we've set previously. We changed it a little bit for inference:
     cfg.MODEL.WEIGHTS = os.path.join(cfg.OUTPUT_DIR, "model_final.pth")  # path to the model we just trained
+    print(str(cfg.MODEL.WEIGHTS))
     cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = 0.7   # set a custom testing threshold
     predictor = DefaultPredictor(cfg)
     
     for d in dataset_val:    
         im = cv2.imread(d["file_name"])
-        # extract the filename from the path
-        filename = os.path.basename(d["file_name"])
-        # remove the file extension
-        filename_without_ext = os.path.splitext(filename)[0]
-        # extract the desired string from the filename
-        sample = filename_without_ext.split('_background')[0]
         outputs = predictor(im)  # format is documented at https://detectron2.readthedocs.io/tutorials/models.html#model-output-format
         v = Visualizer(im[:, :, ::-1],
                     scale=0.5, 
                     instance_mode=ColorMode.IMAGE_BW   # remove the colors of unsegmented pixels. This option is only available for segmentation models
         )
+        print(d['file_name'])
+        print(type(d['file_name']))
         print(outputs["instances"].pred_classes)
         print(outputs["instances"].pred_boxes)
         out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
-        plt.imsave(os.path.join("/hpc/mydata/marcus.forst/segmented", sample + "_segmented.png"), 
+        plt.imsave(os.path.join(cfg.OUTPUT_DIR, str(d["file_name"]) + "_segs.png"), 
                     out.get_image()[:, :, ::-1])
 
 """

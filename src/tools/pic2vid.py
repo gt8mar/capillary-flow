@@ -18,10 +18,12 @@ import matplotlib.pyplot as plt
 def frames_to_timecode(frame_number, frame_rate):
     """
     Method that converts frames to SMPTE timecode.
-    :param frame_number: Number of frames
-    :param frame_rate: frames per second
-    :param drop: true if time code should drop frames, false if not
-    :returns: SMPTE timecode as string, e.g. '01:02:12:32' or '01:02:12;32'
+    Args:
+        frame_number (int): Number of frames
+        frame_rate (int/float): frames per second
+        drop (bool): true if time code should drop frames, false if not
+    
+    Returns: SMPTE timecode as string, e.g. '01:02:12:32' or '01:02:12;32'
     """
     fps_int = int(round(frame_rate))
     # now split our frames into time code
@@ -70,25 +72,38 @@ def extract_metadata(path):
     frame_rate = 100000//int(exposure)  # this rounds the frame-rate
     return pressure, frame_rate
 
-def pic2vid(images, SET = 'set_01', sample = 'sample_000', color = False, compress = True):
+def pic2vid(images, participant = 'part_11', date = '230427',
+            video_folder = 'vid1', color = False, compress = True, overlay = True):
     """
-    takes a list of image files or numpy array and makes a movie with overlays
-    :param images: list of images or numpy array of images
-    :param SET: string
-    :param sample: string
-    :param color: bool
-    :param compress: bool, whether to compress the video or not
-    :return: 0
+    Takes a list of image files or numpy array and makes a movie with overlays
+    
+    Args:
+        images (list/np.array): The image data to be made into a video.
+        participant (str): the participant who made the videos
+        date (str): the date the data was collected
+        video_folder (str): the video number for that day
+        color: bool
+        compress: bool, whether to compress the video or not
+
+    Returns: 
+        int: 0 if successful
+
+    Saves: video file in results folder
     """
+    SET = 'set_01'
     images = np.array(images)
-    metadata_path = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\raw', str(SET), str(sample), 'metadata.txt')
-    output_path = 'C:\\Users\\gt8mar\\capillary-flow\\results'
-    pressure, frame_rate = extract_metadata(metadata_path)
-    print(frame_rate)
-    if color:
-        video_name = f'{SET}_{sample}_color.avi'
+    output_path = '/hpc/projects/capillary-flow/results/videos'
+    if overlay:
+        metadata_path = os.path.join('hpc/projects/capillary-flow/data', participant, date, video_folder, 'metadata', 'metadata.txt')
+        pressure, frame_rate = extract_metadata(metadata_path)
+        print(frame_rate)
     else:
-        video_name = f'{SET}_{sample}.avi'
+        frame_rate = 227.8/2
+        pressure = 'TBD'
+    if color:
+        video_name = f'{SET}_{participant}_{date}_{video_folder}_color.avi'
+    else:
+        video_name = f'{SET}_{participant}_{date}_{video_folder}_gray.avi'
     frame = images[0]
     if compress:
         fourcc = cv2.VideoWriter_fourcc(*'XVID') # avi compression
@@ -108,14 +123,17 @@ def pic2vid(images, SET = 'set_01', sample = 'sample_000', color = False, compre
         add_overlay(img, f'P:{pressure}', (frame.shape[1]-150, 50))
         # add frame counter
         add_overlay(img, timecode, (frame.shape[1]//2 - 100, 50))
-        # add set and sample overlay
+        # add set and sample overlay details
         set_string = str(SET).split('_')[0] + ": " + str(SET).split('_')[1]
-        sample_string = str(sample).split('_')[0] + ": " + str(sample).split('_')[1]
+        participant_string = str(participant)
+        date_string = str(date)
+        video_string = str(video_folder)
+
         add_overlay(img, f'{set_string}', (50, 50))
-        add_overlay(img, f'{sample_string}', (50, 80))
+        add_overlay(img, f'{participant_string}', (50, 80))
         # add version overlay
-        add_overlay(img, "HW: 01", (50, 110))
-        add_overlay(img, "SW: 01", (50, 140))
+        add_overlay(img, f'{date_string}', (50, 110))
+        add_overlay(img, f'{video_string}', (50, 140))
         # TODO: add focus bar
         add_focus_bar(img, focus_measure)
         # TODO: add scale bar
@@ -135,14 +153,12 @@ def pic2vid(images, SET = 'set_01', sample = 'sample_000', color = False, compre
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    SET = 'set_01'
-    sample = 'sample_000'
-    input_folder = str(os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized\\vid'))
+    input_folder = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1\\moco'
     images = get_images(input_folder)
     image_files = []
     for i in range(len(images)): 
         image = np.array(cv2.imread(os.path.join(input_folder, images[i]), cv2.IMREAD_GRAYSCALE))
         image_files.append(image)
-    pic2vid(image_files, SET, sample, color= True)
+    pic2vid(image_files, color= True)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
