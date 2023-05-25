@@ -8,7 +8,7 @@ By: Marcus Forst
 """
 
 import time
-import os
+import os, sys
 from src import write_background_file
 # from src import segment
 
@@ -29,25 +29,26 @@ def main():
     """
 
     """ Write Background """
-    for i in range(9, 10):
-        participant = 'part' + str(i).zfill(2) 
-        date = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant))
-        videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date[0]))
-        for video in videos:
-            path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date[0], video)
-            write_background_file.main(path, color = True)
-        """ Segment capillaries using segment.py """
-        # TODO: make this work
-        # segment.main()
-        # find_centerline.py
-        # make_kymograph.py 
+    i = sys.argv[1]
+    ticks_total = time.time()
+    participant = 'part' + str(i).zfill(2) 
+    date = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant))
+    videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date[0]))
+    for video in videos:
+        ticks = time.time()
+        path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date[0], video)
+        write_background_file.main(path, color = True)
+        print(f'video {video}')
+        print(str(ticks-time.time()))
+    """ Segment capillaries using segment.py """
+    # TODO: make this work
+    # segment.main()
+    # find_centerline.py
+    # make_kymograph.py 
 
+    print(f'finished {participant} from the {date[0]}')
+    print(str(ticks_total-time.time()))    
 
-        print(f'finished {participant} video {video} from the {date[0]}')
-        print(str(ticks-time.time()))    
-    print("-------------------------------------")
-    print("Background Runtime: " + str(time.time() - ticks))
-    ticks = time.time()
 
 
     """ Correlation files """
