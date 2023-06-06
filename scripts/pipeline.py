@@ -33,14 +33,14 @@ def main():
     print(i)
     ticks_total = time.time()
     participant = 'part' + str(i).zfill(2) 
-    # date = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant))
-    # videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date[0]))
-    # for video in videos:
-    #     ticks = time.time()
-    #     path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date[0], video)
-    #     write_background_file.main(path, color = True)
-    #     print(f'video {video}')
-    #     print(str(ticks-time.time()))
+    date = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant))
+    videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date[0]))
+    for video in videos:
+        ticks = time.time()
+        path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date[0], video)
+        write_background_file.main(path, color = True)
+        print(f'video {video}')
+        print(str(ticks-time.time()))
     # """ Segment capillaries using segment.py """
     # # TODO: make this work
     # # segment.main()
