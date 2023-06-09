@@ -14,6 +14,17 @@ from src import write_background_file
 
 SET = "set_01"
 
+def list_only_folders(path):
+    """
+    This function returns a list of only folders in a given path.
+
+    Args:
+        path (str): the path to the folder to be searched
+    Returns:
+        list: a list of folders in the given path
+    """
+    return [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
+
 def main():
     """
     Write background file, corresponding video, segment capillaries, and calculate flow rates.
@@ -33,7 +44,7 @@ def main():
     print(i)
     ticks_total = time.time()
     participant = 'part' + str(i).zfill(2) 
-    date = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant))
+    date = list_only_folders(os.path.join('/hpc/projects/capillary-flow/data', participant))
     videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date[0]))
     for video in videos:
         ticks = time.time()
