@@ -93,3 +93,4 @@ output/last_checkpoint
 src/tools/__pycache__/get_images.cpython-39.pyc
 src/tools/__pycache__/sort_nicely.cpython-39.pyc
 scripts/upload_data.sh
+scripts/slurm-9576935.out
