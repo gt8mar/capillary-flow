@@ -95,3 +95,4 @@ src/tools/__pycache__/sort_nicely.cpython-39.pyc
 scripts/upload_data.sh
 scripts/slurm-9576935.out
 tests/D_segmented/set_01_part15_230428_vid05_background_seg.png
+tests
