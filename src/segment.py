@@ -65,7 +65,43 @@ def parse_filename(filename):
     video = filename_no_ext.split('_')[-2]
     return participant, date, video
 
-def main(path=None, verbose = False):
+def parse_COCO(json_path):
+    """
+    Parses the COCO dataset into a dictionary containing the participant, date, and video number for each image.
+
+    Args:
+        json_path (str): Path to the json file containing the COCO dataset.
+    
+    Returns:
+        dict: Dictionary containing the participant, date, and video number for each image.    
+    """
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+    dict = {}
+    for image in data['images']:
+        filename = image['file_name']
+        participant, date, video = parse_filename(filename)
+        dict[filename] = [participant, date, video]
+    return dict
+
+def COCO_filename_remove_contrast(json_path):
+    """
+    Checks to see if the filename has _contrast in it and changes the filename in the COCO dataset to match.  
+
+    Args:
+        json_path (str): Path to the json file containing the COCO dataset.
+    Returns:
+        None  
+    """
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+    for image in data['images']:
+        if image['file_name'].endswith('_contrast.tiff'):
+            image['file_name'] = image['file_name'].replace('_contrast', '')   
+    with open(json_path, 'w') as f:
+        json.dump(data, f)
+
+def main(path='/hpc/projects/capillary-flow/results/backgrounds', verbose = False, verbose_plot = False):
     """
     Uses detectron2 to segment images using instance segmentation inference.
     Saves the results to a folder called "segmentation_results" in the same
@@ -82,11 +118,13 @@ def main(path=None, verbose = False):
         mask_int (png): Segmented images in png format.
     """
     # Create a detectron2 config and a detectron2 default predictor    
-    folder_seg = '/hpc/projects/capillary-flow/results/backgrounds'
-    json_seg = folder_into_COCO(folder_seg)
+    json_path = "/hpc/projects/capillary-flow/results/dataset_json/dataset_230626.json"
+    COCO_filename_remove_contrast(json_path)
+    folder_seg = path
+    # json_seg = folder_into_COCO(folder_seg)
     weights_path = "/home/marcus.forst/output"
-    register_coco_instances("my_dataset_seg", {}, json_seg, folder_seg)
-    dataset_seg = load_coco_json(json_seg, folder_seg, "my_dataset_seg")
+    register_coco_instances("my_dataset_seg", {}, json_path, folder_seg)
+    dataset_seg = load_coco_json(json_path, folder_seg, "my_dataset_seg")
 
     # Begin inference
     cfg = get_cfg()
@@ -107,42 +145,60 @@ def main(path=None, verbose = False):
     predictor = DefaultPredictor(cfg)
     mask_dict = {}
     for d in dataset_seg:    
-        im = cv2.imread(d["file_name"])
         # extract the filename from the path
         filename = os.path.basename(d["file_name"])
-        participant, date, video = parse_filename(filename)
-        # remove the file extension
-        filename_without_ext = os.path.splitext(filename)[0]
-        # extract the desired string from the filename
-        sample = filename_without_ext.split('_background')[0]
-        outputs = predictor(im)  # format is documented at https://detectron2.readthedocs.io/tutorials/models.html#model-output-format
-        mask = outputs["instances"].pred_masks[0].cpu().numpy()
-        print(mask.shape)
-        print(np.count_nonzero(mask))
-        if verbose:
-            v = Visualizer(im[:, :, ::-1],
-                        scale=0.5, 
-                        instance_mode=ColorMode.IMAGE_BW   # remove the colors of unsegmented pixels. This option is only available for segmentation models
-            )
-            print(outputs["instances"].pred_classes)
-            print(outputs["instances"].pred_boxes)
-            print(im[:,:,-1])
-            out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
-            plt.imsave(os.path.join(cfg.OUTPUT_DIR, str(d["file_name"]) + "_fancy_seg.png"), 
-                        out.get_image()[:, :, ::-1])
-        
-        # Convert boolean array to integer array
-        mask_int = mask.astype(int)
-        mask_dict[sample] = mask_int
-        # Save the mask
-        os.makedirs(os.path.join("hpc/projects/capillary-flow/data", participant, date, video, "D_segmented"), exist_ok=True)
-        plt.imsave(os.path.join("hpc/projects/capillary-flow/data", participant, date, video, "D_segmented", filename_without_ext + "_seg.png"), 
-                    mask_int, cmap='gray')
-        
+        # check if filename is in background folder
+        if filename not in os.listdir(folder_seg):
+            print(f"filename: {filename} not in folder: {folder_seg}")
+        else:
+            im = cv2.imread(d["file_name"]) 
+            if verbose:       
+                print(f"filename: {filename} has shape:")
+                print(im.shape)
+            participant, date, video = parse_filename(filename)
+            # remove the file extension
+            filename_without_ext = os.path.splitext(filename)[0]
+            # extract the desired string from the filename
+            sample = filename_without_ext.split('_background')[0]
+            outputs = predictor(im)  # format is documented at https://detectron2.readthedocs.io/tutorials/models.html#model-output-format
+            if len(outputs["instances"].pred_masks) == 0:
+                if verbose:
+                    print("no masks found")
+                mask = np.zeros((im.shape[0], im.shape[1]))
+            else:
+                total_mask = np.zeros((im.shape[0], im.shape[1]))
+                for i in range(len(outputs["instances"].pred_masks)):
+                    mask = outputs["instances"].pred_masks[i].cpu().numpy()
+                    total_mask += mask
+                if verbose:
+                    print("The number of nonzero pixels in the mask is:")
+                    print(np.count_nonzero(mask))
+                if verbose_plot:
+                    v = Visualizer(im[:, :, ::-1],
+                                scale=0.5, 
+                                instance_mode=ColorMode.IMAGE_BW   # remove the colors of unsegmented pixels. This option is only available for segmentation models
+                    )
+                    print(f'The number of classes is {outputs["instances"].pred_classes}')
+                    print(f'The number of instances is {outputs["instances"].pred_boxes}')
+                    print(im[:,:,-1])
+                    out = v.draw_instance_predictions(outputs["instances"].to("cpu"))
+                    plt.imsave(os.path.join(cfg.OUTPUT_DIR, str(d["file_name"]) + "_fancy_seg.png"), 
+                                out.get_image()[:, :, ::-1])
+                
+            # Convert boolean array to integer array
+            mask_int = total_mask.astype(int)
+            mask_dict[sample] = mask_int
+            # Save the mask
+            os.makedirs(os.path.join("/hpc/projects/capillary-flow/data", participant, date, video, "D_segmented"), exist_ok=True)
+            plt.imsave(os.path.join("/hpc/projects/capillary-flow/data", participant, date, video, "D_segmented", filename_without_ext + "_seg.png"), 
+                        mask_int, cmap='gray')
+            plt.imsave(os.path.join("/hpc/projects/capillary-flow/results/segmented", filename_without_ext + "_seg.png"), 
+                        mask_int, cmap='gray')
+                
 
-        # # Save the integer array to a CSV file            
-        # np.savetxt(os.path.join(cfg.OUTPUT_DIR, filename_without_ext + "_segs.csv"), mask_int, 
-        #            delimiter=',', fmt='%s')
+            # # Save the integer array to a CSV file            
+            # np.savetxt(os.path.join(cfg.OUTPUT_DIR, filename_without_ext + "_segs.csv"), mask_int, 
+            #            delimiter=',', fmt='%s')
     return mask_dict
 
 """
@@ -152,6 +208,7 @@ def main(path=None, verbose = False):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
+    print("Running segment.py...")
     main()
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
