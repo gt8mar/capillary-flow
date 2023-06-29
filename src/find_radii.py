@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from src.tools.load_csv_list import load_csv_list
+from src.tools.parse_vid_path import parse_vid_path
+
 
 PIX_UM = 1.74
 
@@ -62,19 +64,25 @@ def plot_box_swarm(data, x_labels, y_axis_label,  plot_title, figure_name, verbo
         if verbose: plt.show()
     return 0
 
-def main(SET, sample, write = False, verbose = True):
-    input_folder = os.path.join("C:\\Users\\gt8mar\\capillary-flow\\data\\processed", SET, sample, "E_centerline\\distances")
-    output_folder = "C:\\Users\\gt8mar\\capillary-flow\\results"
-    distances = load_csv_list(input_folder, dtype=float)
+def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1',
+          write = False, verbose = True):
+    input_folder = os.path.join(path, "E_centerline", "coords")
+    output_folder = os.path.join(path, "E_centerline", "images")
+    participant, date, video = parse_vid_path(path)
+    SET = 'set_01'
+    file_prefix = f'{SET}_{participant}_{date}_{video}'
+    skeleton_data = load_csv_list(input_folder, dtype=float)
+    # load radii from skeleton data
+    radii = [array[:, 2] for array in skeleton_data] # note that the radii will be row vectors
     medians = []
     means = []
-    for capillary in distances:
+    for capillary in radii:
         median = np.median(capillary) * 2 /PIX_UM
         mean = np.mean(capillary) *2/PIX_UM
         medians.append(median)
         means.append(mean)
     plot_box_swarm([medians, means], x_labels = ["medians", "means"], y_axis_label="diameter (um)", 
-                    plot_title=f"{SET}_{sample} capillary diameters", figure_name="figure 1")
+                    plot_title=f"{file_prefix} capillary diameters", figure_name="figure 1")
     return np.mean(means)
 
 """
