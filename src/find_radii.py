@@ -1,6 +1,8 @@
 """
 Filename: find_radii.py
 -----------------------
+# TODO fix this
+This is broken. 
 By: Marcus Forst
 """
 
