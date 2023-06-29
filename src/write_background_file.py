@@ -97,6 +97,6 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1'
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main('set_01', 'sample_000')
+    main()
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
