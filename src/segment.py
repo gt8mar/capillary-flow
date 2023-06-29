@@ -118,7 +118,7 @@ def main(path='/hpc/projects/capillary-flow/results/backgrounds', verbose = Fals
         mask_int (png): Segmented images in png format.
     """
     # Create a detectron2 config and a detectron2 default predictor    
-    json_path = "/hpc/projects/capillary-flow/results/dataset_json/dataset_230626.json"
+    json_path = "/hpc/projects/capillary-flow/results/dataset_json/dataset_230628.json"
     COCO_filename_remove_contrast(json_path)
     folder_seg = path
     # json_seg = folder_into_COCO(folder_seg)
