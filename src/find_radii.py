@@ -64,8 +64,8 @@ def plot_box_swarm(data, x_labels, y_axis_label,  plot_title, figure_name, verbo
         if verbose: plt.show()
     return 0
 
-def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1',
-          write = False, verbose = True):
+def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01',
+          write = True, verbose = False):
     input_folder = os.path.join(path, "E_centerline", "coords")
     output_folder = os.path.join(path, "E_centerline", "images")
     participant, date, video = parse_vid_path(path)
@@ -82,7 +82,8 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1'
         medians.append(median)
         means.append(mean)
     plot_box_swarm([medians, means], x_labels = ["medians", "means"], y_axis_label="diameter (um)", 
-                    plot_title=f"{file_prefix} capillary diameters", figure_name="figure 1")
+                    plot_title=f"{file_prefix} capillary diameters", figure_name="figure 1",
+                    write=True)
     return np.mean(means)
 
 """
@@ -93,11 +94,12 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1'
 if __name__ == "__main__":
     ticks = time.time()
     means = []
-    for i in range(1,9):
-        sample = 'sample_' + str(i).zfill(3)
-        mean = main("set_01", sample, write = False, verbose=False)
-        means.append(mean)
-    plt.plot(means)
-    plt.show()    
+    # for i in range(1,9):
+    #     sample = 'sample_' + str(i).zfill(3)
+    #     mean = main("set_01", sample, write = False, verbose=False)
+    #     means.append(mean)
+    # plt.plot(means)
+    # plt.show()   
+    main(path = '/hpc/projects/capillary-flow/data/part11/230427/vid01', write = True, verbose = False) 
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
