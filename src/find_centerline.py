@@ -167,7 +167,7 @@ def sort_continuous(array_2D, verbose = False):
     else:
         raise Exception('wrong type')
 
-def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1',
+def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01',
         verbose = False, write = False):
     """ Isolates capillaries from segmented image and finds their centerlines and radii. 
 
@@ -182,7 +182,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1'
     """
     input_folder = os.path.join(path, 'D_segmented')
     os.makedirs(os.path.join(path, 'E_centerline', 'coords'), exist_ok=True)
-    os.makedirs(os.path.join(path, 'E_centerline', 'radii'), exist_ok=True)
+    os.makedirs(os.path.join(path, 'E_centerline', 'images'), exist_ok=True)
     output_folder = os.path.join(path, 'E_centerline')
     participant, date, video = parse_vid_path(path)
     SET = 'set_01'
@@ -200,7 +200,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1'
     # TODO: Check if this does anything
     # save to results
     total_skeleton, total_radii = make_skeletons(segmented, verbose = verbose, write = write, 
-                                                     write_path=os.path.join(output_folder, skeleton_filename))
+                                                     write_path=os.path.join(output_folder,'images', skeleton_filename))
 
     # Make a numpy array of images with isolated capillaries. The mean/sum of this is segmented_2D.
     contours = enumerate_capillaries(segmented, verbose=False, write=write, write_path = os.path.join(input_folder, cap_map_filename))
@@ -208,6 +208,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1'
     skeleton_coords = []
     flattened_radii = []
     used_capillaries = []
+    skeleton_data = []
     j = 0
     for i in range(contours.shape[0]):
         skeleton, radii = make_skeletons(contours[i], verbose=False, histograms = False)     # Skeletons come out in the shape
@@ -221,9 +222,12 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1'
             j += 1
             sorted_skeleton_coords, optimal_order = sort_continuous(skeleton_nums, verbose=False)
             ordered_radii = radii[optimal_order]
+            skeleton_coords_with_radii = np.column_stack((sorted_skeleton_coords, ordered_radii))
             capillary_radii.append(ordered_radii)
             flattened_radii += list(radii)
+            # Attach capillary_radii to skeleton_coords
             skeleton_coords.append(sorted_skeleton_coords)
+            skeleton_data.append(skeleton_coords_with_radii)
     print(f"{len(skeleton_coords)}/{contours.shape[0]} capillaries used")
     if verbose:
         plt.show()
@@ -240,9 +244,9 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1'
         # Save centerline and radii information
         for i in range(len(skeleton_coords)):
             np.savetxt(os.path.join(output_folder, "coords", file_prefix + f'_centerline_coords_{str(i).zfill(2)}.csv'), 
-                    skeleton_coords[i], delimiter=',', fmt = "%s")
-            np.savetxt(os.path.join(output_folder, "radii", file_prefix + f'_capillary_radii_{str(i).zfill(2)}.csv'), 
-                    capillary_radii[i], delimiter=',', fmt = '%s')
+                    skeleton_data[i], delimiter=',', fmt = "%s")
+            # np.savetxt(os.path.join(output_folder, "radii", file_prefix + f'_capillary_radii_{str(i).zfill(2)}.csv'), 
+            #         capillary_radii[i], delimiter=',', fmt = '%s')
 
 
     # # Make overall histogram
