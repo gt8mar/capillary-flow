@@ -8,11 +8,22 @@ By: Marcus Forst
 """
 
 import time
-import os, sys
+import os, sys, re
 from src import write_background_file
 # from src import segment
 
 SET = "set_01"
+
+def list_only_folders(path):
+    """
+    This function returns a list of only folders in a given path.
+
+    Args:
+        path (str): the path to the folder to be searched
+    Returns:
+        list: a list of folders in the given path
+    """
+    return [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
 
 def main():
     """
@@ -30,9 +41,10 @@ def main():
 
     """ Write Background """
     i = sys.argv[1]
+    print(i)
     ticks_total = time.time()
     participant = 'part' + str(i).zfill(2) 
-    date = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant))
+    date = list_only_folders(os.path.join('/hpc/projects/capillary-flow/data', participant))
     videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date[0]))
     for video in videos:
         ticks = time.time()
@@ -40,11 +52,11 @@ def main():
         write_background_file.main(path, color = True)
         print(f'video {video}')
         print(str(ticks-time.time()))
-    """ Segment capillaries using segment.py """
-    # TODO: make this work
-    # segment.main()
-    # find_centerline.py
-    # make_kymograph.py 
+    # """ Segment capillaries using segment.py """
+    # # TODO: make this work
+    # # segment.main()
+    # # find_centerline.py
+    # # make_kymograph.py 
 
     print(f'finished {participant} from the {date[0]}')
     print(str(ticks_total-time.time()))    

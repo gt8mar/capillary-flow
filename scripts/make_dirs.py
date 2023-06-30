@@ -21,15 +21,15 @@ results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results'
 def make_dirs():
     for i in range(10,11):
         sample = 'sample_' + str(i).zfill(3)
-        # os.makedirs(os.path.join(processed_folder, sample, "A_cropped", "vid"), exist_ok = TRUE)
-        # os.makedirs(os.path.join(processed_folder, sample, "B_stabilized", "vid"), exist_ok = TRUE) 
-        # os.makedirs(os.path.join(processed_folder, sample, "C_background"), exist_ok = TRUE)
-        # os.makedirs(os.path.join(processed_folder, sample, "D_segmented"), exist_ok = TRUE)
-        os.makedirs(os.path.join(processed_folder, sample, "E_centerline", "coords"), exist_ok = TRUE)
-        os.makedirs(os.path.join(processed_folder, sample, "E_centerline", "distances"), exist_ok = TRUE)
-        # os.makedirs(os.path.join(processed_folder, sample, "F_blood_flow"), exist_ok = TRUE)
-        # os.makedirs(os.path.join(processed_folder, sample, "G_correlation"), exist_ok = TRUE)
-        # os.makedirs(os.path.join(processed_folder, sample, "H_turbulence"), exist_ok = TRUE)
+        # os.makedirs(os.path.join(processed_folder, sample, "A_cropped", "vid"))
+        # os.makedirs(os.path.join(processed_folder, sample, "B_stabilized", "vid")) 
+        # os.makedirs(os.path.join(processed_folder, sample, "C_background"))
+        # os.makedirs(os.path.join(processed_folder, sample, "D_segmented"))
+        os.makedirs(os.path.join(processed_folder, sample, "E_centerline", "coords"))
+        os.makedirs(os.path.join(processed_folder, sample, "E_centerline", "distances"))
+        # os.makedirs(os.path.join(processed_folder, sample, "F_blood_flow"))
+        # os.makedirs(os.path.join(processed_folder, sample, "G_correlation"))
+        # os.makedirs(os.path.join(processed_folder, sample, "H_turbulence"))
     return 0
 
 
