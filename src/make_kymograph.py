@@ -213,21 +213,25 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
     SET = 'set_01'
     file_prefix = f'{SET}_{participant}_{date}_{video}'
     gap_left, gap_right, gap_bottom, gap_top = get_shifts(metadata_folder) # get gaps from the metadata
-    
+    print(gap_left, gap_right, gap_bottom, gap_top)
+
     # Import images
-    images = get_images(os.path.join(input_folder,'vid'))
+    images = get_images(input_folder)
     image_array = load_image_array(images, input_folder)      # this has the shape (frames, row, col)
-    
+    example_image = image_array[0]
+    print("The size of the array is " + str(image_array.shape))
+
     # Crop array based on shifts
-    image_array = image_array[:, gap_top:gap_bottom, gap_left:gap_right] 
+    image_array = image_array[:, gap_top:example_image.shape[0] + gap_bottom, gap_left:example_image.shape[1] + gap_right] 
     skeleton_data = load_csv_list(os.path.join(centerline_folder, 'coords'))
     centerline_coords = [array[:, :2] for array in skeleton_data] # note that the centerline_coords will be row vectors
     centerline_radii = [array[:, 2] for array in skeleton_data] # note that the radii will be row vectors
-    print("The size of the array is " + str(image_array.shape))
+    print("The size of the array after trimming is " + str(image_array.shape))
     # iterate over the capillaries
     for i in range(len(skeleton_data)):
         if variable_radii: 
-            kymograph = build_centerline_vs_time_variable_radii(image_array, centerline_coords[i], centerline_radii[i], long=True, offset=False)
+            kymograph = build_centerline_vs_time_variable_radii(image_array, 
+                            centerline_coords[i], centerline_radii[i], long=True, offset=False)
         else:
             kymograph = build_centerline_vs_time(image_array, centerline_coords[i], long = True)
         # centerline_array = normalize_rows(centerline_array)
