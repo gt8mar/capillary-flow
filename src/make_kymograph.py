@@ -169,7 +169,7 @@ def test(row = 16, col = 12, radius = 5):
     # plt.colorbar()
     # plt.show()
     return 0
-def test2():
+def test2_normalize_row_and_col():
     image = np.loadtxt('C:\\Users\\ejerison\\capillary-flow\\tests\\set_01_sample_003_blood_flow_00.csv', delimiter=',', dtype = int)
     # image = np.random.randint(size = (100,100), low=0, high = 255)
     print(image)
@@ -182,9 +182,22 @@ def test2():
     return 0
 
 def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01', 
-         write = True, variable_radii = False):
+         write = True, variable_radii = False, verbose = False):
     """
-    TODO: this
+    This function takes a path to a video and calculates the blood flow.
+
+    Args:
+        path (str): path to the video
+        write (bool): whether to write the blood flow to a csv file
+        variable_radii (bool): whether to use variable radii
+        verbose (bool): whether to print the progress
+
+    Returns:
+        blood_flow (np.array): blood flow
+
+    Saves:
+        kymograph (np.array): kymograph of the blood flow
+        kymograph (png file): kymograph of the blood flow
     """
     input_folder = os.path.join(path, 'moco')
     metadata_folder = os.path.join(path, 'metadata')
@@ -211,29 +224,28 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
     centerline_coords = [array[:, :2] for array in skeleton_data] # note that the centerline_coords will be row vectors
     centerline_radii = [array[:, 2] for array in skeleton_data] # note that the radii will be row vectors
     print("The size of the array is " + str(image_array.shape))
-
+    # iterate over the capillaries
+    for i in range(len(skeleton_data)):
+        if variable_radii: 
+            kymograph = build_centerline_vs_time_variable_radii(image_array, centerline_coords[i], centerline_radii[i], long=True, offset=False)
+        else:
+            kymograph = build_centerline_vs_time(image_array, centerline_coords[i], long = True)
+        # centerline_array = normalize_rows(centerline_array)
+        kymograph = normalize_image(kymograph)
     if write:
-        # iterate over the capillaries
-        for i in range(len(skeleton_data)):
-            if variable_radii: 
-                kymograph = build_centerline_vs_time_variable_radii(image_array, centerline_coords[i], centerline_radii[i], long=True, offset=False)
-            else:
-                kymograph = build_centerline_vs_time(image_array, centerline_coords[i], long = True)
-            # centerline_array = normalize_rows(centerline_array)
-            kymograph = normalize_image(kymograph)
-            np.savetxt(os.path.join(output_folder, 'kymo', file_prefix + f'_blood_flow_{str(i).zfill(2)}.csv'), 
-                    kymograph, delimiter=',', fmt = '%s')
+            np.savetxt(os.path.join(output_folder, 'kymo', 
+                                    file_prefix + f'_blood_flow_{str(i).zfill(2)}.csv'), 
+                                    kymograph, delimiter=',', fmt = '%s')
             im = Image.fromarray(kymograph)
-            im.save(os.path.join(output_folder, 'kymo', file_prefix + f'_blood_flow_{str(i).zfill(2)}.tiff'))
-
-
-    
-    # # Plot pixels vs time:
-    # plt.imshow(centerline_array)
-    # plt.title('centerline pixel values per time')
-    # plt.xlabel('frame')
-    # plt.ylabel('centerline pixel')
-    # plt.show()
+            im.save(os.path.join(output_folder, 'kymo', 
+                                 file_prefix + f'_blood_flow_{str(i).zfill(2)}.tiff'))
+    if verbose:
+        # Plot pixels vs time:
+        plt.imshow(kymograph)
+        plt.title('centerline pixel values per time')
+        plt.xlabel('frame')
+        plt.ylabel('centerline pixel')
+        plt.show()
     return 0
 
 
@@ -241,8 +253,9 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    # main(write=True)
-    test2()
+    main(path ='/hpc/projects/capillary-flow/data/part11/230427/vid01',
+          write=True)
+    # test2_normalize_row_and_col()
     # test()
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
