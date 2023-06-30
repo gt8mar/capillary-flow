@@ -4,7 +4,6 @@ Filename: make_kymograph.py
 This file creates kymographs (centerline vs time graphs) of each capillary.
 
 By: Marcus Forst
-sort_nicely credit: Ned B (https://nedbatchelder.com/blog/200712/human_sorting.html)
 average_in_circle credit: Nicolas Gervais (https://stackoverflow.com/questions/49330080/numpy-2d-array-selecting-indices-in-a-circle)
 """
 
@@ -19,6 +18,8 @@ from src.tools.load_image_array import load_image_array
 from src.tools.load_csv_list import load_csv_list
 from src.tools.get_shifts import get_shifts
 from scipy.ndimage import gaussian_filter
+from src.tools.parse_vid_path import parse_vid_path
+
 
 PIXELS_PER_UM = 2
 
@@ -32,7 +33,7 @@ def average_array(array):
         return (array[::2] + array[1::2]) // 2
     else:
         return (array[:-1:2] + array[1::2]) // 2
-def build_centerline_vs_time(image, skeleton_coords, long = True):
+def build_centerline_vs_time(image, centerline_coords, long = True):
     """
     This function takes an image and text file (default: csv) of the coordinates of a
     skeleton and outputs an image of the centerline pixel values vs time.
@@ -40,38 +41,38 @@ def build_centerline_vs_time(image, skeleton_coords, long = True):
     :param skeleton_txt: 2D text file to be read into the function
     :return: centerline_array: 2D numpy array that shows the pixels of the centerline vs time.
     """
-    centerline_array = np.zeros((skeleton_coords.shape[0], image.shape[0]))
+    centerline_array = np.zeros((centerline_coords.shape[0], image.shape[0]))
     if long == False:
-        for i in range(skeleton_coords.shape[0]):
-            row = skeleton_coords[i][0]         # skeleton coords is a list of (row, col) objects
-            col = skeleton_coords[i][1]
+        for i in range(centerline_coords.shape[0]):
+            row = centerline_coords[i][0]         # skeleton coords is a list of (row, col) objects
+            col = centerline_coords[i][1]
             centerline_array[i] = image[:, row, col]
     if long == True:
-        for i in range(skeleton_coords.shape[0]):
-            row = skeleton_coords[i][0]         # skeleton coords is a list of (row, col) objects
-            col = skeleton_coords[i][1]
+        for i in range(centerline_coords.shape[0]):
+            row = centerline_coords[i][0]         # skeleton coords is a list of (row, col) objects
+            col = centerline_coords[i][1]
             radius = 5
             centerline_array[i] = average_in_circle(image, row, col, radius)
     return centerline_array
-def build_centerline_vs_time_variable_radii(image, skeleton_coords, radii, long = False, offset = False):
+def build_centerline_vs_time_variable_radii(image, centerline_coords, radii, long = False, offset = False):
     """
     This function takes an image and text file (default: csv) of the coordinates of a
     skeleton and outputs an image of the centerline pixel values vs time.
     :param image: 3D numpy array (time, row, col)
-    :param skeleton_coords: 2D array of coordinates for the centerline of the capillary
+    :param centerline_coords: 2D array of coordinates for the centerline of the capillary
     :param radii: 1D numpy array of the radii of the capillary
     :return: centerline_array: 2D numpy array that shows the pixels of the centerline vs time.
     """
-    centerline_array = np.zeros((skeleton_coords.shape[0], image.shape[0]))
+    centerline_array = np.zeros((centerline_coords.shape[0], image.shape[0]))
     if long == False:
-        for i in range(skeleton_coords.shape[0]):
-            row = skeleton_coords[i][0]         # skeleton coords is a list of (row, col) objects
-            col = skeleton_coords[i][1]
+        for i in range(centerline_coords.shape[0]):
+            row = centerline_coords[i][0]         # skeleton coords is a list of (row, col) objects
+            col = centerline_coords[i][1]
             centerline_array[i] = image[:, row, col]
     if long == True:
-        for i in range(skeleton_coords.shape[0]):
-            row = skeleton_coords[i][0]         # skeleton coords is a list of (row, col) objects
-            col = skeleton_coords[i][1]
+        for i in range(centerline_coords.shape[0]):
+            row = centerline_coords[i][0]         # skeleton coords is a list of (row, col) objects
+            col = centerline_coords[i][1]
             radius = int(radii[i])
             centerline_array[i] = average_in_circle(image, row, col, radius)
     return centerline_array
@@ -180,37 +181,50 @@ def test2():
     new_new_image = normalize_row_and_col(image)
     return 0
 
-def main(SET = 'set_01', sample = 'sample_000', write = False, variable_radii = False):
+def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01', 
+         write = True, variable_radii = False):
     """
     TODO: this
     """
-    input_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
-    centerline_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'E_centerline')
-    output_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'F_blood_flow')
-    gap_left, gap_right, gap_bottom, gap_top = get_shifts(input_folder) # get gaps from the metadata
+    input_folder = os.path.join(path, 'moco')
+    metadata_folder = os.path.join(path, 'metadata')
+    centerline_folder = os.path.join(path, 'E_centerline')
+    
+    # Create output folders
+    os.makedirs(os.path.join(path, 'F_blood_flow', 'kymo'), exist_ok=True)
+    os.makedirs(os.path.join(path, 'F_blood_flow', 'velocities'), exist_ok=True)
+    output_folder = os.path.join(path, 'F_blood_flow')
+    
+    # Get metadata
+    participant, date, video = parse_vid_path(path)
+    SET = 'set_01'
+    file_prefix = f'{SET}_{participant}_{date}_{video}'
+    gap_left, gap_right, gap_bottom, gap_top = get_shifts(metadata_folder) # get gaps from the metadata
+    
     # Import images
     images = get_images(os.path.join(input_folder,'vid'))
     image_array = load_image_array(images, input_folder)      # this has the shape (frames, row, col)
+    
     # Crop array based on shifts
     image_array = image_array[:, gap_top:gap_bottom, gap_left:gap_right] 
-    skeletons = load_csv_list(os.path.join(centerline_folder, 'coords'))
-    if variable_radii:
-        centerline_radii = load_csv_list(os.path.join(centerline_folder, 'distances'), float)
-        centerline_radii = centerline_radii[0]          # this has the same length as skeletons
+    skeleton_data = load_csv_list(os.path.join(centerline_folder, 'coords'))
+    centerline_coords = [array[:, :2] for array in skeleton_data] # note that the centerline_coords will be row vectors
+    centerline_radii = [array[:, 2] for array in skeleton_data] # note that the radii will be row vectors
     print("The size of the array is " + str(image_array.shape))
 
     if write:
-        for i in range(len(skeletons)):
+        # iterate over the capillaries
+        for i in range(len(skeleton_data)):
             if variable_radii: 
-                kymograph = build_centerline_vs_time_variable_radii(image_array, skeletons[i], centerline_radii[i], long=True, offset=False)
+                kymograph = build_centerline_vs_time_variable_radii(image_array, centerline_coords[i], centerline_radii[i], long=True, offset=False)
             else:
-                kymograph = build_centerline_vs_time(image_array, skeletons[i], long = True)
+                kymograph = build_centerline_vs_time(image_array, centerline_coords[i], long = True)
             # centerline_array = normalize_rows(centerline_array)
             kymograph = normalize_image(kymograph)
-            np.savetxt(os.path.join(output_folder, f'{SET}_{sample}_blood_flow_{str(i).zfill(2)}.csv'), 
+            np.savetxt(os.path.join(output_folder, 'kymo', file_prefix + f'_blood_flow_{str(i).zfill(2)}.csv'), 
                     kymograph, delimiter=',', fmt = '%s')
             im = Image.fromarray(kymograph)
-            im.save(os.path.join(output_folder, f'{SET}_{sample}_blood_flow_{str(i).zfill(2)}.tiff'))
+            im.save(os.path.join(output_folder, 'kymo', file_prefix + f'_blood_flow_{str(i).zfill(2)}.tiff'))
 
 
     
@@ -220,8 +234,6 @@ def main(SET = 'set_01', sample = 'sample_000', write = False, variable_radii = 
     # plt.xlabel('frame')
     # plt.ylabel('centerline pixel')
     # plt.show()
-
-    # TODO: calculate flow rate
     return 0
 
 
