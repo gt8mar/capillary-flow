@@ -13,15 +13,12 @@ import cv2
 import csv
 import shutil
 
-# This function registers the target image to the source image.
-# This only accounts for linear translations in x and y.
-# SIFT feature detection algorithm is used. 
-# If matches are not found between target & source image, the target image is translated by prev_dx and prev_dy if provided, and not translated otherwise.
-def register_img(source_img, target_img, prev_dx=0, prev_dy=0):
+
+def register_img(reference_img, input_img, prev_dx=0, prev_dy=0):
     #find keypoints & descriptors
     sift = cv2.SIFT_create()
-    keypoints1, descriptors1 = sift.detectAndCompute(source_img, None)
-    keypoints2, descriptors2 = sift.detectAndCompute(target_img, None)
+    keypoints1, descriptors1 = sift.detectAndCompute(reference_img, None)
+    keypoints2, descriptors2 = sift.detectAndCompute(input_img, None)
 
     #match descriptors
     matcher = cv2.BFMatcher()
@@ -33,8 +30,8 @@ def register_img(source_img, target_img, prev_dx=0, prev_dy=0):
         if m.distance < 0.5 * n.distance: #free parameter
             good_matches.append(m)
 
-    """# Draw the matches between the source and target images
-    matched_img = cv2.drawMatches(source_img, keypoints1, target_img, keypoints2, good_matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+    """# Draw the matches between the reference and input images
+    matched_img = cv2.drawMatches(reference_img, keypoints1, input_img, keypoints2, good_matches, None, flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
 
     # Display the result
     matched_img = cv2.resize(matched_img, (int(0.5*matched_img.shape[1]), int(0.5*matched_img.shape[0])))
@@ -63,50 +60,60 @@ def register_img(source_img, target_img, prev_dx=0, prev_dy=0):
 
         #transform
         transformation_matrix = np.array([[1, 0, dx_avg], [0, 1, dy_avg]], dtype=np.float32)
-        registered_img = cv2.warpAffine(source_img, transformation_matrix, (target_img.shape[1], target_img.shape[0]))
-        print("registered")
+        registered_img = cv2.warpAffine(input_img, transformation_matrix, (reference_img.shape[1], reference_img.shape[0]))
+
         return registered_img, dx_avg, dy_avg
     else: 
         print("0 matches")
         #transform by values of previous frame
         transformation_matrix = np.array([[1, 0, prev_dx], [0, 1, prev_dy]], dtype=np.float32)
-        registered_img = cv2.warpAffine(source_img, transformation_matrix, (target_img.shape[1], target_img.shape[0]))
+        registered_img = cv2.warpAffine(input_img, transformation_matrix, (reference_img.shape[1], reference_img.shape[0]))
 
         return registered_img, prev_dx, prev_dy
 
-def main():
-    folder_path_source = "D:\\data_gabby\\230201\\vid27\\moco"
-    folder_path_target = "D:\\data_gabby\\230201\\vid28\\moco"
-
-    #get source image (first tiff file in folder)
-    file_path_source = ""
-    for file_name in os.listdir(folder_path_source):
-        file_path = os.path.join(folder_path_source, file_name)
+# This function registers the first frame of input video to first frame of reference video.
+# It saves a new folder in the input folder containing:
+#   reference image, input image, registered input image, translations.csv
+# If feature detection does not work, it does not translate the image and saves 0 as translation values.
+# Args: 
+#   folder_path_reference: file path for reference video
+#   folder_path_inputt: file path for input video
+# Returns:
+#   xval: translation value in x
+#   yval: translation value in y
+def register(folder_path_reference, folder_path_input):
+    """folder_path_reference = "D:\\data_gabby\\230201\\vid27\\moco"
+    folder_path_input = "D:\\data_gabby\\230201\\vid28\\moco"
+    """
+    #get reference image (first tiff file in folder)
+    file_path_reference = ""
+    for file_name in os.listdir(folder_path_reference):
+        file_path = os.path.join(folder_path_reference, file_name)
         if os.path.isfile(file_path) and (file_name.endswith(".tiff") or file_name.endswith(".tif")):
-            file_path_source = file_path
+            file_path_reference = file_path
             break
-    #get target image (first tiff file in folder)
-    file_path_target = ""
-    for file_name in os.listdir(folder_path_target):
-        file_path = os.path.join(folder_path_target, file_name)
+    #get input image (first tiff file in folder)
+    file_path_input = ""
+    for file_name in os.listdir(folder_path_input):
+        file_path = os.path.join(folder_path_input, file_name)
         if os.path.isfile(file_path) and (file_name.endswith(".tiff") or file_name.endswith(".tif")):
-            file_path_target = file_path
+            file_path_input = file_path
             break
     
     #register
-    registered_img, xval, yval = register_img(cv2.imread(file_path_source), cv2.imread(file_path_target))
+    registered_img, xval, yval = register_img(cv2.imread(file_path_reference), cv2.imread(file_path_input))
 
-    #save source, target, registered img in new folder "registered"
+    #save reference, input, registered img in new folder "registered"
     #make new registered folder
-    new_folder_path = os.path.join(os.path.split(folder_path_target)[0], "registered")
+    new_folder_path = os.path.join(os.path.split(folder_path_input)[0], "registered")
     os.makedirs(new_folder_path, exist_ok=True)
     print(new_folder_path)
-    #save source img
-    shutil.copy2(file_path_source, os.path.join(new_folder_path, os.path.basename(file_path_source)))
-    #save target img
-    shutil.copy2(file_path_target, os.path.join(new_folder_path, os.path.basename(file_path_target)))
+    #save reference img
+    shutil.copy2(file_path_reference, os.path.join(new_folder_path, os.path.basename(file_path_reference)))
+    #save input img
+    shutil.copy2(file_path_input, os.path.join(new_folder_path, os.path.basename(file_path_input)))
     #save registered img
-    cv2.imwrite(os.path.join(new_folder_path, "reg_" + os.path.basename(file_path_target)), registered_img)
+    cv2.imwrite(os.path.join(new_folder_path, "reg_" + os.path.basename(file_path_input)), registered_img)
 
     #save translations in new folder "registered"
     translations = []
@@ -116,25 +123,8 @@ def main():
         writer = csv.writer(csvfile)
         writer.writerows(translations)
 
-"""
-    #iterate through all images, stabilize, and save in new folder "stabilized"
-    source_img = img_file_paths[0]
-    new_folder_path = os.path.join(folder_path, "stabilized")
-    os.makedirs(new_folder_path, exist_ok=True)
-    translations = []
-    xval = yval = 0
-    for x in range(1, 50): 
-        registered_img, xval, yval = register_img(cv2.imread(source_img), cv2.imread(img_file_paths[x]), xval, yval)
-        translations.append((xval, yval))
-        dest_path = os.path.join(new_folder_path, os.path.basename(img_file_paths[x]))
-        cv2.imwrite(dest_path, registered_img)   
-        source_img = img_file_paths[x] #update source img
-    
-    #save translations
-    translations_file_path = os.path.join(new_folder_path, "translations.csv")
-    with open(translations_file_path, 'w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerows(translations)"""
+    return xval, yval
+
 """
 -----------------------------------------------------------------------------
 """
@@ -142,6 +132,7 @@ def main():
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main()
+    print("Registering videos...")
+    register()
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
