@@ -19,6 +19,7 @@ from src.tools.load_csv_list import load_csv_list
 from src.tools.get_shifts import get_shifts
 from scipy.ndimage import gaussian_filter
 from src.tools.parse_vid_path import parse_vid_path
+from cv2 import filter2D
 
 
 PIXELS_PER_UM = 2
@@ -39,22 +40,44 @@ def build_centerline_vs_time(image, centerline_coords, long = True):
     skeleton and outputs an image of the centerline pixel values vs time.
     :param image: 3D numpy array (time, row, col)
     :param skeleton_txt: 2D text file to be read into the function
-    :return: centerline_array: 2D numpy array that shows the pixels of the centerline vs time.
+    :return: kymograph: 2D numpy array that shows the pixels of the centerline vs time.
     """
-    centerline_array = np.zeros((centerline_coords.shape[0], image.shape[0]))
+    kymograph = np.zeros((centerline_coords.shape[0], image.shape[0]))
     if long == False:
         for i in range(centerline_coords.shape[0]):
             row = centerline_coords[i][0]         # skeleton coords is a list of (row, col) objects
             col = centerline_coords[i][1]
-            centerline_array[i] = image[:, row, col]
+            kymograph[i] = image[:, row, col]
     if long == True:
         for i in range(centerline_coords.shape[0]):
             row = centerline_coords[i][0]         # skeleton coords is a list of (row, col) objects
             col = centerline_coords[i][1]
             radius = 5
-            centerline_array[i] = average_in_circle(image, row, col, radius)
-    return centerline_array
-def build_centerline_vs_time_variable_radii(image, centerline_coords, radii, long = False, offset = False):
+            kymograph[i] = average_in_circle(image, row, col, radius)
+    return kymograph
+def build_centerline_vs_time_kernal(image, centerline_coords, long = True):
+    """
+    This function takes an image and text file (default: csv) of the coordinates of a
+    skeleton and outputs an image of the centerline pixel values vs time.
+    :param image: 3D numpy array (time, row, col)
+    :param skeleton_txt: 2D text file to be read into the function
+    :return: centerline_array: 2D numpy array that shows the pixels of the centerline vs time.
+    """
+    averaged_array = compute_average_surrounding_pixels(image)
+    kymograph = np.zeros((centerline_coords.shape[0], image.shape[0]))
+    if long == False:
+        for i in range(centerline_coords.shape[0]):
+            row = centerline_coords[i][0]         # skeleton coords is a list of (row, col) objects
+            col = centerline_coords[i][1]
+            kymograph[i] = image[:, row, col]
+    if long == True:
+        for i in range(centerline_coords.shape[0]):
+            row = centerline_coords[i][0]         # skeleton coords is a list of (row, col) objects
+            col = centerline_coords[i][1]
+            radius = 5
+            kymograph[i] = averaged_array[:, row, col]
+    return kymograph
+def build_centerline_vs_time_variable_radii(image, skeleton_data, long = False, offset = False):
     """
     This function takes an image and text file (default: csv) of the coordinates of a
     skeleton and outputs an image of the centerline pixel values vs time.
@@ -63,17 +86,17 @@ def build_centerline_vs_time_variable_radii(image, centerline_coords, radii, lon
     :param radii: 1D numpy array of the radii of the capillary
     :return: centerline_array: 2D numpy array that shows the pixels of the centerline vs time.
     """
-    centerline_array = np.zeros((centerline_coords.shape[0], image.shape[0]))
+    centerline_array = np.zeros((skeleton_data.shape[0], image.shape[0]))
     if long == False:
-        for i in range(centerline_coords.shape[0]):
-            row = centerline_coords[i][0]         # skeleton coords is a list of (row, col) objects
-            col = centerline_coords[i][1]
+        for i in range(skeleton_data.shape[0]):
+            row = skeleton_data[i][0]         # skeleton coords is a list of (row, col) objects
+            col = skeleton_data[i][1]
             centerline_array[i] = image[:, row, col]
     if long == True:
-        for i in range(centerline_coords.shape[0]):
-            row = centerline_coords[i][0]         # skeleton coords is a list of (row, col) objects
-            col = centerline_coords[i][1]
-            radius = int(radii[i])
+        for i in range(skeleton_data.shape[0]):
+            row = skeleton_data[i][0]         # skeleton coords is a list of (row, col) objects
+            col = skeleton_data[i][1]
+            radius = int(skeleton_data[i][2])
             centerline_array[i] = average_in_circle(image, row, col, radius)
     return centerline_array
 def average_in_circle(image, row, col, radius = 5):
@@ -180,6 +203,28 @@ def test2_normalize_row_and_col():
     plt.show()
     new_new_image = normalize_row_and_col(image)
     return 0
+def compute_average_surrounding_pixels(image_stack):
+    # Convert the image stack to float32 type for accurate calculations
+    image_stack = np.float32(image_stack)
+
+    # Create a kernel of ones with a size of 3x3
+    kernel = np.ones((3, 3), np.float32) / 9
+
+    # Reshape the image stack to a 4D tensor to represent individual windows
+    image_windows = image_stack.reshape(image_stack.shape[0], image_stack.shape[1], -1, 3)
+
+    # Perform 2D convolution to compute the average of the surrounding pixels
+    averaged_windows = filter2D(image_windows, -1, kernel)
+
+    # Reshape the averaged windows back to the original stack shape
+    averaged_stack = averaged_windows.reshape(image_stack.shape)
+
+    # Convert the averaged stack back to the original data type (e.g., uint8)
+    averaged_stack = np.uint8(averaged_stack)
+
+    return averaged_stack
+
+
 
 def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01', 
          write = True, variable_radii = False, verbose = False):
@@ -216,40 +261,54 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
     print(gap_left, gap_right, gap_bottom, gap_top)
 
     # Import images
+    start = time.time()
     images = get_images(input_folder)
     image_array = load_image_array(images, input_folder)      # this has the shape (frames, row, col)
     example_image = image_array[0]
+    print("The time to load the images is " + str(time.time() - start) + " seconds")
     print("The size of the array is " + str(image_array.shape))
 
     # Crop array based on shifts
     image_array = image_array[:, gap_top:example_image.shape[0] + gap_bottom, gap_left:example_image.shape[1] + gap_right] 
+    start_time = time.time()
     skeleton_data = load_csv_list(os.path.join(centerline_folder, 'coords'))
-    centerline_coords = [array[:, :2] for array in skeleton_data] # note that the centerline_coords will be row vectors
-    centerline_radii = [array[:, 2] for array in skeleton_data] # note that the radii will be row vectors
+    print(f"the time to load the skeleton csv is {time.time() - start_time} seconds")
     print("The size of the array after trimming is " + str(image_array.shape))
     # iterate over the capillaries
     for i in range(len(skeleton_data)):
         if variable_radii: 
             kymograph = build_centerline_vs_time_variable_radii(image_array, 
-                            centerline_coords[i], centerline_radii[i], long=True, offset=False)
+                            skeleton_data[i], long=True, offset=False)
         else:
-            kymograph = build_centerline_vs_time(image_array, centerline_coords[i], long = True)
+            start_time = time.time()
+            kymograph = build_centerline_vs_time(image_array, skeleton_data[i], long = True)
+            print(f"the old way took {time.time() - start_time} seconds")
+            start_time = time.time()
+            kymograph_new = build_centerline_vs_time_kernal(image_array, skeleton_data[i], long = True)
+            print(f"the new way took {time.time() - start_time} seconds")
         # centerline_array = normalize_rows(centerline_array)
+        start_time = time.time()
         kymograph = normalize_image(kymograph)
-    if write:
-            np.savetxt(os.path.join(output_folder, 'kymo', 
-                                    file_prefix + f'_blood_flow_{str(i).zfill(2)}.csv'), 
-                                    kymograph, delimiter=',', fmt = '%s')
-            im = Image.fromarray(kymograph)
-            im.save(os.path.join(output_folder, 'kymo', 
-                                 file_prefix + f'_blood_flow_{str(i).zfill(2)}.tiff'))
-    if verbose:
-        # Plot pixels vs time:
-        plt.imshow(kymograph)
-        plt.title('centerline pixel values per time')
-        plt.xlabel('frame')
-        plt.ylabel('centerline pixel')
-        plt.show()
+        print(f"the time to normalize the image is {time.time() - start_time} seconds")
+        kymograph_new = normalize_image(kymograph_new)
+        if write:
+                np.savetxt(os.path.join(output_folder, 'kymo', 
+                                        file_prefix + f'_blood_flow_{str(i).zfill(2)}.csv'), 
+                                        kymograph, delimiter=',', fmt = '%s')
+                im = Image.fromarray(kymograph)
+                im.save(os.path.join(output_folder, 'kymo', 
+                                    file_prefix + f'_blood_flow_{str(i).zfill(2)}.tiff'))
+                im2 = Image.fromarray(kymograph_new)
+                im2.save(os.path.join(output_folder, 'kymo', 
+                                    file_prefix + f'_blood_flow_{str(i).zfill(2)}_new.tiff'))
+
+        if verbose:
+            # Plot pixels vs time:
+            plt.imshow(kymograph)
+            plt.title('centerline pixel values per time')
+            plt.xlabel('frame')
+            plt.ylabel('centerline pixel')
+            plt.show()
     return 0
 
 
