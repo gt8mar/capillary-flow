@@ -204,6 +204,14 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
 
     # Make a numpy array of images with isolated capillaries. The mean/sum of this is segmented_2D.
     contours = enumerate_capillaries(segmented, verbose=False, write=write, write_path = os.path.join(input_folder, cap_map_filename))
+    
+    if write:
+        # save segmented_2D
+        segmented_2D = np.sum(contours, axis=0).astype(bool)
+        # segmented_2D[segmented_2D != 0] = 1
+        # save to results
+        np.savetxt(os.path.join(output_folder, 'centerline_mask.txt'), segmented_2D, delimiter=',')
+
     capillary_radii = []
     skeleton_coords = []
     flattened_radii = []
