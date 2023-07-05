@@ -61,7 +61,7 @@ def register_img(reference_img, input_img, prev_dx=0, prev_dy=0):
         #transform
         transformation_matrix = np.array([[1, 0, dx_avg], [0, 1, dy_avg]], dtype=np.float32)
         registered_img = cv2.warpAffine(input_img, transformation_matrix, (reference_img.shape[1], reference_img.shape[0]))
-
+        print("transformed")
         return registered_img, dx_avg, dy_avg
     else: 
         print("0 matches")
@@ -107,7 +107,6 @@ def register(folder_path_reference, folder_path_input):
     #make new registered folder
     new_folder_path = os.path.join(os.path.split(folder_path_input)[0], "registered")
     os.makedirs(new_folder_path, exist_ok=True)
-    print(new_folder_path)
     #save reference img
     shutil.copy2(file_path_reference, os.path.join(new_folder_path, os.path.basename(file_path_reference)))
     #save input img
