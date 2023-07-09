@@ -43,7 +43,7 @@ def create_circular_kernel(radius):
                 kernel[i, j] = 1
 
     return kernel / np.sum(kernel)
-def compute_average_surrounding_pixels(image_stack, radius=5, circle = True):
+def compute_average_surrounding_pixels(image_stack, radius=4, circle = True):
     """
     Compute the average of the surrounding pixels for each pixel in the image stack.
 
@@ -132,11 +132,11 @@ def row_wise_normalize(image):
     scaling_factors = mean_average / row_averages
 
     # Apply row-wise normalization
-    np.multiply(image, scaling_factors[:, np.newaxis], out=image)
+    normalized_image = image * scaling_factors[:, np.newaxis]
 
     # Convert the normalized image to 8-bit unsigned integer
-    image = image.astype(np.uint8)
-
+    normalized_image = normalized_image.astype(np.uint8)
+    
     return image
 def normalize_row_and_col(image):    
     # Normalize rows
@@ -238,9 +238,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
         start_time = time.time()
         # normalize intensity of the kymograph
         kymograph = exposure.rescale_intensity(kymograph, in_range = 'image', out_range = np.uint8)
-        # normalize rows of the kymograph
-        kymograph = row_wise_normalize(kymograph)
-        print(f"the time to normalize the image is {time.time() - start_time} seconds")
+        # print(f"the time to normalize the image is {time.time() - start_time} seconds")
 
         if write:
                 np.savetxt(os.path.join(output_folder, 'kymo', 
