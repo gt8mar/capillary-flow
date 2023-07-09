@@ -24,37 +24,6 @@ from skimage import exposure
 
 PIXELS_PER_UM = 2
 
-def average_array(array):
-    """
-    This returns an averaged array with half length of the input 1d array
-    :param array: 1d numpy array length 2n
-    :return: 1d array length n
-    """
-    if np.mod(len(array), 2) == 0:
-        return (array[::2] + array[1::2]) // 2
-    else:
-        return (array[:-1:2] + array[1::2]) // 2
-def build_centerline_vs_time(image, centerline_coords, long = True):
-    """
-    This function takes an image and text file (default: csv) of the coordinates of a
-    skeleton and outputs an image of the centerline pixel values vs time.
-    :param image: 3D numpy array (time, row, col)
-    :param skeleton_txt: 2D text file to be read into the function
-    :return: kymograph: 2D numpy array that shows the pixels of the centerline vs time.
-    """
-    kymograph = np.zeros((centerline_coords.shape[0], image.shape[0]))
-    if long == False:
-        for i in range(centerline_coords.shape[0]):
-            row = centerline_coords[i][0]         # skeleton coords is a list of (row, col) objects
-            col = centerline_coords[i][1]
-            kymograph[i] = image[:, row, col]
-    if long == True:
-        for i in range(centerline_coords.shape[0]):
-            row = centerline_coords[i][0]         # skeleton coords is a list of (row, col) objects
-            col = centerline_coords[i][1]
-            radius = 5
-            kymograph[i] = average_in_circle(image, row, col, radius)
-    return kymograph
 def create_circular_kernel(radius):
     """
     Create a circular kernel of a given radius.
@@ -127,47 +96,6 @@ def build_centerline_vs_time_kernal(image, centerline_coords, long = True):
             radius = 5
             kymograph[i] = averaged_array[:, row, col]
     return kymograph
-def build_centerline_vs_time_variable_radii(image, skeleton_data, long = False, offset = False):
-    """
-    This function takes an image and text file (default: csv) of the coordinates of a
-    skeleton and outputs an image of the centerline pixel values vs time.
-    :param image: 3D numpy array (time, row, col)
-    :param centerline_coords: 2D array of coordinates for the centerline of the capillary
-    :param radii: 1D numpy array of the radii of the capillary
-    :return: centerline_array: 2D numpy array that shows the pixels of the centerline vs time.
-    """
-    centerline_array = np.zeros((skeleton_data.shape[0], image.shape[0]))
-    if long == False:
-        for i in range(skeleton_data.shape[0]):
-            row = skeleton_data[i][0]         # skeleton coords is a list of (row, col) objects
-            col = skeleton_data[i][1]
-            centerline_array[i] = image[:, row, col]
-    if long == True:
-        for i in range(skeleton_data.shape[0]):
-            row = skeleton_data[i][0]         # skeleton coords is a list of (row, col) objects
-            col = skeleton_data[i][1]
-            radius = int(skeleton_data[i][2])
-            centerline_array[i] = average_in_circle(image, row, col, radius)
-    return centerline_array
-def average_in_circle(image, row, col, radius = 5):
-    """
-    This function inputs an image and a coordinate and outputs the average of a circle of
-    pixels surrounding the coordinate with specified radius.
-    :param image: 3D numpy array
-    :param row: integer, the row coordinate you want to average around
-    :param col: integer, the column coordinate you want to average around
-    :param radius: the radius you want to average over
-    :return circle_values_list: a numpy array of the averaged values of a (row, col) time-slice.
-    """
-    x = np.arange(0, image.shape[2])
-    y = np.arange(0, image.shape[1])
-
-    mask = (x[np.newaxis, :] - col) ** 2 + (y[:, np.newaxis] - row) ** 2 < radius ** 2
-    mask = np.dstack([mask]*image.shape[0])
-    mask = mask.transpose(2, 0, 1)
-    circle_values_list = image[mask].reshape(image.shape[0],-1)
-    circle_values_list = circle_values_list.mean(axis = 1)
-    return circle_values_list
 def normalize_image(image):
     image = image - np.min(image)
     image = image / np.max(image)
@@ -184,6 +112,32 @@ def normalize_rows(image):
     subtracted_image = (image - big_average)/big_std
     new_image = normalize_image(subtracted_image)
     return new_image
+def row_wise_normalize(image):
+    """" 
+    Normalizes the rows of an image by dividing each row by the average of that row
+
+    Args:
+        image (np.ndarray): 2D image of shape (row, col)
+    
+    Returns:
+        image (np.ndarray): 2D image of shape (row, col)
+    """
+    # Compute the average intensity of each row
+    row_averages = np.mean(image, axis=1)
+
+    # Calculate the mean average intensity across all rows
+    mean_average = np.mean(row_averages)
+
+    # Compute the scaling factors for each row
+    scaling_factors = mean_average / row_averages
+
+    # Apply row-wise normalization
+    np.multiply(image, scaling_factors[:, np.newaxis], out=image)
+
+    # Convert the normalized image to 8-bit unsigned integer
+    image = image.astype(np.uint8)
+
+    return image
 def normalize_row_and_col(image):    
     # Normalize rows
     norms = np.linalg.norm(image, axis=1)
@@ -212,37 +166,7 @@ def normalize_row_and_col(image):
     plt.title("Normalized columns")
 
     plt.show()
-def test(row = 16, col = 12, radius = 5):
-    x = np.arange(0, 32)
-    y = np.arange(0, 32)
-    z = np.arange(0, 40)
-    arr = np.zeros((z.size, y.size, x.size))
 
-    col = 12.
-    row = 16.
-    r = radius
-
-    # The two lines below could be merged, but I stored the mask
-    # for code clarity.
-    mask = (x[np.newaxis, :] - col) ** 2 + (y[:, np.newaxis] - row) ** 2 < r ** 2
-    mask_array = np.dstack([mask]*arr.shape[0])
-    mask_array = mask_array.transpose(2, 0, 1)
-    arr[mask_array] = 123
-    print(np.sum(mask))
-    print(mask.shape)
-    print(mask_array.shape)
-    print(arr[mask_array].shape)
-    new = arr[mask_array].reshape(arr.shape[0],-1)
-    print(new.shape)
-    print(new[0])
-    print(new.mean(axis=1))
-    # This plot shows that only within the circle the value is set to 123.
-    # plt.figure(figsize=(6, 6))
-    # plt.pcolormesh(x, y, arr[0])
-    # plt.colorbar()
-    # plt.show()
-    return 0
-def test2_normalize_row_and_col():
     image = np.loadtxt('C:\\Users\\ejerison\\capillary-flow\\tests\\set_01_sample_003_blood_flow_00.csv', delimiter=',', dtype = int)
     # image = np.random.randint(size = (100,100), low=0, high = 255)
     print(image)
@@ -253,7 +177,6 @@ def test2_normalize_row_and_col():
     plt.show()
     new_new_image = normalize_row_and_col(image)
     return 0
-
 
 def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01', 
          write = True, variable_radii = False, verbose = False):
@@ -305,21 +228,20 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
     print("The size of the array after trimming is " + str(image_array.shape))
     # iterate over the capillaries
     for i in range(len(skeleton_data)):
-        if variable_radii: 
-            kymograph = build_centerline_vs_time_variable_radii(image_array, 
-                            skeleton_data[i], long=True, offset=False)
-        else:
-            # start_time = time.time()
-            # kymograph = build_centerline_vs_time(image_array, skeleton_data[i], long = True)
-            # print(f"the old way took {time.time() - start_time} seconds")
-            start_time = time.time()
-            kymograph = build_centerline_vs_time_kernal(image_array, skeleton_data[i], long = True)
-            print(f"the new way took {time.time() - start_time} seconds")
-        # centerline_array = normalize_rows(centerline_array)
+        print(f"working on capillary {i}")
+        # build the kymograph
         start_time = time.time()
-        # kymograph = normalize_image(kymograph)
+        kymograph = build_centerline_vs_time_kernal(image_array, skeleton_data[i], long = True)
+        print(f"capillary {i} took {time.time() - start_time} seconds")
+        
+        # normalize the kymograph 
+        start_time = time.time()
+        # normalize intensity of the kymograph
         kymograph = exposure.rescale_intensity(kymograph, in_range = 'image', out_range = np.uint8)
+        # normalize rows of the kymograph
+        kymograph = row_wise_normalize(kymograph)
         print(f"the time to normalize the image is {time.time() - start_time} seconds")
+
         if write:
                 np.savetxt(os.path.join(output_folder, 'kymo', 
                                         file_prefix + f'_blood_flow_{str(i).zfill(2)}.csv'), 
