@@ -19,8 +19,8 @@ from src.tools.load_csv_list import load_csv_list
 from src.tools.get_shifts import get_shifts
 from scipy.ndimage import gaussian_filter
 from src.tools.parse_vid_path import parse_vid_path
-from cv2 import filter2D
-
+from scipy.ndimage import convolve
+from skimage import exposure
 
 PIXELS_PER_UM = 2
 
@@ -55,6 +55,54 @@ def build_centerline_vs_time(image, centerline_coords, long = True):
             radius = 5
             kymograph[i] = average_in_circle(image, row, col, radius)
     return kymograph
+def create_circular_kernel(radius):
+    """
+    Create a circular kernel of a given radius.
+    
+    Args:
+        radius (int): radius of the circular kernel
+    Returns:
+        kernel (np.ndarray): circular kernel of size (2*radius+1, 2*radius+1)
+    """
+    diameter = 2 * radius + 1
+    center = (radius, radius)
+    kernel = np.zeros((diameter, diameter), dtype=np.float32)
+
+    for i in range(diameter):
+        for j in range(diameter):
+            if np.sqrt((i - center[0]) ** 2 + (j - center[1]) ** 2) <= radius:
+                kernel[i, j] = 1
+
+    return kernel / np.sum(kernel)
+def compute_average_surrounding_pixels(image_stack, radius=5, circle = True):
+    """
+    Compute the average of the surrounding pixels for each pixel in the image stack.
+
+    Args:
+        image_stack (np.ndarray): 3D image stack of shape (time, row, col)
+        radius (int): radius of the circular kernel
+
+    Returns:
+        averaged_stack (np.ndarray): 3D image stack of shape (time, row, col)
+    """
+    # Convert the image stack to float32 type for accurate calculations
+    image_stack = np.float32(image_stack)
+
+    if circle:
+        # Create a circular kernel of a given radius
+        kernel = create_circular_kernel(radius)
+        
+    else:
+        # Create a kernel of ones with a size of radius x radius
+        kernel = np.ones((radius, radius), np.float32) / radius**2
+
+    # Perform 3D convolution to compute the average of the surrounding pixels
+    averaged_stack = convolve(image_stack, kernel[np.newaxis, :, :])
+
+    # Convert the averaged stack back to the original data type (e.g., uint8)
+    averaged_stack = np.uint8(averaged_stack)
+
+    return averaged_stack
 def build_centerline_vs_time_kernal(image, centerline_coords, long = True):
     """
     This function takes an image and text file (default: csv) of the coordinates of a
@@ -63,7 +111,9 @@ def build_centerline_vs_time_kernal(image, centerline_coords, long = True):
     :param skeleton_txt: 2D text file to be read into the function
     :return: centerline_array: 2D numpy array that shows the pixels of the centerline vs time.
     """
+    print("begin step 1")
     averaged_array = compute_average_surrounding_pixels(image)
+    print("begin step 2")
     kymograph = np.zeros((centerline_coords.shape[0], image.shape[0]))
     if long == False:
         for i in range(centerline_coords.shape[0]):
@@ -203,27 +253,6 @@ def test2_normalize_row_and_col():
     plt.show()
     new_new_image = normalize_row_and_col(image)
     return 0
-def compute_average_surrounding_pixels(image_stack):
-    # Convert the image stack to float32 type for accurate calculations
-    image_stack = np.float32(image_stack)
-
-    # Create a kernel of ones with a size of 3x3
-    kernel = np.ones((3, 3), np.float32) / 9
-
-    # Reshape the image stack to a 4D tensor to represent individual windows
-    image_windows = image_stack.reshape(image_stack.shape[0], image_stack.shape[1], -1, 3)
-
-    # Perform 2D convolution to compute the average of the surrounding pixels
-    averaged_windows = filter2D(image_windows, -1, kernel)
-
-    # Reshape the averaged windows back to the original stack shape
-    averaged_stack = averaged_windows.reshape(image_stack.shape)
-
-    # Convert the averaged stack back to the original data type (e.g., uint8)
-    averaged_stack = np.uint8(averaged_stack)
-
-    return averaged_stack
-
 
 
 def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01', 
@@ -280,17 +309,17 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
             kymograph = build_centerline_vs_time_variable_radii(image_array, 
                             skeleton_data[i], long=True, offset=False)
         else:
+            # start_time = time.time()
+            # kymograph = build_centerline_vs_time(image_array, skeleton_data[i], long = True)
+            # print(f"the old way took {time.time() - start_time} seconds")
             start_time = time.time()
-            kymograph = build_centerline_vs_time(image_array, skeleton_data[i], long = True)
-            print(f"the old way took {time.time() - start_time} seconds")
-            start_time = time.time()
-            kymograph_new = build_centerline_vs_time_kernal(image_array, skeleton_data[i], long = True)
+            kymograph = build_centerline_vs_time_kernal(image_array, skeleton_data[i], long = True)
             print(f"the new way took {time.time() - start_time} seconds")
         # centerline_array = normalize_rows(centerline_array)
         start_time = time.time()
-        kymograph = normalize_image(kymograph)
+        # kymograph = normalize_image(kymograph)
+        kymograph = exposure.rescale_intensity(kymograph, in_range = 'image', out_range = np.uint8)
         print(f"the time to normalize the image is {time.time() - start_time} seconds")
-        kymograph_new = normalize_image(kymograph_new)
         if write:
                 np.savetxt(os.path.join(output_folder, 'kymo', 
                                         file_prefix + f'_blood_flow_{str(i).zfill(2)}.csv'), 
@@ -298,9 +327,6 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
                 im = Image.fromarray(kymograph)
                 im.save(os.path.join(output_folder, 'kymo', 
                                     file_prefix + f'_blood_flow_{str(i).zfill(2)}.tiff'))
-                im2 = Image.fromarray(kymograph_new)
-                im2.save(os.path.join(output_folder, 'kymo', 
-                                    file_prefix + f'_blood_flow_{str(i).zfill(2)}_new.tiff'))
 
         if verbose:
             # Plot pixels vs time:
