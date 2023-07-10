@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 #SBATCH --job-name=kymographArray
-#SBATCH --array=11-25
+#SBATCH --array=11-20
 #SBATCH --time=04:00:00
 #SBATCH --nodes=8
 #SBATCH --ntasks-per-node=1
