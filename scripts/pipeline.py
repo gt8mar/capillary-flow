@@ -52,11 +52,6 @@ def main():
         write_background_file.main(path, color = True)
         print(f'video {video}')
         print(str(ticks-time.time()))
-    # """ Segment capillaries using segment.py """
-    # # TODO: make this work
-    # # segment.main()
-    # # find_centerline.py
-    # # make_kymograph.py 
 
     print(f'finished {participant} from the {date[0]}')
     print(str(ticks_total-time.time()))    
