@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#
 #SBATCH --job-name=kymographArray
 #SBATCH --time=04:00:00
 #SBATCH --gpus=10
