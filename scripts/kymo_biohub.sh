@@ -1,14 +1,17 @@
 #!/bin/bash
-#
+
 #SBATCH --job-name=kymographArray
-#SBATCH --array=11-20
 #SBATCH --time=04:00:00
-#SBATCH --nodes=8
-#SBATCH --ntasks-per-node=1
+#SBATCH --gpus=10
+#SBATCH --partition=gpu
 #SBATCH --mem=50G
 #SBATCH --output=kymo_array_%A-%a.out
+#SBATCH --array=11-20
 
 cd /hpc/projects/capillary-flow/scripts
-echo "make centerlines and kymographs: participant ${SLURM_ARRAY_TASK_ID}"
-srun python pipeline_kymo.py ${SLURM_ARRAY_TASK_ID}
-echo "completed kymographs part${SLURM_ARRAY_TASK_ID}"
+module load anaconda
+conda activate capillary-flow
+echo "make centerlines and kymographs: participant $SLURM_ARRAY_TASK_ID"
+srun python kymo_pipeline.py ${SLURM_ARRAY_TASK_ID}
+echo "completed kymographs part$SLURM_ARRAY_TASK_ID"
+exit

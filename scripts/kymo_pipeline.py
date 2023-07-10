@@ -43,6 +43,7 @@ def main():
     """ Write Background """
 
     # Participant number is passed as an argument
+    print(sys.argv)
     i = sys.argv[1]
     print(i)
     ticks_total = time.time()
