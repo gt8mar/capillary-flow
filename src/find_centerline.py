@@ -26,12 +26,6 @@ from src.tools.parse_vid_path import parse_vid_path
 BRANCH_THRESH = 40
 MIN_CAP_LEN = 150
 
-def test():
-    a = np.arange(6).reshape((2, 3))
-    b = a.transpose()
-    print(a)
-    print(b)
-    return 0
 def enumerate_capillaries(image, test = False, verbose = False, write = False, write_path = None):
     """
     This function finds the number of capillaries and returns an array of images with one
@@ -184,6 +178,8 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
     os.makedirs(os.path.join(path, 'E_centerline', 'coords'), exist_ok=True)
     os.makedirs(os.path.join(path, 'E_centerline', 'images'), exist_ok=True)
     output_folder = os.path.join(path, 'E_centerline')
+
+    # extract metadata from path
     participant, date, video = parse_vid_path(path)
     SET = 'set_01'
     file_prefix = f'{SET}_{participant}_{date}_{video}'
@@ -197,7 +193,6 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
     # Make mask either 1 or 0
     segmented[segmented != 0] = 1
 
-    # TODO: Check if this does anything
     # save to results
     total_skeleton, total_radii = make_skeletons(segmented, verbose = verbose, write = write, 
                                                      write_path=os.path.join(output_folder,'images', skeleton_filename))
@@ -219,6 +214,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
     skeleton_data = []
     j = 0
     for i in range(contours.shape[0]):
+        # make skeleton
         skeleton, radii = make_skeletons(contours[i], verbose=False, histograms = False)     # Skeletons come out in the shape
         skeleton_nums = np.asarray(np.nonzero(skeleton))
         # omit small capillaries
@@ -228,6 +224,8 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
         else:
             used_capillaries.append([f"new_capillary_{j}", str(skeleton_nums.shape[1])])
             j += 1
+
+            # Sort skeleton points in order of continuous points
             sorted_skeleton_coords, optimal_order = sort_continuous(skeleton_nums, verbose=False)
             ordered_radii = radii[optimal_order]
             skeleton_coords_with_radii = np.column_stack((sorted_skeleton_coords, ordered_radii))
@@ -261,8 +259,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
     # # plt.hist(flattened_radii)
     # # plt.show()
 
-    # # TODO: Write program to register radii maps with each other 
-    # # TODO: Abnormal capillaries, how do.
+    # # TODO: Abnormal capillaries
 
     return 0
 
