@@ -7,8 +7,7 @@ By: Marcus Forst
 average_in_circle credit: Nicolas Gervais (https://stackoverflow.com/questions/49330080/numpy-2d-array-selecting-indices-in-a-circle)
 """
 
-import os
-import time
+import os, time, gc
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -255,6 +254,9 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
             plt.xlabel('frame')
             plt.ylabel('centerline pixel')
             plt.show()
+        gc.collect()
+        memory_usage = gc.get_stats()[0]['current']
+        print(f"Memory usage from capillary {i}: {memory_usage} bytes")
     return 0
 
 
