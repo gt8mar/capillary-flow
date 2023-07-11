@@ -2,11 +2,11 @@
 #
 #SBATCH --job-name=kymographArray
 #SBATCH --time=04:00:00
-#SBATCH --gpus=10
+#SBATCH --gpus=2
 #SBATCH --partition=gpu
 #SBATCH --mem=150G
 #SBATCH --output=kymo_array_%A-%a.out
-#SBATCH --array=11-20
+#SBATCH --array=11-12
 
 cd /hpc/projects/capillary-flow/scripts
 module load anaconda
