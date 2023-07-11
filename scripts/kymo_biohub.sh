@@ -4,7 +4,7 @@
 #SBATCH --time=04:00:00
 #SBATCH --gpus=10
 #SBATCH --partition=gpu
-#SBATCH --mem=50G
+#SBATCH --mem=150G
 #SBATCH --output=kymo_array_%A-%a.out
 #SBATCH --array=11-20
 
