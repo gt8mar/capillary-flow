@@ -1,105 +1,106 @@
 """
 Filename: align_segmented.py
 -------------------------------------------------------------
-This file
+This file aligns segmented images based on translations between moco images.
 by: Gabby Rincon
 """
-
+#TODO location on finger
 import os
 import time
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import cv2
-import csv
 import shutil
-from register_image import register_image
+from register_images import register_images
 
+def uncrop_segmented(path, input_seg_img):
+    shifts = pd.read_csv(os.path.join(path, 'metadata', 'Results.csv'))
+    gap_left = shifts['x'].max()
+    gap_right = shifts['x'].min()
+    gap_bottom = shifts['y'].min()
+    gap_top = shifts['y'].max()
+    print(gap_left)
+    print(gap_right)
+    print(gap_bottom)
+    print(gap_top)
+
+    slices = [slice(None)] * input_seg_img.ndim
+    rows, cols = input_seg_img.shape[:2]
+    new_rows = rows + gap_top + np.abs(gap_bottom)
+    new_cols = cols + gap_left + np.abs(gap_right)
+    print(new_rows, new_cols)
+    
+    uncropped_input_seg_img = np.zeros((new_rows, new_cols) + input_seg_img.shape[2:], dtype=input_seg_img.dtype)
+    slices[:2] = slice(gap_top, gap_top+rows), slice(gap_left, gap_left+cols)
+    uncropped_input_seg_img[tuple(slices)] = input_seg_img
+
+    return uncropped_input_seg_img
+
+#this function assumes moco folder & seg imgs folder contain the same number of files & they correspond to each other 
 def align_segmented():
     vids_folder_fp = "E:\\Marcus\\gabby test data\\part11"
-    segmented_folder_fp = "E:\\Marcus\\gabby test data\\part11_segmented\\230427"
+    segmented_folder_fp = "E:\\Marcus\\gabby test data\\part11_segmented"
 
     #make list of filepaths of vid 0 in moco folders of all vids
     moco_vids_fp = []
-    sorted_vids_listdir = sorted(filter(lambda x: os.path.exists(os.path.join(vids_folder_fp, x)), os.listdir(vids_folder_fp)))
+    sorted_vids_listdir = sorted(filter(lambda x: os.path.exists(os.path.join(vids_folder_fp, x)), os.listdir(vids_folder_fp))) #sort numerically
     for vid in sorted_vids_listdir:
         moco_folder_fp = os.path.join(vids_folder_fp, vid, "moco")
         moco_vids_fp.append(os.path.join(moco_folder_fp, os.listdir(moco_folder_fp)[0]))
 
-    sorted_seg_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(segmented_folder_fp, x)), os.listdir(segmented_folder_fp))) #sort vids numerically
-    #reference_seg_img_fp = os.path.join(segmented_folder_fp, sorted_seg_listdir[0])
-    #reference_seg_img = cv2.imread(reference_seg_img_fp)
-    reference_vid_fp = moco_vids_fp[0]
-    reference_vid_img = cv2.imread(reference_vid_fp)
+    #set reference
+    reference_moco_fp = moco_vids_fp[0]
+    reference_moco_img = cv2.imread(reference_moco_fp)
 
     #make folder to save registered segmented imgs
     new_folder_path = os.path.join(segmented_folder_fp, "registered")
     os.makedirs(new_folder_path, exist_ok=True)
 
+    """#TEMP new folder for registered frames
+    temp_fp = os.path.join(segmented_folder_fp, "moco")
+    os.makedirs(temp_fp, exist_ok=True)"""
+
+    #first frame
+    sorted_seg_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(segmented_folder_fp, x)), os.listdir(segmented_folder_fp))) #sort numerically
+    first_seg_fp = os.path.join(segmented_folder_fp, sorted_seg_listdir[0])
+    first_seg_img = cv2.imread(first_seg_fp)
+    first_seg_img = uncrop_segmented(os.path.join(os.path.split(os.path.split(moco_vids_fp[0])[0])[0]), first_seg_img)
+    cv2.imwrite(os.path.join(new_folder_path, os.path.basename(first_seg_fp)), first_seg_img)
+
+    prevdx = 0
+    prevdy = 0
     for x in range(1, len(sorted_seg_listdir)):
         if "vid" in sorted_vids_listdir[x]: 
             print(sorted_vids_listdir[x])
             #register vids
-            #input_vid_fp = os.path.join(vids_folder_fp, sorted_vids_listdir[x])
-            input_vid_fp = moco_vids_fp[x]
-            input_vid_img = cv2.imread(input_vid_fp)
-            registered_img, xval, yval = register_image(reference_vid_img, input_vid_img)
-            
-            #TEMP for visual confirmation of registering vids
-            cv2.imwrite(os.path.join("E:\\Marcus\\gabby test data\\reg", "input" + os.path.basename(input_vid_fp)), input_vid_img)
-            cv2.imwrite(os.path.join("E:\\Marcus\\gabby test data\\reg", "ref" + os.path.basename(reference_vid_fp)), reference_vid_img)
-            cv2.imwrite(os.path.join("E:\\Marcus\\gabby test data\\reg", "reg" + os.path.basename(input_vid_fp)), registered_img)
-            
-            #transform new reference image
-            reference_vid_fp = moco_vids_fp[x]
-            reference_vid_img = cv2.imread(reference_vid_fp)
-            transformation_matrix = np.array([[1, 0, -xval], [0, 1, -yval]], dtype=np.float32)
-            reference_vid_img = cv2.warpAffine(reference_vid_img, transformation_matrix, (reference_vid_img.shape[1], reference_vid_img.shape[0]))
+            input_moco_fp = moco_vids_fp[x]
+            input_moco_img = cv2.imread(input_moco_fp)
+            (dx, dy), registered_image = register_images(reference_moco_img, input_moco_img)
 
-            input_seg_img_fp = os.path.join(segmented_folder_fp, sorted_seg_listdir[x])
+            """#TEMP
+            temp_transformation_matrix = np.array([[1, 0, -(prevdx)], [0, 1, -(prevdy)]], dtype=np.float32)
+            temp_registered_image = cv2.warpAffine(registered_image, temp_transformation_matrix, (1440, 1080))
+            cv2.imwrite(os.path.join(temp_fp, os.path.basename(moco_vids_fp[x])), temp_registered_image)
+            """
+            #get image to segment
+            input_seg_fp = os.path.join(segmented_folder_fp, sorted_seg_listdir[x])
+            input_seg_img = cv2.imread(input_seg_fp)
 
+            #make segmented same size
+            input_seg_img = uncrop_segmented(os.path.join(os.path.split(os.path.split(moco_vids_fp[x])[0])[0]), input_seg_img)
+            
             #transform segmented image
-            transformation_matrix = np.array([[1, 0, -xval], [0, 1, -yval]], dtype=np.float32)
-            registered_seg_img = cv2.warpAffine(cv2.imread(input_seg_img_fp), transformation_matrix, (1371, 1016))
+            transformation_matrix = np.array([[1, 0, -(dx + prevdx)], [0, 1, -(dy + prevdy)]], dtype=np.float32)
+            registered_seg_img = cv2.warpAffine(input_seg_img, transformation_matrix, (1440, 1080))
 
             #save segmented image
-            cv2.imwrite(os.path.join(new_folder_path, os.path.basename(input_seg_img_fp)), registered_seg_img)
+            cv2.imwrite(os.path.join(new_folder_path, os.path.basename(input_seg_fp)), registered_seg_img)
 
-            #reference_seg_img_fp = os.path.join(segmented_folder_fp, sorted_seg_listdir[x])
-            #reference_seg_img = cv2.imread(reference_seg_img_fp)
-
-
-def align_moco():
-    vids_folder_fp = "E:\\Marcus\\gabby test data\\part10\\230425"
-
-    #make list of filepaths of vid 0 in moco folders of all vids
-    moco_vids_fp = []
-    sorted_vids_listdir = sorted(filter(lambda x: os.path.exists(os.path.join(vids_folder_fp, x)), os.listdir(vids_folder_fp)))
-    for vid in sorted_vids_listdir:
-        moco_folder_fp = os.path.join(vids_folder_fp, vid, "moco")
-        moco_vids_fp.append(os.path.join(moco_folder_fp, os.listdir(moco_folder_fp)[0]))
-
-    reference_vid_fp = moco_vids_fp[0]
-    reference_vid_img = cv2.imread(reference_vid_fp)
-
-    for x in range(1, len(sorted_vids_listdir)):
-        if "vid" in sorted_vids_listdir[x]: 
-            #register vids
-            input_vid_fp = moco_vids_fp[x]
-            input_vid_img = cv2.imread(input_vid_fp)
-            registered_img, xval, yval = register_image(reference_vid_img, input_vid_img)
-            
-            #TEMP for visual confirmation of registering vids
-            cv2.imwrite(os.path.join("E:\\Marcus\\gabby test data\\reg", "input" + os.path.basename(input_vid_fp)), input_vid_img)
-            cv2.imwrite(os.path.join("E:\\Marcus\\gabby test data\\reg", "ref" + os.path.basename(reference_vid_fp)), reference_vid_img)
-            cv2.imwrite(os.path.join("E:\\Marcus\\gabby test data\\reg", "reg" + os.path.basename(input_vid_fp)), registered_img)
-            
-            #transform new reference image
-            reference_vid_fp = moco_vids_fp[x]
-            reference_vid_img = cv2.imread(reference_vid_fp)
-            transformation_matrix = np.array([[1, 0, -xval], [0, 1, -yval]], dtype=np.float32)
-            reference_vid_img = cv2.warpAffine(reference_vid_img, transformation_matrix, (reference_vid_img.shape[1], reference_vid_img.shape[0]))
-    
-
+            #set new reference, prevdx, prevdy
+            reference_moco_img = input_moco_img
+            prevdx += dx
+            prevdy += dy
 
 
 """
