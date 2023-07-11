@@ -1,5 +1,5 @@
 """
-Filename: register_image.py
+Filename: register_images.py
 By: Gabby Rincon & ChatGPT
 """
 
@@ -9,7 +9,7 @@ import numpy as np
 import cv2
 
 """
-This function takes 2 images (reference and target) and returns the target translated to the reference as well as the x and y translation values.
+This function takes 2 images as np arrays (reference and target) and returns the x and y translation values and the target translated to the reference.
 """
 def register_images(reference_img, target_img):
     #grayscale
