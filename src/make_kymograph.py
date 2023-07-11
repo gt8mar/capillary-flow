@@ -221,7 +221,9 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
 
     # Crop array based on shifts
     image_array = image_array[:, gap_top:example_image.shape[0] + gap_bottom, gap_left:example_image.shape[1] + gap_right] 
+    print("The size of the array after trimming is " + str(image_array.shape))
     start_time = time.time()
+    print("the start time is " + str(start_time))
     skeleton_data = load_csv_list(os.path.join(centerline_folder, 'coords'))
     print(f"the time to load the skeleton csv is {time.time() - start_time} seconds")
     print("The size of the array after trimming is " + str(image_array.shape))
