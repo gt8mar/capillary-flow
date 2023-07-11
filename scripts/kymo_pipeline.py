@@ -7,8 +7,7 @@ centerlines for segmented capillaries and make kymographs.
 By: Marcus Forst
 """
 
-import time
-import os, sys
+import os, sys, gc, time
 from src import find_centerline
 from src import make_kymograph
 
@@ -40,12 +39,9 @@ def main():
         kymograph files
     """
 
-    """ Write Background """
-
     # Participant number is passed as an argument
-    print(sys.argv)
     i = sys.argv[1]
-    print(i)
+    print(f"begin kymo_pipeline for participant {i}")
     ticks_total = time.time()
     participant = 'part' + str(i).zfill(2) 
 
@@ -58,14 +54,26 @@ def main():
         ticks = time.time()
         path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date[0], video)
         find_centerline.main(path, verbose=False, write=True)
+
+        # Run garbage collection to free up memory
+        gc.collect()
+        memory_usage = gc.get_stats()[0]['current']
+        print(f"Memory usage finding centerlinese in {video}: {memory_usage} bytes")
+        print(f"completed centerlines for video {video}")
+        print(f"{video} took {ticks-time.time()} seconds")
+        print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+        
+        # Make kymographs
         make_kymograph.main(path, verbose=False, write=True)
         print(f'completed kymographs for video {video}')
-        print(str(ticks-time.time()))
+        
+        # Run garbage collection to free up memory
+        gc.collect()
+        memory_usage = gc.get_stats()[0]['current']
+        print(f"Memory usage making kymographs in {video}: {memory_usage} bytes")
+        print(f"{video} took {ticks-time.time()} seconds")
 
-    print(f'finished {participant} from the date {date[0]}')
-    print(str(ticks_total-time.time()))    
-
-
+    print(f'finished {participant} from the date {date[0]} in {ticks_total-time.time()} seconds')
 
     """ Correlation files """
     # for folder in os.listdir(UMBRELLA_FOLDER_MOCO):
