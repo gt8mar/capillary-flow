@@ -9,5 +9,5 @@ def load_csv_list(path, dtype = int):
     for name in csv_names:
         file = np.loadtxt(os.path.join(path, name), delimiter = ',', dtype = dtype)
         csv_list.append(file) 
-    print(f"list shape: {np.shape(csv_list)}")
+    print(f"list length: {len(csv_list)}")
     return csv_list
