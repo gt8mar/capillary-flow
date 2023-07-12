@@ -256,9 +256,6 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid18'
             plt.xlabel('frame')
             plt.ylabel('centerline pixel')
             plt.show()
-        gc.collect()
-        memory_usage = gc.get_stats()[0]['current']
-        print(f"Memory usage from capillary {i}: {memory_usage} bytes")
     return 0
 
 

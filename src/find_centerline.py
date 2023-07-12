@@ -161,7 +161,7 @@ def sort_continuous(array_2D, verbose = False):
     else:
         raise Exception('wrong type')
 
-def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01',
+def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid18',
         verbose = False, write = False):
     """ Isolates capillaries from segmented image and finds their centerlines and radii. 
 
@@ -272,6 +272,6 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(path = '/hpc/projects/capillary-flow/data/part11/230427/vid01', verbose = False, write = True)
+    main(path = '/hpc/projects/capillary-flow/data/part11/230427/vid18', verbose = False, write = True)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
