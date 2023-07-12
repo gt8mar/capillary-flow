@@ -177,7 +177,7 @@ def normalize_row_and_col(image):
     new_new_image = normalize_row_and_col(image)
     return 0
 
-def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01', 
+def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid18', 
          write = True, variable_radii = False, verbose = False):
     """
     This function takes a path to a video and calculates the blood flow.
@@ -266,7 +266,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(path ='/hpc/projects/capillary-flow/data/part11/230427/vid01',
+    main(path ='/hpc/projects/capillary-flow/data/part11/230427/vid18',
           write=True)
     # test2_normalize_row_and_col()
     # test()
