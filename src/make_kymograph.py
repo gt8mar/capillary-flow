@@ -196,6 +196,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part13\\230428\\vid25'
     input_folder = os.path.join(path, 'moco')
     metadata_folder = os.path.join(path, 'metadata')
     centerline_folder = os.path.join(path, 'E_centerline')
+    results_folder = '/hpc/projects/capillary-flow/results'
     
     # Create output folders
     os.makedirs(os.path.join(path, 'F_blood_flow', 'kymo'), exist_ok=True)
@@ -240,6 +241,9 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part13\\230428\\vid25'
                                         kymograph, delimiter=',', fmt = '%s')
                 im = Image.fromarray(kymograph)
                 im.save(os.path.join(output_folder, 'kymo', 
+                                    file_prefix + f'_blood_flow_{str(i).zfill(2)}.tiff'))
+                # save to results folder
+                im.save(os.path.join(results_folder, 'kymographs',
                                     file_prefix + f'_blood_flow_{str(i).zfill(2)}.tiff'))
 
         if verbose:
