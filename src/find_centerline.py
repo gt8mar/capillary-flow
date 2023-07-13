@@ -26,7 +26,7 @@ import warnings
 
 
 BRANCH_THRESH = 40
-MIN_CAP_LEN = 150
+MIN_CAP_LEN = 50
 
 def enumerate_capillaries(image, test = False, verbose = False, write = False, write_path = None):
     """
@@ -163,7 +163,7 @@ def sort_continuous(array_2D, verbose = False):
     else:
         raise Exception('wrong type')
 
-def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part13\\230428\\vid25',
+def main(path = "F:\\Marcus\\data\\part13\\230428\\vid25",
         verbose = False, write = False):
     """ Isolates capillaries from segmented image and finds their centerlines and radii. 
 
@@ -200,9 +200,9 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part13\\230428\\vid25'
     # Make mask either 1 or 0
     segmented[segmented != 0] = 1
 
-    # save to results
-    total_skeleton, total_radii = make_skeletons(segmented, verbose = verbose, write = write, 
-                                                     write_path=os.path.join(output_folder,'images', skeleton_filename))
+    # # save to results
+    # total_skeleton, total_radii = make_skeletons(segmented, verbose = verbose, write = write, 
+    #                                                  write_path=os.path.join(output_folder,'images', skeleton_filename))
 
     # Make a numpy array of images with isolated capillaries. The mean/sum of this is segmented_2D.
     contours = enumerate_capillaries(segmented, verbose=False, write=write, write_path = os.path.join(input_folder, cap_map_filename))
@@ -222,6 +222,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part13\\230428\\vid25'
     j = 0
     for i in range(contours.shape[0]):
         # make skeleton
+        print(f"Making skeleton for capillary {i}")
         skeleton, radii = make_skeletons(contours[i], verbose=False, histograms = False)     # Skeletons come out in the shape
         skeleton_nums = np.asarray(np.nonzero(skeleton))
         # omit small capillaries
@@ -280,5 +281,6 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part13\\230428\\vid25'
 if __name__ == "__main__":
     ticks = time.time()
     main(path = '/hpc/projects/capillary-flow/data/part13/230428/vid25', verbose = False, write = True)
+    # main(verbose = True, write = True)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
