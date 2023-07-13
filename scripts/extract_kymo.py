@@ -34,7 +34,7 @@ def search_for_kymo_tiff_files(source_folder, destination_folder):
     return tiff_files
 
 source_folder = "/hpc/projects/capillary-flow/data"
-destination_folder = "/hpc/projects/capillary-flow/data/results/kymographs"
+destination_folder = "/hpc/projects/capillary-flow/results/kymographs"
 tiff_files = search_for_kymo_tiff_files(source_folder, destination_folder)
 
 # Print the paths of all the TIFF files that have been copied
