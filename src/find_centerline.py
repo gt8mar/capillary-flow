@@ -22,6 +22,8 @@ import time
 from sklearn.neighbors import NearestNeighbors
 import networkx as nx
 from src.tools.parse_vid_path import parse_vid_path
+import warnings
+
 
 BRANCH_THRESH = 40
 MIN_CAP_LEN = 150
@@ -161,7 +163,7 @@ def sort_continuous(array_2D, verbose = False):
     else:
         raise Exception('wrong type')
 
-def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid18',
+def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part13\\230428\\vid25',
         verbose = False, write = False):
     """ Isolates capillaries from segmented image and finds their centerlines and radii. 
 
@@ -174,6 +176,11 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid18'
 
     Saves: Centerlines, radii, which capillaries are too small
     """
+    
+    # Ignore FilFinder warnings
+    warnings.filterwarnings("ignore", category=UserWarning, module="fil_finder.filament")
+    
+    # Set up paths
     input_folder = os.path.join(path, 'D_segmented')
     os.makedirs(os.path.join(path, 'E_centerline', 'coords'), exist_ok=True)
     os.makedirs(os.path.join(path, 'E_centerline', 'images'), exist_ok=True)
@@ -272,6 +279,6 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid18'
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(path = '/hpc/projects/capillary-flow/data/part11/230427/vid18', verbose = False, write = True)
+    main(path = '/hpc/projects/capillary-flow/data/part13/230428/vid25', verbose = False, write = True)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))

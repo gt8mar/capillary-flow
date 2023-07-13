@@ -51,18 +51,19 @@ def main():
 
     # Find centerlines and make kymographs for each video
     for video in videos:
+        print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+        print(f"beginning centerlines and kymographs for video {video}")
+        print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
         ticks = time.time()
         path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date[0], video)
         find_centerline.main(path, verbose=False, write=True)
-
-        print(f"completed centerlines for video {video}")
-        print(f"{video} took {ticks-time.time()} seconds")
-        print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+        print(f"completed centerlines for video {video} in {ticks-time.time()} seconds")
         
         # Make kymographs
         make_kymograph.main(path, verbose=False, write=True)
-        print(f'completed kymographs for video {video}')
-        print(f"{video} took {ticks-time.time()} seconds")
+        print(f'completed kymographs for video {video} in {ticks-time.time()} seconds')
+        print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+
 
     print(f'finished {participant} from the date {date[0]} in {ticks_total-time.time()} seconds')
 

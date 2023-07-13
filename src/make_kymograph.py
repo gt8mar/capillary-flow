@@ -79,9 +79,7 @@ def build_centerline_vs_time_kernal(image, centerline_coords, long = True):
     :param skeleton_txt: 2D text file to be read into the function
     :return: centerline_array: 2D numpy array that shows the pixels of the centerline vs time.
     """
-    print("begin step 1")
     averaged_array = compute_average_surrounding_pixels(image)
-    print("begin step 2")
     kymograph = np.zeros((centerline_coords.shape[0], image.shape[0]))
     if long == False:
         for i in range(centerline_coords.shape[0]):
@@ -177,7 +175,7 @@ def normalize_row_and_col(image):
     new_new_image = normalize_row_and_col(image)
     return 0
 
-def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid18', 
+def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part13\\230428\\vid25', 
          write = True, variable_radii = False, verbose = False):
     """
     This function takes a path to a video and calculates the blood flow.
@@ -216,20 +214,15 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid18'
     images = get_images(input_folder)
     image_array = load_image_array(images, input_folder)      # this has the shape (frames, row, col)
     example_image = image_array[0]
-    print("The time to load the images is " + str(time.time() - start) + " seconds")
+    print(f"Loading images for {file_prefix} took {time.time() - start} seconds")
     print("The size of the array is " + str(image_array.shape))
 
     # Crop array based on shifts
     image_array = image_array[:, gap_top:example_image.shape[0] + gap_bottom, gap_left:example_image.shape[1] + gap_right] 
-    print("The size of the array after trimming is " + str(image_array.shape))
     start_time = time.time()
-    print("the start time is " + str(start_time))
     skeleton_data = load_csv_list(os.path.join(centerline_folder, 'coords'))
-    print(f"the time to load the skeleton csv is {time.time() - start_time} seconds")
-    print("The size of the array after trimming is " + str(image_array.shape))
     # iterate over the capillaries
     for i in range(len(skeleton_data)):
-        print(f"working on capillary {i}")
         # build the kymograph
         start_time = time.time()
         kymograph = build_centerline_vs_time_kernal(image_array, skeleton_data[i], long = True)
@@ -263,7 +256,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid18'
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(path ='/hpc/projects/capillary-flow/data/part11/230427/vid18',
+    main(path ='/hpc/projects/capillary-flow/data/part13/230428/vid25',
           write=True)
     # test2_normalize_row_and_col()
     # test()
