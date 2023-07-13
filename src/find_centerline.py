@@ -200,10 +200,6 @@ def main(path = "F:\\Marcus\\data\\part13\\230428\\vid25",
     # Make mask either 1 or 0
     segmented[segmented != 0] = 1
 
-    # # save to results
-    # total_skeleton, total_radii = make_skeletons(segmented, verbose = verbose, write = write, 
-    #                                                  write_path=os.path.join(output_folder,'images', skeleton_filename))
-
     # Make a numpy array of images with isolated capillaries. The mean/sum of this is segmented_2D.
     contours = enumerate_capillaries(segmented, verbose=False, write=write, write_path = os.path.join(input_folder, cap_map_filename))
     
