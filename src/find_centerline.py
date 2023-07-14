@@ -26,7 +26,7 @@ import warnings
 
 
 BRANCH_THRESH = 40
-MIN_CAP_LEN = 50
+MIN_CAP_LEN = 5
 
 def enumerate_capillaries(image, test = False, verbose = False, write = False, write_path = None):
     """
