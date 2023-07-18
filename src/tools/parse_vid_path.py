@@ -29,4 +29,6 @@ def parse_vid_path(path):
     date = dir_names[-2]
     # remove bp from the video name
     video = dir_names[-1].replace('bp', '')
-    return participant, date, video  # SET,
+    SET = 'set_01'
+    file_prefix = f'{SET}_{participant}_{date}_{video}'
+    return participant, date, video, file_prefix

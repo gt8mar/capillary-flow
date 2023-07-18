@@ -18,7 +18,7 @@ def count_max_tiff_files(folder_path):
                 max_tiff_count = tiff_count
     return max_tiff_count
 
-folder_path = "data"
-max_tiff_count = count_max_tiff_files(folder_path)
+source_folder = "/hpc/projects/capillary-flow/data"
+max_tiff_count = count_max_tiff_files(source_folder)
 
 print("Maximum number of TIFF files in a 'kymo' folder:", max_tiff_count)

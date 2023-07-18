@@ -204,9 +204,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part13\\230428\\vid25'
     output_folder = os.path.join(path, 'F_blood_flow')
     
     # Get metadata
-    participant, date, video = parse_vid_path(path)
-    SET = 'set_01'
-    file_prefix = f'{SET}_{participant}_{date}_{video}'
+    participant, date, video, file_prefix = parse_vid_path(path)
     gap_left, gap_right, gap_bottom, gap_top = get_shifts(metadata_folder) # get gaps from the metadata
     print(gap_left, gap_right, gap_bottom, gap_top)
 

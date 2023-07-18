@@ -38,7 +38,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1'
     os.makedirs(os.path.join(path, 'C_background'), exist_ok=True)
     output_folder = os.path.join(path, 'C_background')
     results_folder = '/hpc/projects/capillary-flow/results/backgrounds'  # I want to save all the backgrounds to the same folder for easy transfer to hasty.ai
-    participant, date, video = parse_vid_path(path)
+    participant, date, video, file_prefix = parse_vid_path(path)
 
     # Read in shift values from stabilization algorithm
     shifts = pd.read_csv(os.path.join(path, 'metadata', 'Results.csv'))
