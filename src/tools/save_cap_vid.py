@@ -19,6 +19,9 @@ from src.tools.get_shifts import get_shifts
 def crop_frame_around_mask(image_array, mask, padding=20):
     # Find the bounding box coordinates of the mask
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if len(contours) == 0 or contours[0] is None:
+        print("No contours found")
+        return []
     cropped_frames = []
     for contour in contours:
         x, y, w, h = cv2.boundingRect(contour)
@@ -73,8 +76,9 @@ def save_video(cropped_masked_array, cap_name, path, fps=114, plot=False):
 
     # Release the video writer
     video_writer.close()
+    return 0
 
-def main(path = "F:\\Marcus\\data\\part11\\230427\\vid16", plot=False):
+def main(path = "F:\\Marcus\\data\\part11\\230427\\vid15", plot=False):
     """
     This function saves the masked region of a series of TIFF images as a video.
 
@@ -116,7 +120,10 @@ def main(path = "F:\\Marcus\\data\\part11\\230427\\vid16", plot=False):
     # Apply the mask to the image array
     masked_array = (binary_mask * image_array) 
     cropped_masked_arrays = crop_frame_around_mask(masked_array, binary_mask)
-
+    if cropped_masked_arrays == []:
+        print("No contours found")
+        return 0
+    
     # TODO: add correct naming to save_video
 
     # Save the masked arrays as videos
