@@ -18,12 +18,24 @@ from src.tools.load_image_array import load_image_array
 from src.tools.get_shifts import get_shifts
 
 def crop_frame_around_mask(image_array, mask, padding=20):
+    """
+    Crops the image array around their respective masks.
+
+    Args:
+        image_array (np.ndarray): The array of images.
+        mask (np.ndarray): mask of the capillaries
+        padding (int, optional): The number of pixels to pad the mask by. Defaults to 20.
+    
+    Returns:
+        list: A list of cropped frames.
+    """
     # Find the bounding box coordinates of the mask
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if len(contours) == 0 or contours[0] is None:
         print("No contours found")
         return []
     cropped_frames = []
+    
     for contour in contours:
         x, y, w, h = cv2.boundingRect(contour)
 
@@ -69,7 +81,7 @@ def save_video(cropped_masked_array, cap_name, path, fps=114, plot=False):
     if platform.system() == 'Windows':
         results_file = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\results\\cap_vids', f'{file_prefix}_capillary_{cap_name}.avi')
     else:
-        results_file = os.path.join('/hpc/projets/capillary-flow/results/cap_vids', f'{file_prefix}_capillary_{cap_name}.avi')
+        results_file = os.path.join('/hpc/projects/capillary-flow/results/cap_vids', f'{file_prefix}_capillary_{cap_name}.avi')
     fourcc = 'raw'  # Specify the codec (MP4V)
     frame_size = (cropped_masked_array.shape[2], cropped_masked_array.shape[1])  # (width, height)
     video_writer = imageio.get_writer(output_file, format='FFMPEG', mode='I')
@@ -87,7 +99,7 @@ def save_video(cropped_masked_array, cap_name, path, fps=114, plot=False):
     video_writer2.close()
     return 0
 
-def main(path = "F:\\Marcus\\data\\part11\\230427\\vid15", plot=False):
+def main(path = "F:\\Marcus\\data\\part12\\230428\\vid01", plot=False):
     """
     This function saves the masked region of a series of TIFF images as a video.
 
