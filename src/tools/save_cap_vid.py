@@ -14,6 +14,7 @@ import os, time
 from src.tools.parse_vid_path import parse_vid_path
 from src.tools.get_images import get_images
 from src.tools.load_image_array import load_image_array
+from src.tools.get_shifts import get_shifts
 
 def crop_frame_around_mask(image_array, mask, padding=20):
     # Find the bounding box coordinates of the mask
@@ -59,7 +60,8 @@ def save_video(cropped_masked_array, cap_name, path, fps=114, plot=False):
 
     # ------------------------make video-------------------------------------------------------------
     # Create a VideoWriter object to save the video
-    output_file = os.path.join(path,'masked_vid', f'{file_prefix}_capillary_{cap_name}.avi')
+    os.makedirs(os.path.join(path, 'G_masked_vid'), exist_ok=True)
+    output_file = os.path.join(path,'G_masked_vid', f'{file_prefix}_capillary_{cap_name}.avi')
     fourcc = 'raw'  # Specify the codec (MP4V)
     frame_size = (cropped_masked_array.shape[2], cropped_masked_array.shape[1])  # (width, height)
     video_writer = imageio.get_writer(output_file, format='FFMPEG', mode='I')
@@ -86,6 +88,7 @@ def main(path = "F:\\Marcus\\data\\part11\\230427\\vid16", plot=False):
     # input folders
     moco_folder = os.path.join(path, 'moco')
     mask_folder = os.path.join(path, "D_segmented")
+    metadata_folder = os.path.join(path, 'metadata')
     
     # Get the base file name (without extension) to find the corresponding mask file
     participant, date, video, file_prefix = parse_vid_path(path)
@@ -96,6 +99,9 @@ def main(path = "F:\\Marcus\\data\\part11\\230427\\vid16", plot=False):
     start = time.time()
     images = get_images(moco_folder)
     image_array = load_image_array(images, moco_folder)      # this has the shape (frames, row, col)
+    gap_left, gap_right, gap_bottom, gap_top = get_shifts(metadata_folder)
+    print(f"Gap left: {gap_left}, gap right: {gap_right}, gap bottom: {gap_bottom}, gap top: {gap_top}")
+    image_array = image_array[:, gap_top:image_array.shape[1] + gap_bottom, gap_left:image_array.shape[2] + gap_right]
     example_image = image_array[0]
     print(f"Loading images for {file_prefix} took {time.time() - start} seconds")
     print("The size of the array is " + str(image_array.shape))
