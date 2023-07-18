@@ -33,7 +33,7 @@ def crop_frame_around_mask(image_array, mask, padding=20):
         cropped_frames.append(cropped_frame)
     return cropped_frames
 
-def save_video(cropped_masked_array, path, fps=114, plot=False):
+def save_video(cropped_masked_array, cap_name, path, fps=114, plot=False):
     """
     Saves the cropped frames as a video.
 
@@ -59,7 +59,7 @@ def save_video(cropped_masked_array, path, fps=114, plot=False):
 
     # ------------------------make video-------------------------------------------------------------
     # Create a VideoWriter object to save the video
-    output_file = path + '\\masked_vid\\'+'output_video.avi'
+    output_file = os.path.join(path,'masked_vid', f'{file_prefix}_capillary_{cap_name}.avi')
     fourcc = 'raw'  # Specify the codec (MP4V)
     frame_size = (cropped_masked_array.shape[2], cropped_masked_array.shape[1])  # (width, height)
     video_writer = imageio.get_writer(output_file, format='FFMPEG', mode='I')
@@ -72,7 +72,7 @@ def save_video(cropped_masked_array, path, fps=114, plot=False):
     # Release the video writer
     video_writer.close()
 
-def main(path = "F:\\Marcus\\data\\part11\\230427\\vid01", plot=False):
+def main(path = "F:\\Marcus\\data\\part11\\230427\\vid16", plot=False):
     """
     This function saves the masked region of a series of TIFF images as a video.
 
@@ -88,9 +88,7 @@ def main(path = "F:\\Marcus\\data\\part11\\230427\\vid01", plot=False):
     mask_folder = os.path.join(path, "D_segmented")
     
     # Get the base file name (without extension) to find the corresponding mask file
-    participant, date, video = parse_vid_path(path)
-    SET = 'set_01'
-    file_prefix = f'{SET}_{participant}_{date}_{video}'
+    participant, date, video, file_prefix = parse_vid_path(path)
     base_name = file_prefix + '_background_seg'
     mask_path = os.path.join(mask_folder, base_name + '.png')
 
@@ -113,10 +111,12 @@ def main(path = "F:\\Marcus\\data\\part11\\230427\\vid01", plot=False):
     masked_array = (binary_mask * image_array) 
     cropped_masked_arrays = crop_frame_around_mask(masked_array, binary_mask)
 
-    # TODO: 
-    for cropped_masked_array in cropped_masked_arrays:   
-        save_video(cropped_masked_array, path, plot=plot)
+    # TODO: add correct naming to save_video
 
+    # Save the masked arrays as videos
+    for i in range(len(cropped_masked_arrays)):
+        cap_name = str(i).zfill(2)  
+        save_video(cropped_masked_arrays[i], cap_name, path, plot=plot)
     return 0
 
 # This provided line is required at the end of a Python file
