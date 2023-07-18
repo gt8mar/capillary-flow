@@ -45,7 +45,11 @@ def main():
     participant = 'part' + str(i).zfill(2) 
 
     # Load the date and video numbers
-    date = list_only_folders(os.path.join('/hpc/projects/capillary-flow/data', participant))
+    date_folders = list_only_folders(os.path.join('/hpc/projects/capillary-flow/data', participant))
+    # date is the folder with only numbers in the title
+    dates = [dates for dates in date_folders if dates.isdigit()]
+    date = dates[0]
+
     videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date[0]))
 
     # Find centerlines and make kymographs for each video
