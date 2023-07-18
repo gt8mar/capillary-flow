@@ -9,6 +9,7 @@ By: Marcus Forst
 
 import os, sys, gc, time
 from src.tools import save_cap_vid
+from src.tools import find_earliest_date_dir
 
 SET = "set_01"
 
@@ -45,12 +46,9 @@ def main():
     participant = 'part' + str(i).zfill(2) 
 
     # Load the date and video numbers
-    date_folders = list_only_folders(os.path.join('/hpc/projects/capillary-flow/data', participant))
-    # date is the folder with only numbers in the title
-    dates = [dates for dates in date_folders if dates.isdigit()]
-    date = dates[0]
+    date = find_earliest_date_dir(os.path.join('/hpc/projects/capillary-flow/data', participant))
 
-    videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date[0]))
+    videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date))
 
     # Find centerlines and make kymographs for each video
     for video in videos:
