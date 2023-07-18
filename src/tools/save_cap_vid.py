@@ -141,6 +141,8 @@ def main(path = "F:\\Marcus\\data\\part12\\230428\\vid01", plot=False):
     # Apply the mask to the image array
     masked_array = (binary_mask * image_array) 
     cropped_masked_arrays = crop_frame_around_mask(masked_array, binary_mask)
+    
+    # Check if any contours were found
     if cropped_masked_arrays == []:
         print("No contours found")
         return 0
