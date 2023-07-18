@@ -108,6 +108,7 @@ def main(path = "F:\\Marcus\\data\\part12\\230428\\vid01", plot=False):
     
     Returns:
         0 (int): The function returns 0 if it runs successfully.
+        1 (int): The function returns 1 if it runs with no capillaries found.
     """
 
     # input folders
@@ -145,15 +146,15 @@ def main(path = "F:\\Marcus\\data\\part12\\230428\\vid01", plot=False):
     # Check if any contours were found
     if cropped_masked_arrays == []:
         print("No contours found")
-        return 0
+        return 1
     
     # TODO: add correct naming to save_video
 
-    # Save the masked arrays as videos
-    for i in range(len(cropped_masked_arrays)):
-        cap_name = str(i).zfill(2)  
-        save_video(cropped_masked_arrays[i], cap_name, path, plot=plot)
-    return 0
+    else:# Save the masked arrays as videos
+        for i in range(len(cropped_masked_arrays)):
+            cap_name = str(i).zfill(2)  
+            save_video(cropped_masked_arrays[i], cap_name, path, plot=plot)
+        return 0
 
 # This provided line is required at the end of a Python file
 # to call the main() function.
