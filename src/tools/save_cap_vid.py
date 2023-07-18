@@ -11,6 +11,7 @@ import imageio
 import numpy as np
 import matplotlib.pyplot as plt
 import os, time
+import platform
 from src.tools.parse_vid_path import parse_vid_path
 from src.tools.get_images import get_images
 from src.tools.load_image_array import load_image_array
@@ -65,17 +66,25 @@ def save_video(cropped_masked_array, cap_name, path, fps=114, plot=False):
     # Create a VideoWriter object to save the video
     os.makedirs(os.path.join(path, 'G_masked_vid'), exist_ok=True)
     output_file = os.path.join(path,'G_masked_vid', f'{file_prefix}_capillary_{cap_name}.avi')
+    if platform.system() == 'Windows':
+        results_file = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\results\\cap_vids', f'{file_prefix}_capillary_{cap_name}.avi')
+    else:
+        results_file = os.path.join('/hpc/projets/capillary-flow/results/cap_vids', f'{file_prefix}_capillary_{cap_name}.avi')
     fourcc = 'raw'  # Specify the codec (MP4V)
     frame_size = (cropped_masked_array.shape[2], cropped_masked_array.shape[1])  # (width, height)
     video_writer = imageio.get_writer(output_file, format='FFMPEG', mode='I')
+    video_writer2 = imageio.get_writer(results_file, format='FFMPEG', mode='I')
+
 
     # Iterate over each frame and write it to the video
     for frame in cropped_masked_array:
         frame = frame.astype(np.uint8)  # Convert the frame to uint8 data type
         video_writer.append_data(frame)
+        video_writer2.append_data(frame)
 
     # Release the video writer
     video_writer.close()
+    video_writer2.close()
     return 0
 
 def main(path = "F:\\Marcus\\data\\part11\\230427\\vid15", plot=False):
