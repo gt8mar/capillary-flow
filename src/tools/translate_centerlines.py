@@ -62,7 +62,7 @@ def translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_c
                         writer.writerow(translated_row)
 
     return translated_coords_fp
-
+"""
 #this function renames the filenames of the centerline coordinates to the correct capillary name
 def rename_caps(translated_coords_fp, projected_caps_fp):
     renamed_folder_fp = os.path.join(os.path.split(translated_coords_fp)[0], "renamed")
@@ -83,9 +83,46 @@ def rename_caps(translated_coords_fp, projected_caps_fp):
             midpoint_x_int = int(float(midpoint_x))
             midpoint_y_int = int(float(midpoint_y))
             if gray_image[midpoint_x_int][midpoint_y_int] > 0:
-                new_csv_filename = file[:-6] + "cap" + ("%02d" % x) + ".csv"
+                new_csv_filename = file[:-6] + "cap_" + ("%02d" % x) + ".csv"
                 shutil.copy(os.path.join(translated_coords_fp, file), os.path.join(renamed_folder_fp, new_csv_filename))
                 break
+    return renamed_folder_fp
+"""
+
+def rename_caps(coords_fp, individual_caps_fp):
+    renamed_folder_fp = os.path.join(os.path.split(coords_fp)[0], "renamed")
+    os.makedirs(renamed_folder_fp, exist_ok=True)
+    for file in os.listdir(coords_fp):
+        #get centerline midpoint x and y values
+        with open(os.path.join(coords_fp, file), 'r') as coords:
+            reader = csv.reader(coords)
+            rows = list(reader)
+            midpoint_row = rows[len(rows) // 2]
+            midpoint_x = midpoint_row[0]
+            midpoint_y = midpoint_row[1]
+
+        """#check which capillary this file corresponds to
+        for x in range(len(os.listdir(individual_caps_fp))):
+            image_array = cv2.imread(os.path.join(individual_caps_fp, os.listdir(individual_caps_fp)[x]))
+            gray_image = cv2.cvtColor(image_array, cv2.COLOR_BGR2GRAY)
+            midpoint_x_int = int(float(midpoint_x))
+            midpoint_y_int = int(float(midpoint_y))
+            #if cap contains midpoint x, y
+            if gray_image[midpoint_x_int][midpoint_y_int] > 0:
+                new_csv_filename = file[:-6] + "cap_" + ("%02d" % x) + ".csv"
+                shutil.copy(os.path.join(coords_fp, file), os.path.join(renamed_folder_fp, new_csv_filename))
+                break"""
+        
+        for cap in os.listdir(individual_caps_fp):
+            image_array = cv2.imread(os.path.join(individual_caps_fp, cap))
+            gray_image = cv2.cvtColor(image_array, cv2.COLOR_BGR2GRAY)
+            midpoint_x_int = int(float(midpoint_x))
+            midpoint_y_int = int(float(midpoint_y))
+            if gray_image[midpoint_x_int][midpoint_y_int] > 0:
+                new_csv_filename = file[:-6] + cap[-11:-4] + ".csv"
+                shutil.copy(os.path.join(coords_fp, file), os.path.join(renamed_folder_fp, new_csv_filename))
+                break
+
     return renamed_folder_fp
 
 #TEMP
@@ -170,10 +207,12 @@ def main():
     translations_csv = os.path.join(registered_folder, "translations.csv")
     projected_caps_fp = os.path.join(registered_folder, "proj_caps")
     crops_csv = os.path.join(registered_folder, "crop_values.csv")
+    individual_caps = os.path.join(registered_folder, "individual_caps")
 
     translated_coords_fp = translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_csv)
-    show_centerlines(projected_caps_fp, translated_coords_fp)
-    renamed_coords_fp = rename_caps(translated_coords_fp, projected_caps_fp)
+    #show_centerlines(projected_caps_fp, translated_coords_fp)
+    #renamed_coords_fp = rename_caps(translated_coords_fp, projected_caps_fp)
+    renamed_coords_fp = rename_caps(translated_coords_fp, individual_caps)
     #plot_radii(renamed_coords_fp)
 
     
