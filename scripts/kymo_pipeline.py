@@ -10,7 +10,7 @@ By: Marcus Forst
 import os, sys, gc, time
 from src import find_centerline
 from src import make_kymograph
-from src.tools import find_earliest_date_dir
+from src.tools.find_earliest_date_dir import find_earliest_date_dir
 
 SET = "set_01"
 
@@ -47,7 +47,7 @@ def main():
     participant = 'part' + str(i).zfill(2) 
 
     # Load the date and video numbers
-    date = find_earliest_date_dir(os.path.join('/hpc/projects/capillary-flow/data', participant))
+    date = find_earliest_date_dir.main(os.path.join('/hpc/projects/capillary-flow/data', participant))
 
 
     videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date))
