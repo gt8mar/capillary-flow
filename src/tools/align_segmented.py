@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import cv2
 import shutil
 from register_images import register_images
+import csv
 
 def uncrop_segmented(path, input_seg_img):
     shifts = pd.read_csv(os.path.join(path, 'metadata', 'Results.csv'))
@@ -20,22 +21,17 @@ def uncrop_segmented(path, input_seg_img):
     gap_right = shifts['x'].min()
     gap_bottom = shifts['y'].min()
     gap_top = shifts['y'].max()
-    print(gap_left)
-    print(gap_right)
-    print(gap_bottom)
-    print(gap_top)
 
     slices = [slice(None)] * input_seg_img.ndim
     rows, cols = input_seg_img.shape[:2]
     new_rows = rows + gap_top + np.abs(gap_bottom)
     new_cols = cols + gap_left + np.abs(gap_right)
-    print(new_rows, new_cols)
     
     uncropped_input_seg_img = np.zeros((new_rows, new_cols) + input_seg_img.shape[2:], dtype=input_seg_img.dtype)
     slices[:2] = slice(gap_top, gap_top+rows), slice(gap_left, gap_left+cols)
     uncropped_input_seg_img[tuple(slices)] = input_seg_img
 
-    return uncropped_input_seg_img
+    return uncropped_input_seg_img, gap_left, gap_right, gap_bottom, gap_top
 
 #this function assumes moco folder & seg imgs folder contain the same number of files & they correspond to each other 
 def align_segmented():
@@ -61,15 +57,20 @@ def align_segmented():
     temp_fp = os.path.join(segmented_folder_fp, "moco")
     os.makedirs(temp_fp, exist_ok=True)"""
 
+    crops = []
+
     #first frame
     sorted_seg_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(segmented_folder_fp, x)), os.listdir(segmented_folder_fp))) #sort numerically
     first_seg_fp = os.path.join(segmented_folder_fp, sorted_seg_listdir[0])
     first_seg_img = cv2.imread(first_seg_fp)
-    first_seg_img = uncrop_segmented(os.path.join(os.path.split(os.path.split(moco_vids_fp[0])[0])[0]), first_seg_img)
+    first_seg_img, left, right, bottom, top = uncrop_segmented(os.path.join(os.path.split(os.path.split(moco_vids_fp[0])[0])[0]), first_seg_img)
+    crops.append((left, right, bottom, top))
     cv2.imwrite(os.path.join(new_folder_path, os.path.basename(first_seg_fp)), first_seg_img)
 
+    translations = []
     prevdx = 0
     prevdy = 0
+    translations.append((prevdx, prevdy))
     for x in range(1, len(sorted_seg_listdir)):
         if "vid" in sorted_vids_listdir[x]: 
             print(sorted_vids_listdir[x])
@@ -88,11 +89,14 @@ def align_segmented():
             input_seg_img = cv2.imread(input_seg_fp)
 
             #make segmented same size
-            input_seg_img = uncrop_segmented(os.path.join(os.path.split(os.path.split(moco_vids_fp[x])[0])[0]), input_seg_img)
-            
+            input_seg_img, left, right, bottom, top = uncrop_segmented(os.path.join(os.path.split(os.path.split(moco_vids_fp[x])[0])[0]), input_seg_img)
+            crops.append((left, right, bottom, top))
+
             #transform segmented image
             transformation_matrix = np.array([[1, 0, -(dx + prevdx)], [0, 1, -(dy + prevdy)]], dtype=np.float32)
             registered_seg_img = cv2.warpAffine(input_seg_img, transformation_matrix, (1440, 1080))
+
+            translations.append((dx + prevdx, dy + prevdy))
 
             #save segmented image
             cv2.imwrite(os.path.join(new_folder_path, os.path.basename(input_seg_fp)), registered_seg_img)
@@ -102,6 +106,15 @@ def align_segmented():
             prevdx += dx
             prevdy += dy
 
+    translations_csv_fp = os.path.join(new_folder_path, "translations.csv")
+    with open(translations_csv_fp, 'w', newline='') as translations_csv_file:
+        writer = csv.writer(translations_csv_file) 
+        writer.writerows(translations)
+
+    crops_csv_fp = os.path.join(new_folder_path, "crop_values.csv")
+    with open(crops_csv_fp, 'w', newline='') as crops_csv_file:
+        writer = csv.writer(crops_csv_file) 
+        writer.writerows(crops)
 
 """
 -----------------------------------------------------------------------------
