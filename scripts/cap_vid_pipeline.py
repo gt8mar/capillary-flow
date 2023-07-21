@@ -56,14 +56,14 @@ def main():
         print(f"beginning cropped capillary videos for: {video}")
         print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
         ticks = time.time()
-        path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date[0], video)
+        path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, video)
         ran = save_cap_vid.main(path)
         if ran == 1:
             print(f"no capillaries found for video {video}")
         else:
             print(f"completed capillary videos for video {video} in {ticks-time.time()} seconds")
 
-    print(f'finished {participant} from the date {date[0]} in {ticks_total-time.time()} seconds')
+    print(f'finished {participant} from the date {date} in {ticks_total-time.time()} seconds')
     return 0
 
 
