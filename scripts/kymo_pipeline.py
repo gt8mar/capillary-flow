@@ -10,6 +10,7 @@ By: Marcus Forst
 import os, sys, gc, time
 from src import find_centerline
 from src import make_kymograph
+from src.tools import find_earliest_date_dir
 
 SET = "set_01"
 
@@ -46,12 +47,10 @@ def main():
     participant = 'part' + str(i).zfill(2) 
 
     # Load the date and video numbers
-    date_folders = list_only_folders(os.path.join('/hpc/projects/capillary-flow/data', participant))
-    # date is the folder with only numbers in the title
-    dates = [dates for dates in date_folders if dates.isdigit()]
-    date = dates[0]
-    
-    videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date[0]))
+    date = find_earliest_date_dir(os.path.join('/hpc/projects/capillary-flow/data', participant))
+
+
+    videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date))
 
     # Find centerlines and make kymographs for each video
     for video in videos:
@@ -59,17 +58,17 @@ def main():
         print(f"beginning centerlines and kymographs for video {video}")
         print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
         ticks = time.time()
-        path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date[0], video)
+        path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, video)
         find_centerline.main(path, verbose=False, write=True)
         print(f"completed centerlines for video {video} in {ticks-time.time()} seconds")
         
-        # Make kymographs
-        make_kymograph.main(path, verbose=False, write=True)
-        print(f'completed kymographs for video {video} in {ticks-time.time()} seconds')
-        print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+        # # Make kymographs
+        # make_kymograph.main(path, verbose=False, write=True)
+        # print(f'completed kymographs for video {video} in {ticks-time.time()} seconds')
+        # print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
 
 
-    print(f'finished {participant} from the date {date[0]} in {ticks_total-time.time()} seconds')
+    print(f'finished {participant} from the date {date} in {ticks_total-time.time()} seconds')
 
     """ Correlation files """
     # for folder in os.listdir(UMBRELLA_FOLDER_MOCO):
