@@ -8,7 +8,7 @@ By: Marcus Forst
 
 import os
 
-def find_earliest_date_dir(path):
+def find_earliest_date_dir(path='F:\\Marcus\\data\\part13'):
     """
     Finds the earliest date directory in the current directory.
     
@@ -18,15 +18,14 @@ def find_earliest_date_dir(path):
     Returns:
         str: the earliest date directory in the participant directory
     """
-    numeric_directories = [directory for directory in path if directory.isdigit()]
-
-    if len(numeric_directories) == 0:
-        return None
-    elif len(numeric_directories) == 1:
-        return numeric_directories[0]
-    else:
-        numeric_values = [int(directory) for directory in numeric_directories]
-        return str(min(numeric_values))
+    folder_list = os.listdir(path)
+    # remove 'part_metadata' from the list if it is in the list
+    if 'part_metadata' in folder_list:
+        folder_list.remove('part_metadata')
+    # read remaining folders as integers 
+    folder_list = [int(folder) for folder in folder_list]
+    # return the minimum value
+    return str(min(folder_list))
 
 # This provided line is required at the end of a Python file
 # to call the main() function.

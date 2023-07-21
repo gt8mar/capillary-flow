@@ -47,9 +47,7 @@ def main():
     participant = 'part' + str(i).zfill(2) 
 
     # Load the date and video numbers
-    date = find_earliest_date_dir.main(os.path.join('/hpc/projects/capillary-flow/data', participant))
-
-
+    date = find_earliest_date_dir(os.path.join('/hpc/projects/capillary-flow/data', participant))
     videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date))
 
     # Find centerlines and make kymographs for each video
