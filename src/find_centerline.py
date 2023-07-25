@@ -162,31 +162,8 @@ def sort_continuous(array_2D, verbose = False):
         return sorted_array, opt_order
     else:
         raise Exception('wrong type')
-def load_image_with_video_suffix(segmented_filename):
-    # Define the varying parts of the filename
-    varying_parts = ["", "bp", "scan"]
 
-    # Loop through the possible filenames and load the image if it exists
-    found_image = False
-    for varying_part in varying_parts:
-        full_filename = f"{segmented_filename.replace('_background_seg.png', varying_part + '_background_seg.png')}"
-        matching_files = glob.glob(full_filename)
-        
-        if matching_files:
-            found_image = True
-            image_path = matching_files[0]
-            image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-            break
-
-    if found_image:
-        # Image successfully loaded
-        print("Image loaded:", image_path)
-        return image
-    else:
-        print("Image not found.")
-        return None
-
-def main(path = "F:\\Marcus\\data\\part13\\230428\\vid25",
+def main(path = "F:\\Marcus\\data\\part09\\230414\\vid16",
         verbose = False, write = False):
     """ Isolates capillaries from segmented image and finds their centerlines and radii. 
 
@@ -211,12 +188,19 @@ def main(path = "F:\\Marcus\\data\\part13\\230428\\vid25",
 
     # extract metadata from path
     participant, date, video, file_prefix = parse_vid_path(path)
+    
+    # Remove the bp or scan suffix if it exists
+    if video.endswith('bp'):
+        video = video[:-2]
+    if video.endswith('scan'):
+        video = video[:-4]
+
     segmented_filename = file_prefix + '_background_seg.png'
     skeleton_filename = file_prefix + '_background_skeletons.png'
     cap_map_filename = file_prefix + '_cap_map.png'
 
     # Read in the mask
-    segmented = load_image_with_video_suffix(segmented_filename)
+    segmented = cv2.imread(os.path.join(input_folder, segmented_filename), cv2.IMREAD_GRAYSCALE)
     # Make mask either 1 or 0
     segmented[segmented != 0] = 1
 
@@ -296,7 +280,7 @@ def main(path = "F:\\Marcus\\data\\part13\\230428\\vid25",
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(path = '/hpc/projects/capillary-flow/data/part13/230428/vid25', verbose = False, write = True)
+    # main(path = '/hpc/projects/capillary-flow/data/part13/230428/vid25', verbose = False, write = True)
     # main(verbose = True, write = True)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
