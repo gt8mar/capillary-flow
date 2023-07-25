@@ -13,7 +13,7 @@ sort_continuous credit: Imanol Luengo (https://stackoverflow.com/questions/37742
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
-import os
+import os, glob
 from skimage import measure
 from skimage.morphology import medial_axis
 from fil_finder import FilFinder2D
@@ -162,6 +162,29 @@ def sort_continuous(array_2D, verbose = False):
         return sorted_array, opt_order
     else:
         raise Exception('wrong type')
+def load_image_with_video_suffix(segmented_filename):
+    # Define the varying parts of the filename
+    varying_parts = ["", "bp", "scan"]
+
+    # Loop through the possible filenames and load the image if it exists
+    found_image = False
+    for varying_part in varying_parts:
+        full_filename = f"{segmented_filename.replace('_background_seg.png', varying_part + '_background_seg.png')}"
+        matching_files = glob.glob(full_filename)
+        
+        if matching_files:
+            found_image = True
+            image_path = matching_files[0]
+            image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+            break
+
+    if found_image:
+        # Image successfully loaded
+        print("Image loaded:", image_path)
+        return image
+    else:
+        print("Image not found.")
+        return None
 
 def main(path = "F:\\Marcus\\data\\part13\\230428\\vid25",
         verbose = False, write = False):
@@ -193,8 +216,7 @@ def main(path = "F:\\Marcus\\data\\part13\\230428\\vid25",
     cap_map_filename = file_prefix + '_cap_map.png'
 
     # Read in the mask
-    segmented = cv2.imread(os.path.join(input_folder, segmented_filename), 
-                           cv2.IMREAD_GRAYSCALE)
+    segmented = load_image_with_video_suffix(segmented_filename)
     # Make mask either 1 or 0
     segmented[segmented != 0] = 1
 
