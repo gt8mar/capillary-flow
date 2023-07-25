@@ -9,7 +9,7 @@ By: Marcus Forst
 
 import os, sys, gc, time
 from src.tools import save_cap_vid
-from src.tools import find_earliest_date_dir
+from src.tools.find_earliest_date_dir import find_earliest_date_dir
 
 SET = "set_01"
 
