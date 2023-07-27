@@ -2,6 +2,7 @@
 Filename: calculate_slope.py
 -------------------------------
 This file uses a sliding window method to calculate the velocity of blood through capillaries.
+
 By: Marcus Forst
 """
 
