@@ -8,6 +8,7 @@ By: Marcus Forst
 """
 
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import cv2
 import os
@@ -51,7 +52,8 @@ def select_outliers(data, lower_percentile = 10, upper_percentile = 90):
         data_clipped.append(column[(column >= lower_bound) & (column <= upper_bound)]) 
         outlier_points.append(column[(column < lower_bound) | (column > upper_bound)])
     return data_clipped, outlier_points
-def plot_box_swarm(data, x_labels, y_axis_label,  plot_title, figure_name, verbose = True, write = False, remove_outliers = False):
+def plot_box_swarm(data, x_labels, y_axis_label,  plot_title, figure_name, 
+                   verbose = True, write = False, remove_outliers = False):
     """Plot box-plot and swarm plot for data list.
  
     Args:
@@ -60,6 +62,12 @@ def plot_box_swarm(data, x_labels, y_axis_label,  plot_title, figure_name, verbo
         x_labels (list of str): List with labels of x-axis.
         plot_title (str): Plot title.
         figure_name (str): Path to output figure.
+        verbose (bool): If True, show plot.
+        write (bool): If True, write plot to file.
+        remove_outliers (bool): If True, remove outliers from data.
+
+    Returns:
+        int: 0 if successful.
          
     """
     if remove_outliers:
@@ -152,14 +160,23 @@ def find_slopes(image, method = 'ridge', verbose = False, write = False, plot_ti
             slopes.append(slope[0])
     if remove_outliers:
         slopes_clipped, outliers = select_outliers(slopes)
-        average_slope = np.absolute(np.mean(np.array(slopes_clipped, dtype = float)))
+        if len(slopes_clipped) == 0:
+            average_slope = 0
+        else:
+            average_slope = np.absolute(np.mean(np.array(slopes_clipped, dtype = float)))
     else:
-        average_slope = np.mean(np.array(slopes, dtype = float))
+        if len(slopes) == 0:
+            average_slope = 0
+        else:
+            average_slope = np.mean(np.array(slopes, dtype = float))
     
     # Display the original image with lines drawn on it
     if verbose:
         print(average_slope)
-        cv2.line(image, (int(image.shape[1]/2), 0), (int((image.shape[0]-1)/average_slope) + int(image.shape[1]/2), image.shape[0]-1), (255,255,0), 2)
+        if average_slope == 0:
+            cv2.line(image, (int(image.shape[1]/2), 0), (int(image.shape[1]/2), image.shape[0]-1), (255,255,0), 2)
+        else:
+            cv2.line(image, (int(image.shape[1]/2), 0), (int((image.shape[0]-1)/average_slope) + int(image.shape[1]/2), image.shape[0]-1), (255,255,0), 2)
         cv2.imshow(plot_title, image)
         cv2.waitKey(0)
     if write:
@@ -173,12 +190,21 @@ def find_slopes(image, method = 'ridge', verbose = False, write = False, plot_ti
     cv2.destroyAllWindows()
     return slopes
 
-def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
-    input_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), 'participant_04_cap_04', "blood_flow")
-    output_folder = os.path.join(input_folder, "prog_rep")
-    # Read in the mask
+def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test', verbose = False, write = False):
+    # Set up paths
+    input_folder = os.path.join(path, 'F_blood_flow', 'kymo')
+    output_folder = os.path.join(path, 'F_blood_flow', 'velocities')
+    metadata_folder = os.path.join(path, 'part_metadata')                           # This is for the test data
+    # metadata_folder = os.path.join(os.path.dirname(path), 'part_metadata')        # This is for the real data
+    
+    # Read in the metadata
+    metadata = pd.read_excel(os.path.join(metadata_folder,os.listdir(metadata_folder)[0]), sheet_name = 'Sheet1')
+    print(metadata.head())
+
+    # Read in the kymographs
     images = get_images(input_folder, "tiff")
     data = []
+    data_slice = []
     for image in images: 
         kymo_raw = cv2.imread(os.path.join(input_folder, image), cv2.IMREAD_GRAYSCALE)
 
@@ -189,23 +215,30 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
         # plt.imshow(norm_blur)
         # plt.show()
         # print(np.mean(normalized_rows))
-
+        kymo_slice = kymo_raw[::5,:]
         kymo_blur = gaussian_filter(kymo_raw, sigma = 2)
-
+        kymo_slice_blur = gaussian_filter(kymo_slice, sigma = 2)
         if write:
             base_name, extension = os.path.splitext(image)
             filename = base_name + "kymo_new_line"
             slopes = find_slopes(kymo_blur, method = 'lasso', verbose = False, write=True, filename=filename)
+            # slopes_slice = find_slopes(kymo_slice_blur, method = 'lasso', verbose = False, write=True, filename=filename)
         else:
             slopes = find_slopes(kymo_blur, method = 'lasso', verbose = verbose, write=False)
+            # slopes_slice = find_slopes(kymo_slice_blur, method = 'lasso', verbose = verbose, write=False)
         # transform slopes from pixels/frames into um/s:
         slopes = np.absolute(slopes) *FPS/PIX_UM
+        # slopes_slice = np.absolute(slopes_slice) *FPS/PIX_UM
         data.append(np.absolute(slopes))
-        print(slopes)
+        # data_slice.append(np.absolute(slopes_slice))
+        print(f'the slopes are {slopes}')
+        # print(f'the sliced velocities are {slopes_slice*5}')
         print(f"The average slope for {image} is {np.mean(np.array(slopes, dtype = float))}")
+        # print(f"The average slope slice for {image} is {np.mean(np.array(slopes_slice, dtype = float))}")
     plot_box_swarm(data, ["0.2 psi", "0.4 psi", "0.6 psi", "0.8 psi"], 
                    "velocity (um/s)", "Participant_4 cap_4", "figure 1")
-
+    plot_box_swarm(data_slice, ["0.2 psi", "0.4 psi", "0.6 psi", "0.8 psi"],
+                     "velocity (um/s)", "slice", "figure 2")
     return 0
 
 
@@ -217,6 +250,6 @@ def main(SET='set_01', sample = 'sample_000', verbose = False, write = False):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main("set_01", "sample_009", write = True, verbose=False)
+    main(write = False, verbose=True)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
