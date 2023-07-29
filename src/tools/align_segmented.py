@@ -35,8 +35,8 @@ def uncrop_segmented(path, input_seg_img):
 
 #this function assumes moco folder & seg imgs folder contain the same number of files & they correspond to each other 
 def align_segmented():
-    vids_folder_fp = "E:\\Marcus\\gabby test data\\part11"
-    segmented_folder_fp = "E:\\Marcus\\gabby test data\\part11_segmented"
+    vids_folder_fp = "E:\\Marcus\\gabby_test_data\\part09\\1-15\\230414"
+    segmented_folder_fp = "E:\\Marcus\\gabby_test_data\\part09\\1-15\\segmented"
 
     #make list of filepaths of vid 0 in moco folders of all vids
     moco_vids_fp = []
@@ -73,10 +73,10 @@ def align_segmented():
     translations.append((prevdx, prevdy))
     for x in range(1, len(sorted_seg_listdir)):
         if "vid" in sorted_vids_listdir[x]: 
-            print(sorted_vids_listdir[x])
             #register vids
             input_moco_fp = moco_vids_fp[x]
             input_moco_img = cv2.imread(input_moco_fp)
+            print("vid" + str(x))
             (dx, dy), registered_image = register_images(reference_moco_img, input_moco_img)
 
             """#TEMP
