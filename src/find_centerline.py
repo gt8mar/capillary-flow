@@ -13,7 +13,7 @@ sort_continuous credit: Imanol Luengo (https://stackoverflow.com/questions/37742
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
-import os, glob
+import os, glob, platform
 from skimage import measure
 from skimage.morphology import medial_axis
 from fil_finder import FilFinder2D
@@ -278,6 +278,11 @@ def main(path = "F:\\Marcus\\data\\part09\\230414\\vid33",
         for i in range(len(skeleton_coords)):
             np.savetxt(os.path.join(output_folder, "coords", file_prefix + f'_centerline_coords_{str(i).zfill(2)}.csv'), 
                     skeleton_data[i], delimiter=',', fmt = "%s")
+            if platform.system() == 'Windows':
+                pass
+            else:
+                np.savetxt(os.path.join('/hpc/projects/capillary-flow/results/centerlines', file_prefix + f'_centerline_coords_{str(i).zfill(2)}.csv'), 
+                            skeleton_data[i], delimiter=',', fmt = "%s")
             # np.savetxt(os.path.join(output_folder, "radii", file_prefix + f'_capillary_radii_{str(i).zfill(2)}.csv'), 
             #         capillary_radii[i], delimiter=',', fmt = '%s')
 
