@@ -118,26 +118,18 @@ def plot_box_swarm(data, x_labels, y_axis_label,  plot_title, figure_name,
             else: plt.close()
         if verbose: plt.show()
     return 0
-def find_slopes(image, output_folder=None, method = 'ridge', verbose = False, write = False, plot_title = "Kymograph", filename = "kymograph_1", remove_outliers = False):
+def find_slopes(image, filename, output_folder=None, method = 'ridge', verbose = False, write = False, 
+                plot_title = "Kymograph", remove_outliers = False):
     edges = cv2.Canny(image, CANNY_THRESH_1, CANNY_THRESH_2)
     # To save edge images:
     # Create a 1x3 grid for subplots
     fig = plt.figure(figsize= (16,4)) #figsize = (5,20)
-    # gs = gridspec.GridSpec(1, 3, width_ratios=[1, 1, 2])
-    # gs.update(height_ratios=[1])
-
-
-    # # Add plots to the grid
-    # ax1 = plt.subplot(gs[0])
-    # ax2 = plt.subplot(gs[1])
-    # ax3 = plt.subplot(gs[2]) 
     ax1 = plt.subplot2grid((2, 4), (0, 0), colspan=1, rowspan=2)
     ax2 = plt.subplot2grid((2,4), (0, 1), colspan=1, rowspan=2)
     ax3 = plt.subplot2grid((1,4), (0, 2), colspan=2, rowspan=1)
     ax1.imshow(edges)
     ax1.set_title("Canny Edge Detection")
         
-    print(f"the shape of the file is {edges.shape}")
     # Find contours of the edges
     contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
@@ -204,7 +196,6 @@ def find_slopes(image, output_folder=None, method = 'ridge', verbose = False, wr
             average_slope = np.mean(np.array(slopes, dtype = float))
     
     # Display the original image with lines drawn on it
-    print(weighted_average_slope)
     if weighted_average_slope == 0:
         cv2.line(image, (int(image.shape[1]/2), 0), (int(image.shape[1]/2), image.shape[0]-1), (255,255,0), 2)
     else:
@@ -215,59 +206,95 @@ def find_slopes(image, output_folder=None, method = 'ridge', verbose = False, wr
     ax3.hist(slopes, bins = 100)
     ax3.set_title("Slope Histogram")
     plot_title = f"Average Slope: {weighted_average_slope:.3f}"
+    plt.suptitle(filename + "\n" + plot_title)
     plt.tight_layout()
     
+    if write: 
+        print(filename)
+        plt.savefig(os.path.join(output_folder, str(filename) + ".png"), bbox_inches='tight', dpi=400)
     if verbose:
-        plt.show()
-    elif write:
-        # make plot title
-        plt.savefig(os.path.join(output_folder, filename+".png"), bbox_inches='tight', dpi=400)
-        plt.close()
+        plt.show()  
     else:
         plt.close()
     return weighted_average_slope
 
-def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test', verbose = False, write = False):
+def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test', verbose = False, write = False,
+         test = False):
     # Set up paths
     input_folder = os.path.join(path, 'F_blood_flow', 'kymo')
     output_folder = os.path.join(path, 'F_blood_flow', 'velocities')
-    metadata_folder = os.path.join(path, 'part_metadata')                           # This is for the test data
-    # metadata_folder = os.path.join(os.path.dirname(path), 'part_metadata')        # This is for the real data
+    if test:
+        metadata_folder = os.path.join(path, 'part_metadata')                           # This is for the test data
+    else: 
+        metadata_folder = os.path.join(os.path.dirname(path), 'part_metadata')        # This is for the real data
 
     # participant, date, video, file_prefix = parse_vid_path(path)
     SET = "set_01"
     part = "part09"
     
     # Read in the metadata
-    metadata = pd.read_excel(os.path.join(metadata_folder,os.listdir(metadata_folder)[0]), sheet_name = 'Sheet1')
+    metadata = pd.read_excel(os.path.join(metadata_folder,os.listdir(metadata_folder)[1]), sheet_name = 'Sheet1')
+    column_names  = ['centerlines name', 'cap name']
+    name_map = pd.read_csv(os.path.join(metadata_folder,os.listdir(metadata_folder)[0]), names = column_names)
+
+    # Remove 'translated_' from all elements in the columns:
+    name_map = name_map.apply(lambda x: x.str.replace('translated_', ''))
+    name_map = name_map.apply(lambda x: x.str.replace('centerline_coords', 'blood_flow'))
+    name_map = name_map.apply(lambda x: x.str.replace('csv', 'tiff'))
+    # duplicate the cap name column
+    name_map['cap name short'] = name_map['cap name']
+    # remove the prefix from the short cap name
+    name_map['cap name short'] = name_map['cap name short'].apply(lambda x: x.split("_")[-1].split(".")[0])
+    
+    print(name_map.head())
     
     # Read in the kymographs
     images = get_images(input_folder, "tiff")
-    data = []
-    
+    # Create a dataframe to store the results
+    df = pd.DataFrame(columns = ['Participant','Video', 'Pressure', 'Capillary', 'Weighted Average Slope'])
     for image in images: 
         kymo_raw = cv2.imread(os.path.join(input_folder, image), cv2.IMREAD_GRAYSCALE)
         video = image.split("_")[4]
-        print(video)
         # Get the metadata for the video
         video_metadata = metadata.loc[metadata['Video'] == video]
         # Get the pressure for the video
         pressure = video_metadata['Pressure'].values[0]
-        print(f"video {video} Pressure: {pressure}")
-        
+        # Get the capillary name for the video
+        old_capillary_name = image
+        capillary_name = name_map.loc[name_map['centerlines name'] == old_capillary_name]['cap name short'].values[0]
+        filename = f'{SET}_{part}_{video}_{str(int(pressure*10)).zfill(2)}_{capillary_name}'
         kymo_blur = gaussian_filter(kymo_raw, sigma = 2)
+        
         if write:
-            base_name, extension = os.path.splitext(image)
-            filename = base_name + "kymo_new_line"
-            weighted_average_slope = find_slopes(kymo_blur, method = 'lasso', verbose = False, write=True, filename=filename)
+            base_name, extension = os.path.splitext(image)            
+            weighted_average_slope = find_slopes(kymo_blur, filename, output_folder, method = 'lasso', verbose = False, write=True)
         else:
-            weighted_average_slope = find_slopes(kymo_blur, method = 'lasso', verbose = verbose, write=False)
+            weighted_average_slope = find_slopes(kymo_blur, filename, output_folder, method = 'lasso', verbose = verbose, write=False)
         # transform slope from pixels/frames into um/s:
         um_slope = np.absolute(weighted_average_slope) *FPS/PIX_UM
+        # add row to dataframe
+        new_data = pd.DataFrame([[part, video, pressure, capillary_name, um_slope]], columns = df.columns)
+        df = pd.concat([df, new_data], ignore_index=True)
 
-        data.append(um_slope)
-        print(f"Average slope: {um_slope:.3f} um/s")
+    grouped_df = df.groupby('Capillary')
+    print(grouped_df.head())
+    fig, ax = plt.subplots()
 
+    for name, group in grouped_df:
+        ax.plot(group['Pressure'], group['Weighted Average Slope'], marker='o', linestyle='', ms=12, label=name)
+    
+    ax.set_xlabel('Pressure (psi)')
+    ax.set_ylabel('Velocity (um/s)')
+    ax.set_title('Velocity vs. Pressure for each Capillary')
+    ax.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    if write:
+        plt.savefig(os.path.join(output_folder, "velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
+    if verbose:
+        plt.show()
+    else:
+        plt.close()
     # plot_box_swarm(data, ["0.2 psi", "0.4 psi", "0.6 psi", "0.8 psi"], 
     #                "velocity (um/s)", "Participant_4 cap_4", "figure 1")
     # plot_box_swarm(data_slice, ["0.2 psi", "0.4 psi", "0.6 psi", "0.8 psi"],
@@ -283,6 +310,6 @@ def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test', verbose = F
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(write = False, verbose=False)
+    main(write = False, verbose= False, test = True)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
