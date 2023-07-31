@@ -245,9 +245,7 @@ def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test', verbose = F
     name_map['cap name short'] = name_map['cap name']
     # remove the prefix from the short cap name
     name_map['cap name short'] = name_map['cap name short'].apply(lambda x: x.split("_")[-1].split(".")[0])
-    
-    print(name_map.head())
-    
+        
     # Read in the kymographs
     images = get_images(input_folder, "tiff")
     # Create a dataframe to store the results
@@ -277,18 +275,47 @@ def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test', verbose = F
         df = pd.concat([df, new_data], ignore_index=True)
 
     grouped_df = df.groupby('Capillary')
-    print(grouped_df.head())
-    fig, ax = plt.subplots()
+    # Get the unique capillary names
+    capillaries = df['Capillary'].unique()
 
-    for name, group in grouped_df:
-        ax.plot(group['Pressure'], group['Weighted Average Slope'], marker='o', linestyle='', ms=12, label=name)
-    
-    ax.set_xlabel('Pressure (psi)')
-    ax.set_ylabel('Velocity (um/s)')
-    ax.set_title('Velocity vs. Pressure for each Capillary')
-    ax.legend()
-    plt.grid(True)
+    # Create subplots
+    num_plots = len(capillaries)
+    fig, axes = plt.subplots(nrows=num_plots, ncols=1, figsize=(8, 2*num_plots), sharey = True, sharex = True)
+
+    # Plot each capillary's data in separate subplots
+    for i, capillary in enumerate(capillaries):
+        capillary_data = grouped_df.get_group(capillary)
+        ax = axes[i]
+        ax.plot(capillary_data['Pressure'], capillary_data['Weighted Average Slope'], marker='o', linestyle='-')
+        # label all points which decrease in pressure with a red dot
+        ax.plot(capillary_data.loc[capillary_data['Pressure'].diff() < 0, 'Pressure'],
+                capillary_data.loc[capillary_data['Pressure'].diff() < 0, 'Weighted Average Slope'],
+                marker='o', linestyle='-', color='red')
+        ax.set_xlabel('Pressure (psi)')
+        ax.set_ylabel('Velocity (um/s)')
+        ax.set_title(f'Capillary {capillary}')
+        ax.grid(True)
+
+    # Adjust spacing between subplots
     plt.tight_layout()
+
+    # Show the plots
+    plt.show()
+
+    
+    # # Plot all capillaries on the same plot
+    # fig, ax = plt.subplots()
+    # for name, group in grouped_df:
+    #     ax.plot(group['Pressure'], group['Weighted Average Slope'], marker='o', linestyle='', ms=12, label=name)
+    
+    # ax.set_xlabel('Pressure (psi)')
+    # ax.set_ylabel('Velocity (um/s)')
+    # ax.set_title('Velocity vs. Pressure for each Capillary')
+    # ax.legend()
+    # plt.grid(True)
+    # plt.tight_layout()
+    # plt.show()
+
     if write:
         plt.savefig(os.path.join(output_folder, "velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
     if verbose:
