@@ -210,7 +210,6 @@ def find_slopes(image, filename, output_folder=None, method = 'ridge', verbose =
     plt.tight_layout()
     
     if write: 
-        print(filename)
         plt.savefig(os.path.join(output_folder, str(filename) + ".png"), bbox_inches='tight', dpi=400)
     if verbose:
         plt.show()  
@@ -218,24 +217,26 @@ def find_slopes(image, filename, output_folder=None, method = 'ridge', verbose =
         plt.close()
     return weighted_average_slope
 
-def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test', verbose = False, write = False,
+def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test_part11', verbose = False, write = False,
          test = False):
     # Set up paths
     input_folder = os.path.join(path, 'F_blood_flow', 'kymo')
     output_folder = os.path.join(path, 'F_blood_flow', 'velocities')
     if test:
         metadata_folder = os.path.join(path, 'part_metadata')                           # This is for the test data
+        SET = "set_01"
+        part = "part11"
+        date = '230427'
     else: 
         metadata_folder = os.path.join(os.path.dirname(path), 'part_metadata')        # This is for the real data
-
-    # participant, date, video, file_prefix = parse_vid_path(path)
-    SET = "set_01"
-    part = "part09"
+        participant, date, video, file_prefix = parse_vid_path(path)
     
+    metadata_name = f'{part}_{date}.xlsx'
+
     # Read in the metadata
-    metadata = pd.read_excel(os.path.join(metadata_folder,os.listdir(metadata_folder)[1]), sheet_name = 'Sheet1')
+    metadata = pd.read_excel(os.path.join(metadata_folder, metadata_name), sheet_name = 'Sheet1')
     column_names  = ['centerlines name', 'cap name']
-    name_map = pd.read_csv(os.path.join(metadata_folder,os.listdir(metadata_folder)[0]), names = column_names)
+    name_map = pd.read_csv(os.path.join(metadata_folder, 'name_map_edited.csv'), names = column_names)
 
     # Remove 'translated_' from all elements in the columns:
     name_map = name_map.apply(lambda x: x.str.replace('translated_', ''))
@@ -250,11 +251,15 @@ def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test', verbose = F
     images = get_images(input_folder, "tiff")
     # Create a dataframe to store the results
     df = pd.DataFrame(columns = ['Participant','Video', 'Pressure', 'Capillary', 'Weighted Average Slope'])
-    for image in images: 
+    for image in images:
         kymo_raw = cv2.imread(os.path.join(input_folder, image), cv2.IMREAD_GRAYSCALE)
         video = image.split("_")[4]
         # Get the metadata for the video
-        video_metadata = metadata.loc[metadata['Video'] == video]
+        video_metadata = metadata.loc[
+                (metadata['Video'] == video) |
+                (metadata['Video'] == video + 'bp') |
+                (metadata['Video'] == video + 'scan')
+                ]
         # Get the pressure for the video
         pressure = video_metadata['Pressure'].values[0]
         # Get the capillary name for the video
@@ -274,20 +279,31 @@ def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test', verbose = F
         new_data = pd.DataFrame([[part, video, pressure, capillary_name, um_slope]], columns = df.columns)
         df = pd.concat([df, new_data], ignore_index=True)
 
+    
+    """
+    --------------------------------- Plot the data---------------------------------------------------
+    """
+    # Group the data by 'Capillary'
     grouped_df = df.groupby('Capillary')
     # Get the unique capillary names
     capillaries = df['Capillary'].unique()
 
     # Create subplots
     num_plots = len(capillaries)
-    fig, axes = plt.subplots(nrows=num_plots, ncols=1, figsize=(8, 2*num_plots), sharey = True, sharex = True)
+    num_rows = (num_plots + 3) // 4  # Round up to the nearest integer
+
+    # Create subplots
+    fig, axes = plt.subplots(nrows=num_rows, ncols=4, figsize=(10, 2 * num_rows), sharey=True, sharex=True)
+
+    # Flatten the 2x2 subplot array to make it easier to iterate over
+    axes = axes.flatten()
 
     # Plot each capillary's data in separate subplots
     for i, capillary in enumerate(capillaries):
         capillary_data = grouped_df.get_group(capillary)
         ax = axes[i]
         ax.plot(capillary_data['Pressure'], capillary_data['Weighted Average Slope'], marker='o', linestyle='-')
-        # label all points which decrease in pressure with a red dot
+        # Label all points which decrease in pressure with a red dot
         ax.plot(capillary_data.loc[capillary_data['Pressure'].diff() < 0, 'Pressure'],
                 capillary_data.loc[capillary_data['Pressure'].diff() < 0, 'Weighted Average Slope'],
                 marker='o', linestyle='-', color='red')
@@ -296,25 +312,34 @@ def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test', verbose = F
         ax.set_title(f'Capillary {capillary}')
         ax.grid(True)
 
+    # If there are unused subplots, remove them
+    for i in range(num_plots, num_rows * 2):
+        fig.delaxes(axes[i])
+
     # Adjust spacing between subplots
     plt.tight_layout()
 
-    # Show the plots
-    plt.show()
-
+    if write:
+        plt.savefig(os.path.join(output_folder, "velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
+    if verbose:
+        plt.show()
+    else:
+        plt.close()
     
-    # # Plot all capillaries on the same plot
-    # fig, ax = plt.subplots()
-    # for name, group in grouped_df:
-    #     ax.plot(group['Pressure'], group['Weighted Average Slope'], marker='o', linestyle='', ms=12, label=name)
+    """
+    --------------------------------- Plot the data on the same graph ---------------------------------------------------
+    """
     
-    # ax.set_xlabel('Pressure (psi)')
-    # ax.set_ylabel('Velocity (um/s)')
-    # ax.set_title('Velocity vs. Pressure for each Capillary')
-    # ax.legend()
-    # plt.grid(True)
-    # plt.tight_layout()
-    # plt.show()
+    fig, ax = plt.subplots()
+    for name, group in grouped_df:
+        ax.plot(group['Pressure'], group['Weighted Average Slope'], marker='o', linestyle='', ms=12, label=name)
+    
+    ax.set_xlabel('Pressure (psi)')
+    ax.set_ylabel('Velocity (um/s)')
+    ax.set_title('Velocity vs. Pressure for each Capillary')
+    ax.legend()
+    plt.grid(True)
+    plt.tight_layout()
 
     if write:
         plt.savefig(os.path.join(output_folder, "velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
@@ -337,6 +362,6 @@ def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test', verbose = F
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(write = False, verbose= False, test = True)
+    main(write = True, verbose= False, test = True)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
