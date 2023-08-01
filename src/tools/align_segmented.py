@@ -35,7 +35,7 @@ def uncrop_segmented(path, input_seg_img):
 
 #this function assumes moco folder & seg imgs folder contain the same number of files & they correspond to each other 
 def align_segmented(path):
-    vid_folder_fp = os.path.join(path, "videos")
+    vid_folder_fp = os.path.join(path, "vids")
     segmented_folder_fp = os.path.join(path, "segmented")
 
     #make list of filepaths of vid 0 in moco folders of all vids
