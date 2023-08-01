@@ -140,9 +140,9 @@ def show_centerlines(projected_caps_fp, coords_fp, individual_caps_fp):
         cv2.waitKey(0)  
 
 
-def main():
-    coords_fp = "E:\\Marcus\\gabby_test_data\\part11_centerlines_test\\coords2"
-    registered_folder = "E:\\Marcus\\gabby_test_data\\part11_segmented\\registered"
+def main(path):
+    coords_fp = os.path.join(path, "centerlines")
+    registered_folder = os.path.join(path, "segmented", "registered")
 
     sorted_coords_listdir = sorted_seg_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(coords_fp, x)), os.listdir(coords_fp))) #sort numerically
     translations_csv = os.path.join(registered_folder, "translations.csv")

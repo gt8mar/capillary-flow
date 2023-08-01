@@ -79,7 +79,7 @@ def subplots(plotinfo):
     num_cols = 3
     num_rows = (num_plots + num_cols - 1) // num_cols
     fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 5 * num_rows), sharey=True)
-    fig.suptitle("Capillaries idk")
+    fig.suptitle("Diameter over pressure")
 
     # Find overall min and max x-values for all subplots
     overall_min_x = float('inf')
@@ -223,13 +223,13 @@ def plot_area_by_length(caps_fp, centerlines_fp, metadata_fp):
 
         plotinfo.append([area/length, pressure, capnum, vidnum])
 
-    #subplots(plotinfo)
-    boxplot(plotinfo)
+    subplots(plotinfo)
+    #boxplot(plotinfo)
     
-def main():
-    caps_fp = "E:\\Marcus\\gabby test data\\part11_segmented\\registered\\individual_caps"
-    centerlines_fp = "E:\\Marcus\\gabby test data\\part11_centerlines_test\\coords2\\renamed"
-    metadata_fp = "E:\\Marcus\\gabby test data\\part11\\part11_230427.xlsx - Sheet1.csv"
+def main(path):
+    caps_fp = os.path.join(path, "segmented", "individual_caps_translated")
+    centerlines_fp = os.path.join(path, "centerlines", "renamed")
+    metadata_fp = os.path.join(os.path.dirname(os.path.dirname(path)), os.path.basename(path) + "_metadata", os.path.basename(path) + "_" + os.path.basename(os.path.dirname(path)))
 
     plot_area_by_length(caps_fp, centerlines_fp, metadata_fp)
     

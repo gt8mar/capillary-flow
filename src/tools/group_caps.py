@@ -32,10 +32,6 @@ def group_by_vid(vidlist):
 def get_single_caps(image):
     # Label connected components
     labeled_image = label(image, connectivity=2)
-    """plt.imshow(labeled_image, cmap='nipy_spectral')
-    plt.colorbar()
-    plt.title('Labeled Image')
-    plt.show()"""
     
     min_pixel_count = 100
     # Filter components based on minimum pixel count
@@ -59,29 +55,12 @@ def get_single_caps(image):
     
     return component_arrays
 
-"""def number_caps(caps, seg_imgs_fp):
-    sorted_seg_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(seg_imgs_fp, x)), os.listdir(seg_imgs_fp))) #sort numerically
-    
-    #read all segmented vids as arrays
-    seg_imgs = []
-    for image in sorted_seg_listdir:
-        image = cv2.imread(os.path.join(seg_imgs_fp, image), cv2.IMREAD_GRAYSCALE)
-        seg_imgs.append(image)
-
-    #separate capillaries in seg_imgs
-    individual_caps = []
-    for vid in seg_imgs:
-        individual_caps.append(get_single_caps(vid))
-"""
-
 def separate_caps(registered_folder_fp):
-    new_folder_fp = os.path.join(registered_folder_fp, "individual_caps_translated")
+    new_folder_fp = os.path.join(os.path.dirname(registered_folder_fp), "individual_caps_translated")
     os.makedirs(new_folder_fp, exist_ok=True)
 
     for vid in os.listdir(registered_folder_fp):
         if vid.endswith('.png'):
-            """cv2.imshow("seg", cv2.imread(os.path.join(registered_folder_fp, vid)))
-            cv2.waitKey(0)"""
             individual_caps = get_single_caps(cv2.imread(os.path.join(registered_folder_fp, vid), cv2.IMREAD_GRAYSCALE))
             filenames = []
             for cap in individual_caps:
@@ -106,12 +85,12 @@ def separate_caps(registered_folder_fp):
                                     renamed = True
                                     break
 
-def save_untranslated(seg_imgs_fp):
-    indi_caps_fp = os.path.join(seg_imgs_fp, "individual_caps_translated")
-    translations_csv = os.path.join(seg_imgs_fp, "translations.csv")
-    crops_csv = os.path.join(seg_imgs_fp, "crop_values.csv")
+def save_untranslated(registered_folder_fp):
+    indi_caps_fp = os.path.join(os.path.dirname(registered_folder_fp), "individual_caps_translated")
+    translations_csv = os.path.join(os.path.dirname(registered_folder_fp), "translations.csv")
+    crops_csv = os.path.join(os.path.dirname(registered_folder_fp), "crop_values.csv")
 
-    orig_fp = os.path.join(seg_imgs_fp, "individual_caps_original")
+    orig_fp = os.path.join(os.path.dirname(registered_folder_fp), "individual_caps_original")
     os.makedirs(orig_fp, exist_ok=True)
 
     grouped_by_vid = group_by_vid(os.listdir(indi_caps_fp))
@@ -151,20 +130,13 @@ def save_untranslated(seg_imgs_fp):
                     trans_img[start_row:end_row, start_col:end_col] = img[max(0, -yint):min(orig_height, new_height - yint),max(0, -xint):min(orig_width, new_width - xint)]
                     crop_img = trans_img[tint:bint, lint:rint]
                     cv2.imwrite(os.path.join(orig_fp, cap), crop_img)
-
-
-
-
-
-
-
             
-def main():
-    seg_imgs_fp = "E:\\Marcus\\gabby_test_data\\part14_segmented\\230428\\registered"
-    sorted_seg_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(seg_imgs_fp, x)) and x.endswith('.png'), os.listdir(seg_imgs_fp)))
+def main(path):
+    registered_fp = os.path.join(path, "segmented", "registered")
+    sorted_seg_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(registered_fp, x)) and x.endswith('.png'), os.listdir(registered_fp)))
     
     #get translations
-    translations_fp = os.path.join(seg_imgs_fp, "translations.csv")
+    translations_fp = os.path.join(os.path.dirname(registered_fp), "translations.csv")
     with open(translations_fp, 'r') as csv_file:
         reader = csv.reader(csv_file)
         translations = list(reader)
@@ -172,14 +144,14 @@ def main():
     #get max projection
     maxproject = np.zeros((1080, 1440))
     for image in sorted_seg_listdir:
-        maxproject += cv2.imread(os.path.join(seg_imgs_fp, image), cv2.IMREAD_GRAYSCALE)
+        maxproject += cv2.imread(os.path.join(registered_fp, image), cv2.IMREAD_GRAYSCALE)
     maxproject = np.clip(maxproject, 0, 255)
     
     #get array of images in which each image has 1 capillary (all frames projected on)
     caps = get_single_caps(maxproject)
 
     #save maxproj individual caps, named
-    caps_fp = os.path.join(seg_imgs_fp, "proj_caps")
+    caps_fp = os.path.join(os.path.dirname(registered_fp), "proj_caps")
     os.makedirs(caps_fp, exist_ok=True)
     for x in range(len(caps)):
         filename = "cap_" + str(x).zfill(2) + ".png"
@@ -187,10 +159,10 @@ def main():
         cv2.imwrite(str(cap_fp), caps[x])
 
     #save individual caps, named
-    separate_caps(seg_imgs_fp)
+    separate_caps(registered_fp)
 
     #save untranslated individual caps, named
-    save_untranslated(seg_imgs_fp)
+    save_untranslated(registered_fp)
     
 
     
