@@ -13,6 +13,20 @@ import cv2
 from skimage.measure import label
 from skimage.segmentation import find_boundaries
 import csv
+import re
+
+def group_by_vid(vidlist):
+    grouped = {}
+
+    for file in vidlist:
+        vmatch = re.search(r'vid(\d{2})', file)
+        vidnum = vmatch.group(1)
+        if vidnum in grouped:
+            grouped[vidnum].append(file)
+        else: grouped[vidnum] = [file]
+
+    result = list(grouped.values())
+    return result
 
 #this function takes a segmented image of multiple capillaries and returns an array of images, each with one capillary
 def get_single_caps(image):
@@ -61,7 +75,7 @@ def get_single_caps(image):
 """
 
 def separate_caps(registered_folder_fp):
-    new_folder_fp = os.path.join(registered_folder_fp, "individual_caps")
+    new_folder_fp = os.path.join(registered_folder_fp, "individual_caps_translated")
     os.makedirs(new_folder_fp, exist_ok=True)
 
     for vid in os.listdir(registered_folder_fp):
@@ -92,11 +106,61 @@ def separate_caps(registered_folder_fp):
                                     renamed = True
                                     break
 
+def save_untranslated(seg_imgs_fp):
+    indi_caps_fp = os.path.join(seg_imgs_fp, "individual_caps_translated")
+    translations_csv = os.path.join(seg_imgs_fp, "translations.csv")
+    crops_csv = os.path.join(seg_imgs_fp, "crop_values.csv")
+
+    orig_fp = os.path.join(seg_imgs_fp, "individual_caps_original")
+    os.makedirs(orig_fp, exist_ok=True)
+
+    grouped_by_vid = group_by_vid(os.listdir(indi_caps_fp))
+
+    with open(translations_csv, 'r') as translations:
+        t_reader = csv.reader(translations)
+        translated_rows = list(t_reader)
+
+        with open(crops_csv, 'r') as crops:
+            c_reader = csv.reader(crops)
+            crop_rows = list(c_reader)
+
+            for i in range(len(grouped_by_vid)):
+                x, y = translated_rows[i] 
+                xint = int(x)
+                xint = -xint
+                yint = int(y)
+                yint = -yint
+                l, r, b, t = crop_rows[i]
+                lint = int(l)
+                rint = int(r)
+                bint = int(b)
+                tint = int(t)
+
+                for cap in grouped_by_vid[i]:
+                    img = cv2.imread(os.path.join(indi_caps_fp, cap), cv2.IMREAD_GRAYSCALE)
+                    orig_height, orig_width = img.shape
+                    new_height = orig_height + abs(yint)
+                    new_width = orig_width + abs(xint)
+
+                    trans_img = np.zeros((new_height, new_width), dtype=np.uint8)
+                    start_row = max(0, yint)
+                    end_row = min(orig_height + yint, new_height)
+                    start_col = max(0, xint)
+                    end_col = min(orig_width + xint, new_width)
+
+                    trans_img[start_row:end_row, start_col:end_col] = img[max(0, -yint):min(orig_height, new_height - yint),max(0, -xint):min(orig_width, new_width - xint)]
+                    crop_img = trans_img[tint:bint, lint:rint]
+                    cv2.imwrite(os.path.join(orig_fp, cap), crop_img)
+
+
+
+
+
 
 
             
 def main():
-    seg_imgs_fp = "E:\\Marcus\\gabby test data\\part11_segmented\\registered"
+    seg_imgs_fp = "E:\\Marcus\\gabby_test_data\\part14_segmented\\230428\\registered"
     sorted_seg_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(seg_imgs_fp, x)) and x.endswith('.png'), os.listdir(seg_imgs_fp)))
     
     #get translations
@@ -114,6 +178,7 @@ def main():
     #get array of images in which each image has 1 capillary (all frames projected on)
     caps = get_single_caps(maxproject)
 
+    #save maxproj individual caps, named
     caps_fp = os.path.join(seg_imgs_fp, "proj_caps")
     os.makedirs(caps_fp, exist_ok=True)
     for x in range(len(caps)):
@@ -121,7 +186,11 @@ def main():
         cap_fp = os.path.join(caps_fp, filename)
         cv2.imwrite(str(cap_fp), caps[x])
 
+    #save individual caps, named
     separate_caps(seg_imgs_fp)
+
+    #save untranslated individual caps, named
+    save_untranslated(seg_imgs_fp)
     
 
     
