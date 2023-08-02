@@ -19,7 +19,7 @@ def main(vidnum_start = 0):
     Returns:
         int: 0 if executed
     """
-    directory_path = 'C:\\Users\\gt8mar\\Desktop\\data\\part25\\230601'
+    directory_path = 'C:\\Users\\gt8mar\\Desktop\\data\\part27\\230613'
     # directory_path = 'D:\\Marcus\\backup\\data\\part24\\230601'
 
     filenames = os.listdir(directory_path)

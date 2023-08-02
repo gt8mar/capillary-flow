@@ -71,9 +71,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
           write = True, verbose = False):
     input_folder = os.path.join(path, "E_centerline", "coords")
     output_folder = os.path.join(path, "E_centerline", "images")
-    participant, date, video = parse_vid_path(path)
-    SET = 'set_01'
-    file_prefix = f'{SET}_{participant}_{date}_{video}'
+    participant, date, video, file_prefix = parse_vid_path(path)
     skeleton_data = load_csv_list(input_folder, dtype=float)
     # load radii from skeleton data
     radii = [array[:, 2] for array in skeleton_data] # note that the radii will be row vectors

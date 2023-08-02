@@ -13,7 +13,7 @@ sort_continuous credit: Imanol Luengo (https://stackoverflow.com/questions/37742
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
-import os
+import os, glob, platform
 from skimage import measure
 from skimage.morphology import medial_axis
 from fil_finder import FilFinder2D
@@ -22,16 +22,12 @@ import time
 from sklearn.neighbors import NearestNeighbors
 import networkx as nx
 from src.tools.parse_vid_path import parse_vid_path
+import warnings
+
 
 BRANCH_THRESH = 40
-MIN_CAP_LEN = 150
+MIN_CAP_LEN = 5
 
-def test():
-    a = np.arange(6).reshape((2, 3))
-    b = a.transpose()
-    print(a)
-    print(b)
-    return 0
 def enumerate_capillaries(image, test = False, verbose = False, write = False, write_path = None):
     """
     This function finds the number of capillaries and returns an array of images with one
@@ -166,8 +162,33 @@ def sort_continuous(array_2D, verbose = False):
         return sorted_array, opt_order
     else:
         raise Exception('wrong type')
+def load_image_with_prefix(input_folder, segmented_filename):
+    # Define the varying parts of the filename
+    varying_parts = ["", "bp", "scan"]
 
-def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01',
+    # Loop through the possible filenames and load the image if it exists
+    found_image = False
+    for varying_part in varying_parts:
+        print(segmented_filename)
+        full_filename = f"{segmented_filename.replace('_background', varying_part + '_background')}"
+        matching_files = glob.glob(os.path.join(input_folder, full_filename))
+        print(matching_files)
+        
+        if matching_files:
+            found_image = True
+            image_path = matching_files[0]
+            image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+            break
+
+    if found_image:
+        # Image successfully loaded
+        print("Image loaded:", image_path)
+        return image
+    else:
+        print("Image not found.")
+        return None
+
+def main(path = "F:\\Marcus\\data\\part09\\230414\\vid33",
         verbose = False, write = False):
     """ Isolates capillaries from segmented image and finds their centerlines and radii. 
 
@@ -180,30 +201,38 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
 
     Saves: Centerlines, radii, which capillaries are too small
     """
+    
+    # Ignore FilFinder warnings
+    warnings.filterwarnings("ignore", category=UserWarning, module="fil_finder.filament")
+    
+    # Set up paths
     input_folder = os.path.join(path, 'D_segmented')
     os.makedirs(os.path.join(path, 'E_centerline', 'coords'), exist_ok=True)
     os.makedirs(os.path.join(path, 'E_centerline', 'images'), exist_ok=True)
     output_folder = os.path.join(path, 'E_centerline')
-    participant, date, video = parse_vid_path(path)
-    SET = 'set_01'
-    file_prefix = f'{SET}_{participant}_{date}_{video}'
+
+    # extract metadata from path
+    participant, date, video, file_prefix = parse_vid_path(path)
+    
     segmented_filename = file_prefix + '_background_seg.png'
     skeleton_filename = file_prefix + '_background_skeletons.png'
     cap_map_filename = file_prefix + '_cap_map.png'
 
     # Read in the mask
-    segmented = cv2.imread(os.path.join(input_folder, segmented_filename), 
-                           cv2.IMREAD_GRAYSCALE)
+    segmented = load_image_with_prefix(input_folder, segmented_filename)
     # Make mask either 1 or 0
     segmented[segmented != 0] = 1
 
-    # TODO: Check if this does anything
-    # save to results
-    total_skeleton, total_radii = make_skeletons(segmented, verbose = verbose, write = write, 
-                                                     write_path=os.path.join(output_folder,'images', skeleton_filename))
-
     # Make a numpy array of images with isolated capillaries. The mean/sum of this is segmented_2D.
     contours = enumerate_capillaries(segmented, verbose=False, write=write, write_path = os.path.join(input_folder, cap_map_filename))
+    
+    if write:
+        # save segmented_2D
+        segmented_2D = np.sum(contours, axis=0).astype(bool)
+        # segmented_2D[segmented_2D != 0] = 1
+        # save to results
+        np.savetxt(os.path.join(output_folder, 'centerline_mask.txt'), segmented_2D, delimiter=',')
+
     capillary_radii = []
     skeleton_coords = []
     flattened_radii = []
@@ -211,6 +240,8 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
     skeleton_data = []
     j = 0
     for i in range(contours.shape[0]):
+        # make skeleton
+        print(f"Making skeleton for capillary {i}")
         skeleton, radii = make_skeletons(contours[i], verbose=False, histograms = False)     # Skeletons come out in the shape
         skeleton_nums = np.asarray(np.nonzero(skeleton))
         # omit small capillaries
@@ -220,6 +251,8 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
         else:
             used_capillaries.append([f"new_capillary_{j}", str(skeleton_nums.shape[1])])
             j += 1
+
+            # Sort skeleton points in order of continuous points
             sorted_skeleton_coords, optimal_order = sort_continuous(skeleton_nums, verbose=False)
             ordered_radii = radii[optimal_order]
             skeleton_coords_with_radii = np.column_stack((sorted_skeleton_coords, ordered_radii))
@@ -245,6 +278,11 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
         for i in range(len(skeleton_coords)):
             np.savetxt(os.path.join(output_folder, "coords", file_prefix + f'_centerline_coords_{str(i).zfill(2)}.csv'), 
                     skeleton_data[i], delimiter=',', fmt = "%s")
+            if platform.system() == 'Windows':
+                pass
+            else:
+                np.savetxt(os.path.join('/hpc/projects/capillary-flow/results/centerlines', file_prefix + f'_centerline_coords_{str(i).zfill(2)}.csv'), 
+                            skeleton_data[i], delimiter=',', fmt = "%s")
             # np.savetxt(os.path.join(output_folder, "radii", file_prefix + f'_capillary_radii_{str(i).zfill(2)}.csv'), 
             #         capillary_radii[i], delimiter=',', fmt = '%s')
 
@@ -253,8 +291,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
     # # plt.hist(flattened_radii)
     # # plt.show()
 
-    # # TODO: Write program to register radii maps with each other 
-    # # TODO: Abnormal capillaries, how do.
+    # # TODO: Abnormal capillaries
 
     return 0
 
@@ -267,6 +304,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(path = '/hpc/projects/capillary-flow/data/part11/230427/vid01', verbose = False, write = True)
+    # main(path = '/hpc/projects/capillary-flow/data/part13/230428/vid25', verbose = False, write = True)
+    main(verbose = True, write = True)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))

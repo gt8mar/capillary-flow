@@ -7,8 +7,7 @@ By: Marcus Forst
 average_in_circle credit: Nicolas Gervais (https://stackoverflow.com/questions/49330080/numpy-2d-array-selecting-indices-in-a-circle)
 """
 
-import os
-import time
+import os, time, gc
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -19,21 +18,60 @@ from src.tools.load_csv_list import load_csv_list
 from src.tools.get_shifts import get_shifts
 from scipy.ndimage import gaussian_filter
 from src.tools.parse_vid_path import parse_vid_path
-
+from scipy.ndimage import convolve
+from skimage import exposure
 
 PIXELS_PER_UM = 2
 
-def average_array(array):
+def create_circular_kernel(radius):
     """
-    This returns an averaged array with half length of the input 1d array
-    :param array: 1d numpy array length 2n
-    :return: 1d array length n
+    Create a circular kernel of a given radius.
+    
+    Args:
+        radius (int): radius of the circular kernel
+    Returns:
+        kernel (np.ndarray): circular kernel of size (2*radius+1, 2*radius+1)
     """
-    if np.mod(len(array), 2) == 0:
-        return (array[::2] + array[1::2]) // 2
+    diameter = 2 * radius + 1
+    center = (radius, radius)
+    kernel = np.zeros((diameter, diameter), dtype=np.float32)
+
+    for i in range(diameter):
+        for j in range(diameter):
+            if np.sqrt((i - center[0]) ** 2 + (j - center[1]) ** 2) <= radius:
+                kernel[i, j] = 1
+
+    return kernel / np.sum(kernel)
+def compute_average_surrounding_pixels(image_stack, radius=4, circle = True):
+    """
+    Compute the average of the surrounding pixels for each pixel in the image stack.
+
+    Args:
+        image_stack (np.ndarray): 3D image stack of shape (time, row, col)
+        radius (int): radius of the circular kernel
+
+    Returns:
+        averaged_stack (np.ndarray): 3D image stack of shape (time, row, col)
+    """
+    # Convert the image stack to float32 type for accurate calculations
+    image_stack = np.float32(image_stack)
+
+    if circle:
+        # Create a circular kernel of a given radius
+        kernel = create_circular_kernel(radius)
+        
     else:
-        return (array[:-1:2] + array[1::2]) // 2
-def build_centerline_vs_time(image, centerline_coords, long = True):
+        # Create a kernel of ones with a size of radius x radius
+        kernel = np.ones((radius, radius), np.float32) / radius**2
+
+    # Perform 3D convolution to compute the average of the surrounding pixels
+    averaged_stack = convolve(image_stack, kernel[np.newaxis, :, :])
+
+    # Convert the averaged stack back to the original data type (e.g., uint8)
+    averaged_stack = np.uint8(averaged_stack)
+
+    return averaged_stack
+def build_centerline_vs_time_kernal(image, centerline_coords, long = True):
     """
     This function takes an image and text file (default: csv) of the coordinates of a
     skeleton and outputs an image of the centerline pixel values vs time.
@@ -41,60 +79,20 @@ def build_centerline_vs_time(image, centerline_coords, long = True):
     :param skeleton_txt: 2D text file to be read into the function
     :return: centerline_array: 2D numpy array that shows the pixels of the centerline vs time.
     """
-    centerline_array = np.zeros((centerline_coords.shape[0], image.shape[0]))
+    averaged_array = compute_average_surrounding_pixels(image)
+    kymograph = np.zeros((centerline_coords.shape[0], image.shape[0]))
     if long == False:
         for i in range(centerline_coords.shape[0]):
             row = centerline_coords[i][0]         # skeleton coords is a list of (row, col) objects
             col = centerline_coords[i][1]
-            centerline_array[i] = image[:, row, col]
+            kymograph[i] = image[:, row, col]
     if long == True:
         for i in range(centerline_coords.shape[0]):
             row = centerline_coords[i][0]         # skeleton coords is a list of (row, col) objects
             col = centerline_coords[i][1]
             radius = 5
-            centerline_array[i] = average_in_circle(image, row, col, radius)
-    return centerline_array
-def build_centerline_vs_time_variable_radii(image, centerline_coords, radii, long = False, offset = False):
-    """
-    This function takes an image and text file (default: csv) of the coordinates of a
-    skeleton and outputs an image of the centerline pixel values vs time.
-    :param image: 3D numpy array (time, row, col)
-    :param centerline_coords: 2D array of coordinates for the centerline of the capillary
-    :param radii: 1D numpy array of the radii of the capillary
-    :return: centerline_array: 2D numpy array that shows the pixels of the centerline vs time.
-    """
-    centerline_array = np.zeros((centerline_coords.shape[0], image.shape[0]))
-    if long == False:
-        for i in range(centerline_coords.shape[0]):
-            row = centerline_coords[i][0]         # skeleton coords is a list of (row, col) objects
-            col = centerline_coords[i][1]
-            centerline_array[i] = image[:, row, col]
-    if long == True:
-        for i in range(centerline_coords.shape[0]):
-            row = centerline_coords[i][0]         # skeleton coords is a list of (row, col) objects
-            col = centerline_coords[i][1]
-            radius = int(radii[i])
-            centerline_array[i] = average_in_circle(image, row, col, radius)
-    return centerline_array
-def average_in_circle(image, row, col, radius = 5):
-    """
-    This function inputs an image and a coordinate and outputs the average of a circle of
-    pixels surrounding the coordinate with specified radius.
-    :param image: 3D numpy array
-    :param row: integer, the row coordinate you want to average around
-    :param col: integer, the column coordinate you want to average around
-    :param radius: the radius you want to average over
-    :return circle_values_list: a numpy array of the averaged values of a (row, col) time-slice.
-    """
-    x = np.arange(0, image.shape[2])
-    y = np.arange(0, image.shape[1])
-
-    mask = (x[np.newaxis, :] - col) ** 2 + (y[:, np.newaxis] - row) ** 2 < radius ** 2
-    mask = np.dstack([mask]*image.shape[0])
-    mask = mask.transpose(2, 0, 1)
-    circle_values_list = image[mask].reshape(image.shape[0],-1)
-    circle_values_list = circle_values_list.mean(axis = 1)
-    return circle_values_list
+            kymograph[i] = averaged_array[:, row, col]
+    return kymograph
 def normalize_image(image):
     image = image - np.min(image)
     image = image / np.max(image)
@@ -111,6 +109,32 @@ def normalize_rows(image):
     subtracted_image = (image - big_average)/big_std
     new_image = normalize_image(subtracted_image)
     return new_image
+def row_wise_normalize(image):
+    """" 
+    Normalizes the rows of an image by dividing each row by the average of that row
+
+    Args:
+        image (np.ndarray): 2D image of shape (row, col)
+    
+    Returns:
+        image (np.ndarray): 2D image of shape (row, col)
+    """
+    # Compute the average intensity of each row
+    row_averages = np.mean(image, axis=1)
+
+    # Calculate the mean average intensity across all rows
+    mean_average = np.mean(row_averages)
+
+    # Compute the scaling factors for each row
+    scaling_factors = mean_average / row_averages
+
+    # Apply row-wise normalization
+    normalized_image = image * scaling_factors[:, np.newaxis]
+
+    # Convert the normalized image to 8-bit unsigned integer
+    normalized_image = normalized_image.astype(np.uint8)
+    
+    return image
 def normalize_row_and_col(image):    
     # Normalize rows
     norms = np.linalg.norm(image, axis=1)
@@ -139,37 +163,7 @@ def normalize_row_and_col(image):
     plt.title("Normalized columns")
 
     plt.show()
-def test(row = 16, col = 12, radius = 5):
-    x = np.arange(0, 32)
-    y = np.arange(0, 32)
-    z = np.arange(0, 40)
-    arr = np.zeros((z.size, y.size, x.size))
 
-    col = 12.
-    row = 16.
-    r = radius
-
-    # The two lines below could be merged, but I stored the mask
-    # for code clarity.
-    mask = (x[np.newaxis, :] - col) ** 2 + (y[:, np.newaxis] - row) ** 2 < r ** 2
-    mask_array = np.dstack([mask]*arr.shape[0])
-    mask_array = mask_array.transpose(2, 0, 1)
-    arr[mask_array] = 123
-    print(np.sum(mask))
-    print(mask.shape)
-    print(mask_array.shape)
-    print(arr[mask_array].shape)
-    new = arr[mask_array].reshape(arr.shape[0],-1)
-    print(new.shape)
-    print(new[0])
-    print(new.mean(axis=1))
-    # This plot shows that only within the circle the value is set to 123.
-    # plt.figure(figsize=(6, 6))
-    # plt.pcolormesh(x, y, arr[0])
-    # plt.colorbar()
-    # plt.show()
-    return 0
-def test2_normalize_row_and_col():
     image = np.loadtxt('C:\\Users\\ejerison\\capillary-flow\\tests\\set_01_sample_003_blood_flow_00.csv', delimiter=',', dtype = int)
     # image = np.random.randint(size = (100,100), low=0, high = 255)
     print(image)
@@ -181,7 +175,7 @@ def test2_normalize_row_and_col():
     new_new_image = normalize_row_and_col(image)
     return 0
 
-def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01', 
+def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part13\\230428\\vid25', 
          write = True, variable_radii = False, verbose = False):
     """
     This function takes a path to a video and calculates the blood flow.
@@ -202,6 +196,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
     input_folder = os.path.join(path, 'moco')
     metadata_folder = os.path.join(path, 'metadata')
     centerline_folder = os.path.join(path, 'E_centerline')
+    results_folder = '/hpc/projects/capillary-flow/results'
     
     # Create output folders
     os.makedirs(os.path.join(path, 'F_blood_flow', 'kymo'), exist_ok=True)
@@ -209,43 +204,53 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
     output_folder = os.path.join(path, 'F_blood_flow')
     
     # Get metadata
-    participant, date, video = parse_vid_path(path)
-    SET = 'set_01'
-    file_prefix = f'{SET}_{participant}_{date}_{video}'
+    participant, date, video, file_prefix = parse_vid_path(path)
     gap_left, gap_right, gap_bottom, gap_top = get_shifts(metadata_folder) # get gaps from the metadata
-    
+    print(gap_left, gap_right, gap_bottom, gap_top)
+
     # Import images
-    images = get_images(os.path.join(input_folder,'vid'))
+    start = time.time()
+    images = get_images(input_folder)
     image_array = load_image_array(images, input_folder)      # this has the shape (frames, row, col)
-    
-    # Crop array based on shifts
-    image_array = image_array[:, gap_top:gap_bottom, gap_left:gap_right] 
-    skeleton_data = load_csv_list(os.path.join(centerline_folder, 'coords'))
-    centerline_coords = [array[:, :2] for array in skeleton_data] # note that the centerline_coords will be row vectors
-    centerline_radii = [array[:, 2] for array in skeleton_data] # note that the radii will be row vectors
+    example_image = image_array[0]
+    print(f"Loading images for {file_prefix} took {time.time() - start} seconds")
     print("The size of the array is " + str(image_array.shape))
+
+    # Crop array based on shifts
+    image_array = image_array[:, gap_top:example_image.shape[0] + gap_bottom, gap_left:example_image.shape[1] + gap_right] 
+    start_time = time.time()
+    skeleton_data = load_csv_list(os.path.join(centerline_folder, 'coords'))
     # iterate over the capillaries
     for i in range(len(skeleton_data)):
-        if variable_radii: 
-            kymograph = build_centerline_vs_time_variable_radii(image_array, centerline_coords[i], centerline_radii[i], long=True, offset=False)
-        else:
-            kymograph = build_centerline_vs_time(image_array, centerline_coords[i], long = True)
-        # centerline_array = normalize_rows(centerline_array)
-        kymograph = normalize_image(kymograph)
-    if write:
-            np.savetxt(os.path.join(output_folder, 'kymo', 
-                                    file_prefix + f'_blood_flow_{str(i).zfill(2)}.csv'), 
-                                    kymograph, delimiter=',', fmt = '%s')
-            im = Image.fromarray(kymograph)
-            im.save(os.path.join(output_folder, 'kymo', 
-                                 file_prefix + f'_blood_flow_{str(i).zfill(2)}.tiff'))
-    if verbose:
-        # Plot pixels vs time:
-        plt.imshow(kymograph)
-        plt.title('centerline pixel values per time')
-        plt.xlabel('frame')
-        plt.ylabel('centerline pixel')
-        plt.show()
+        # build the kymograph
+        start_time = time.time()
+        kymograph = build_centerline_vs_time_kernal(image_array, skeleton_data[i], long = True)
+        print(f"capillary {i} took {time.time() - start_time} seconds")
+        
+        # normalize the kymograph 
+        start_time = time.time()
+        # normalize intensity of the kymograph
+        kymograph = exposure.rescale_intensity(kymograph, in_range = 'image', out_range = np.uint8)
+        # print(f"the time to normalize the image is {time.time() - start_time} seconds")
+
+        if write:
+                np.savetxt(os.path.join(output_folder, 'kymo', 
+                                        file_prefix + f'_blood_flow_{str(i).zfill(2)}.csv'), 
+                                        kymograph, delimiter=',', fmt = '%s')
+                im = Image.fromarray(kymograph)
+                im.save(os.path.join(output_folder, 'kymo', 
+                                    file_prefix + f'_blood_flow_{str(i).zfill(2)}.tiff'))
+                # save to results folder
+                im.save(os.path.join(results_folder, 'kymographs',
+                                    file_prefix + f'_blood_flow_{str(i).zfill(2)}.tiff'))
+
+        if verbose:
+            # Plot pixels vs time:
+            plt.imshow(kymograph)
+            plt.title('centerline pixel values per time')
+            plt.xlabel('frame')
+            plt.ylabel('centerline pixel')
+            plt.show()
     return 0
 
 
@@ -253,7 +258,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part11\\230427\\vid01'
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(path ='/hpc/projects/capillary-flow/data/part11/230427/vid01',
+    main(path ='/hpc/projects/capillary-flow/data/part13/230428/vid25',
           write=True)
     # test2_normalize_row_and_col()
     # test()

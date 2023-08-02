@@ -9,7 +9,12 @@ import os
 import pandas as pd   
     
 def get_shifts(input_folder):
-    """ Calculates and then returns max shifts """
+    """ 
+    Calculates and then returns max shifts.
+    
+    Args:
+        input_folder (str): The path to the folder (metadata) containing the imagej log file.
+    """
     shifts = pd.read_csv(os.path.join(input_folder, 'Results.csv'))
     gap_left = shifts['x'].max()
     gap_right = shifts['x'].min()

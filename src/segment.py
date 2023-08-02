@@ -59,10 +59,10 @@ def parse_filename(filename):
         date (str): Date of the video.
         video (str): Video number.
     """
-    filename_no_ext = filename.split('.')[0]
+    filename_no_ext = filename.split('.')[0].replace('contrast_', '')
     participant = filename_no_ext.split('_')[-4]
     date = filename_no_ext.split('_')[-3]
-    video = filename_no_ext.split('_')[-2]
+    video = filename_no_ext.split('_')[-2].replace('bp', '')
     return participant, date, video
 
 def parse_COCO(json_path):
@@ -159,12 +159,12 @@ def main(path='/hpc/projects/capillary-flow/results/backgrounds', verbose = Fals
             # remove the file extension
             filename_without_ext = os.path.splitext(filename)[0]
             # extract the desired string from the filename
-            sample = filename_without_ext.split('_background')[0]
+            prefix = filename_without_ext.split('_background')[0]
             outputs = predictor(im)  # format is documented at https://detectron2.readthedocs.io/tutorials/models.html#model-output-format
             if len(outputs["instances"].pred_masks) == 0:
                 if verbose:
                     print("no masks found")
-                mask = np.zeros((im.shape[0], im.shape[1]))
+                total_mask = np.zeros((im.shape[0], im.shape[1]))
             else:
                 total_mask = np.zeros((im.shape[0], im.shape[1]))
                 for i in range(len(outputs["instances"].pred_masks)):
@@ -187,7 +187,7 @@ def main(path='/hpc/projects/capillary-flow/results/backgrounds', verbose = Fals
                 
             # Convert boolean array to integer array
             mask_int = total_mask.astype(int)
-            mask_dict[sample] = mask_int
+            mask_dict[prefix] = mask_int
             # Save the mask
             os.makedirs(os.path.join("/hpc/projects/capillary-flow/data", participant, date, video, "D_segmented"), exist_ok=True)
             plt.imsave(os.path.join("/hpc/projects/capillary-flow/data", participant, date, video, "D_segmented", filename_without_ext + "_seg.png"), 

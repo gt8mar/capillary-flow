@@ -1,16 +1,16 @@
 """
 Filename: pipeline.py
 ------------------------------------------------------
-This program runs a sequence of python programs to write a background
-file, a corresponding video, segment capillaries, and calculate
-flow rates.
+This program runs a sequence of python programs to find 
+centerlines for segmented capillaries and make kymographs.
+
 By: Marcus Forst
 """
 
-import time
-import os, sys, re
-from src import write_background_file
-# from src import segment
+import os, sys, gc, time
+from src import find_centerline
+from src import make_kymograph
+from src.tools.find_earliest_date_dir import find_earliest_date_dir
 
 SET = "set_01"
 
@@ -27,41 +27,46 @@ def list_only_folders(path):
 
 def main():
     """
-    Write background file, corresponding video, segment capillaries, and calculate flow rates.
+    Finds centerlines for segmented capillaries and makes kymographs.
 
     Args:
         None
+
     Returns:
         0 if successful
+
     Saves:
-        background file
-        video
-        segmented file
+        centerline files
+        kymograph files
     """
 
-    """ Write Background """
+    # Participant number is passed as an argument
     i = sys.argv[1]
-    print(i)
+    print(f"begin kymo_pipeline for participant {i}")
     ticks_total = time.time()
     participant = 'part' + str(i).zfill(2) 
+
     # Load the date and video numbers
-    date_folders = list_only_folders(os.path.join('/hpc/projects/capillary-flow/data', participant))
-    # date is the folder with only numbers in the title
-    dates = [dates for dates in date_folders if dates.isdigit()]
-    date = dates[0]
-    
-    videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date[0]))
+    date = find_earliest_date_dir(os.path.join('/hpc/projects/capillary-flow/data', participant))
+    videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date))
+
+    # Find centerlines and make kymographs for each video
     for video in videos:
+        print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+        print(f"beginning centerlines and kymographs for video {video}")
+        print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
         ticks = time.time()
-        path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date[0], video)
-        write_background_file.main(path, color = True)
-        print(f'video {video}')
-        print(str(ticks-time.time()))
+        path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, video)
+        find_centerline.main(path, verbose=False, write=True)
+        print(f"completed centerlines for video {video} in {ticks-time.time()} seconds")
+        
+        # # Make kymographs
+        # make_kymograph.main(path, verbose=False, write=True)
+        # print(f'completed kymographs for video {video} in {ticks-time.time()} seconds')
+        # print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
 
-    print(f'finished {participant} from the {date[0]}')
-    print(str(ticks_total-time.time()))    
 
-
+    print(f'finished {participant} from the date {date} in {ticks_total-time.time()} seconds')
 
     """ Correlation files """
     # for folder in os.listdir(UMBRELLA_FOLDER_MOCO):

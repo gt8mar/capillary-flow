@@ -2,6 +2,7 @@
 Filename: correlation.py
 ------------------------------------------------------
 Calculates the correlation between pixels and their nearest neighbors. 
+
 By: Marcus Forst
 """
 
@@ -23,6 +24,9 @@ BIN_FACTOR = 4
 # SECTION_END = 984
 
 def make_correlation_matrix(image_array_binned):
+    """
+    Calculates the correlation between pixels and their nearest neighbors.
+    """
     # Initialize correlation matrix
     up_left = image_array_binned[:-1, 1:-1, 1:-1] * image_array_binned[1:, :-2, :-2]
     up_mid = image_array_binned[:-1, 1:-1, 1:-1] * image_array_binned[1:, :-2, 1:-1]
@@ -52,7 +56,10 @@ def make_correlation_matrix(image_array_binned):
     # corr_y /= 5000
     return corr_x, corr_y
 
-def main(SET = 'set_01', sample = 'sample_009', mask = False, verbose = True, write = False, bin_factor = 4):
+def main(path, mask = False, verbose = True, write = False, bin_factor = 4):
+    """
+    Calculates the correlation between pixels and their nearest neighbors.
+    """
     input_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
     mask_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'D_segmented')
     output_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'G_correlation')
