@@ -27,10 +27,7 @@ CANNY_THRESH_1 = 20
 CANNY_THRESH_2 = 50
 
 # TODO: play around with these parameters
-
-# TODO: improve plotting
 # TODO: zero speed capillaries handling
-# TODO: metadata lookup
 # TODO: data aggregation
 
 def average_array(array):
@@ -217,7 +214,7 @@ def find_slopes(image, filename, output_folder=None, method = 'ridge', verbose =
         plt.close()
     return weighted_average_slope
 
-def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test_part11', verbose = False, write = False,
+def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test_part09', location = 1, verbose = False, write = False,
          test = False):
     # Set up paths
     input_folder = os.path.join(path, 'F_blood_flow', 'kymo')
@@ -225,8 +222,8 @@ def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test_part11', verb
     if test:
         metadata_folder = os.path.join(path, 'part_metadata')                           # This is for the test data
         SET = "set_01"
-        part = "part11"
-        date = '230427'
+        part = "part09"
+        date = '230414'
     else: 
         metadata_folder = os.path.join(os.path.dirname(path), 'part_metadata')        # This is for the real data
         participant, date, video, file_prefix = parse_vid_path(path)
@@ -235,8 +232,12 @@ def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test_part11', verb
 
     # Read in the metadata
     metadata = pd.read_excel(os.path.join(metadata_folder, metadata_name), sheet_name = 'Sheet1')
+    # Select video rows with correct location
+    metadata = metadata[metadata['Location'] == location]
+    
+    # Run program on this data:
     column_names  = ['centerlines name', 'cap name']
-    name_map = pd.read_csv(os.path.join(metadata_folder, 'name_map_edited.csv'), names = column_names)
+    name_map = pd.read_csv(os.path.join(metadata_folder, 'name_map.csv'), names = column_names)
 
     # Remove 'translated_' from all elements in the columns:
     name_map = name_map.apply(lambda x: x.str.replace('translated_', ''))
@@ -249,6 +250,9 @@ def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test_part11', verb
         
     # Read in the kymographs
     images = get_images(input_folder, "tiff")
+    # Select images with correct location
+    images = [image for image in images if image.split("_")[4] in metadata['Video'].values]
+
     # Create a dataframe to store the results
     df = pd.DataFrame(columns = ['Participant','Video', 'Pressure', 'Capillary', 'Weighted Average Slope'])
     for image in images:
@@ -362,6 +366,6 @@ def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test_part11', verb
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(write = True, verbose= False, test = True)
+    main(write = False, verbose= False, test = True)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
