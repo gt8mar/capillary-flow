@@ -20,6 +20,7 @@ from detectron2.config import get_cfg
 from detectron2 import model_zoo
 from detectron2.engine import DefaultTrainer, DefaultPredictor
 from detectron2.utils.visualizer import ColorMode
+import pandas as pd
 # from detectron2.data import MetadataCatalog
 
 def folder_into_COCO(path):
@@ -152,6 +153,7 @@ def main(path='/hpc/projects/capillary-flow/results/backgrounds', verbose = Fals
             print(f"filename: {filename} not in folder: {folder_seg}")
         else:
             im = cv2.imread(d["file_name"]) 
+            im = cv2.equalizeHist(cv2.cvtColor(im, cv2.COLOR_BGR2GRAY))
             if verbose:       
                 print(f"filename: {filename} has shape:")
                 print(im.shape)
@@ -188,10 +190,17 @@ def main(path='/hpc/projects/capillary-flow/results/backgrounds', verbose = Fals
             # Convert boolean array to integer array
             mask_int = total_mask.astype(int)
             mask_dict[prefix] = mask_int
+
+            # TODO Read in metadata to get location
+            metadata_fp = pd.read_excel(os.path.join("/hpc/projects/capillary-flow/data", participant, date))
+
             # Save the mask
-            os.makedirs(os.path.join("/hpc/projects/capillary-flow/data", participant, date, video, "D_segmented"), exist_ok=True)
-            plt.imsave(os.path.join("/hpc/projects/capillary-flow/data", participant, date, video, "D_segmented", filename_without_ext + "_seg.png"), 
-                        mask_int, cmap='gray')
+            #os.makedirs(os.path.join("/hpc/projects/capillary-flow/data", participant, date, video, "D_segmented"), exist_ok=True)
+            #plt.imsave(os.path.join("/hpc/projects/capillary-flow/data", participant, date, video, "D_segmented", filename_without_ext + "_seg.png"), 
+            #            mask_int, cmap='gray')
+            #TODO makedirs & save to segmented folder in loc 
+            os.makedirs(os.path.join("/hpc/projects/capillary-flow/data", participant, date))
+            plt.imsave()
             plt.imsave(os.path.join("/hpc/projects/capillary-flow/results/segmented", filename_without_ext + "_seg.png"), 
                         mask_int, cmap='gray')
                 
