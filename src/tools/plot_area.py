@@ -13,8 +13,8 @@ import cv2
 import csv
 import re
 import matplotlib.colors as mcolors
-from collections import defaultdict
-
+import pandas as pd
+import platform
 
 def exclude_fragmented(caps_fp):
     caps_listdir = []
@@ -26,21 +26,19 @@ def exclude_fragmented(caps_fp):
             caps_listdir = caps_listdir[:-1]
     return caps_listdir
 
-def exclude_bp(caps_listdir, metadata_fp):
+def exclude_bp_scan(caps_listdir, metadata_fp):
     new_caps_listdir = []
     for cap in caps_listdir:
         vmatch = re.search(r'vid(\d{2})', cap)
         vidnum = vmatch.group(1)
-        with open(metadata_fp, 'r') as metadata:
-            reader = csv.reader(metadata)
-            rows = list(reader)
-            for row in rows:
-                if vidnum in str(row[3]):
-                    if "bp" in str(row[3]):
-                        break
-                    else:
-                        new_caps_listdir.append(cap)
-                        break
+        metadata = pd.read_excel(metadata_fp)
+        for index, row in metadata.iterrows():
+            if vidnum in str(row[3]):
+                if "bp" in str(row[3]) or "scan" in str(row[3]):
+                    break
+                else:
+                    new_caps_listdir.append(cap)
+                    break
     return new_caps_listdir
 
 def exclude_twisty():
@@ -73,13 +71,13 @@ def group_by_vidnum(plotinfo):
     result_list = list(grouped_caps.values())
     return result_list   
 
-def subplots(plotinfo):
+def subplots(plotinfo, partnum, location):
     grouped_plotinfo = group_by_cap(plotinfo)
     num_plots = len(grouped_plotinfo)
     num_cols = 3
     num_rows = (num_plots + num_cols - 1) // num_cols
     fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 5 * num_rows), sharey=True)
-    fig.suptitle("Diameter over pressure")
+    fig.suptitle(partnum + " " + location + " capillary size vs. pressure")
 
     # Find overall min and max x-values for all subplots
     overall_min_x = float('inf')
@@ -103,18 +101,21 @@ def subplots(plotinfo):
 
             ax.scatter(x_scatter, y_scatter, c=colors)
 
-            x_line = [float(entry[1]) for entry in cap]  
+            x_line = [float(entry[1]) for entry in cap]
             y_line = [entry[0] for entry in cap]
-            if "Red" in [entry[4] for entry in sorted_cap]:
-                cmap = mcolors.LinearSegmentedColormap.from_list('custom_cmap', ['blue', 'red'], N=len(x_line) - 1)
-                for i in range(len(x_line) - 1):
-                    ax.plot([x_line[i], x_line[i + 1]], [y_line[i], y_line[i + 1]], c=cmap(i))
-            else:
-                ax.plot(x_line, y_line)
+
+            colors = [entry[4] for entry in cap[1:]] + [cap[-1][4]]
+
+            cmap = mcolors.ListedColormap(colors)
+
+            for i in range(len(x_line) - 1):
+                color = cmap(i)
+                ax.plot([x_line[i], x_line[i + 1]], [y_line[i], y_line[i + 1]], c=color)
+
 
             ax.set_xlabel('Pressure (psi)')
             ax.set_ylabel('Area/Length')
-            ax.set_title(cap[0][2])
+            ax.set_title("cap" + cap[0][2])
 
             # Update overall min and max x-values
             overall_min_x = min(overall_min_x, min(x_scatter))
@@ -129,6 +130,8 @@ def subplots(plotinfo):
 
     plt.tight_layout()
     plt.show()
+
+    return plt
 
 
 def boxplot(plotinfo):
@@ -166,7 +169,6 @@ def boxplot(plotinfo):
     
     ax[0].boxplot(yvals_up, positions=xvals_up)
     ax[1].boxplot(yvals_down, positions=xvals_down)
-    print(xvals_down)
 
     #ax.legend()
     ax[0].set_xlabel('Pressure (psi)')
@@ -181,7 +183,7 @@ def boxplot(plotinfo):
 
 def plot_area_by_length(caps_fp, centerlines_fp, metadata_fp):
     caps_listdir_nofrag = exclude_fragmented(caps_fp)
-    caps_listdir_nobp = exclude_bp(caps_listdir_nofrag, metadata_fp)
+    caps_listdir_nobp = exclude_bp_scan(caps_listdir_nofrag, metadata_fp)
 
     plotinfo = []
 
@@ -212,27 +214,36 @@ def plot_area_by_length(caps_fp, centerlines_fp, metadata_fp):
             length = len(rows)
         
         #get pressure
-        with open(metadata_fp, 'r') as metadata:
-            reader = csv.reader(metadata)
-            rows = list(reader)
-            pressure = 0
-            for row in rows:
-                    if vidnum in str(row[3]):
-                        pressure = str(row[5])
-                        break
+        pressure = 0
+        metadata = pd.read_excel(metadata_fp)
+        for index, row in metadata.iterrows():
+            if vidnum in str(row[3]):
+                pressure = str(row[5])
+                break
 
         plotinfo.append([area/length, pressure, capnum, vidnum])
 
-    subplots(plotinfo)
+    partnum = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(caps_fp)))))
+    location = os.path.basename(os.path.dirname(os.path.dirname(caps_fp)))
+    subplots(plotinfo, partnum, location)
     #boxplot(plotinfo)
     
-def main(path):
+def main(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
     caps_fp = os.path.join(path, "segmented", "individual_caps_translated")
     centerlines_fp = os.path.join(path, "centerlines", "renamed")
-    metadata_fp = os.path.join(os.path.dirname(os.path.dirname(path)), os.path.basename(path) + "_metadata", os.path.basename(path) + "_" + os.path.basename(os.path.dirname(path)))
+    metadata_fp = os.path.join(os.path.dirname(path), os.path.basename(os.path.dirname(path)) + "_metadata", os.path.basename(os.path.dirname(os.path.dirname(path))) + "_" + os.path.basename(os.path.dirname(path)) + ".xlsx")
 
-    plot_area_by_length(caps_fp, centerlines_fp, metadata_fp)
-    
+    size_plot = plot_area_by_length(caps_fp, centerlines_fp, metadata_fp)
+    #save to folder in data/part/date/loc/segmented/plots
+    plot_fp = os.path.join(path, "segmented", "plots")
+    os.makedirs(plot_fp, exist_ok=True)
+    size_plot.savefig(os.path.join(plot_fp, "size_v_pressure.png"))
+    #save to folder in results
+    if platform.system() != 'Windows':
+        size_results_fp = "/hpc/projects/capillary-flow/results/size"
+        os.makedirs(size_results_fp, exist_ok=True)
+        size_plot.savefig(size_results_fp)
+
 
 """
 -----------------------------------------------------------------------------
