@@ -229,20 +229,26 @@ def plot_area_by_length(caps_fp, centerlines_fp, metadata_fp):
     #boxplot(plotinfo)
     
 def main(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
+    participant = os.path.basename(os.path.dirname(os.path.dirname(path)))
+    date = os.path.basename(os.path.dirname(path))
+    location = os.path.basename(path)
+    
     caps_fp = os.path.join(path, "segmented", "individual_caps_translated")
     centerlines_fp = os.path.join(path, "centerlines", "renamed")
-    metadata_fp = os.path.join(os.path.dirname(path), os.path.basename(os.path.dirname(path)) + "_metadata", os.path.basename(os.path.dirname(os.path.dirname(path))) + "_" + os.path.basename(os.path.dirname(path)) + ".xlsx")
+    metadata_fp = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(path)))), "metadata", participant + "_" + date + ".xlsx")
 
     size_plot = plot_area_by_length(caps_fp, centerlines_fp, metadata_fp)
+
     #save to folder in data/part/date/loc/segmented/plots
-    plot_fp = os.path.join(path, "segmented", "plots")
+    filename = "set_01_" + participant + "_" + date + "_" + location + "_size_v_pressure.png"
+    plot_fp = os.path.join(path, "size", "plots")
     os.makedirs(plot_fp, exist_ok=True)
-    size_plot.savefig(os.path.join(plot_fp, "size_v_pressure.png"))
+    size_plot.savefig(os.path.join(plot_fp, filename))
     #save to folder in results
     if platform.system() != 'Windows':
         size_results_fp = "/hpc/projects/capillary-flow/results/size"
         os.makedirs(size_results_fp, exist_ok=True)
-        size_plot.savefig(size_results_fp)
+        size_plot.savefig(os.path.join(size_results_fp, filename))
 
 
 """
