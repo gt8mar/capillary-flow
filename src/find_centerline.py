@@ -23,6 +23,7 @@ from sklearn.neighbors import NearestNeighbors
 import networkx as nx
 from src.tools.parse_vid_path import parse_vid_path
 import warnings
+import pandas as pd
 
 
 BRANCH_THRESH = 40
@@ -205,18 +206,34 @@ def main(path = "F:\\Marcus\\data\\part09\\230414\\vid33",
     # Ignore FilFinder warnings
     warnings.filterwarnings("ignore", category=UserWarning, module="fil_finder.filament")
     
-    # Set up paths
-    input_folder = os.path.join(path, 'D_segmented')
-    os.makedirs(os.path.join(path, 'E_centerline', 'coords'), exist_ok=True)
-    os.makedirs(os.path.join(path, 'E_centerline', 'images'), exist_ok=True)
-    output_folder = os.path.join(path, 'E_centerline')
-
     # extract metadata from path
     participant, date, video, file_prefix = parse_vid_path(path)
     
     segmented_filename = file_prefix + '_background_seg.png'
     skeleton_filename = file_prefix + '_background_skeletons.png'
     cap_map_filename = file_prefix + '_cap_map.png'
+
+    #get location from metadata
+    metadata = pd.read_excel(os.path.join("/hpc/projects/capillary-flow/metadata", participant + "_" + date + ".xlsx"))
+    for index, row in metadata.iterrows():
+        if video in str(row[3]):
+            if str(row[10]) == "Temp" or str(row[10]) == "Ex":
+                location = "loc" + str(row[10])
+            else:
+                location = "loc0" + str(row[10]) 
+            break
+
+    # Set up paths
+    loc_fp = os.path.dirname(os.path.dirname(path))
+    input_folder = os.path.join(loc_fp, "segmented")
+    os.makedirs(os.path.join(loc_fp, "centerlines", "coords"), exist_ok=True)
+    os.makedirs(os.path.join(loc_fp, "centerlines", "images"), exist_ok=True)
+    output_folder = os.path.join(loc_fp, "centerlines")
+    """input_folder = os.path.join(path, 'D_segmented')
+    os.makedirs(os.path.join(path, 'E_centerline', 'coords'), exist_ok=True)
+    os.makedirs(os.path.join(path, 'E_centerline', 'images'), exist_ok=True)
+    output_folder = os.path.join(path, 'E_centerline')
+    """
 
     # Read in the mask
     segmented = load_image_with_prefix(input_folder, segmented_filename)
@@ -281,6 +298,7 @@ def main(path = "F:\\Marcus\\data\\part09\\230414\\vid33",
             if platform.system() == 'Windows':
                 pass
             else:
+                os.makedirs('/hpc/projects/capillary-flow/results/centerlines')
                 np.savetxt(os.path.join('/hpc/projects/capillary-flow/results/centerlines', file_prefix + f'_centerline_coords_{str(i).zfill(2)}.csv'), 
                             skeleton_data[i], delimiter=',', fmt = "%s")
             # np.savetxt(os.path.join(output_folder, "radii", file_prefix + f'_capillary_radii_{str(i).zfill(2)}.csv'), 

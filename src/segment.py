@@ -191,19 +191,21 @@ def main(path='/hpc/projects/capillary-flow/results/backgrounds', verbose = Fals
             mask_int = total_mask.astype(int)
             mask_dict[prefix] = mask_int
 
-            # TODO Read in metadata to get location
-            metadata_fp = pd.read_excel(os.path.join("/hpc/projects/capillary-flow/data", participant, date))
+            #get location from metadata
+            metadata = pd.read_excel(os.path.join("/hpc/projects/capillary-flow/metadata", participant + "_" + date + ".xlsx"))
+            for index, row in metadata.iterrows():
+                if video in str(row[3]):
+                    if str(row[10]) == "Temp" or str(row[10]) == "Ex":
+                        location = "loc" + str(row[10])
+                    else:
+                        location = "loc0" + str(row[10]) 
+                    break
 
             # Save the mask
-            #os.makedirs(os.path.join("/hpc/projects/capillary-flow/data", participant, date, video, "D_segmented"), exist_ok=True)
-            #plt.imsave(os.path.join("/hpc/projects/capillary-flow/data", participant, date, video, "D_segmented", filename_without_ext + "_seg.png"), 
-            #            mask_int, cmap='gray')
-            #TODO makedirs & save to segmented folder in loc 
-            os.makedirs(os.path.join("/hpc/projects/capillary-flow/data", participant, date))
-            plt.imsave()
-            plt.imsave(os.path.join("/hpc/projects/capillary-flow/results/segmented", filename_without_ext + "_seg.png"), 
-                        mask_int, cmap='gray')
-                
+            os.makedirs(os.path.join("/hpc/projects/capillary-flow/data", participant, date, location, "segmented"), exist_ok=True)
+            plt.imsave(os.path.join("/hpc/projects/capillary-flow/data", participant, date, location, "segmented", filename_without_ext + "_" + location + "_seg.png"), mask_int, cmap='gray')
+            os.makedirs(os.path.join("/hpc/projects/capillary-flow/results/segmented"), exist_ok=True)
+            plt.imsave(os.path.join("/hpc/projects/capillary-flow/results/segmented", filename_without_ext + "_" + location + "_seg.png"), mask_int, cmap='gray')
 
             # # Save the integer array to a CSV file            
             # np.savetxt(os.path.join(cfg.OUTPUT_DIR, filename_without_ext + "_segs.csv"), mask_int, 
