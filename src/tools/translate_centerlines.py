@@ -152,10 +152,8 @@ def main(path):
 
     translated_coords_fp = translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_csv)
     
-    #renamed_coords_fp = rename_caps(translated_coords_fp, projected_caps_fp)
     renamed_coords_fp = rename_caps(translated_coords_fp, individual_caps_fp)
     #show_centerlines(projected_caps_fp, renamed_coords_fp, individual_caps_fp)
-    #plot_radii(renamed_coords_fp)
 
     
 
