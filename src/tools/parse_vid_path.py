@@ -25,11 +25,12 @@ def parse_vid_path(path):
     
     # Extract the variables from the directory names
     # set = dir_names[-4]
-    participant = dir_names[-3]
-    date = dir_names[-2]
+    participant = dir_names[-5]
+    date = dir_names[-4]    
+    location = dir_names[-3]
     # remove bp from the video name
     video = dir_names[-1].replace('bp', '')
     video = video.replace('scan', '')
     SET = 'set_01'
-    file_prefix = f'{SET}_{participant}_{date}_{video}'
-    return participant, date, video, file_prefix
+    file_prefix = f'{SET}_{participant}_{date}_{location}_{video}'
+    return participant, date, location, video, file_prefix

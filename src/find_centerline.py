@@ -212,7 +212,7 @@ def main(path = "F:\\Marcus\\data\\part09\\230414\\vid33",
     output_folder = os.path.join(path, 'E_centerline')
 
     # extract metadata from path
-    participant, date, video, file_prefix = parse_vid_path(path)
+    participant, date, location, video, file_prefix = parse_vid_path(path)
     
     segmented_filename = file_prefix + '_background_seg.png'
     skeleton_filename = file_prefix + '_background_skeletons.png'
