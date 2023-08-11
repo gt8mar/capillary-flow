@@ -64,7 +64,18 @@ def parse_filename(filename):
     participant = filename_no_ext.split('_')[-4]
     date = filename_no_ext.split('_')[-3]
     video = filename_no_ext.split('_')[-2].replace('bp', '')
-    return participant, date, video
+
+    #get location from metadata
+    metadata = pd.read_excel(os.path.join("/hpc/projects/capillary-flow/metadata", participant + "_" + date + ".xlsx"))
+    for index, row in metadata.iterrows():
+        if video in str(row[3]):
+            if str(row[10]) == "Temp" or str(row[10]) == "Ex":
+                location = "loc" + str(row[10])
+            else:
+                location = "loc" + str(row[10]).zfill(2)
+            break
+    file_prefix = f'set01_{participant}_{date}_{location}_{video}'
+    return participant, date, location, video, file_prefix
 
 def parse_COCO(json_path):
     """
@@ -162,13 +173,12 @@ def main(path='/hpc/projects/capillary-flow/results/backgrounds', verbose = Fals
             if verbose:       
                 print(f"filename: {filename} has shape:")
                 print(im.shape)
-                
+            
+            
             # extract the participant, date, and video number from the filename
-            participant, date, video = parse_filename(filename)
-            # remove the file extension
-            filename_without_ext = os.path.splitext(filename)[0]
-            # extract the desired string from the filename
-            prefix = filename_without_ext.split('_background')[0]
+            participant, date, location, video, file_prefix = parse_filename(filename)
+            
+            # make predictions
             outputs = predictor(im)  # format is documented at https://detectron2.readthedocs.io/tutorials/models.html#model-output-format
             if len(outputs["instances"].pred_masks) == 0:
                 if verbose:
@@ -196,23 +206,15 @@ def main(path='/hpc/projects/capillary-flow/results/backgrounds', verbose = Fals
                 
             # Convert boolean array to integer array
             mask_int = total_mask.astype(int)
-            mask_dict[prefix] = mask_int
+            mask_dict[file_prefix] = mask_int
 
-            #get location from metadata
-            metadata = pd.read_excel(os.path.join("/hpc/projects/capillary-flow/metadata", participant + "_" + date + ".xlsx"))
-            for index, row in metadata.iterrows():
-                if video in str(row[3]):
-                    if str(row[10]) == "Temp" or str(row[10]) == "Ex":
-                        location = "loc" + str(row[10])
-                    else:
-                        location = "loc" + str(row[10]).zfill(2)
-                    break
+            
 
             # Save the mask
             os.makedirs(os.path.join("/hpc/projects/capillary-flow/data", participant, date, location, "segmented"), exist_ok=True)
-            plt.imsave(os.path.join("/hpc/projects/capillary-flow/data", participant, date, location, "segmented", filename_without_ext + "_" + location + "_seg.png"), mask_int, cmap='gray')
+            plt.imsave(os.path.join("/hpc/projects/capillary-flow/data", participant, date, location, "segmented", file_prefix + "_seg.png"), mask_int, cmap='gray')
             os.makedirs(os.path.join("/hpc/projects/capillary-flow/results/segmented"), exist_ok=True)
-            plt.imsave(os.path.join("/hpc/projects/capillary-flow/results/segmented", filename_without_ext + "_" + location + "_seg.png"), mask_int, cmap='gray')
+            plt.imsave(os.path.join("/hpc/projects/capillary-flow/results/segmented", file_prefix + "_seg.png"), mask_int, cmap='gray')
 
             # # Save the integer array to a CSV file            
             # np.savetxt(os.path.join(cfg.OUTPUT_DIR, filename_without_ext + "_segs.csv"), mask_int, 
