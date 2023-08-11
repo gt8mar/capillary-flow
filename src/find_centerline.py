@@ -16,12 +16,13 @@ import cv2
 import os, glob, platform
 from skimage import measure
 from skimage.morphology import medial_axis
-from fil_finder import FilFinder2D
-import astropy.units as u
+# from fil_finder import FilFinder2D
+# import astropy.units as u
 import time
 from sklearn.neighbors import NearestNeighbors
 import networkx as nx
-from src.tools.parse_vid_path import parse_vid_path
+# from src.tools.parse_vid_path import parse_vid_path
+# from src.tools.parse_filename import parse_filename
 import warnings
 import pandas as pd
 
@@ -206,118 +207,124 @@ def main(path = "F:\\Marcus\\data\\part09\\230414\\loc01",
     # Ignore FilFinder warnings
     warnings.filterwarnings("ignore", category=UserWarning, module="fil_finder.filament")
     
-    # extract metadata from path
-    participant, date, video, file_prefix = parse_vid_path(path)
+    # segmented folder
+    segmented_folder = os.path.join(path, "segmented")
+    location = os.path.basename(path)
+    print(location)
+
+    # # extract metadata from path
+    # participant, date, video, file_prefix = parse_vid_path(path)
 
 
-    #get location from metadata
-    metadata = pd.read_excel(os.path.join("/hpc/projects/capillary-flow/metadata", participant + "_" + date + ".xlsx"))
-    for index, row in metadata.iterrows():
-        if video in str(row[3]):
-            if str(row[10]) == "Temp" or str(row[10]) == "Ex":
-                location = "loc" + str(row[10])
-            else:
-                location = "loc" + str(row[10]).zfill(2)
-            break
+    # #get location from metadata
+    # metadata = pd.read_excel(os.path.join("/hpc/projects/capillary-flow/metadata", participant + "_" + date + ".xlsx"))
+    # for index, row in metadata.iterrows():
+    #     if video in str(row[3]):
+    #         if str(row[10]) == "Temp" or str(row[10]) == "Ex":
+    #             location = "loc" + str(row[10])
+    #         else:
+    #             location = "loc" + str(row[10]).zfill(2)
+    #         break
 
-    # Set up paths
-    # loc_fp = os.path.dirname(os.path.dirname(path))
-    # input_folder = os.path.join(loc_fp, "segmented")
-    # os.makedirs(os.path.join(loc_fp, "centerlines", "coords"), exist_ok=True)
-    # os.makedirs(os.path.join(loc_fp, "centerlines", "images"), exist_ok=True)
-    # output_folder = os.path.join(loc_fp, "centerlines")
+    # # Set up paths
+    # # loc_fp = os.path.dirname(os.path.dirname(path))
+    # # input_folder = os.path.join(loc_fp, "segmented")
+    # # os.makedirs(os.path.join(loc_fp, "centerlines", "coords"), exist_ok=True)
+    # # os.makedirs(os.path.join(loc_fp, "centerlines", "images"), exist_ok=True)
+    # # output_folder = os.path.join(loc_fp, "centerlines")
     
-    input_folder = os.path.join(path, 'segmented')
-    os.makedirs(os.path.join(path, 'centerlines', 'coords'), exist_ok=True)
-    os.makedirs(os.path.join(path, 'centerlines', 'images'), exist_ok=True)
-    output_folder = os.path.join(path, 'centerlines')
+    # input_folder = os.path.join(path, 'segmented')
+    # os.makedirs(os.path.join(path, 'centerlines', 'coords'), exist_ok=True)
+    # os.makedirs(os.path.join(path, 'centerlines', 'images'), exist_ok=True)
+    # output_folder = os.path.join(path, 'centerlines')
     
-    # iterate through segmented files
-    for file in os.listdir(input_folder):
-        if file.endswith("seg.png"):
-            # parse filename
+    # # iterate through segmented files
+    # for file in os.listdir(input_folder):
+    #     if file.endswith("seg.png"):
+    #         # parse filename
+
             
 
 
-            segmented_filename = file
-            skeleton_filename = file.replace("_seg.png", "_skeletons.png")
-            cap_map_filename = file.replace("_seg.png", "_cap_map.png")
-            break
-    # Read in the mask
-    segmented = load_image_with_prefix(input_folder, segmented_filename)
-    # Make mask either 1 or 0
-    segmented[segmented != 0] = 1
+    #         segmented_filename = file
+    #         skeleton_filename = file.replace("_seg.png", "_skeletons.png")
+    #         cap_map_filename = file.replace("_seg.png", "_cap_map.png")
+    #         break
+    # # Read in the mask
+    # segmented = load_image_with_prefix(input_folder, segmented_filename)
+    # # Make mask either 1 or 0
+    # segmented[segmented != 0] = 1
 
-    # Make a numpy array of images with isolated capillaries. The mean/sum of this is segmented_2D.
-    contours = enumerate_capillaries(segmented, verbose=False, write=write, write_path = os.path.join(input_folder, cap_map_filename))
+    # # Make a numpy array of images with isolated capillaries. The mean/sum of this is segmented_2D.
+    # contours = enumerate_capillaries(segmented, verbose=False, write=write, write_path = os.path.join(input_folder, cap_map_filename))
     
-    if write:
-        # save segmented_2D
-        segmented_2D = np.sum(contours, axis=0).astype(bool)
-        # segmented_2D[segmented_2D != 0] = 1
-        # save to results
-        np.savetxt(os.path.join(output_folder, 'centerline_mask.txt'), segmented_2D, delimiter=',')
+    # if write:
+    #     # save segmented_2D
+    #     segmented_2D = np.sum(contours, axis=0).astype(bool)
+    #     # segmented_2D[segmented_2D != 0] = 1
+    #     # save to results
+    #     np.savetxt(os.path.join(output_folder, 'centerline_mask.txt'), segmented_2D, delimiter=',')
 
-    capillary_radii = []
-    skeleton_coords = []
-    flattened_radii = []
-    used_capillaries = []
-    skeleton_data = []
-    j = 0
-    for i in range(contours.shape[0]):
-        # make skeleton
-        print(f"Making skeleton for capillary {i}")
-        skeleton, radii = make_skeletons(contours[i], verbose=False, histograms = False)     # Skeletons come out in the shape
-        skeleton_nums = np.asarray(np.nonzero(skeleton))
-        # omit small capillaries
-        if skeleton_nums.shape[1] <= MIN_CAP_LEN:
-            used_capillaries.append(["small", str(skeleton_nums.shape[1])])
-            pass
-        else:
-            used_capillaries.append([f"new_capillary_{j}", str(skeleton_nums.shape[1])])
-            j += 1
+    # capillary_radii = []
+    # skeleton_coords = []
+    # flattened_radii = []
+    # used_capillaries = []
+    # skeleton_data = []
+    # j = 0
+    # for i in range(contours.shape[0]):
+    #     # make skeleton
+    #     print(f"Making skeleton for capillary {i}")
+    #     skeleton, radii = make_skeletons(contours[i], verbose=False, histograms = False)     # Skeletons come out in the shape
+    #     skeleton_nums = np.asarray(np.nonzero(skeleton))
+    #     # omit small capillaries
+    #     if skeleton_nums.shape[1] <= MIN_CAP_LEN:
+    #         used_capillaries.append(["small", str(skeleton_nums.shape[1])])
+    #         pass
+    #     else:
+    #         used_capillaries.append([f"new_capillary_{j}", str(skeleton_nums.shape[1])])
+    #         j += 1
 
-            # Sort skeleton points in order of continuous points
-            sorted_skeleton_coords, optimal_order = sort_continuous(skeleton_nums, verbose=False)
-            ordered_radii = radii[optimal_order]
-            skeleton_coords_with_radii = np.column_stack((sorted_skeleton_coords, ordered_radii))
-            capillary_radii.append(ordered_radii)
-            flattened_radii += list(radii)
-            # Attach capillary_radii to skeleton_coords
-            skeleton_coords.append(sorted_skeleton_coords)
-            skeleton_data.append(skeleton_coords_with_radii)
-    print(f"{len(skeleton_coords)}/{contours.shape[0]} capillaries used")
-    if verbose:
-        plt.show()
-        # Plot all capillaries together      
-            # plt.plot(capillary_radii[i])
-            # plt.title(f'Capillary {i} radii')
-            # plt.show()
+    #         # Sort skeleton points in order of continuous points
+    #         sorted_skeleton_coords, optimal_order = sort_continuous(skeleton_nums, verbose=False)
+    #         ordered_radii = radii[optimal_order]
+    #         skeleton_coords_with_radii = np.column_stack((sorted_skeleton_coords, ordered_radii))
+    #         capillary_radii.append(ordered_radii)
+    #         flattened_radii += list(radii)
+    #         # Attach capillary_radii to skeleton_coords
+    #         skeleton_coords.append(sorted_skeleton_coords)
+    #         skeleton_data.append(skeleton_coords_with_radii)
+    # print(f"{len(skeleton_coords)}/{contours.shape[0]} capillaries used")
+    # if verbose:
+    #     plt.show()
+    #     # Plot all capillaries together      
+    #         # plt.plot(capillary_radii[i])
+    #         # plt.title(f'Capillary {i} radii')
+    #         # plt.show()
 
-    if write:
-        # Save which capillaries were dropped out
-        np.savetxt(os.path.join(input_folder, file_prefix + '_cap_cut.csv'), 
-                            np.array(used_capillaries), delimiter = ',',
-                            fmt = '%s')
-        # Save centerline and radii information
-        for i in range(len(skeleton_coords)):
-            np.savetxt(os.path.join(output_folder, "coords", file_prefix + f'_centerline_coords_{str(i).zfill(2)}.csv'), 
-                    skeleton_data[i], delimiter=',', fmt = "%s")
-            if platform.system() == 'Windows':
-                pass
-            else:
-                os.makedirs('/hpc/projects/capillary-flow/results/centerlines')
-                np.savetxt(os.path.join('/hpc/projects/capillary-flow/results/centerlines', file_prefix + f'_centerline_coords_{str(i).zfill(2)}.csv'), 
-                            skeleton_data[i], delimiter=',', fmt = "%s")
-            # np.savetxt(os.path.join(output_folder, "radii", file_prefix + f'_capillary_radii_{str(i).zfill(2)}.csv'), 
-            #         capillary_radii[i], delimiter=',', fmt = '%s')
+    # if write:
+    #     # Save which capillaries were dropped out
+    #     np.savetxt(os.path.join(input_folder, file_prefix + '_cap_cut.csv'), 
+    #                         np.array(used_capillaries), delimiter = ',',
+    #                         fmt = '%s')
+    #     # Save centerline and radii information
+    #     for i in range(len(skeleton_coords)):
+    #         np.savetxt(os.path.join(output_folder, "coords", file_prefix + f'_centerline_coords_{str(i).zfill(2)}.csv'), 
+    #                 skeleton_data[i], delimiter=',', fmt = "%s")
+    #         if platform.system() == 'Windows':
+    #             pass
+    #         else:
+    #             os.makedirs('/hpc/projects/capillary-flow/results/centerlines')
+    #             np.savetxt(os.path.join('/hpc/projects/capillary-flow/results/centerlines', file_prefix + f'_centerline_coords_{str(i).zfill(2)}.csv'), 
+    #                         skeleton_data[i], delimiter=',', fmt = "%s")
+    #         # np.savetxt(os.path.join(output_folder, "radii", file_prefix + f'_capillary_radii_{str(i).zfill(2)}.csv'), 
+    #         #         capillary_radii[i], delimiter=',', fmt = '%s')
 
 
-    # # Make overall histogram
-    # # plt.hist(flattened_radii)
-    # # plt.show()
+    # # # Make overall histogram
+    # # # plt.hist(flattened_radii)
+    # # # plt.show()
 
-    # # TODO: Abnormal capillaries
+    # # # TODO: Abnormal capillaries
 
     return 0
 
@@ -331,6 +338,6 @@ def main(path = "F:\\Marcus\\data\\part09\\230414\\loc01",
 if __name__ == "__main__":
     ticks = time.time()
     # main(path = '/hpc/projects/capillary-flow/data/part13/230428/vid25', verbose = False, write = True)
-    main(verbose = True, write = True)
+    main(verbose = False, write = False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
