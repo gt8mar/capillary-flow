@@ -208,10 +208,7 @@ def main(path = "F:\\Marcus\\data\\part09\\230414\\loc01",
     
     # extract metadata from path
     participant, date, video, file_prefix = parse_vid_path(path)
-    
-    segmented_filename = file_prefix + '_background_seg.png'
-    skeleton_filename = file_prefix + '_background_skeletons.png'
-    cap_map_filename = file_prefix + '_cap_map.png'
+
 
     #get location from metadata
     metadata = pd.read_excel(os.path.join("/hpc/projects/capillary-flow/metadata", participant + "_" + date + ".xlsx"))
@@ -220,21 +217,32 @@ def main(path = "F:\\Marcus\\data\\part09\\230414\\loc01",
             if str(row[10]) == "Temp" or str(row[10]) == "Ex":
                 location = "loc" + str(row[10])
             else:
-                location = "loc0" + str(row[10]) 
+                location = "loc" + str(row[10]).zfill(2)
             break
 
     # Set up paths
-    loc_fp = os.path.dirname(os.path.dirname(path))
-    input_folder = os.path.join(loc_fp, "segmented")
-    os.makedirs(os.path.join(loc_fp, "centerlines", "coords"), exist_ok=True)
-    os.makedirs(os.path.join(loc_fp, "centerlines", "images"), exist_ok=True)
-    output_folder = os.path.join(loc_fp, "centerlines")
-    """input_folder = os.path.join(path, 'D_segmented')
-    os.makedirs(os.path.join(path, 'E_centerline', 'coords'), exist_ok=True)
-    os.makedirs(os.path.join(path, 'E_centerline', 'images'), exist_ok=True)
-    output_folder = os.path.join(path, 'E_centerline')
-    """
+    # loc_fp = os.path.dirname(os.path.dirname(path))
+    # input_folder = os.path.join(loc_fp, "segmented")
+    # os.makedirs(os.path.join(loc_fp, "centerlines", "coords"), exist_ok=True)
+    # os.makedirs(os.path.join(loc_fp, "centerlines", "images"), exist_ok=True)
+    # output_folder = os.path.join(loc_fp, "centerlines")
+    
+    input_folder = os.path.join(path, 'segmented')
+    os.makedirs(os.path.join(path, 'centerlines', 'coords'), exist_ok=True)
+    os.makedirs(os.path.join(path, 'centerlines', 'images'), exist_ok=True)
+    output_folder = os.path.join(path, 'centerlines')
+    
+    # iterate through segmented files
+    for file in os.listdir(input_folder):
+        if file.endswith("seg.png"):
+            # parse filename
+            
 
+
+            segmented_filename = file
+            skeleton_filename = file.replace("_seg.png", "_skeletons.png")
+            cap_map_filename = file.replace("_seg.png", "_cap_map.png")
+            break
     # Read in the mask
     segmented = load_image_with_prefix(input_folder, segmented_filename)
     # Make mask either 1 or 0
