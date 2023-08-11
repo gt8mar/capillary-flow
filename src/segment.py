@@ -152,11 +152,18 @@ def main(path='/hpc/projects/capillary-flow/results/backgrounds', verbose = Fals
         if filename not in os.listdir(folder_seg):
             print(f"filename: {filename} not in folder: {folder_seg}")
         else:
-            im = cv2.imread(d["file_name"]) 
-            im = cv2.equalizeHist(im, cv2.COLOR_BGR2GRAY)
+            # read the image
+            im = cv2.imread(d["file_name"], cv2.IMREAD_GRAYSCALE).astype(np.uint8)
+            # equalize the histogram
+            im = cv2.equalizeHist(im)
+            # convert to rgb
+            im = cv2.cvtColor(im, cv2.COLOR_GRAY2RGB)
+
             if verbose:       
                 print(f"filename: {filename} has shape:")
                 print(im.shape)
+                
+            # extract the participant, date, and video number from the filename
             participant, date, video = parse_filename(filename)
             # remove the file extension
             filename_without_ext = os.path.splitext(filename)[0]
@@ -198,7 +205,7 @@ def main(path='/hpc/projects/capillary-flow/results/backgrounds', verbose = Fals
                     if str(row[10]) == "Temp" or str(row[10]) == "Ex":
                         location = "loc" + str(row[10])
                     else:
-                        location = "loc0" + str(row[10]) 
+                        location = "loc" + str(row[10]).zfill(2)
                     break
 
             # Save the mask
