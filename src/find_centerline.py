@@ -189,7 +189,7 @@ def load_image_with_prefix(input_folder, segmented_filename):
         print("Image not found.")
         return None
 
-def main(path = "F:\\Marcus\\data\\part09\\230414\\vid33",
+def main(path = "F:\\Marcus\\data\\part09\\230414\\loc01",
         verbose = False, write = False):
     """ Isolates capillaries from segmented image and finds their centerlines and radii. 
 
