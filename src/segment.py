@@ -64,17 +64,21 @@ def parse_filename(filename):
     participant = filename_no_ext.split('_')[-4]
     date = filename_no_ext.split('_')[-3]
     video = filename_no_ext.split('_')[-2].replace('bp', '')
-
+    print(participant, date, video)
     #get location from metadata
     metadata = pd.read_excel(os.path.join("/hpc/projects/capillary-flow/metadata", participant + "_" + date + ".xlsx"))
-    for index, row in metadata.iterrows():
-        if video in str(row[3]):
-            if str(row[10]) == "Temp" or str(row[10]) == "Ex":
-                location = "loc" + str(row[10])
-            else:
-                location = "loc" + str(row[10]).zfill(2)
-            break
+    # make location column entries into strings
+    location = metadata.loc[(metadata['Video'] == video )| 
+                            (metadata["Video"]== video + 'bp')| 
+                            (metadata['Video']== video +'scan')]['Location'].values[0]
+    
+    if str(location) == "Temp" or str(location) == "Ex":
+        location = "loc" + str(location)
+    else:
+        location = "loc" + str(location).zfill(2)
+    
     file_prefix = f'set01_{participant}_{date}_{location}_{video}'
+    print(file_prefix)
     return participant, date, location, video, file_prefix
 
 def parse_COCO(json_path):
