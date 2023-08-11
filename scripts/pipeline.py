@@ -2,63 +2,65 @@
 Filename: pipeline.py
 ------------------------------------------------------
 This program runs a sequence of python programs to write a background
-file and corresponding video.
+file, a corresponding video, segment capillaries, and calculate
+flow rates.
 By: Marcus Forst
 """
 
 import time
-import os
-from src import auto_corr
-from src import correlation
-from src.tools import pic2vid_stand_alone
-from src import crop
+import os, sys, re
 from src import write_background_file
-# import correlation_with_cap_selection
-
-# CAPILLARY_ROW = 565
-# CAPILLARY_COL = 590
-# BKGD_COL = 669
-# BKGD_ROW = 570
+# from src import segment
 
 SET = "set_01"
-SAMPLE = "sample_000"
-processed_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', SET)
 
-def C_write_background():
-    for i in range(12):
-        sample = 'sample_' + str(i).zfill(3)
-        os.makedirs(os.path.join(processed_folder, sample, "C_background"))
-        os.makedirs(os.path.join(processed_folder, sample, "D_stabilized"))
-        write_background_file.main(SET, sample)
-        print(f'finished sample {i}')
+def list_only_folders(path):
+    """
+    This function returns a list of only folders in a given path.
 
+    Args:
+        path (str): the path to the folder to be searched
+    Returns:
+        list: a list of folders in the given path
+    """
+    return [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
 
+def main():
+    """
+    Write background file, corresponding video, segment capillaries, and calculate flow rates.
 
-"""
------------------------------------------------------------------------------
-"""
-# This provided line is required at the end of a Python file
-# to call the main() function.
-if __name__ == "__main__":
-    print("Run full pipeline")
-    print("-------------------------------------")
-    ticks_first = time.time()
-    ticks = time.time()
-
-    """ Step A: Preprocess """
-    # done in preprocess.py
-
-    """ Step B: Stabilize using moco in imagej """
-    # done in imagej
+    Args:
+        None
+    Returns:
+        0 if successful
+    Saves:
+        background file
+        video
+        segmented file
+    """
 
     """ Write Background """
-    # for folder in os.listdir(UMBRELLA_FOLDER):
-    #     path = os.path.join(UMBRELLA_FOLDER, folder)
-    #     write_background_file.main(folder, path, DATE, PARTICIPANT)
-    C_write_background()
-    print("-------------------------------------")
-    print("Background Runtime: " + str(time.time() - ticks))
-    ticks = time.time()
+    i = sys.argv[1]
+    print(i)
+    ticks_total = time.time()
+    participant = 'part' + str(i).zfill(2) 
+    # Load the date and video numbers
+    date_folders = list_only_folders(os.path.join('/hpc/projects/capillary-flow/data', participant))
+    # date is the folder with only numbers in the title
+    dates = [dates for dates in date_folders if dates.isdigit()]
+    date = dates[0]
+    
+    videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date[0]))
+    for video in videos:
+        ticks = time.time()
+        path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date[0], video)
+        write_background_file.main(path, color = True)
+        print(f'video {video}')
+        print(str(ticks-time.time()))
+
+    print(f'finished {participant} from the {date[0]}')
+    print(str(ticks_total-time.time()))    
+
 
 
     """ Correlation files """
@@ -73,6 +75,20 @@ if __name__ == "__main__":
     # print("-------------------------------------")
     # print("Correlation Runtime: " + str(time.time() - ticks))
     # ticks = time.time()
+    return 0
+
+
+"""
+-----------------------------------------------------------------------------
+"""
+# This provided line is required at the end of a Python file
+# to call the main() function.
+if __name__ == "__main__":
+    print("Run full pipeline")
+    print("-------------------------------------")
+    ticks_first = time.time()
+    ticks = time.time()
+    main()  
 
     print("-------------------------------------")
     print("Total Pipeline Runtime: " + str(time.time() - ticks_first))

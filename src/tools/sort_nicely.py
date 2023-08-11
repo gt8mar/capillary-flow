@@ -22,7 +22,7 @@ def alphanum_key(string):
     return [tryint(char) for char in re.split('([0-9]+)', string)]
 
 
-def main(list):
+def sort_nicely(list):
     """ Sort the given list in the way that humans expect """
     list.sort(key=alphanum_key)
     return 0
@@ -31,4 +31,4 @@ def main(list):
 # This provided line is required at the end of a Python file
 # to call the main() function.
 if __name__ == "__main__":
-    main()
+    sort_nicely()

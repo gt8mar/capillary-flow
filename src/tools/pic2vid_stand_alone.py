@@ -3,23 +3,22 @@ Filename: pic2vid.py
 -------------------------------------------------------------
 This file turns a group of files into a video. It correctly orders misordered files.
 by: Marcus Forst
-sort_nicely credit: Ned B (https://nedbatchelder.com/blog/200712/human_sorting.html)
 """
 
 import os
 import time
 import numpy as np
 import cv2
-from src.tools import get_images
+from src.tools.get_images import get_images
 
-# UMBRELLA_FOLDER = 'C:\\Users\\gt8mar\\Desktop\\data\\221010'
-FILEFOLDER_PATH = "C:\\Users\\gt8mar\\Desktop\\data\\221019\\raw\\vid12"
-DATE = "221101"
-PARTICIPANT = "Participant4"
-FOLDER_NAME = 'vid12'
+# UMBRELLA_FOLDER = 'C:\\Users\\ejerison\\Desktop\\data\\221010'
+FILEFOLDER_PATH = "C:\\Users\\gt8mar\\Desktop\\data\\230425\\vid15bp"
+DATE = "230425"
+PARTICIPANT = "Participant10"
+FOLDER_NAME = 'vid15bp'
 SET = '01'
-SAMPLE = '0002'
-FRAME_RATE = 169
+SAMPLE = '0077'
+FRAME_RATE = 227.3
 
 def frames_to_timecode(frame_number, frame_rate):
     """
@@ -71,7 +70,7 @@ def main(filefolder = FILEFOLDER_PATH, folder = FOLDER_NAME, date = DATE,
     :param images: list of image filenames (strings)
     :return:
     """
-    images = get_images.main(filefolder)
+    images = get_images(filefolder)
     video_name = f'{date}_{participant}_{folder}.avi'
     frame = cv2.imread(os.path.join(filefolder, images[0]))
     video = cv2.VideoWriter(video_name, 0, 60, (frame.shape[1], frame.shape[0]))

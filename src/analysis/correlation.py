@@ -1,9 +1,9 @@
 """
 Filename: correlation.py
 ------------------------------------------------------
-TBD
+Calculates the correlation between pixels and their nearest neighbors. 
+
 By: Marcus Forst
-sort_nicely credit: Ned B (https://nedbatchelder.com/blog/200712/human_sorting.html)
 """
 
 import numpy as np
@@ -14,60 +14,19 @@ import re
 import time
 from PIL import Image
 from skimage.measure import block_reduce
+from src.tools.get_images import get_images
+from src.tools.load_image_array import load_image_array
+from src.tools.get_shifts import get_shifts
 
-# FILEFOLDER = 'C:\\Users\\gt8mar\\Desktop\\data\\220513\\pointer2'
-FILEFOLDER = 'C:\\Users\\gt8mar\\Desktop\\data\\221010\\stupid2'
 BIN_FACTOR = 4
 
 # SECTION_START = 138
 # SECTION_END = 984
 
-# Sort images first
-def tryint(s):
-    try:
-        return int(s)
-    except:
-        return s
-def alphanum_key(s):
-    """ Turn a string into a list of string and number chunks.
-        "z23a" -> ["z", 23, "a"]
-    """
-    return [tryint(c) for c in re.split('([0-9]+)', s)]
-def sort_nicely(l):
-    """ Sort the given list in the way that humans expect.
-    """
-    l.sort(key=alphanum_key)
-def get_images(FILEFOLDER):
-    """
-    this function grabs image names, sorts them, and puts them in a list.
-    :param FILEFOLDER: string
-    :return: images: list of images
-    """
-    images = [img for img in os.listdir(FILEFOLDER) if img.endswith(".tif") or img.endswith(
-        ".tiff")]  # if this came out of moco the file suffix is .tif otherwise it's tiff
-    sort_nicely(images)
-    return images
-def load_image_array(image_list):
-    """
-    This function loads images into a numpy array.
-    :param image_list: List of images
-    :return: image_array: 3D numpy array
-    """
-    # Initialize array for images
-    z_time = len(image_list)
-    image_example = cv2.imread(os.path.join(FILEFOLDER, image_list[0]))
-    rows, cols, layers = image_example.shape
-    image_array = np.zeros((z_time, rows, cols), dtype='uint16')
-    # loop to populate array
-    for i in range(z_time):
-        image_array[i] = cv2.imread(os.path.join(FILEFOLDER, image_list[i]), cv2.IMREAD_GRAYSCALE)
-    return image_array
-def bin_image_by_2_space(image):
-    return (image[:, :-1:2, :-1:2] + image[:, 1::2, :-1:2]
-            + image[:, :-1:2, 1::2] + image[:, 1::2, 1::2])//4
-def bin_image_by_2_time(image):
-    return (image[:-1:2,:,:] + image[1::2, :, :])//2
 def make_correlation_matrix(image_array_binned):
+    """
+    Calculates the correlation between pixels and their nearest neighbors.
+    """
     # Initialize correlation matrix
     up_left = image_array_binned[:-1, 1:-1, 1:-1] * image_array_binned[1:, :-2, :-2]
     up_mid = image_array_binned[:-1, 1:-1, 1:-1] * image_array_binned[1:, :-2, 1:-1]
@@ -97,32 +56,52 @@ def make_correlation_matrix(image_array_binned):
     # corr_y /= 5000
     return corr_x, corr_y
 
-def main(filefolder = FILEFOLDER, bin_factor = BIN_FACTOR):
-    images = get_images(filefolder)
-    image_array = load_image_array(images)
-    # image_array = image_array2[SECTION_START:SECTION_END]
-    background = np.mean(image_array, axis=0)
+def main(path, mask = False, verbose = True, write = False, bin_factor = 4):
+    """
+    Calculates the correlation between pixels and their nearest neighbors.
+    """
+    input_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'B_stabilized')
+    mask_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'D_segmented')
+    output_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', str(SET), str(sample), 'G_correlation')
+    images = get_images(os.path.join(input_folder, 'vid'))
+    image_array = load_image_array(images, input_folder)
+    gap_left, gap_right, gap_bottom, gap_top = get_shifts(input_folder)
+    # Crop array based on shifts
+    image_array = image_array[:, gap_top:gap_bottom, gap_left:gap_right] 
+    # Read in the masks
+    segmented = cv2.imread(os.path.join(mask_folder, f'{SET}_{sample}_background.png'), cv2.IMREAD_GRAYSCALE)
+    # Make mask either 1 or 0
+    segmented[segmented != 0] = 1
+    if mask:
+        image_array = segmented * image_array
     print(image_array.shape)
 
     # """Bin images to conserve memory and improve resolution"""
     image_array_binned = block_reduce(image_array, (2,2,2), func= np.mean)
+    mask_binned = block_reduce(segmented, (2, 2), func=np.mean)
 
     print(image_array_binned.shape)
+    print(mask_binned.shape)
     # plt.imshow(np.mean(image_array_binned, axis = 0))
     # plt.show()
 
-    # max = np.max(image_array_binned)
     corr_x, corr_y = make_correlation_matrix(image_array_binned)
     # Plot a subset of this array
-    corr_x_slice = corr_x[10:-10:bin_factor, 10:-10:bin_factor]
-    corr_y_slice = corr_y[10:-10:bin_factor, 10:-10:bin_factor]
+    corr_x_slice = corr_x[::bin_factor, ::bin_factor]
+    corr_y_slice = corr_y[::bin_factor, ::bin_factor]
+    # mask_slice = mask_binned[::bin_factor, ::bin_factor] 
+    # mask_slice = mask_slice[:,:-1]  # this -1 is a result of the make_corr_matrix shift
+    mask_slice = 1
     print(corr_y_slice.shape)
 
     # y, x = np.meshgrid(np.arange(0, rows // (BIN_FACTOR*2), 1), np.arange(0, cols // (BIN_FACTOR*2), 1))
     # plt.quiver(x, y, corr_x_slice, corr_y_slice)
-    plt.quiver(corr_y_slice, corr_x_slice, angles = 'xy')
+    plt.quiver(corr_y_slice*mask_slice, corr_x_slice*mask_slice, angles = 'xy')
     plt.gca().invert_yaxis()
-    plt.show()
+    if verbose:
+        plt.show()
+    if write:
+        plt.imsave(os.path.join(output_folder, "correlation.png"))
     return 0
 
 """

@@ -1,15 +1,16 @@
 """
 Filename: analyze.py
 ------------------------------------------------------
-This program runs a sequence of python programs to analyze capillaries
+This program runs a sequence of python programs to analyze capillaries.
+It requires segmented capillaries to run. 
 By: Marcus Forst
 """
 
 import time
 import os
-from src import auto_corr
-from src import correlation
-from src import blood_flow_linear
+from src.analysis import auto_corr
+from src.analysis import correlation
+from src import make_kymograph
 from src import find_centerline
 
 # CAPILLARY_ROW = 565
@@ -18,39 +19,17 @@ from src import find_centerline
 # BKGD_ROW = 570
 
 SET = "set_01"
-SAMPLE = "sample_000"
-processed_folder = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\data\\processed', SET)
-
-def E_centerline():
-    for i in range(12):
-        sample = 'sample_' + str(i).zfill(3)
-        os.makedirs(os.path.join(processed_folder, sample, "E_centerline"))
-        find_centerline.main(SET, sample, write = True)
-        print(f'finished sample {i}')
-    return 0
-
-def F_blood_velocity():
-    for i in range(12):
-        sample = 'sample_' + str(i).zfill(3)
-        os.makedirs(os.path.join(processed_folder, sample, "F_blood_flow"))
-        # blood_flow_linear.main()
-        print(f'finished sample {i}')
-    return 0
+sample = "sample_000"
+processed_folder = os.path.join('C:\\Users\\ejerison\\capillary-flow\\data\\processed', SET)
 
 def G_correlation():
-    for i in range(12):
-        sample = 'sample_' + str(i).zfill(3)
-        os.makedirs(os.path.join(processed_folder, sample, "G_correlation"))
-    #     path = os.path.join(UMBRELLA_FOLDER, folder)
-    #     segmented_file_name = folder + '0000segmented'
-    #     correlation_with_cap_selection.main(path, UMBRELLA_FOLDER_MOCO, segmented_file_name)
-    #     auto_corr.main(UMBRELLA_FOLDER_MOCO, CAPILLARY_ROW, CAPILLARY_COL, BKGD_ROW, BKGD_COL)
-    #     correlation.main(UMBRELLA_FOLDER_MOCO)
-        print(f'finished sample {i}')
+    # path = os.path.join(UMBRELLA_FOLDER, folder)
+    # segmented_file_name = folder + '0000segmented'
+    # correlation_with_cap_selection.main(path, UMBRELLA_FOLDER_MOCO, segmented_file_name)
+    # auto_corr.main(UMBRELLA_FOLDER_MOCO, CAPILLARY_ROW, CAPILLARY_COL, BKGD_ROW, BKGD_COL)
+    # correlation.main(UMBRELLA_FOLDER_MOCO)
+    # print(f'finished correlation')
     return 0
-
-
-
 
 """
 -----------------------------------------------------------------------------
@@ -62,44 +41,19 @@ if __name__ == "__main__":
     print("-------------------------------------")
     ticks_first = time.time()
     ticks = time.time()
+    for i in range(12,21):
+        sample = 'sample_' + str(i).zfill(3)
 
-    """ Step A: Preprocess """
-    # done in preprocess.py
+        find_centerline.main(SET, sample, write = True)
+        print("-------------------------------------")
+        print(f"{sample} Centerline Runtime: {time.time() - ticks}")
+        ticks = time.time()
 
-    """ Step B: Stabilize using moco in imagej """
-    # done in imagej
-
-    """ Step C: Write Background """
-    # done in pipeline.py
-
-    """ Step D: Segmentation """
-    # done in hasty.ai
-
-    """ Step E: Find centerline """
-    E_centerline()
-
-    """ Step F: Calculate blood-velocity """
-    F_blood_velocity()
-    
-    print("-------------------------------------")
-    print("Centerline Runtime: " + str(time.time() - ticks))
-    ticks = time.time()
- 
-
-
-    """ Step G: Calculate correlation """
-    G_correlation()
-
-    print("-------------------------------------")
-    print("Correlation Runtime: " + str(time.time() - ticks))
-    ticks = time.time()
-
-    """ """
-
-
-
-
-
+        make_kymograph.main(SET, sample, write = True)    
+        print("-------------------------------------")
+        print(f"{sample} Blood-Flow Runtime: {time.time() - ticks}")
+        ticks = time.time()
+        # correlation.main(SET, sample, verbose = False, write = True)
     print("-------------------------------------")
     print("Total Pipeline Runtime: " + str(time.time() - ticks_first))
 
