@@ -33,7 +33,6 @@ def parse_filename(filename):
                                                item.startswith('240') |
                                                item.startswith('241'))][0]
     video = [item for item in filename_list if item.startswith('vid')] [0]
-    print(participant, date, video)
     # get location from metadata
     metadata = pd.read_excel(os.path.join("/hpc/projects/capillary-flow/metadata", str(participant) + "_" + str(date) + ".xlsx"))
     # make location column entries into strings
@@ -47,7 +46,6 @@ def parse_filename(filename):
         location = "loc" + str(location).zfill(2)
     
     file_prefix = f'set01_{participant}_{date}_{location}_{video}'
-    print(file_prefix)
     return participant, date, location, video, file_prefix
 
 if __name__ == "__main__":
