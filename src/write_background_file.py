@@ -65,7 +65,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
     # Convert to numpy array
     image_files = np.array(image_files)
     # save video
-    pic2vid(image_files, participant=participant, date=date, location = location, video_folder=video, color=color, overlay=False) 
+    pic2vid(image_files, participant=participant, date=date, location = location, video_folder=video, color=color, overlay=True) 
     ROWS, COLS = image_files[0].shape
     
     if method == "mean":
