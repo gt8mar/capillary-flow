@@ -47,7 +47,6 @@ def folder_into_COCO(path):
                     f.write('{"file_name": "' + file + '", "height": ' + str(height) + ', "width": ' + str(width) + '1280, "id": ' + str(i) + '},')
             f.write('], "categories": [{"supercategory": "background", "id": 0, "name": "background"}], "annotations": []}')
         return json_path
-
 def parse_filename(filename):
     """
     Parses the filename of an image into its participant, date, and video number.
@@ -78,7 +77,6 @@ def parse_filename(filename):
     
     file_prefix = f'set01_{participant}_{date}_{location}_{video}'
     return participant, date, location, video, file_prefix
-
 def parse_COCO(json_path):
     """
     Parses the COCO dataset into a dictionary containing the participant, date, and video number for each image.
@@ -97,7 +95,6 @@ def parse_COCO(json_path):
         participant, date, video = parse_filename(filename)
         dict[filename] = [participant, date, video]
     return dict
-
 def COCO_filename_remove_contrast(json_path):
     """
     Checks to see if the filename has _contrast in it and changes the filename in the COCO dataset to match.  
