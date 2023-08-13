@@ -61,7 +61,7 @@ def main():
             print(f'video {video}')
             print(str(ticks-time.time()))
 
-    print(f'finished {participant} from the {date[0]}')
+    print(f'finished {participant} from the {date}')
     print(str(ticks_total-time.time()))    
 
 
