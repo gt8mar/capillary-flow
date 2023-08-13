@@ -11,6 +11,7 @@ import time
 import os, sys, re
 from src import write_background_file
 # from src import segment
+from src.tools.find_earliest_date_dir import find_earliest_date_dir
 
 SET = "set_01"
 
@@ -47,16 +48,18 @@ def main():
     # Load the date and video numbers
     date_folders = list_only_folders(os.path.join('/hpc/projects/capillary-flow/data', participant))
     # date is the folder with only numbers in the title
-    dates = [dates for dates in date_folders if dates.isdigit()]
-    date = dates[0]
+    date = find_earliest_date_dir(date_folders)
     
-    videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date[0]))
-    for video in videos:
+    locations = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date))
+    for location in locations:
         ticks = time.time()
-        path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date[0], video)
-        write_background_file.main(path, color = True)
-        print(f'video {video}')
-        print(str(ticks-time.time()))
+        video_folders = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', 
+                                               participant, date, location, "vids"))
+        for video in video_folders:
+            path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, location, "vids", video)
+            write_background_file.main(path, color = True)
+            print(f'video {video}')
+            print(str(ticks-time.time()))
 
     print(f'finished {participant} from the {date[0]}')
     print(str(ticks_total-time.time()))    
