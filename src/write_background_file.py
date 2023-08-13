@@ -17,13 +17,13 @@ from src.tools.parse_vid_path import parse_vid_path
 from src.tools.get_images import get_images
 from src.tools.pic2vid import pic2vid
 
-def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1', 
+def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01\\vids\\vid01', 
          method = "median", color = False):  
     """
     Writes a background file and a video into results and C_background.
 
     Args: 
-        path (str): Path to the umbrella video folder.
+        path (str): Path to the umbrella video folder within the location and vids folder.
         method (string): Method to create background file
         color (bool): Whether to make a color video or not (grayscale)
 
@@ -35,8 +35,10 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1'
         video (.avi): video of stabilized images
     """  
     input_folder = os.path.join(path, 'moco')
-    os.makedirs(os.path.join(path, 'C_background'), exist_ok=True)
-    output_folder = os.path.join(path, 'C_background')
+    location_folder = os.path.dirname(os.path.dirname((path)))
+    location = os.path.basename(location_folder)
+    os.makedirs(os.path.join(location_folder, 'backgrounds'), exist_ok=True)
+    output_folder = os.path.join(os.path.dirname(path), 'backgrounds')
     results_folder = '/hpc/projects/capillary-flow/results/backgrounds'  # I want to save all the backgrounds to the same folder for easy transfer to hasty.ai
     participant, date, video, file_prefix = parse_vid_path(path)
 
@@ -50,15 +52,20 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1'
     print(f'gap right is {gap_right}')
     print(f'gap bottom is {gap_bottom}')
     print(f'gap top is {gap_top}')
+
+    # Read in sorted image names
     images = get_images(os.path.join(input_folder))
     image_files = []
     for i in range(len(images)):
+        # Read in image
         image = np.array(cv2.imread(os.path.join(input_folder, images[i]), cv2.IMREAD_GRAYSCALE))
         # Crop image using shifts so that there is not a black border around the outside of the video
         cropped_image = image[gap_top:image.shape[0] + gap_bottom, gap_left:image.shape[1] + gap_right]
         image_files.append(cropped_image)
+    # Convert to numpy array
     image_files = np.array(image_files)
-    pic2vid(image_files, participant=participant, date=date, video_folder=video, color=color, overlay=False) 
+    # save video
+    pic2vid(image_files, participant=participant, date=date, location = location, video_folder=video, color=color, overlay=False) 
     ROWS, COLS = image_files[0].shape
     
     if method == "mean":
