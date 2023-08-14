@@ -15,6 +15,7 @@ import re
 import matplotlib.colors as mcolors
 import pandas as pd
 import platform
+from itertools import chain
 
 def exclude_fragmented(caps_fp):
     caps_listdir = []
@@ -69,15 +70,17 @@ def group_by_vidnum(plotinfo):
             grouped_caps[vidnum] = [entry]
     
     result_list = list(grouped_caps.values())
-    return result_list   
+    return result_list  
 
-def subplots(plotinfo, partnum, location):
+def quantitative_subplots(plotinfo, partnum, date, location):
     grouped_plotinfo = group_by_cap(plotinfo)
     num_plots = len(grouped_plotinfo)
     num_cols = 3
     num_rows = (num_plots + num_cols - 1) // num_cols
     fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 5 * num_rows), sharey=True)
     fig.suptitle(partnum + " " + location + " capillary size vs. pressure")
+
+    slope_data = []
 
     # Find overall min and max x-values for all subplots
     overall_min_x = float('inf')
@@ -87,40 +90,59 @@ def subplots(plotinfo, partnum, location):
         if i < num_plots:
             cap = grouped_plotinfo[i]
 
-            for point in cap:
-                point.append("Blue")
-            for x in range(len(cap) - 1):
-                if float(cap[x][1]) > float(cap[x + 1][1]):
-                    cap[x + 1][4] = "Red"
+            max_index = len(cap)
+            for i in range(1, len(cap)):
+                if cap[i][1] < cap[i - 1][1]:
+                    max_index = i
+                    break
 
-            sorted_cap = sorted(cap, key=lambda x: x[1])
+            increasing_cap = cap[:max_index]
+            decreasing_cap = cap[max_index - 1:]
 
-            x_scatter = [float(entry[1]) for entry in sorted_cap]  
-            y_scatter = [entry[0] for entry in sorted_cap]
-            colors = [entry[4] for entry in sorted_cap]
+            sorted_inc_cap = sorted(increasing_cap, key=lambda x: x[1])
+            sorted_dec_cap = sorted(decreasing_cap, key=lambda x: x[1])
 
-            ax.scatter(x_scatter, y_scatter, c=colors)
+            x_scatter_inc = [float(entry[1]) for entry in sorted_inc_cap]  
+            y_scatter_inc = [entry[0] for entry in sorted_inc_cap]
 
-            x_line = [float(entry[1]) for entry in cap]
-            y_line = [entry[0] for entry in cap]
+            x_scatter_dec = [float(entry[1]) for entry in sorted_dec_cap]  
+            y_scatter_dec = [entry[0] for entry in sorted_dec_cap]
 
-            colors = [entry[4] for entry in cap[1:]] + [cap[-1][4]]
+            ax.scatter(x_scatter_inc, y_scatter_inc, c="Black")
+            ax.scatter(x_scatter_dec, y_scatter_dec, c="Black")
 
-            cmap = mcolors.ListedColormap(colors)
+            x_line_inc = [float(entry[1]) for entry in increasing_cap]
+            y_line_inc = [entry[0] for entry in increasing_cap]
 
-            for i in range(len(x_line) - 1):
-                color = cmap(i)
-                ax.plot([x_line[i], x_line[i + 1]], [y_line[i], y_line[i + 1]], c=color)
+            for i in range(len(x_line_inc) - 1):
+                ax.plot([x_line_inc[i], x_line_inc[i + 1]], [y_line_inc[i], y_line_inc[i + 1]], c="Blue")
 
+            x_line_dec = [float(entry[1]) for entry in decreasing_cap]
+            y_line_dec = [entry[0] for entry in decreasing_cap]
+
+            for i in range(len(x_line_dec) - 1):
+                ax.plot([x_line_dec[i], x_line_dec[i + 1]], [y_line_dec[i], y_line_dec[i + 1]], c="Red")
+
+            if len(x_line_inc) > 1:
+                inc_slope, _ = np.polyfit(x_line_inc, y_line_inc, 1)
+            else:
+                inc_slope = ""
+            line_name_inc = "inc_" + partnum + "_" + date + "_" + location + "_cap" + cap[0][2] 
+            if len(x_line_dec) > 1:
+                dec_slope, _ = np.polyfit(x_line_dec, y_line_dec, 1)
+            else:
+                dec_slope = ""
+            line_name_dec = "dec_" + partnum + "_" + date + "_" + location + "_cap" + cap[0][2] 
+            slope_data.append([line_name_inc, inc_slope])
+            slope_data.append([line_name_dec, dec_slope])
 
             ax.set_xlabel('Pressure (psi)')
             ax.set_ylabel('Area/Length')
             ax.set_title("cap" + cap[0][2])
 
             # Update overall min and max x-values
-            overall_min_x = min(overall_min_x, min(x_scatter))
-            overall_max_x = max(overall_max_x, max(x_scatter))
-
+            overall_min_x = min(chain([overall_min_x], x_scatter_inc, x_scatter_dec))
+            overall_max_x = max(chain([overall_max_x], x_scatter_inc, x_scatter_dec))
         else:
             ax.axis('off')
 
@@ -130,8 +152,8 @@ def subplots(plotinfo, partnum, location):
 
     plt.tight_layout()
     plt.show()
-
-    return plt
+    print(slope_data)
+    return fig, slope_data 
 
 
 def boxplot(plotinfo):
@@ -224,11 +246,12 @@ def plot_area_by_length(caps_fp, centerlines_fp, metadata_fp):
         plotinfo.append([area/length, pressure, capnum, vidnum])
 
     partnum = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(caps_fp)))))
+    date = os.path.basename((os.path.dirname(os.path.dirname(os.path.dirname(caps_fp)))))
     location = os.path.basename(os.path.dirname(os.path.dirname(caps_fp)))
-    subplots(plotinfo, partnum, location)
+    return quantitative_subplots(plotinfo, partnum, date, location)
     #boxplot(plotinfo)
     
-def main(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
+def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
     participant = os.path.basename(os.path.dirname(os.path.dirname(path)))
     date = os.path.basename(os.path.dirname(path))
     location = os.path.basename(path)
@@ -237,18 +260,34 @@ def main(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
     centerlines_fp = os.path.join(path, "centerlines", "renamed")
     metadata_fp = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(path)))), "metadata", participant + "_" + date + ".xlsx")
 
-    size_plot = plot_area_by_length(caps_fp, centerlines_fp, metadata_fp)
+    size_plot, slopes = plot_area_by_length(caps_fp, centerlines_fp, metadata_fp)
 
-    #save to folder in data/part/date/loc/segmented/plots
+    #save to plot folder in data/part/date/loc/size/plots
     filename = "set_01_" + participant + "_" + date + "_" + location + "_size_v_pressure.png"
     plot_fp = os.path.join(path, "size", "plots")
     os.makedirs(plot_fp, exist_ok=True)
     size_plot.savefig(os.path.join(plot_fp, filename))
-    #save to folder in results
+
+    #save plot to folder in results
     if platform.system() != 'Windows':
-        size_results_fp = "/hpc/projects/capillary-flow/results/size"
+        size_results_fp = "/hpc/projects/capillary-flow/results/size/plots"
         os.makedirs(size_results_fp, exist_ok=True)
         size_plot.savefig(os.path.join(size_results_fp, filename))
+
+    #save slopes to data/part/date/loc/size/slopes.csv
+    slopes_fp = os.path.join(path, "size", "slopes.csv")
+    with open(slopes_fp, 'w') as slopes_file:
+        writer = csv.writer(slopes_file)
+        for row in slopes:
+            writer.writerow(row)
+        
+    #save slopes to folder in results
+    if platform.system() != 'Windows':
+        slope_results_fp = "/hpc/projects/capillary-flow/results/size/slopes.csv"
+        with open(slope_results_fp, 'a') as slopes_file: #append to previous slopes file
+            writer = csv.writer(slopes_file)
+            for row in slopes:
+                writer.writerow(row)
 
 
 """
