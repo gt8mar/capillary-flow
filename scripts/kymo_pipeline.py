@@ -50,22 +50,18 @@ def main():
     date = find_earliest_date_dir(os.path.join('/hpc/projects/capillary-flow/data', participant))
     locations = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date))
     for location in locations:
-        videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date, location, 'vids'))
-
-        # Find centerlines and make kymographs for each video
-        for video in videos:
-            print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-            print(f"beginning centerlines and kymographs for video {video}")
-            print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-            ticks = time.time()
-            location_path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, location)
-            find_centerline.main(location_path, verbose=False, write=True)
-            print(f"completed centerlines for video {video} in {ticks-time.time()} seconds")
-            
-            # # Make kymographs
-            # make_kymograph.main(path, verbose=False, write=True)
-            # print(f'completed kymographs for video {video} in {ticks-time.time()} seconds')
-            # print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+        print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+        print(f"beginning centerlines and kymographs for location {location}")
+        print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+        ticks = time.time()
+        location_path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, location)
+        find_centerline.main(location_path, verbose=False, write=True)
+        print(f"completed centerlines for location {location} in {ticks-time.time()} seconds")
+        
+        # # Make kymographs
+        # make_kymograph.main(path, verbose=False, write=True)
+        # print(f'completed kymographs for video {video} in {ticks-time.time()} seconds')
+        # print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
 
 
         print(f'finished {participant} from the date {date} in {ticks_total-time.time()} seconds')
