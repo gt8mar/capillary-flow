@@ -1,4 +1,4 @@
-from src.tools import align_segmented
+from src.tools.align_segmented import align_segmented
 from src.tools import group_caps
 from src.tools import translate_centerlines
 from src.tools import plot_area
@@ -24,7 +24,7 @@ def main():
         print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
         ticks = time.time()
         location_path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, location)
-        align_segmented.align_segmented(location_path)
+        align_segmented(location_path)
         group_caps.main(location_path)
         translate_centerlines.main(location_path)
         plot_area.main(location_path)
