@@ -193,7 +193,7 @@ def main(path = "F:\\Marcus\\data\\part09\\230414\\loc01",
     """ Isolates capillaries from segmented image and finds their centerlines and radii. 
 
     Args: 
-        path (str): Path to the umbrella video folder.
+        path (str): Path to the umbrella location folder.
         verbose: bool, shows plots if true
         write: bool, saves plots if true
 

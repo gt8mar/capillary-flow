@@ -58,8 +58,8 @@ def main():
             print(f"beginning centerlines and kymographs for video {video}")
             print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
             ticks = time.time()
-            path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, location, 'vids', video)
-            find_centerline.main(path, verbose=False, write=True)
+            location_path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, location)
+            find_centerline.main(location_path, verbose=False, write=True)
             print(f"completed centerlines for video {video} in {ticks-time.time()} seconds")
             
             # # Make kymographs
