@@ -50,7 +50,7 @@ def main():
     date = find_earliest_date_dir(os.path.join('/hpc/projects/capillary-flow/data', participant))
     locations = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date))
     for location in locations:
-        videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date))
+        videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date, location, 'vids'))
 
         # Find centerlines and make kymographs for each video
         for video in videos:
@@ -58,7 +58,7 @@ def main():
             print(f"beginning centerlines and kymographs for video {video}")
             print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
             ticks = time.time()
-            path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, video)
+            path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, location, 'vids', video)
             find_centerline.main(path, verbose=False, write=True)
             print(f"completed centerlines for video {video} in {ticks-time.time()} seconds")
             
