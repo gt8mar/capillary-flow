@@ -70,8 +70,8 @@ def separate_caps(registered_folder_fp):
                     for col in range(cap.shape[1]):
                         if renamed == True: break
                         if cap[row][col] > 0:
-                            for projcap in os.listdir(os.path.join(registered_folder_fp, "proj_caps")):
-                                projcap_fp = os.path.join(registered_folder_fp, "proj_caps", projcap)
+                            for projcap in os.listdir(os.path.join(os.path.dirname(registered_folder_fp), "proj_caps")):
+                                projcap_fp = os.path.join(os.path.dirname(registered_folder_fp), "proj_caps", projcap)
                                 if cv2.imread(projcap_fp, cv2.IMREAD_GRAYSCALE)[row][col] > 0:
                                     capnum = projcap[:-4] + "a" 
                                     counter = 0
@@ -105,10 +105,10 @@ def save_untranslated(registered_folder_fp):
 
             for i in range(len(grouped_by_vid)):
                 x, y = translated_rows[i] 
-                xint = int(x)
-                xint = -xint
-                yint = int(y)
-                yint = -yint
+                xint = int(float(x))
+                xint = xint
+                yint = int(float(y))
+                yint = yint
                 l, r, b, t = crop_rows[i]
                 lint = int(l)
                 rint = int(r)
@@ -118,20 +118,20 @@ def save_untranslated(registered_folder_fp):
                 for cap in grouped_by_vid[i]:
                     img = cv2.imread(os.path.join(indi_caps_fp, cap), cv2.IMREAD_GRAYSCALE)
                     orig_height, orig_width = img.shape
-                    new_height = orig_height + abs(yint)
-                    new_width = orig_width + abs(xint)
+                    trans_img = np.zeros((orig_height, orig_width), dtype=np.uint8)
 
-                    trans_img = np.zeros((new_height, new_width), dtype=np.uint8)
                     start_row = max(0, yint)
-                    end_row = min(orig_height + yint, new_height)
+                    end_row = min(orig_height, orig_height + yint)
                     start_col = max(0, xint)
-                    end_col = min(orig_width + xint, new_width)
+                    end_col = min(orig_width, orig_width + xint)
 
-                    trans_img[start_row:end_row, start_col:end_col] = img[max(0, -yint):min(orig_height, new_height - yint),max(0, -xint):min(orig_width, new_width - xint)]
+                    trans_img[start_row:end_row, start_col:end_col] = img[max(0, -yint):min(orig_height, orig_height - yint), max(0, -xint):min(orig_width, orig_width - xint)]
+                    bint = None if bint == 0 else bint
+                    rint = None if rint == 0 else rint
                     crop_img = trans_img[tint:bint, lint:rint]
                     cv2.imwrite(os.path.join(orig_fp, cap), crop_img)
             
-def main(path):
+def main(path="E:\\Marcus\\gabby_test_data\\part09\\loc01"):
     registered_fp = os.path.join(path, "segmented", "registered")
     sorted_seg_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(registered_fp, x)) and x.endswith('.png'), os.listdir(registered_fp)))
     

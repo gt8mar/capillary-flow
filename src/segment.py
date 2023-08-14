@@ -20,6 +20,7 @@ from detectron2.config import get_cfg
 from detectron2 import model_zoo
 from detectron2.engine import DefaultTrainer, DefaultPredictor
 from detectron2.utils.visualizer import ColorMode
+import pandas as pd
 # from detectron2.data import MetadataCatalog
 
 def folder_into_COCO(path):
@@ -46,7 +47,6 @@ def folder_into_COCO(path):
                     f.write('{"file_name": "' + file + '", "height": ' + str(height) + ', "width": ' + str(width) + '1280, "id": ' + str(i) + '},')
             f.write('], "categories": [{"supercategory": "background", "id": 0, "name": "background"}], "annotations": []}')
         return json_path
-
 def parse_filename(filename):
     """
     Parses the filename of an image into its participant, date, and video number.
@@ -63,8 +63,20 @@ def parse_filename(filename):
     participant = filename_no_ext.split('_')[-4]
     date = filename_no_ext.split('_')[-3]
     video = filename_no_ext.split('_')[-2].replace('bp', '')
-    return participant, date, video
-
+    #get location from metadata
+    metadata = pd.read_excel(os.path.join("/hpc/projects/capillary-flow/metadata", participant + "_" + date + ".xlsx"))
+    # make location column entries into strings
+    location = metadata.loc[(metadata['Video'] == video )| 
+                            (metadata["Video"]== video + 'bp')| 
+                            (metadata['Video']== video +'scan')]['Location'].values[0]
+    
+    if str(location) == "Temp" or str(location) == "Ex":
+        location = "loc" + str(location)
+    else:
+        location = "loc" + str(location).zfill(2)
+    
+    file_prefix = f'set01_{participant}_{date}_{location}_{video}'
+    return participant, date, location, video, file_prefix
 def parse_COCO(json_path):
     """
     Parses the COCO dataset into a dictionary containing the participant, date, and video number for each image.
@@ -83,7 +95,6 @@ def parse_COCO(json_path):
         participant, date, video = parse_filename(filename)
         dict[filename] = [participant, date, video]
     return dict
-
 def COCO_filename_remove_contrast(json_path):
     """
     Checks to see if the filename has _contrast in it and changes the filename in the COCO dataset to match.  
@@ -151,15 +162,22 @@ def main(path='/hpc/projects/capillary-flow/results/backgrounds', verbose = Fals
         if filename not in os.listdir(folder_seg):
             print(f"filename: {filename} not in folder: {folder_seg}")
         else:
-            im = cv2.imread(d["file_name"]) 
+            # read the image
+            im = cv2.imread(d["file_name"], cv2.IMREAD_GRAYSCALE).astype(np.uint8)
+            # equalize the histogram
+            im = cv2.equalizeHist(im)
+            # convert to rgb
+            im = cv2.cvtColor(im, cv2.COLOR_GRAY2RGB)
+
             if verbose:       
                 print(f"filename: {filename} has shape:")
                 print(im.shape)
-            participant, date, video = parse_filename(filename)
-            # remove the file extension
-            filename_without_ext = os.path.splitext(filename)[0]
-            # extract the desired string from the filename
-            prefix = filename_without_ext.split('_background')[0]
+            
+            
+            # extract the participant, date, and video number from the filename
+            participant, date, location, video, file_prefix = parse_filename(filename)
+            
+            # make predictions
             outputs = predictor(im)  # format is documented at https://detectron2.readthedocs.io/tutorials/models.html#model-output-format
             if len(outputs["instances"].pred_masks) == 0:
                 if verbose:
@@ -187,14 +205,15 @@ def main(path='/hpc/projects/capillary-flow/results/backgrounds', verbose = Fals
                 
             # Convert boolean array to integer array
             mask_int = total_mask.astype(int)
-            mask_dict[prefix] = mask_int
+            mask_dict[file_prefix] = mask_int
+
+            
+
             # Save the mask
-            os.makedirs(os.path.join("/hpc/projects/capillary-flow/data", participant, date, video, "D_segmented"), exist_ok=True)
-            plt.imsave(os.path.join("/hpc/projects/capillary-flow/data", participant, date, video, "D_segmented", filename_without_ext + "_seg.png"), 
-                        mask_int, cmap='gray')
-            plt.imsave(os.path.join("/hpc/projects/capillary-flow/results/segmented", filename_without_ext + "_seg.png"), 
-                        mask_int, cmap='gray')
-                
+            os.makedirs(os.path.join("/hpc/projects/capillary-flow/data", participant, date, location, "segmented"), exist_ok=True)
+            plt.imsave(os.path.join("/hpc/projects/capillary-flow/data", participant, date, location, "segmented", file_prefix + "_seg.png"), mask_int, cmap='gray')
+            os.makedirs(os.path.join("/hpc/projects/capillary-flow/results/segmented"), exist_ok=True)
+            plt.imsave(os.path.join("/hpc/projects/capillary-flow/results/segmented", file_prefix + "_seg.png"), mask_int, cmap='gray')
 
             # # Save the integer array to a CSV file            
             # np.savetxt(os.path.join(cfg.OUTPUT_DIR, filename_without_ext + "_segs.csv"), mask_int, 

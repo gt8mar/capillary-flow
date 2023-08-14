@@ -148,14 +148,12 @@ def main(path):
     translations_csv = os.path.join(registered_folder, "translations.csv")
     projected_caps_fp = os.path.join(registered_folder, "proj_caps")
     crops_csv = os.path.join(registered_folder, "crop_values.csv")
-    individual_caps_fp = os.path.join(registered_folder, "individual_caps")
+    individual_caps_fp = os.path.join(registered_folder, "individual_caps_translated")
 
     translated_coords_fp = translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_csv)
     
-    #renamed_coords_fp = rename_caps(translated_coords_fp, projected_caps_fp)
     renamed_coords_fp = rename_caps(translated_coords_fp, individual_caps_fp)
     #show_centerlines(projected_caps_fp, renamed_coords_fp, individual_caps_fp)
-    #plot_radii(renamed_coords_fp)
 
     
 
