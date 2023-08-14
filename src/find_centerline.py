@@ -227,7 +227,7 @@ def main(path = "F:\\Marcus\\data\\part09\\230414\\loc01",
 
             # Make a numpy array of images with isolated capillaries. The mean/sum of this is segmented_2D.
             # TODO: fix this horrible plotting
-            contours = enumerate_capillaries(segmented, verbose=False, write=write, write_path = os.path.join(segmented_folder, cap_map_filename))
+            contours = enumerate_capillaries(segmented, verbose=False, write=write, write_path = os.path.join(output_folder, 'images', cap_map_filename))
             
             if write:
                 # save segmented_2D
@@ -245,7 +245,7 @@ def main(path = "F:\\Marcus\\data\\part09\\230414\\loc01",
             for i in range(contours.shape[0]):
                 # make skeleton
                 print(f"Making skeleton for capillary {i}")
-                skeleton, radii = make_skeletons(contours[i], verbose=verbose, histograms = False)     # Skeletons come out in the shape
+                skeleton, radii = make_skeletons(contours[i], verbose=False, histograms = False)     # Skeletons come out in the shape
                 skeleton_nums = np.asarray(np.nonzero(skeleton))
                 # omit small capillaries
                 if skeleton_nums.shape[1] <= MIN_CAP_LEN:
@@ -274,7 +274,7 @@ def main(path = "F:\\Marcus\\data\\part09\\230414\\loc01",
 
             if write:
                 # Save which capillaries were dropped out
-                np.savetxt(os.path.join(segmented_folder, file_prefix + '_cap_cut.csv'), 
+                np.savetxt(os.path.join(output_folder, file_prefix + '_cap_cut.csv'), 
                                     np.array(used_capillaries), delimiter = ',',
                                     fmt = '%s')
                 # Save centerline and radii information
@@ -309,6 +309,6 @@ def main(path = "F:\\Marcus\\data\\part09\\230414\\loc01",
 if __name__ == "__main__":
     ticks = time.time()
     # main(path = '/hpc/projects/capillary-flow/data/part09/230414/loc01', verbose = False, write = True)
-    main(verbose = True, write = False)
+    main(verbose = False, write = True)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
