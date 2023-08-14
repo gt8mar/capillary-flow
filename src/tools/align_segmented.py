@@ -12,7 +12,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import cv2
 import shutil
-from register_images import register_images
+from src.tools.register_images import register_images
 import csv
 
 def uncrop_segmented(path, input_seg_img):
