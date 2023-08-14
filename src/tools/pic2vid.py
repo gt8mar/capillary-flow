@@ -62,17 +62,21 @@ def calculate_focus_measure(image,method='LAPE'):
     else:
         focus_measure = np.std(image,axis=None)# GLVA
     return focus_measure
-def extract_metadata(path):
+def extract_metadata(path, video):
     """input path: string; outputs pressure: string, frame rate: integer"""
-    shifts = pd.read_csv(path, header=None).transpose()
-    shifts.columns  = shifts.iloc[0]
-    shifts = shifts.drop(shifts.index[0])
-    pressure = shifts['Pressure'][1].strip(';')
-    exposure = shifts['Exposure'][1].strip(';')
-    frame_rate = 100000//int(exposure)  # this rounds the frame-rate
+    metadata = pd.read_excel(path)
+    pressure = metadata.loc[(metadata['Video'] == video )| 
+                            (metadata["Video"]== video + 'bp')| 
+                            (metadata['Video']== video +'scan')]['Pressure'].values[0]
+    frame_rate = metadata.loc[(metadata['Video'] == video )| 
+                            (metadata["Video"]== video + 'bp')| 
+                            (metadata['Video']== video +'scan')]['FPS'].values[0]
+    
+    
+
     return pressure, frame_rate
 
-def pic2vid(images, participant = 'part_11', date = '230427',
+def pic2vid(path, images, participant = 'part_11', date = '230427', location = 'loc01',
             video_folder = 'vid1', color = False, compress = True, overlay = True):
     """
     Takes a list of image files or numpy array and makes a movie with overlays
@@ -81,6 +85,7 @@ def pic2vid(images, participant = 'part_11', date = '230427',
         images (list/np.array): The image data to be made into a video.
         participant (str): the participant who made the videos
         date (str): the date the data was collected
+        location (str): the location of the data
         video_folder (str): the video number for that day
         color: bool
         compress: bool, whether to compress the video or not
@@ -94,16 +99,16 @@ def pic2vid(images, participant = 'part_11', date = '230427',
     images = np.array(images)
     output_path = '/hpc/projects/capillary-flow/results/videos'
     if overlay:
-        metadata_path = os.path.join('hpc/projects/capillary-flow/data', participant, date, video_folder, 'metadata', 'metadata.txt')
-        pressure, frame_rate = extract_metadata(metadata_path)
+        metadata_path = os.path.join('hpc/projects/capillary-flow/data', participant, date, 'part_metadata', f'{participant}_{date}.xlsx')
+        pressure, frame_rate = extract_metadata(metadata_path, video)
         print(frame_rate)
     else:
         frame_rate = 227.8/2
         pressure = 'TBD'
     if color:
-        video_name = f'{SET}_{participant}_{date}_{video_folder}_color.avi'
+        video_name = f'{SET}_{participant}_{date}_{location}_{video_folder}_color.avi'
     else:
-        video_name = f'{SET}_{participant}_{date}_{video_folder}_gray.avi'
+        video_name = f'{SET}_{participant}_{date}_{location}_{video_folder}_gray.avi'
     frame = images[0]
     if compress:
         fourcc = cv2.VideoWriter_fourcc(*'XVID') # avi compression
@@ -127,13 +132,15 @@ def pic2vid(images, participant = 'part_11', date = '230427',
         set_string = str(SET).split('_')[0] + ": " + str(SET).split('_')[1]
         participant_string = str(participant)
         date_string = str(date)
+        location_string = str(location)
         video_string = str(video_folder)
 
         add_overlay(img, f'{set_string}', (50, 50))
         add_overlay(img, f'{participant_string}', (50, 80))
         # add version overlay
         add_overlay(img, f'{date_string}', (50, 110))
-        add_overlay(img, f'{video_string}', (50, 140))
+        add_overlay(img, f'{location_string}', (50, 140))
+        add_overlay(img, f'{video_string}', (50, 170))
         # TODO: add focus bar
         add_focus_bar(img, focus_measure)
         # TODO: add scale bar

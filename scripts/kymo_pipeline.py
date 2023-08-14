@@ -48,38 +48,40 @@ def main():
 
     # Load the date and video numbers
     date = find_earliest_date_dir(os.path.join('/hpc/projects/capillary-flow/data', participant))
-    videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date))
+    locations = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date))
+    for location in locations:
+        videos = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date))
 
-    # Find centerlines and make kymographs for each video
-    for video in videos:
-        print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-        print(f"beginning centerlines and kymographs for video {video}")
-        print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-        ticks = time.time()
-        path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, video)
-        find_centerline.main(path, verbose=False, write=True)
-        print(f"completed centerlines for video {video} in {ticks-time.time()} seconds")
-        
-        # # Make kymographs
-        # make_kymograph.main(path, verbose=False, write=True)
-        # print(f'completed kymographs for video {video} in {ticks-time.time()} seconds')
-        # print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+        # Find centerlines and make kymographs for each video
+        for video in videos:
+            print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+            print(f"beginning centerlines and kymographs for video {video}")
+            print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+            ticks = time.time()
+            path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, video)
+            find_centerline.main(path, verbose=False, write=True)
+            print(f"completed centerlines for video {video} in {ticks-time.time()} seconds")
+            
+            # # Make kymographs
+            # make_kymograph.main(path, verbose=False, write=True)
+            # print(f'completed kymographs for video {video} in {ticks-time.time()} seconds')
+            # print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
 
 
-    print(f'finished {participant} from the date {date} in {ticks_total-time.time()} seconds')
+        print(f'finished {participant} from the date {date} in {ticks_total-time.time()} seconds')
 
-    """ Correlation files """
-    # for folder in os.listdir(UMBRELLA_FOLDER_MOCO):
-    #     path = os.path.join(UMBRELLA_FOLDER, folder)
-    #     pic2vid.main(path, folder, DATE, PARTICIPANT)
-    #     segmented_file_name = folder + '0000segmented'
-    #     correlation_with_cap_selection.main(path, UMBRELLA_FOLDER_MOCO, segmented_file_name)
-    #     auto_corr.main(UMBRELLA_FOLDER_MOCO, CAPILLARY_ROW, CAPILLARY_COL, BKGD_ROW, BKGD_COL)
-    #     correlation.main(UMBRELLA_FOLDER_MOCO)
+        """ Correlation files """
+        # for folder in os.listdir(UMBRELLA_FOLDER_MOCO):
+        #     path = os.path.join(UMBRELLA_FOLDER, folder)
+        #     pic2vid.main(path, folder, DATE, PARTICIPANT)
+        #     segmented_file_name = folder + '0000segmented'
+        #     correlation_with_cap_selection.main(path, UMBRELLA_FOLDER_MOCO, segmented_file_name)
+        #     auto_corr.main(UMBRELLA_FOLDER_MOCO, CAPILLARY_ROW, CAPILLARY_COL, BKGD_ROW, BKGD_COL)
+        #     correlation.main(UMBRELLA_FOLDER_MOCO)
 
-    # print("-------------------------------------")
-    # print("Correlation Runtime: " + str(time.time() - ticks))
-    # ticks = time.time()
+        # print("-------------------------------------")
+        # print("Correlation Runtime: " + str(time.time() - ticks))
+        # ticks = time.time()
     return 0
 
 
