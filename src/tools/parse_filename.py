@@ -7,7 +7,7 @@ participant, date, location, and video number.
 By: Marcus Forst
 """
 
-import os
+import os, platform
 import pandas as pd
 
 def parse_filename(filename):
@@ -34,7 +34,10 @@ def parse_filename(filename):
                                                item.startswith('241'))][0]
     video = [item for item in filename_list if item.startswith('vid')] [0]
     # get location from metadata
-    metadata = pd.read_excel(os.path.join("/hpc/projects/capillary-flow/metadata", str(participant) + "_" + str(date) + ".xlsx"))
+    if platform.system() == 'Windows':
+        metadata = pd.read_excel(os.path.join("C:\\Users\\gt8mar\\capillary-flow\\metadata", str(participant) + "_" + str(date) + ".xlsx"))
+    else:    
+        metadata = pd.read_excel(os.path.join("/hpc/projects/capillary-flow/metadata", str(participant) + "_" + str(date) + ".xlsx"))
     # make location column entries into strings
     location = metadata.loc[(metadata['Video'] == video )| 
                             (metadata["Video"]== video + 'bp')| 
