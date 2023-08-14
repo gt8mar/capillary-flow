@@ -22,7 +22,7 @@ import time
 from sklearn.neighbors import NearestNeighbors
 import networkx as nx
 # from src.tools.parse_vid_path import parse_vid_path
-from tools.parse_filename import parse_filename
+from src.tools.parse_filename import parse_filename
 import warnings
 import pandas as pd
 
@@ -226,6 +226,7 @@ def main(path = "F:\\Marcus\\data\\part09\\230414\\loc01",
             segmented[segmented != 0] = 1
 
             # Make a numpy array of images with isolated capillaries. The mean/sum of this is segmented_2D.
+            # TODO: fix this horrible plotting
             contours = enumerate_capillaries(segmented, verbose=False, write=write, write_path = os.path.join(segmented_folder, cap_map_filename))
             
             if write:
@@ -244,7 +245,7 @@ def main(path = "F:\\Marcus\\data\\part09\\230414\\loc01",
             for i in range(contours.shape[0]):
                 # make skeleton
                 print(f"Making skeleton for capillary {i}")
-                skeleton, radii = make_skeletons(contours[i], verbose=False, histograms = False)     # Skeletons come out in the shape
+                skeleton, radii = make_skeletons(contours[i], verbose=verbose, histograms = False)     # Skeletons come out in the shape
                 skeleton_nums = np.asarray(np.nonzero(skeleton))
                 # omit small capillaries
                 if skeleton_nums.shape[1] <= MIN_CAP_LEN:
@@ -307,7 +308,7 @@ def main(path = "F:\\Marcus\\data\\part09\\230414\\loc01",
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(path = '/hpc/projects/capillary-flow/data/part09/230414/loc01', verbose = False, write = True)
-    # main(verbose = False, write = False)
+    # main(path = '/hpc/projects/capillary-flow/data/part09/230414/loc01', verbose = False, write = True)
+    main(verbose = True, write = False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
