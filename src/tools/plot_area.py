@@ -152,7 +152,6 @@ def quantitative_subplots(plotinfo, partnum, date, location):
 
     plt.tight_layout()
     plt.show()
-    print(slope_data)
     return fig, slope_data 
 
 

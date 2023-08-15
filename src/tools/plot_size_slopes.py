@@ -5,6 +5,10 @@ import matplotlib.pyplot as plt
 import platform
 
 def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
+    participant = os.path.basename(os.path.dirname(os.path.dirname(path)))
+    date = os.path.basename(os.path.dirname(path))
+    location = os.path.basename(path)
+
     file_path = os.path.join(path, "size", "slopes.csv")
     df = pd.read_csv(file_path, header=None)
 
@@ -18,10 +22,6 @@ def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
 
     plt.ylabel('Size Slopes')
     plt.title('Change in Capillary Size for Increasing and Decreasing Pressures')
-
-    participant = os.path.basename(os.path.dirname(os.path.dirname(path)))
-    date = os.path.basename(os.path.dirname(path))
-    location = os.path.basename(path)
 
     filename = "set_01_" + participant + "_" + date + "_" + location + "_size_slopes.png"
     plot_fp = os.path.join(path, "size", "slopes")
