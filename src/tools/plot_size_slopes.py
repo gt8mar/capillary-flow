@@ -19,11 +19,19 @@ def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
     plt.ylabel('Size Slopes')
     plt.title('Change in Capillary Size for Increasing and Decreasing Pressures')
 
-    plt.show()
+    participant = os.path.basename(os.path.dirname(os.path.dirname(path)))
+    date = os.path.basename(os.path.dirname(path))
+    location = os.path.basename(path)
+
+    filename = "set_01_" + participant + "_" + date + "_" + location + "_size_slopes.png"
+    plot_fp = os.path.join(path, "size", "slopes")
+    os.makedirs(plot_fp, exist_ok=True)
+    plt.savefig(os.path.join(plot_fp, filename))
+
     if platform.system() != 'Windows':
-        slope_boxplot_fp = "/hpc/projects/capillary-flow/results/size/slopes_boxplot.png"
-        os.makedirs(slope_boxplot_fp, exist_ok=True)
-        plt.savefig(slope_boxplot_fp)
+        slope_boxplot_results_fp = "/hpc/projects/capillary-flow/results/size/slopes_boxplot.png"
+        os.makedirs(slope_boxplot_results_fp, exist_ok=True)
+        plt.savefig(slope_boxplot_results_fp)
 
     
 
