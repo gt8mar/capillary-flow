@@ -19,6 +19,8 @@ def main():
     date = find_earliest_date_dir(os.path.join('/hpc/projects/capillary-flow/data', participant))
     locations = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date))
     for location in locations:
+        if location == "locEx" or location == "locTemp" or location == "locScan":
+            continue
         print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
         print(f"beginning size for location {location}")
         print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
