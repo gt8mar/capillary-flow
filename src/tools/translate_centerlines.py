@@ -43,7 +43,7 @@ def translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_c
         for row in reader:
             crops.append(row)
 
-    translated_coords_fp = os.path.join(coords_fp, "translated")
+    translated_coords_fp = os.path.join(os.path.dirname(coords_fp), "translated")
     os.makedirs(translated_coords_fp, exist_ok=True)
     #apply translation
     for x in range(len(grouped_coords_listdir)):
@@ -145,7 +145,7 @@ def show_centerlines(projected_caps_fp, coords_fp, individual_caps_fp):
 
 
 def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
-    coords_fp = os.path.join(path, "centerlines")
+    coords_fp = os.path.join(path, "centerlines", "coords")
     segmented_folder = os.path.join(path, "segmented")
 
     sorted_coords_listdir = sorted_seg_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(coords_fp, x)), os.listdir(coords_fp))) #sort numerically
