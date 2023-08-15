@@ -58,7 +58,8 @@ def translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_c
                         xcol = float(row[0])
                         ycol = float(row[1])
                         translated_row = [xcol - dx, ycol - dy, *row[2:]]
-                        writer.writerow(translated_row)
+                        if (xcol - dx) <= 1080 and (ycol - dy) <= 1440:
+                            writer.writerow(translated_row)
 
     return translated_coords_fp
 
