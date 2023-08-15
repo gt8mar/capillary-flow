@@ -100,7 +100,7 @@ def align_segmented(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
 
             #save segmented image
             cv2.imwrite(os.path.join(reg_folder_path, os.path.basename(input_seg_fp)), registered_seg_img)
-
+            
             #set new reference, prevdx, prevdy
             reference_moco_img = input_moco_img
             prevdx += dx
