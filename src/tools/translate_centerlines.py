@@ -78,6 +78,9 @@ def rename_caps(coords_fp, individual_caps_fp):
             reader = csv.reader(coords)
             rows = list(reader)
             midpoint_row = rows[len(rows) // 2]
+            print(file)
+            print(len(rows) // 2)
+            print(midpoint_row)
             midpoint_x = midpoint_row[0]
             midpoint_y = midpoint_row[1]
             
