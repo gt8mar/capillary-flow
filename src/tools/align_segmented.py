@@ -70,7 +70,8 @@ def align_segmented(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
     translations = []
     prevdx = 0
     prevdy = 0
-    translations.append((prevdx, prevdy))
+    translations.append((prevdx, prevdy)) 
+    print(sorted_seg_listdir)
     for x in range(1, len(sorted_seg_listdir)):
         if "vid" in sorted_vids_listdir[x]: 
             #register vids
