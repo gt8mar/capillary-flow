@@ -4,7 +4,6 @@ Filename: align_segmented.py
 This file aligns segmented images based on translations between moco images.
 by: Gabby Rincon
 """
-#TODO location on finger
 import os
 import time
 import platform
@@ -110,7 +109,7 @@ def align_segmented(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
             crops.append((left, right, bottom, top))
 
             #transform segmented image
-            transformation_matrix = np.array([[1, 0, abs(minx) + translations[x][0]], [0, 1, abs(miny) + translations[x][1]]], dtype=np.float32)
+            transformation_matrix = np.array([[1, 0, abs(minx) - translations[x][0]], [0, 1, abs(miny) - translations[x][1]]], dtype=np.float32)
             registered_seg_img = cv2.warpAffine(input_seg_img, transformation_matrix, (abs(minx) + 1440 + abs(maxx), abs(miny) + 1080 + abs(maxy)))
 
             resize_vals.append([minx, maxx, miny, maxy])
