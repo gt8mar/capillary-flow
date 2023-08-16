@@ -7,13 +7,16 @@ by: Gabby Rincon
 #TODO location on finger
 import os
 import time
+import platform
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import cv2
 import shutil
-#from src.tools.register_images import register_images
-from register_images import register_images
+if platform.system() != 'Windows':
+    from src.tools.register_images import register_images
+else:
+    from register_images import register_images
 import csv
 
 def uncrop_segmented(path, input_seg_img):
