@@ -89,6 +89,7 @@ def save_untranslated(registered_folder_fp):
     indi_caps_fp = os.path.join(os.path.dirname(registered_folder_fp), "individual_caps_translated")
     translations_csv = os.path.join(os.path.dirname(registered_folder_fp), "translations.csv")
     crops_csv = os.path.join(os.path.dirname(registered_folder_fp), "crop_values.csv")
+    resize_vals_csv = os.path.join(os.path.dirname(registered_folder_fp), "resize_vals.csv")
 
     orig_fp = os.path.join(os.path.dirname(registered_folder_fp), "individual_caps_original")
     os.makedirs(orig_fp, exist_ok=True)
@@ -99,37 +100,52 @@ def save_untranslated(registered_folder_fp):
         t_reader = csv.reader(translations)
         translated_rows = list(t_reader)
 
-        with open(crops_csv, 'r') as crops:
-            c_reader = csv.reader(crops)
-            crop_rows = list(c_reader)
+        with open(resize_vals_csv, 'r') as resizes:
+            r_reader = csv.reader(resizes)
+            resize_row = list(r_reader)[0]
 
-            for i in range(len(grouped_by_vid)):
-                x, y = translated_rows[i] 
-                xint = int(float(x))
-                xint = xint
-                yint = int(float(y))
-                yint = yint
-                l, r, b, t = crop_rows[i]
-                lint = int(l)
-                rint = int(r)
-                bint = int(b)
-                tint = int(t)
+            with open(crops_csv, 'r') as crops:
+                c_reader = csv.reader(crops)
+                crop_rows = list(c_reader)
 
-                for cap in grouped_by_vid[i]:
-                    img = cv2.imread(os.path.join(indi_caps_fp, cap), cv2.IMREAD_GRAYSCALE)
-                    orig_height, orig_width = img.shape
-                    trans_img = np.zeros((orig_height, orig_width), dtype=np.uint8)
+                minx = abs(int(resize_row[0]))
+                maxx = abs(int(resize_row[1]))
+                miny = abs(int(resize_row[2]))
+                maxy = abs(int(resize_row[3]))
 
-                    start_row = max(0, yint)
-                    end_row = min(orig_height, orig_height + yint)
-                    start_col = max(0, xint)
-                    end_col = min(orig_width, orig_width + xint)
+                for i in range(len(grouped_by_vid)):
+                    x, y = translated_rows[i] 
+                    xint = int(float(x))
+                    xint = xint
+                    yint = int(float(y))
+                    yint = yint
 
-                    trans_img[start_row:end_row, start_col:end_col] = img[max(0, -yint):min(orig_height, orig_height - yint), max(0, -xint):min(orig_width, orig_width - xint)]
-                    bint = None if bint == 0 else bint
-                    rint = None if rint == 0 else rint
-                    crop_img = trans_img[tint:bint, lint:rint]
-                    cv2.imwrite(os.path.join(orig_fp, cap), crop_img)
+                    l, r, b, t = crop_rows[i]
+                    lint = int(l)
+                    rint = int(r)
+                    bint = int(b)
+                    tint = int(t)
+                    
+                    for cap in grouped_by_vid[i]:
+                        img = cv2.imread(os.path.join(indi_caps_fp, cap), cv2.IMREAD_GRAYSCALE)
+                        
+                        ystart = miny + yint
+                        yend = -(maxy - yint)
+                        xstart = minx + xint
+                        xend = -(maxx - xint)
+
+                        ystart = None if ystart == 0 else ystart
+                        yend = None if yend == 0 else yend
+                        xstart = None if xstart == 0 else xstart
+                        xend = None if xend == 0 else xend
+
+                        untrans_img = img[ystart:yend, xstart:xend]
+                        
+                        bint = None if bint == 0 else bint
+                        rint = None if rint == 0 else rint
+                        crop_img = untrans_img[tint:bint, lint:rint]
+
+                        cv2.imwrite(os.path.join(orig_fp, cap), crop_img)
             
 def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
     registered_fp = os.path.join(path, "segmented", "registered")
