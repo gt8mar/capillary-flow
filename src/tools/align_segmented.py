@@ -12,7 +12,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import cv2
 import shutil
-from src.tools.register_images import register_images
+#from src.tools.register_images import register_images
+from register_images import register_images
 import csv
 
 def uncrop_segmented(path, input_seg_img):
@@ -64,26 +65,39 @@ def align_segmented(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
     first_seg_fp = os.path.join(segmented_folder_fp, sorted_seg_listdir[0])
     first_seg_img = cv2.imread(first_seg_fp)
     first_seg_img, left, right, bottom, top = uncrop_segmented(os.path.join(os.path.split(os.path.split(moco_vids_fp[0])[0])[0]), first_seg_img)
-    crops.append((left, right, bottom, top))
     cv2.imwrite(os.path.join(reg_folder_path, os.path.basename(first_seg_fp)), first_seg_img)
 
     translations = []
     prevdx = 0
     prevdy = 0
-    translations.append((prevdx, prevdy)) 
-    print(sorted_seg_listdir)
+    translations.append([prevdx, prevdy]) 
     for x in range(1, len(sorted_seg_listdir)):
         if "vid" in sorted_vids_listdir[x]: 
+            print("registering: " + sorted_seg_listdir[x])
             #register vids
             input_moco_fp = moco_vids_fp[x]
             input_moco_img = cv2.imread(input_moco_fp)
-            (dx, dy), registered_image = register_images(reference_moco_img, input_moco_img)
+            [dx, dy], registered_image = register_images(reference_moco_img, input_moco_img)
 
-            """#TEMP
-            temp_transformation_matrix = np.array([[1, 0, -(prevdx)], [0, 1, -(prevdy)]], dtype=np.float32)
-            temp_registered_image = cv2.warpAffine(registered_image, temp_transformation_matrix, (1440, 1080))
-            cv2.imwrite(os.path.join(temp_fp, os.path.basename(moco_vids_fp[x])), temp_registered_image)
-            """
+            dx = int(dx)
+            dy = int(dy)
+            translations.append([dx + prevdx, dy + prevdy])
+
+            #set new reference, prevdx, prevdy
+            reference_moco_img = input_moco_img
+            prevdx += dx
+            prevdy += dy
+
+    #get max size of segmented img
+    minx = min(min(entry[0], 0) for entry in translations)
+    maxx = max(max(entry[0], 0) for entry in translations)
+    miny = min(min(entry[1], 0) for entry in translations)
+    maxy = max(max(entry[1], 0) for entry in translations)
+
+    resize_vals = []
+
+    for x in range(0, len(sorted_seg_listdir)):
+        if "vid" in sorted_vids_listdir[x]: 
             #get image to segment
             input_seg_fp = os.path.join(segmented_folder_fp, sorted_seg_listdir[x])
             input_seg_img = cv2.imread(input_seg_fp)
@@ -93,23 +107,23 @@ def align_segmented(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
             crops.append((left, right, bottom, top))
 
             #transform segmented image
-            transformation_matrix = np.array([[1, 0, -(dx + prevdx)], [0, 1, -(dy + prevdy)]], dtype=np.float32)
-            registered_seg_img = cv2.warpAffine(input_seg_img, transformation_matrix, (1440, 1080))
+            transformation_matrix = np.array([[1, 0, abs(minx) + translations[x][0]], [0, 1, abs(miny) + translations[x][1]]], dtype=np.float32)
+            registered_seg_img = cv2.warpAffine(input_seg_img, transformation_matrix, (abs(minx) + 1440 + abs(maxx), abs(miny) + 1080 + abs(maxy)))
 
-            translations.append((dx + prevdx, dy + prevdy))
-
+            resize_vals.append([minx, maxx, miny, maxy])
+ 
             #save segmented image
             cv2.imwrite(os.path.join(reg_folder_path, os.path.basename(input_seg_fp)), registered_seg_img)
-            
-            #set new reference, prevdx, prevdy
-            reference_moco_img = input_moco_img
-            prevdx += dx
-            prevdy += dy
 
     translations_csv_fp = os.path.join(segmented_folder_fp, "translations.csv")
     with open(translations_csv_fp, 'w', newline='') as translations_csv_file:
         writer = csv.writer(translations_csv_file) 
         writer.writerows(translations)
+
+    resize_csv_fp = os.path.join(segmented_folder_fp, "resize_vals.csv")
+    with open(resize_csv_fp, 'w', newline='') as resize_csv_file:
+        writer = csv.writer(resize_csv_file) 
+        writer.writerows(resize_vals)
 
     crops_csv_fp = os.path.join(segmented_folder_fp, "crop_values.csv")
     with open(crops_csv_fp, 'w', newline='') as crops_csv_file:

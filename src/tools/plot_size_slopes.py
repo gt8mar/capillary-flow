@@ -29,8 +29,8 @@ def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
     plt.savefig(os.path.join(plot_fp, filename))
 
     if platform.system() != 'Windows':
-        slope_boxplot_results_fp = "/hpc/projects/capillary-flow/results/size/slopes_boxplot.png"
-        os.makedirs(slope_boxplot_results_fp, exist_ok=True)
+        os.makedirs("/hpc/projects/capillary-flow/results/size/slopes", exist_ok=True)
+        slope_boxplot_results_fp = os.path.join("/hpc/projects/capillary-flow/results/size/slopes" , "set_01_" + participant + "_" + date + "_" + location +  "_slopes_boxplot.png")
         plt.savefig(slope_boxplot_results_fp)
 
     
