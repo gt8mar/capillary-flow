@@ -14,6 +14,7 @@ from skimage.measure import label
 from skimage.segmentation import find_boundaries
 import csv
 import re
+import platform
 
 def group_by_vid(vidlist):
     grouped = {}
@@ -174,6 +175,15 @@ def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
         filename = "cap_" + str(x).zfill(2) + ".png"
         cap_fp = os.path.join(caps_fp, filename)
         cv2.imwrite(str(cap_fp), caps[x])
+
+    #save to results
+    if platform.system() != 'Windows':
+        pc_results_fp = "/hpc/projects/capillary-flow/results/segmented/proj_caps"
+        os.makedirs(pc_results_fp, exist_ok=True)
+        for x in range(len(caps)):
+            filename = "cap_" + str(x).zfill(2) + ".png"
+            cap_fp = os.path.join(pc_results_fp, filename)
+            cv2.imwrite(str(cap_fp), caps[x])
 
     #save individual caps, named
     separate_caps(registered_fp)
