@@ -142,7 +142,8 @@ def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
         translations = list(reader)
 
     #get max projection
-    maxproject = np.zeros((1080, 1440))
+    rows, cols = cv2.imread(os.path.join(registered_fp, sorted_seg_listdir[0]), cv2.IMREAD_GRAYSCALE).shape
+    maxproject = np.zeros((rows, cols))
     for image in sorted_seg_listdir:
         maxproject += cv2.imread(os.path.join(registered_fp, image), cv2.IMREAD_GRAYSCALE)
     maxproject = np.clip(maxproject, 0, 255)
