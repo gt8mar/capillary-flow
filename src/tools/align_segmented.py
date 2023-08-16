@@ -111,7 +111,6 @@ def align_segmented(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
  
             #save segmented image
             cv2.imwrite(os.path.join(reg_folder_path, os.path.basename(input_seg_fp)), registered_seg_img)
-            print(registered_seg_img.shape)
 
     translations_csv_fp = os.path.join(segmented_folder_fp, "translations.csv")
     with open(translations_csv_fp, 'w', newline='') as translations_csv_file:
