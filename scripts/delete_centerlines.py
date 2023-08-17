@@ -20,7 +20,8 @@ def delete_centerlines_files(source_folder):
     Returns:
         list: a list of the paths to the TIFF files that have been copied
     """
-    for participant in os.listdir(source_folder):
+    for i in range(9,21):
+        participant = 'part' + str(i).zfill(2)
         date = find_earliest_date_dir(os.path.join(source_folder, participant))
         for location in os.listdir(os.path.join(source_folder, participant, date)):
             # delete all files and folders in the centerlines
