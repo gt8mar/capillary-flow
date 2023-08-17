@@ -41,7 +41,7 @@ def enumerate_capillaries(image, test = False, verbose = False, write = False, w
     row, col = image.shape
     print(row, col)
     contours = measure.find_contours(image, 0.8)
-    print("The number of capillaries is: " + str(len(contours)))
+    print("The number of contours is: " + str(len(contours)))
     if test:
         contour_array = np.zeros((1, row, col))
         for i in range(1):
@@ -77,10 +77,14 @@ def enumerate_capillaries(image, test = False, verbose = False, write = False, w
                         contour_array[j] = contour_array[j] - contour_array[i]
                         # remove contour_array[i] from contour_array
                         contour_array[i] = np.zeros((row, col))
-        print(contour_array.shape)
         # remove empty contours
-        contour_array = contour_array[~np.all(contour_array == 0, axis=(1, 2))]
-        print(contour_array.shape)
+        # Calculate the sum of absolute values for each image
+        image_sums = np.sum(np.abs(contour_array), axis=(1, 2))
+        # Find the indices of non-blank images
+        non_blank_indices = np.nonzero(image_sums)
+        # Select only the non-blank images
+        contour_array = contour_array[non_blank_indices]
+        print(f'the number of capillaries is {contour_array.shape[0]}')
         return contour_array
 def make_skeletons(image, verbose = True, histograms = False, write = False, write_path = None):
     """
