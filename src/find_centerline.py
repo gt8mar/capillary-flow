@@ -68,6 +68,17 @@ def enumerate_capillaries(image, test = False, verbose = False, write = False, w
                 fig.savefig(write_path)
             if verbose:
                 plt.show()
+        # check each contour to see if it fits inside another contour
+        # if it does, subtract the smaller contour from the larger contour
+        for i in range(len(contours)):
+            for j in range(len(contours)):
+                if i != j:
+                    if np.all(np.isin(contours[i], contours[j])):
+                        contour_array[j] = contour_array[j] - contour_array[i]
+                        # remove contour_array[i] from contour_array
+                        contour_array[i] = np.zeros((row, col))
+        # remove empty contours
+        contour_array = contour_array[~np.all(contour_array == 0, axis=(1, 2))]
         return contour_array
 def make_skeletons(image, verbose = True, histograms = False, write = False, write_path = None):
     """
