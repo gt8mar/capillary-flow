@@ -84,7 +84,7 @@ def enumerate_capillaries(image, test = False, verbose = False, write = False, w
         non_blank_indices = np.nonzero(image_sums)
         # Select only the non-blank images
         contour_array = contour_array[non_blank_indices]
-        print(f'the number of capillaries is {contour_array.shape[0]}')
+        print(f'the new number of capillaries is {contour_array.shape[0]}')
         return contour_array
 def make_skeletons(image, verbose = True, histograms = False, write = False, write_path = None):
     """
