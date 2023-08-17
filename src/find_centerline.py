@@ -77,8 +77,10 @@ def enumerate_capillaries(image, test = False, verbose = False, write = False, w
                         contour_array[j] = contour_array[j] - contour_array[i]
                         # remove contour_array[i] from contour_array
                         contour_array[i] = np.zeros((row, col))
+        print(contour_array.shape)
         # remove empty contours
         contour_array = contour_array[~np.all(contour_array == 0, axis=(1, 2))]
+        print(contour_array.shape)
         return contour_array
 def make_skeletons(image, verbose = True, histograms = False, write = False, write_path = None):
     """
