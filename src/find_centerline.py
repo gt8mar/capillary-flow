@@ -190,7 +190,7 @@ def main(path = "F:\\Marcus\\data\\part09\\230414\\loc01",
             segmented[segmented != 0] = 1
 
             # Make a numpy array of images with isolated capillaries. The mean/sum of this is segmented_2D.
-            # TODO: fix this horrible plotting
+            # TODO: add plotting
             contours = enumerate_capillaries2(segmented)    # , verbose=False, write=write, write_path = os.path.join(output_folder, 'images', cap_map_filename)
             
             if write:
