@@ -9,6 +9,7 @@ By: Marcus Forst
 import numpy as np
 import matplotlib.pyplot as plt
 from skimage import measure
+import cv2
 
 def enumerate_capillaries(image, test = False, verbose = False, write = False, write_path = None):
     """
@@ -50,22 +51,22 @@ def enumerate_capillaries(image, test = False, verbose = False, write = False, w
                 plt.show()
         # check each contour to see if it fits inside another contour
         # if it does, subtract the smaller contour from the larger contour
-        for i in range(len(contours)):
-            for j in range(len(contours)):
+        for i in range(contour_array.shape[0]):
+            for j in range(contour_array.shape[0]):
                 if i != j:
-                    if np.all(np.isin(contours[i], contours[j])):
+                    if np.all(np.isin(contour_array[i], contour_array[j])):
+                        print('ya')
                         contour_array[j] = contour_array[j] - contour_array[i]
                         # remove contour_array[i] from contour_array
                         contour_array[i] = np.zeros((row, col))
         # remove empty contours
-        # Calculate the sum of absolute values for each image
-        image_sums = np.sum(np.abs(contour_array), axis=(1, 2))
-        # Find the indices of non-blank images
-        non_blank_indices = np.nonzero(image_sums)
-        # Select only the non-blank images
-        contour_array = contour_array[non_blank_indices]
+        contour_array = contour_array[~np.all(contour_array == 0, axis=(1, 2))]
         print(f'the new number of capillaries is {contour_array.shape[0]}')
         return contour_array
 
 if __name__ == "__main__":
-    enumerate_capillaries()
+    image_path = 'C:\\Users\\gt8mar\\capillary-flow\\results\\segmented\\set01_part09_230414_loc02_vid22_seg.png'
+    image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    contour = enumerate_capillaries(image, test = False, verbose = False)
+    plt.imshow(contour[1])
+    plt.show()
