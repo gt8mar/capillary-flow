@@ -15,6 +15,8 @@ from skimage.segmentation import find_boundaries
 import csv
 import re
 import platform
+#from enumerate_capillaries import enumerate_capillaries
+from enumerate_capillaries2 import find_connected_components
 
 def group_by_vid(vidlist):
     grouped = {}
@@ -29,6 +31,7 @@ def group_by_vid(vidlist):
     result = list(grouped.values())
     return result
 
+#BROKEN
 #this function takes a segmented image of multiple capillaries and returns an array of images, each with one capillary
 def get_single_caps(image):
     # Label connected components
@@ -62,7 +65,9 @@ def separate_caps(registered_folder_fp):
 
     for vid in os.listdir(registered_folder_fp):
         if vid.endswith('.png'):
-            individual_caps = get_single_caps(cv2.imread(os.path.join(registered_folder_fp, vid), cv2.IMREAD_GRAYSCALE))
+            #individual_caps = get_single_caps(cv2.imread(os.path.join(registered_folder_fp, vid), cv2.IMREAD_GRAYSCALE))
+            #individual_caps = enumerate_capillaries(cv2.imread(os.path.join(registered_folder_fp, vid), cv2.IMREAD_GRAYSCALE), test=False, verbose=False, write=False)
+            individual_caps = find_connected_components(cv2.imread(os.path.join(registered_folder_fp, vid), cv2.IMREAD_GRAYSCALE))
             filenames = []
             for cap in individual_caps:
                 renamed = False
@@ -130,10 +135,15 @@ def save_untranslated(registered_folder_fp):
                     for cap in grouped_by_vid[i]:
                         img = cv2.imread(os.path.join(indi_caps_fp, cap), cv2.IMREAD_GRAYSCALE)
                         
-                        ystart = miny + yint
+                        """ystart = miny + yint
                         yend = -(maxy - yint)
                         xstart = minx + xint
-                        xend = -(maxx - xint)
+                        xend = -(maxx - xint)"""
+
+                        ystart = miny
+                        yend = -(maxy)
+                        xstart = minx
+                        xend = -(maxx)
 
                         ystart = None if ystart == 0 else ystart
                         yend = None if yend == 0 else yend
@@ -147,16 +157,12 @@ def save_untranslated(registered_folder_fp):
                         crop_img = untrans_img[tint:bint, lint:rint]
 
                         cv2.imwrite(os.path.join(orig_fp, cap), crop_img)
+                        #cv2.imwrite(os.path.join(orig_fp, cap), untrans_img)
+
             
 def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
     registered_fp = os.path.join(path, "segmented", "registered")
     sorted_seg_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(registered_fp, x)) and x.endswith('.png'), os.listdir(registered_fp)))
-    
-    #get translations
-    translations_fp = os.path.join(os.path.dirname(registered_fp), "translations.csv")
-    with open(translations_fp, 'r') as csv_file:
-        reader = csv.reader(csv_file)
-        translations = list(reader)
 
     #get max projection
     rows, cols = cv2.imread(os.path.join(registered_fp, sorted_seg_listdir[0]), cv2.IMREAD_GRAYSCALE).shape
@@ -166,7 +172,9 @@ def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
     maxproject = np.clip(maxproject, 0, 255)
     
     #get array of images in which each image has 1 capillary (all frames projected on)
-    caps = get_single_caps(maxproject)
+    #caps = get_single_caps(maxproject)
+    #caps = enumerate_capillaries(maxproject, test=False, verbose=False, write=False)
+    caps = find_connected_components(maxproject)
 
     #save maxproj individual caps, named
     caps_fp = os.path.join(os.path.dirname(registered_fp), "proj_caps")
