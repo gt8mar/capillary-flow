@@ -23,6 +23,8 @@ from sklearn.neighbors import NearestNeighbors
 import networkx as nx
 # from src.tools.parse_vid_path import parse_vid_path
 from src.tools.parse_filename import parse_filename
+from src.tools.enumerate_capillaries import enumerate_capillaries
+from src.tools.enumerate_capillaries2 import enumerate_capillaries2
 import warnings
 import pandas as pd
 
@@ -30,62 +32,7 @@ import pandas as pd
 BRANCH_THRESH = 40
 MIN_CAP_LEN = 5
 
-def enumerate_capillaries(image, test = False, verbose = False, write = False, write_path = None):
-    """
-    This function finds the number of capillaries and returns an array of images with one
-    capillary per image.
-    :param image: 2D numpy array
-    :param short: boolian, if you want to test using one capillary. Default is false.
-    :return: 3D numpy array: [capillary index, row, col]
-    """
-    row, col = image.shape
-    print(row, col)
-    contours = measure.find_contours(image, 0.8)
-    print("The number of contours is: " + str(len(contours)))
-    if test:
-        contour_array = np.zeros((1, row, col))
-        for i in range(1):
-            grid = np.array(measure.grid_points_in_poly((row, col), contours[i]))
-            contour_array[i] = grid
-            # plt.plot(contours[i][:, 1], contours[i][:, 0], linewidth=2)   # this shows all of the enumerated capillaries
-        # plt.show()
-        return contour_array
-    else:
-        contour_array = np.zeros((len(contours), row, col))
-        if  verbose or write:
-            fig = plt.figure(figsize = (12,10))
-            ax = fig.add_subplot(111)
-        for i in range(len(contours)):
-            grid = np.array(measure.grid_points_in_poly((row, col), contours[i]))
-            contour_array[i] = grid
-            if verbose or write:
-                ax.plot(contours[i][:, 1], contours[i][:, 0], linewidth=2, label = "capillary " + str(i)) #plt.imshow(contour_array[i])   # plt.plot(contours[i][:, 1], contours[i][:, 0], linewidth=2) this shows all of the enumerated capillaries
-                # plt.show()
-        if verbose or write:
-            ax.invert_yaxis()
-            ax.legend(loc = 'center left')
-            if write:
-                fig.savefig(write_path)
-            if verbose:
-                plt.show()
-        # check each contour to see if it fits inside another contour
-        # if it does, subtract the smaller contour from the larger contour
-        for i in range(len(contours)):
-            for j in range(len(contours)):
-                if i != j:
-                    if np.all(np.isin(contours[i], contours[j])):
-                        contour_array[j] = contour_array[j] - contour_array[i]
-                        # remove contour_array[i] from contour_array
-                        contour_array[i] = np.zeros((row, col))
-        # remove empty contours
-        # Calculate the sum of absolute values for each image
-        image_sums = np.sum(np.abs(contour_array), axis=(1, 2))
-        # Find the indices of non-blank images
-        non_blank_indices = np.nonzero(image_sums)
-        # Select only the non-blank images
-        contour_array = contour_array[non_blank_indices]
-        print(f'the new number of capillaries is {contour_array.shape[0]}')
-        return contour_array
+
 def make_skeletons(image, verbose = True, histograms = False, write = False, write_path = None):
     """
     This function uses the FilFinder package to find and prune skeletons of images.
@@ -244,7 +191,7 @@ def main(path = "F:\\Marcus\\data\\part09\\230414\\loc01",
 
             # Make a numpy array of images with isolated capillaries. The mean/sum of this is segmented_2D.
             # TODO: fix this horrible plotting
-            contours = enumerate_capillaries(segmented, verbose=False, write=write, write_path = os.path.join(output_folder, 'images', cap_map_filename))
+            contours = enumerate_capillaries2(segmented)    # , verbose=False, write=write, write_path = os.path.join(output_folder, 'images', cap_map_filename)
             
             if write:
                 # save segmented_2D
