@@ -10,13 +10,13 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
-from skimage.measure import label
-from skimage.segmentation import find_boundaries
 import csv
 import re
 import platform
-#from enumerate_capillaries import enumerate_capillaries
-from enumerate_capillaries2 import find_connected_components
+if platform.system() == 'Windows':
+    from enumerate_capillaries2 import find_connected_components
+else:
+    from src.tools.enumerate_capillaries2 import find_connected_components
 
 def group_by_vid(vidlist):
     grouped = {}
@@ -30,34 +30,6 @@ def group_by_vid(vidlist):
 
     result = list(grouped.values())
     return result
-
-#BROKEN
-#this function takes a segmented image of multiple capillaries and returns an array of images, each with one capillary
-def get_single_caps(image):
-    # Label connected components
-    labeled_image = label(image, connectivity=2)
-    
-    min_pixel_count = 100
-    # Filter components based on minimum pixel count
-    component_mask = np.zeros_like(image, dtype=bool)
-    for component_label in np.unique(labeled_image):
-        if component_label == 0:
-            continue
-        component_pixels = labeled_image == component_label
-        pixel_count = np.count_nonzero(component_pixels)
-        if pixel_count >= min_pixel_count:
-            component_mask |= component_pixels
-    
-    # Create an array for each filtered connected component
-    component_arrays = []
-    for component_label in np.unique(labeled_image[component_mask]):
-        if component_label == 0:
-            continue
-        component_array = np.zeros_like(image)
-        component_array[labeled_image == component_label] = image[labeled_image == component_label]
-        component_arrays.append(component_array)
-    
-    return component_arrays
 
 def separate_caps(registered_folder_fp):
     new_folder_fp = os.path.join(os.path.dirname(registered_folder_fp), "individual_caps_translated")
@@ -134,16 +106,11 @@ def save_untranslated(registered_folder_fp):
                     
                     for cap in grouped_by_vid[i]:
                         img = cv2.imread(os.path.join(indi_caps_fp, cap), cv2.IMREAD_GRAYSCALE)
-                        
-                        """ystart = miny + yint
-                        yend = -(maxy - yint)
-                        xstart = minx + xint
-                        xend = -(maxx - xint)"""
 
-                        ystart = miny
-                        yend = -(maxy)
-                        xstart = minx
-                        xend = -(maxx)
+                        ystart = maxy - yint
+                        yend = -(miny + yint)
+                        xstart = maxx - xint
+                        xend = -(minx + xint)
 
                         ystart = None if ystart == 0 else ystart
                         yend = None if yend == 0 else yend
@@ -157,8 +124,6 @@ def save_untranslated(registered_folder_fp):
                         crop_img = untrans_img[tint:bint, lint:rint]
 
                         cv2.imwrite(os.path.join(orig_fp, cap), crop_img)
-                        #cv2.imwrite(os.path.join(orig_fp, cap), untrans_img)
-
             
 def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
     registered_fp = os.path.join(path, "segmented", "registered")
@@ -172,8 +137,6 @@ def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
     maxproject = np.clip(maxproject, 0, 255)
     
     #get array of images in which each image has 1 capillary (all frames projected on)
-    #caps = get_single_caps(maxproject)
-    #caps = enumerate_capillaries(maxproject, test=False, verbose=False, write=False)
     caps = find_connected_components(maxproject)
 
     #save maxproj individual caps, named
@@ -199,10 +162,6 @@ def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
     #save untranslated individual caps, named
     save_untranslated(registered_fp)
     
-
-    
-
-
 
 """
 -----------------------------------------------------------------------------

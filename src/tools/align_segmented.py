@@ -17,6 +17,8 @@ if platform.system() != 'Windows':
 else:
     from register_images import register_images
 import csv
+from skimage.color import rgb2gray
+from skimage import io
 
 def uncrop_segmented(path, input_seg_img):
     shifts = pd.read_csv(os.path.join(path, 'metadata', 'Results.csv'))
@@ -25,15 +27,9 @@ def uncrop_segmented(path, input_seg_img):
     gap_bottom = shifts['y'].min()
     gap_top = shifts['y'].max()
 
-    slices = [slice(None)] * input_seg_img.ndim
-    rows, cols = input_seg_img.shape[:2]
-    new_rows = rows + gap_top + np.abs(gap_bottom)
-    new_cols = cols + gap_left + np.abs(gap_right)
-    
-    uncropped_input_seg_img = np.zeros((new_rows, new_cols) + input_seg_img.shape[2:], dtype=input_seg_img.dtype)
-    slices[:2] = slice(gap_top, gap_top+rows), slice(gap_left, gap_left+cols)
-    uncropped_input_seg_img[tuple(slices)] = input_seg_img
+    input_seg_img = rgb2gray(input_seg_img)
 
+    uncropped_input_seg_img = np.pad(input_seg_img, ((abs(gap_top), abs(gap_bottom)), (abs(gap_left), abs(gap_right))), mode='constant', constant_values=0)
     return uncropped_input_seg_img, gap_left, gap_right, gap_bottom, gap_top
 
 #this function assumes moco folder & seg imgs folder contain the same number of files & they correspond to each other 
@@ -56,10 +52,6 @@ def align_segmented(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
     reg_folder_path = os.path.join(segmented_folder_fp, "registered")
     os.makedirs(reg_folder_path, exist_ok=True)
 
-    """#TEMP new folder for registered frames
-    temp_fp = os.path.join(segmented_folder_fp, "moco")
-    os.makedirs(temp_fp, exist_ok=True)"""
-
     crops = []
 
     #first frame
@@ -67,7 +59,6 @@ def align_segmented(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
     first_seg_fp = os.path.join(segmented_folder_fp, sorted_seg_listdir[0])
     first_seg_img = cv2.imread(first_seg_fp)
     first_seg_img, left, right, bottom, top = uncrop_segmented(os.path.join(os.path.split(os.path.split(moco_vids_fp[0])[0])[0]), first_seg_img)
-    cv2.imwrite(os.path.join(reg_folder_path, os.path.basename(first_seg_fp)), first_seg_img)
 
     translations = []
     prevdx = 0
@@ -109,13 +100,17 @@ def align_segmented(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
             crops.append((left, right, bottom, top))
 
             #transform segmented image
-            transformation_matrix = np.array([[1, 0, abs(minx) - translations[x][0]], [0, 1, abs(miny) - translations[x][1]]], dtype=np.float32)
-            registered_seg_img = cv2.warpAffine(input_seg_img, transformation_matrix, (abs(minx) + 1440 + abs(maxx), abs(miny) + 1080 + abs(maxy)))
+            padbottom = abs(miny) + translations[x][1]
+            padtop = abs(maxy) - translations[x][1]
+            padright = abs(minx) + translations[x][0]
+            padleft = abs(maxx) - translations[x][0]
+            registered_seg_img = np.pad(input_seg_img, ((padtop, padbottom), (padleft, padright)), mode='constant', constant_values=0)
 
             resize_vals.append([minx, maxx, miny, maxy])
- 
+
             #save segmented image
-            cv2.imwrite(os.path.join(reg_folder_path, os.path.basename(input_seg_fp)), registered_seg_img)
+            registered_seg_img = (registered_seg_img * 255).astype(np.uint8)
+            io.imsave(os.path.join(reg_folder_path, os.path.basename(input_seg_fp)), registered_seg_img)
 
     translations_csv_fp = os.path.join(segmented_folder_fp, "translations.csv")
     with open(translations_csv_fp, 'w', newline='') as translations_csv_file:
