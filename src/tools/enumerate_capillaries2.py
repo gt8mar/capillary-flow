@@ -45,6 +45,7 @@ def find_connected_components(input_array):
         nonzero_count = np.count_nonzero(component)
         if nonzero_count >= 2000:
             result.append(component)
+    
     # Convert the list of 2D arrays to a 3D numpy array
     return np.array(result)
 
