@@ -105,7 +105,7 @@ def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
                                 
                 overlay = overlay.astype(np.uint8)
                 overlayed = cv2.addWeighted(frame_img, 1, overlay, 1, 0)
-                cv2.putText(overlayed, capnum, (xcoord, ycoord), cv2.FONT_HERSHEY_PLAIN, 1, color, 1, cv2.LINE_AA)
+                cv2.putText(overlayed, capnum, (xcoord, ycoord), cv2.FONT_HERSHEY_PLAIN, 2, color, 1, cv2.LINE_AA)
 
                 filename = cap[:-27] + ".png"
                 frame_img = overlayed
