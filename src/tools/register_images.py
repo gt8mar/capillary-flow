@@ -11,7 +11,7 @@ import cv2
 """
 This function takes 2 images as np arrays (reference and target) and returns the x and y translation values and the target translated to the reference.
 """
-def register_images(reference_img, target_img):
+def register_images(reference_img, target_img, prevdx=0, prevdy=0):
     #grayscale
     equalized_reference_img = cv2.equalizeHist(cv2.cvtColor(reference_img, cv2.COLOR_BGR2GRAY))
     equalized_target_img = cv2.equalizeHist(cv2.cvtColor(target_img, cv2.COLOR_BGR2GRAY))
@@ -55,7 +55,9 @@ def register_images(reference_img, target_img):
     #if no matches found, return (0,0) & untranslated image
     if len(good_matches) == 0:
         print("not translated")
-        return (0, 0), equalized_target_img
+        transformation_matrix = np.array([[1, 0, -(prevdx)], [0, 1, -(prevdy)]], dtype=np.float32)
+        shifted_image = cv2.warpAffine(target_img, transformation_matrix, (reference_img.shape[1], reference_img.shape[0]))
+        return (0, 0), shifted_image
 
     #average translations across all matches
     dx_sum = dy_sum = 0.0
@@ -72,7 +74,7 @@ def register_images(reference_img, target_img):
     dy_avg = dy_sum / len(good_matches)
 
     #transform
-    transformation_matrix = np.array([[1, 0, -dx_avg], [0, 1, -dy_avg]], dtype=np.float32)
+    transformation_matrix = np.array([[1, 0, -(dx_avg + prevdx)], [0, 1, -(dy_avg + prevdy)]], dtype=np.float32)
     shifted_image = cv2.warpAffine(target_img, transformation_matrix, (reference_img.shape[1], reference_img.shape[0]))
 
     return (dx_avg, dy_avg), shifted_image
