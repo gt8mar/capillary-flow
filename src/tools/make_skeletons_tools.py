@@ -1,11 +1,12 @@
 """
-Filename: make_skeletons.py
+Filename: make_skeletons_tools.py
 ------------------------------------------------------
 This program skeletonizes a binary mask and prunes it to a single line.
 
 By: Marcus Forst
 """
 
+import os
 import numpy as np
 from skimage.morphology import skeletonize
 from skimage.measure import label
@@ -15,7 +16,9 @@ from collections import deque
 from scipy.ndimage import convolve
 from collections import deque
 from scipy.ndimage import distance_transform_edt
-
+from fil_finder import FilFinder2D
+import astropy.units as u
+from skimage.morphology import medial_axis
 
 
 # Skeletonize the binary mask
@@ -117,7 +120,67 @@ def cut_loops(skel):
                 skel[p] = 0
     return skel
 
+def make_skeletons_old(image, verbose = True, histograms = False, write = False, write_path = None):
+    """
+    This function uses the FilFinder package to find and prune skeletons of images.
+    :param image: 2D numpy array or list of points that make up polygon mask
+    :return fil.skeleton: 2D numpy array with skeletons
+    :return radii: 1D numpy array that is a list of radii (which correspond to the skeleton coordinates)
+    """
+    # Load in skeleton class for skeleton pruning
+    fil = FilFinder2D(image, beamwidth=0 * u.pix, mask=image)
+    # Use separate method to get radii
+    skeleton, distance = medial_axis(image, return_distance=True)
+    # This is a necessary step for the fil object. It does nothing.
+    fil.preprocess_image(skip_flatten=True)
+    # This makes the skeleton
+    fil.medskel()
+    # This prunes the skeleton
+    fil.analyze_skeletons(branch_thresh=BRANCH_THRESH * u.pix, prune_criteria='length',
+                          skel_thresh=BRANCH_THRESH * u.pix)
+    # Multiply the radii by the skeleton, selects out the radii we care about.
+    distance_on_skeleton = distance * fil.skeleton
+    radii = distance[fil.skeleton.astype(bool)]
+    overlay = distance_on_skeleton + image
+    # This plots the histogram of the capillary and the capillary with distance values.
+    if verbose:
+        if histograms:
+            plt.hist(radii)
+            plt.show()
+        plt.imshow(distance_on_skeleton, cmap='magma')
+        plt.show()
+    if write:
+        if verbose:
+            plt.imshow(overlay)
+            plt.show()
+        plt.imsave(write_path, overlay)
+    return fil.skeleton, radii
 
+def make_skeletons_new(binary_image, plot=False):
+    BRANCH_THRESH = 5
+    fil = FilFinder2D(binary_image, beamwidth=0 * u.pix, mask=binary_image)
+    fil.preprocess_image(skip_flatten=True)
+    fil.medskel(verbose=False)
+    fil.analyze_skeletons(branch_thresh=BRANCH_THRESH * u.pix, prune_criteria='length',
+                          skel_thresh=BRANCH_THRESH * u.pix, verbose = plot)
+    if plot:
+        fig, axes = plt.subplots(1, 3, figsize=(16, 6), sharex=True, sharey=True)
+        ax = axes.ravel()
+        ax[0].imshow(binary_image, cmap=plt.cm.gray)
+        ax[0].axis('off')
+        ax[0].set_title('original', fontsize=20)
+        ax[1].imshow(fil.skeleton, cmap=plt.cm.gray)
+        ax[1].axis('off')
+        ax[1].set_title('skeleton', fontsize=20)
+        ax[2].imshow(fil.skeleton_longpath, cmap=plt.cm.gray)
+        ax[2].axis('off')
+        ax[2].set_title('cut', fontsize=20)
+        fig.tight_layout()        
+        plt.show()
+    print(fil.skeleton_longpath.shape)
+    __, distance = medial_axis(binary_image, return_distance=True)
+    radii = distance[fil.skeleton_longpath.astype(bool)]
+    return fil.skeleton_longpath
 
 def make_skeletons(binary_image, plot=False):
     """
@@ -132,9 +195,9 @@ def make_skeletons(binary_image, plot=False):
 
     skeleton = perform_skeletonization(binary_image)
     pruned_skeleton = prune_skeleton(skeleton)
-    handled_skeleton = handle_loops(pruned_skeleton)
-    copy_of_handled_skeleton = handled_skeleton.copy()
-    cut_skeleton = cut_loops(copy_of_handled_skeleton)
+    # handled_skeleton = handle_loops(pruned_skeleton)
+    # copy_of_handled_skeleton = handled_skeleton.copy()
+    # cut_skeleton = cut_loops(copy_of_handled_skeleton)
 
     if plot:
         # Display the result
@@ -146,35 +209,51 @@ def make_skeletons(binary_image, plot=False):
         ax[1].imshow(skeleton, cmap=plt.cm.gray)
         ax[1].axis('off')
         ax[1].set_title('skeleton', fontsize=20)
-        ax[2].imshow(cut_skeleton, cmap=plt.cm.gray)
-        ax[2].axis('off')
-        ax[2].set_title('cut', fontsize=20)
+        # ax[2].imshow(cut_skeleton, cmap=plt.cm.gray)
+        # ax[2].axis('off')
+        # ax[2].set_title('cut', fontsize=20)
         fig.tight_layout()
         plt.show()
-    return cut_skeleton
+    return pruned_skeleton #cut_skeleton
 
 
 def distance_to_edge(binary_mask, skeleton):
     # Inverse of binary mask, as we want distances to the zeroes (boundary)
     dist_transform = distance_transform_edt(~binary_mask)
-    
-    skeleton_distances = {}
-    for point in np.argwhere(skeleton):
-        tuple_point = tuple(point)
-        skeleton_distances[tuple_point] = dist_transform[tuple_point]
+    skeleton_coords = np.nonzero(skeleton)
+    skeleton_distances = dist_transform[skeleton]
+
+    # skeleton_distances = {}
+    # for point in np.argwhere(skeleton):
+    #     tuple_point = tuple(point)
+    #     skeleton_distances[tuple_point] = dist_transform[tuple_point]
         
     return skeleton_distances
 
 
 if __name__ == "__main__":
-    image_path = 'C:\\Users\\gt8mar\\capillary-flow\\tests\\part09\\230414\\loc02\\segmented\\individual_caps_original\\set01_part09_230414_loc02_vid24_seg_cap_01a.png'
-    import cv2
-    # image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    binary_mask = (io.imread(image_path, as_gray=True) > 0.5).astype(int)
-    print(binary_mask.shape)
-    skeleton = make_skeletons(binary_mask, plot=True)
-    # Assuming you have binary_mask and handled_skeleton ready
-    distances = distance_to_edge(binary_mask, skeleton)
-    print(distances)
+    image_folder = 'C:\\Users\\gt8mar\\capillary-flow\\tests\\part09\\230414\\loc02\\segmented\\individual_caps_original'
+    image_names = ['set01_part09_230414_loc02_vid19_seg_cap_06a.png','set01_part09_230414_loc02_vid22_seg_cap_06a.png']
+    for image_name in image_names:
+        image_path = os.path.join(image_folder, image_name)
+        import cv2
+        binary_mask = (io.imread(image_path, as_gray=True) > 0.5).astype(int)
+        print(binary_mask.shape)
+        skeleton = make_skeletons_new(binary_mask, plot=False)
+        print(skeleton.shape)
+        skeleton_coords = np.nonzero(skeleton)
+        
+
+        distances = distance_to_edge(binary_mask, skeleton)
+        print(distances)
+        
+
+
+        # plt.hist(distances.values())
+        # plt.show()
+    # skeleton = make_skeletons(binary_mask, plot=True)
+    # # Assuming you have binary_mask and handled_skeleton ready
+    # distances = distance_to_edge(binary_mask, skeleton)
+    # print(distances)
 
 
