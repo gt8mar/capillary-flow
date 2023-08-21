@@ -77,7 +77,7 @@ def align_segmented(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
             #register vids
             input_moco_fp = moco_vids_fp[x]
             input_moco_img = cv2.imread(input_moco_fp)
-            [dx, dy], registered_image = register_images(reference_moco_img, input_moco_img)
+            [dx, dy], registered_image = register_images(reference_moco_img, input_moco_img, prevdx, prevdy)
 
             dx = int(dx)
             dy = int(dy)
