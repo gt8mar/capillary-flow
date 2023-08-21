@@ -37,6 +37,10 @@ def align_segmented(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
     vid_folder_fp = os.path.join(path, "vids")
     segmented_folder_fp = os.path.join(path, "segmented")
 
+    #make folder to save registered moco images
+    reg_moco_folder = os.path.join(segmented_folder_fp, "moco_registered")
+    os.makedirs(reg_moco_folder, exist_ok=True)
+
     #make list of filepaths of vid 0 in moco folders of all vids
     moco_vids_fp = []
     sorted_vids_listdir = sorted(filter(lambda x: os.path.exists(os.path.join(vid_folder_fp, x)), os.listdir(vid_folder_fp))) #sort numerically
@@ -47,6 +51,9 @@ def align_segmented(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
     #set reference
     reference_moco_fp = moco_vids_fp[0]
     reference_moco_img = cv2.imread(reference_moco_fp)
+
+    #save reference moco
+    cv2.imwrite(os.path.join(reg_moco_folder, os.path. basename(reference_moco_fp)), reference_moco_img)
 
     #make folder to save registered segmented imgs
     reg_folder_path = os.path.join(segmented_folder_fp, "registered")
@@ -80,6 +87,9 @@ def align_segmented(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
             reference_moco_img = input_moco_img
             prevdx += dx
             prevdy += dy
+
+            #save registered moco frame
+            cv2.imwrite(os.path.join(reg_moco_folder, os.path.basename(input_moco_fp)), registered_image)
 
     #get max size of segmented img
     minx = min(min(entry[0], 0) for entry in translations)
