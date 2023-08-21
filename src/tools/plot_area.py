@@ -154,54 +154,6 @@ def quantitative_subplots(plotinfo, partnum, date, location):
     plt.show()
     return fig, slope_data 
 
-
-def boxplot(plotinfo):
-    grouped_by_vidnum = group_by_vidnum(plotinfo)
-    xvals = []
-    yvals = []
-    labels = []
-
-    for vidnum in grouped_by_vidnum:
-        labels.append(vidnum[0][1])
-        xvals.append(float(vidnum[0][1]))
-        yval = []
-        for point in vidnum:
-            yval.append(point[0])
-        yvals.append(yval)
-
-    xvals_up = xvals
-    xvals_down = []
-    yvals_up = yvals
-    yvals_down = []
-    for i in range(1,len(grouped_by_vidnum)):
-        if grouped_by_vidnum[i][0][1] < grouped_by_vidnum[i-1][0][1]:
-            xvals_up = xvals[:i]
-            xvals_down = xvals[i:]
-            yvals_up = yvals[:i]
-            yvals_down = yvals[i:]
-            break
-
-    fig, ax = plt.subplots(1, 2, figsize=(15, 5), sharey = True)
-    
-    for i in range(len(yvals_up)):
-        ax[0].scatter([xvals_up[i] for _ in range(len(yvals_up[i]))], yvals_up[i], c="Black")
-    for i in range(len(yvals_down)):
-        ax[1].scatter([xvals_down[i] for _ in range(len(yvals_down[i]))], yvals_down[i], c="Black")
-    
-    ax[0].boxplot(yvals_up, positions=xvals_up)
-    ax[1].boxplot(yvals_down, positions=xvals_down)
-
-    #ax.legend()
-    ax[0].set_xlabel('Pressure (psi)')
-    ax[0].set_ylabel('Area/Length')
-    ax[0].set_title('Up')
-
-    ax[1].set_xlabel('Pressure (psi)')
-    ax[1].set_ylabel('Area/Length')
-    ax[1].set_title('Down')
-    plt.show()
-    
-
 def plot_area_by_length(caps_fp, centerlines_fp, metadata_fp):
     caps_listdir_nofrag = exclude_fragmented(caps_fp)
     caps_listdir_nobp = exclude_bp_scan(caps_listdir_nofrag, metadata_fp)
@@ -248,7 +200,6 @@ def plot_area_by_length(caps_fp, centerlines_fp, metadata_fp):
     date = os.path.basename((os.path.dirname(os.path.dirname(os.path.dirname(caps_fp)))))
     location = os.path.basename(os.path.dirname(os.path.dirname(caps_fp)))
     return quantitative_subplots(plotinfo, partnum, date, location)
-    #boxplot(plotinfo)
     
 def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
     participant = os.path.basename(os.path.dirname(os.path.dirname(path)))
