@@ -37,8 +37,6 @@ def separate_caps(registered_folder_fp):
 
     for vid in os.listdir(registered_folder_fp):
         if vid.endswith('.png'):
-            #individual_caps = get_single_caps(cv2.imread(os.path.join(registered_folder_fp, vid), cv2.IMREAD_GRAYSCALE))
-            #individual_caps = enumerate_capillaries(cv2.imread(os.path.join(registered_folder_fp, vid), cv2.IMREAD_GRAYSCALE), test=False, verbose=False, write=False)
             individual_caps = find_connected_components(cv2.imread(os.path.join(registered_folder_fp, vid), cv2.IMREAD_GRAYSCALE))
             filenames = []
             for cap in individual_caps:
