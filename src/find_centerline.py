@@ -40,6 +40,7 @@ def make_skeletons(binary_image, plot = False):
     :return fil.skeleton: 2D numpy array with skeletons
     :return radii: 1D numpy array that is a list of radii (which correspond to the skeleton coordinates)
     """
+   
     # Load in skeleton class for skeleton pruning
     fil = FilFinder2D(binary_image, beamwidth=0 * u.pix, mask=binary_image)
     # Use separate method to get radii
@@ -47,7 +48,26 @@ def make_skeletons(binary_image, plot = False):
     # This is a necessary step for the fil object. It does nothing.
     fil.preprocess_image(skip_flatten=True)
     # This makes the skeleton
-    fil.medskel()
+    fil.medskel(verbose=True)
+    # find highest point in the skeleton (lowest row)
+    highest_point = np.argmin(np.nonzero(fil.skeleton)[0])
+    # do a depth first search, beginning at the highest point to find intersection points. if none, then it is a loop
+    # TODO: blast a whole, then search for junctions. If none, then it is a loop
+
+    # def dfs(row, col, parent, visited, skeleton):
+    #     visited.add((row, col))
+    #     loop = []
+    #     for dr, dc in directions:
+    #         r = row + dr
+    #         c = col + dc
+    #         if 0 <= r < skeleton.shape[0] and 0 <= c < skeleton.shape[1] and skeleton[r, c] == 1 and (r, c) not in visited:
+    #             loop.append((r, c))
+    #             loop += dfs(r, c, (row, col), visited, skeleton)
+    #     return loop
+
+
+
+    
     # This prunes the skeleton
     fil.analyze_skeletons(branch_thresh=BRANCH_THRESH * u.pix, prune_criteria='length',
                           skel_thresh=MIN_CAP_LEN * u.pix)
@@ -162,7 +182,7 @@ def load_image_with_prefix(input_folder, segmented_filename):
 
 #  "F:\\Marcus\\data\\part09\\230414\\loc01"
 
-def main(path ='C:\\Users\\gt8mar\\capillary-flow\\tests\\part09\\230414\\loc02',
+def main(path ='C:\\Users\\gt8mar\\capillary-flow\\tests\\part18\\230502\\locEx', # 'C:\\Users\\gt8mar\\capillary-flow\\tests\\part09\\230414\\loc02', #
         verbose = False, write = False, plot=False):
     """ Isolates capillaries from segmented image and finds their centerlines and radii. 
 
