@@ -33,7 +33,7 @@ def uncrop_segmented(path, input_seg_img):
     return uncropped_input_seg_img, gap_left, gap_right, gap_bottom, gap_top
 
 #this function assumes moco folder & seg imgs folder contain the same number of files & they correspond to each other 
-def align_segmented(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
+def align_segmented(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
     vid_folder_fp = os.path.join(path, "vids")
     segmented_folder_fp = os.path.join(path, "segmented")
 
