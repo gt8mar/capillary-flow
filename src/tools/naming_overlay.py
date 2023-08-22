@@ -73,9 +73,9 @@ def make_overlays(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
         maxx = abs(int(rows[0][1]))
         miny = abs(int(rows[0][2]))
         maxy = abs(int(rows[0][3]))
-        minx = None if minx == 0 else minx
+        minx = None if minx == 0 else -minx
         maxx = None if maxx == 0 else maxx
-        miny = None if miny == 0 else miny
+        miny = None if miny == 0 else -miny
         maxy = None if maxy == 0 else maxy
 
         predefined_colors = [
@@ -120,7 +120,7 @@ def make_overlays(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
 
                 cap_img = cv2.imread(os.path.join(path, "segmented", "individual_caps_translated", cap))
                 cap_img = rgb2gray(cap_img)
-                resized_cap = cap_img[maxy:-miny, maxx:-minx]
+                resized_cap = cap_img[maxy:miny, maxx:minx]
                 
                 #get label coordinates
                 xcoord, ycoord = get_label_position(resized_cap)
