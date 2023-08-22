@@ -5,6 +5,7 @@ import csv
 import cv2
 import numpy as np
 from skimage.color import rgb2gray
+import platform
 
 def get_label_position(input_array):
     # Find the indices of non-zero elements in the array
@@ -32,7 +33,36 @@ def get_label_position(input_array):
     
     return x_coord, y_coord
 
-def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
+def rename_files(directory_path):
+    # Get a list of files in the directory
+    file_list = os.listdir(directory_path)
+
+    # Iterate through each file in the directory
+    for filename in file_list:
+        # Search for a number in the filename
+        match = re.search(r'vid(\d+)', filename)
+        
+        # Check if a match was found and the number is 1 or 2 digits
+        if match and len(match.group(1)) <= 2:
+            num = int(match.group(1))
+            new_filename = filename.replace(match.group(0), f'vid{num:02}')
+
+            # Construct the full paths for the old and new filenames
+            old_path = os.path.join(directory_path, filename)
+            new_path = os.path.join(directory_path, new_filename)
+
+            # Rename the file
+            os.rename(old_path, new_path)
+
+def extract_file_info(filename):
+    set_part_date = filename[:21] #with trailing underscore
+    lmatch = re.search(r'loc(\d{2})', filename)
+    location = "" if lmatch == None else "loc" + lmatch.group(1) + "_"
+    vmatch = re.search(r'vid(\d{2})', filename)
+    vid = "" if vmatch == None else "vid" + vmatch.group(1) + "_"
+    return set_part_date, location, vid
+
+def make_overlays(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
     reg_moco_fp = os.path.join(path, "segmented", "moco_registered")
 
     resize_csv = os.path.join(path, "segmented", "resize_vals.csv")
@@ -67,6 +97,7 @@ def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
         ]
     element_colors = {}
     colored_elements = []
+    rename_files(reg_moco_fp)
     for frame in os.listdir(reg_moco_fp):
         vmatch = re.search(r'vid(\d{2})', frame)
         vidnum = vmatch.group(1)
@@ -100,22 +131,27 @@ def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
                 for y in range(height):
                     for x in range(width):
                         if resized_cap[y][x] != 0:
-                            alpha = int(0.1 * resized_cap[y][x])
+                            alpha = int(0.5 * resized_cap[y][x])
                             overlay[y, x] = [color[0], color[1], color[2], alpha]
                                 
                 overlay = overlay.astype(np.uint8)
                 overlayed = cv2.addWeighted(frame_img, 1, overlay, 1, 0)
-                cv2.putText(overlayed, capnum, (xcoord, ycoord), cv2.FONT_HERSHEY_PLAIN, 2, color, 1, cv2.LINE_AA)
+                cv2.putText(overlayed, capnum, (xcoord, ycoord), cv2.FONT_HERSHEY_PLAIN, 2, color, 2, cv2.FILLED)
 
-                filename = cap[:-27] + ".png"
+                set_part_date, location, vid = extract_file_info(cap)
+                filename = set_part_date + location + vid + "overlay.png"
                 frame_img = overlayed
         overlay_folder = os.path.join(path, "segmented", "overlays")
         os.makedirs(overlay_folder, exist_ok=True)
         cv2.imwrite(os.path.join(overlay_folder, filename), overlayed)
+        if platform.system() != 'Windows':
+            overlays_fp = '/hpc/projects/capillary-flow/results/size/overlays'
+            os.makedirs(overlays_fp, exist_ok=True)
+            cv2.imwrite(os.path.join(overlays_fp, filename), overlayed)
 
 
 if __name__ == "__main__":
     ticks = time.time()
-    main()
+    make_overlays()
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
