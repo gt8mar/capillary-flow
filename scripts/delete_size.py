@@ -24,10 +24,11 @@ def delete_centerlines_files(source_folder):
             folder_list = []
             file_list = []
             for file in os.listdir(os.path.join(source_folder, participant, date, location, 'size')):
-                if os.path.isdir(os.path.join(source_folder, participant, date, location, 'centerlines', file)):
-                    folder_list.append(file)
+                item_path = os.path.join(source_folder, participant, date, location, 'size', file)
+                if os.path.isdir(os.path.join(source_folder, participant, date, location, 'size', file)):
+                    folder_list.append(item_path)
                 else:
-                    file_list.append(file)
+                    file_list.append(item_path)     
             for file in file_list:
                 os.remove(os.path.join(source_folder, participant, date, location, 'size', file))
             for folder in folder_list:
