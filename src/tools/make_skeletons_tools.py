@@ -120,49 +120,105 @@ def cut_loops(skel):
                 skel[p] = 0
     return skel
 
-def make_skeletons_old(image, verbose = True, histograms = False, write = False, write_path = None):
+def neighbors(i, j, visited, skeleton):
+    height, width = skeleton.shape
+    deltas = [-1, 0, 1]
+    for dx in deltas:
+        for dy in deltas:
+            x, y = i + dx, j + dy
+            if 0 <= x < height and 0 <= y < width and skeleton[x][y] == 1 and (x, y) not in visited:
+                yield (x, y)
+def dfs(i, j, parent, visited, skeleton):
+    stack = [(i, j)]
+    path = [(i, j)]
+    while stack:
+        current = stack.pop()
+        visited.add(current)
+        for neighbor in neighbors(*current, visited, skeleton):
+            if neighbor != parent:
+                if neighbor in path:
+                    return path[path.index(neighbor):]  # Loop detected
+                stack.append(neighbor)
+                path.append(neighbor)
+    return []
+def find_largest_loop(skeleton):
+    height, width = skeleton.shape
+    visited = set()
+    largest_loop = []
+
+    for i in range(height):
+        for j in range(width):
+            if skeleton[i][j] == 1 and (i, j) not in visited:
+                loop = dfs(i, j, None, visited, skeleton)
+                if len(loop) > len(largest_loop):
+                    largest_loop = loop
+
+    return largest_loop
+
+def find_loop_contours(skeleton):
+    skeleton_copy = skeleton.np.astype(np.uint8)
+    
+    # Thicken the skeleton using dilation
+    kernel = np.ones((3,3), np.uint8)
+    thickened_skeleton = skeleton_copy #cv2.dilate(skeleton_copy, kernel, iterations=1)
+
+    contours = cv2.findContours(thickened_skeleton, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    if len(contours) == 0:
+        return fil.skeleton, fil.skeleton_longpath, np.array([])
+    else:
+        hierarchy = contours[1] if len(contours) == 2 else contours[2]
+        contours = contours[0] if len(contours) == 2 else contours[1]
+        hierarchy = hierarchy[0]
+
+    count = 0
+    result = cv2.merge([skeleton_copy,skeleton_copy,skeleton_copy])
+    for component in zip(contours, hierarchy):
+        cntr = component[0]
+        hier = component[1]
+        # discard outermost no parent contours and keep innermost no child contours
+        # hier = indices for next, previous, child, parent
+        # no parent or no child indicated by negative values
+        if (hier[3] > -1) & (hier[2] < 0):
+            count = count + 1
+            cv2.drawContours(result, [cntr], 0, (0,0,255), 2)
+        # contour_x, contour_y = contours[0][:,0,0], contours[0][:,0,1]
+        # plt.scatter(contour_x, contour_y)
+        # plt.show()
+        # cv2.drawContours(skeleton_copy, [contours[0]], -1, (255, 255, 0), 3, hierarchy=hierarchy)
+        cv2.imshow('contour', result)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+    return contours
+
+def make_skeletons(binary_image, plot = False):
     """
     This function uses the FilFinder package to find and prune skeletons of images.
     :param image: 2D numpy array or list of points that make up polygon mask
     :return fil.skeleton: 2D numpy array with skeletons
     :return radii: 1D numpy array that is a list of radii (which correspond to the skeleton coordinates)
     """
+    BRANCH_THRESH = 20  # Branches must be at least this many pixels long
+    MIN_CAP_LEN = 5  # Caps must be at least this many pixels long
     # Load in skeleton class for skeleton pruning
-    fil = FilFinder2D(image, beamwidth=0 * u.pix, mask=image)
+    fil = FilFinder2D(binary_image, beamwidth=0 * u.pix, mask=binary_image)
     # Use separate method to get radii
-    skeleton, distance = medial_axis(image, return_distance=True)
+    __, distance = medial_axis(binary_image, return_distance=True)
     # This is a necessary step for the fil object. It does nothing.
     fil.preprocess_image(skip_flatten=True)
     # This makes the skeleton
     fil.medskel()
-    # This prunes the skeleton
+    # This prunes the skeleton    
     fil.analyze_skeletons(branch_thresh=BRANCH_THRESH * u.pix, prune_criteria='length',
-                          skel_thresh=BRANCH_THRESH * u.pix)
-    # Multiply the radii by the skeleton, selects out the radii we care about.
-    distance_on_skeleton = distance * fil.skeleton
-    radii = distance[fil.skeleton.astype(bool)]
-    overlay = distance_on_skeleton + image
-    # This plots the histogram of the capillary and the capillary with distance values.
-    if verbose:
-        if histograms:
-            plt.hist(radii)
-            plt.show()
-        plt.imshow(distance_on_skeleton, cmap='magma')
-        plt.show()
-    if write:
-        if verbose:
-            plt.imshow(overlay)
-            plt.show()
-        plt.imsave(write_path, overlay)
-    return fil.skeleton, radii
+                          skel_thresh=MIN_CAP_LEN * u.pix)
 
-def make_skeletons_new(binary_image, plot=False):
-    BRANCH_THRESH = 5
-    fil = FilFinder2D(binary_image, beamwidth=0 * u.pix, mask=binary_image)
-    fil.preprocess_image(skip_flatten=True)
-    fil.medskel(verbose=False)
-    fil.analyze_skeletons(branch_thresh=BRANCH_THRESH * u.pix, prune_criteria='length',
-                          skel_thresh=BRANCH_THRESH * u.pix, verbose = plot)
+
+    # Multiply the radii by the skeleton, selects out the radii we care about.
+    distance_on_skeleton = distance * fil.skeleton_longpath
+    radii = distance[fil.skeleton_longpath.astype(bool)]
+    # This makes an overlay of the skeleton and the distance values
+    overlay = distance_on_skeleton + binary_image
+
+    # plot the skeleton and the pruned skeleton
     if plot:
         fig, axes = plt.subplots(1, 3, figsize=(16, 6), sharex=True, sharey=True)
         ax = axes.ravel()
@@ -177,59 +233,10 @@ def make_skeletons_new(binary_image, plot=False):
         ax[2].set_title('cut', fontsize=20)
         fig.tight_layout()        
         plt.show()
-    print(fil.skeleton_longpath.shape)
-    __, distance = medial_axis(binary_image, return_distance=True)
-    radii = distance[fil.skeleton_longpath.astype(bool)]
-    return fil.skeleton_longpath
-
-def make_skeletons(binary_image, plot=False):
-    """
-    This function skeletonizes a binary mask and prunes it to a single line.
-
-    Args:
-        binary_image (numpy.ndarray): the binary mask
-        plot (bool): whether to plot the result
-    Returns:
-        numpy.ndarray: the skeletonized binary mask
-    """
-
-    skeleton = perform_skeletonization(binary_image)
-    pruned_skeleton = prune_skeleton(skeleton)
-    # handled_skeleton = handle_loops(pruned_skeleton)
-    # copy_of_handled_skeleton = handled_skeleton.copy()
-    # cut_skeleton = cut_loops(copy_of_handled_skeleton)
-
     if plot:
-        # Display the result
-        fig, axes = plt.subplots(1, 3, figsize=(16, 6), sharex=True, sharey=True)
-        ax = axes.ravel()
-        ax[0].imshow(binary_image, cmap=plt.cm.gray)
-        ax[0].axis('off')
-        ax[0].set_title('original', fontsize=20)
-        ax[1].imshow(skeleton, cmap=plt.cm.gray)
-        ax[1].axis('off')
-        ax[1].set_title('skeleton', fontsize=20)
-        # ax[2].imshow(cut_skeleton, cmap=plt.cm.gray)
-        # ax[2].axis('off')
-        # ax[2].set_title('cut', fontsize=20)
-        fig.tight_layout()
+        plt.imshow(overlay)
         plt.show()
-    return pruned_skeleton #cut_skeleton
-
-
-def distance_to_edge(binary_mask, skeleton):
-    # Inverse of binary mask, as we want distances to the zeroes (boundary)
-    dist_transform = distance_transform_edt(~binary_mask)
-    skeleton_coords = np.nonzero(skeleton)
-    skeleton_distances = dist_transform[skeleton]
-
-    # skeleton_distances = {}
-    # for point in np.argwhere(skeleton):
-    #     tuple_point = tuple(point)
-    #     skeleton_distances[tuple_point] = dist_transform[tuple_point]
-        
-    return skeleton_distances
-
+    return fil.skeleton, fil.skeleton_longpath, radii
 
 if __name__ == "__main__":
     image_folder = 'C:\\Users\\gt8mar\\capillary-flow\\tests\\part09\\230414\\loc02\\segmented\\individual_caps_original'
@@ -239,13 +246,9 @@ if __name__ == "__main__":
         import cv2
         binary_mask = (io.imread(image_path, as_gray=True) > 0.5).astype(int)
         print(binary_mask.shape)
-        skeleton = make_skeletons_new(binary_mask, plot=False)
-        print(skeleton.shape)
-        skeleton_coords = np.nonzero(skeleton)
+        skeleton, skeleton_longest, radii = make_skeletons(binary_mask, plot=False)
         
-
-        distances = distance_to_edge(binary_mask, skeleton)
-        print(distances)
+        
         
 
 
