@@ -69,10 +69,10 @@ def make_overlays(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
     with open(resize_csv, 'r') as resize_values:
         reader = csv.reader(resize_values)
         rows = list(reader)
-        minx = abs(int(rows[0][0]))
-        maxx = abs(int(rows[0][1]))
-        miny = abs(int(rows[0][2]))
-        maxy = abs(int(rows[0][3]))
+        minx = int(rows[0][0])
+        maxx = int(rows[0][1])
+        miny = int(rows[0][2])
+        maxy = int(rows[0][3])
         #minx = None if minx == 0 else -minx
         #maxx = None if maxx == 0 else maxx
         #miny = None if miny == 0 else -miny
