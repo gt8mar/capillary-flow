@@ -120,6 +120,7 @@ def make_overlays(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
 
                 cap_img = cv2.imread(os.path.join(path, "segmented", "individual_caps_translated", cap))
                 cap_img = rgb2gray(cap_img)
+                print("cap_img size: " + cap_img.shape)
                 if miny==0 and minx==0:
                     resized_cap = cap_img[maxy:, maxx:]
                 elif miny==0:
@@ -128,7 +129,7 @@ def make_overlays(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
                     resized_cap = cap_img[maxy:miny, maxx:]
                 else:
                     resized_cap = cap_img[maxy:miny, maxx:minx]
-                
+                print("resized_cap_size: " + resized_cap.shape)
                 #get label coordinates
                 xcoord, ycoord = get_label_position(resized_cap)
 
