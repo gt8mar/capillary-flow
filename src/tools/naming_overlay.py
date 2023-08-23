@@ -148,13 +148,13 @@ def make_overlays(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
                 set_part_date, location, vid = extract_file_info(cap)
                 filename = set_part_date + location + vid + "overlay.png"
                 frame_img = overlayed
-        overlay_folder = os.path.join(path, "segmented", "overlays")
-        os.makedirs(overlay_folder, exist_ok=True)
-        cv2.imwrite(os.path.join(overlay_folder, filename), overlayed)
-        if platform.system() != 'Windows':
-            overlays_fp = '/hpc/projects/capillary-flow/results/size/overlays'
-            os.makedirs(overlays_fp, exist_ok=True)
-            cv2.imwrite(os.path.join(overlays_fp, filename), overlayed)
+                overlay_folder = os.path.join(path, "segmented", "overlays")
+                os.makedirs(overlay_folder, exist_ok=True)
+                cv2.imwrite(os.path.join(overlay_folder, filename), overlayed)
+                if platform.system() != 'Windows':
+                    overlays_fp = '/hpc/projects/capillary-flow/results/size/overlays'
+                    os.makedirs(overlays_fp, exist_ok=True)
+                    cv2.imwrite(os.path.join(overlays_fp, filename), overlayed)
 
 
 if __name__ == "__main__":
