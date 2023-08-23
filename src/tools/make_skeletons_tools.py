@@ -240,13 +240,14 @@ def make_skeletons(binary_image, plot = False):
 
 if __name__ == "__main__":
     image_folder = 'C:\\Users\\gt8mar\\capillary-flow\\tests\\part09\\230414\\loc02\\segmented\\individual_caps_original'
-    image_names = ['set01_part09_230414_loc02_vid19_seg_cap_06a.png','set01_part09_230414_loc02_vid22_seg_cap_06a.png']
+    # image_names = ['set01_part09_230414_loc02_vid19_seg_cap_06a.png','set01_part09_230414_loc02_vid22_seg_cap_06a.png']
+    image_names = ['set01_part09_230414_loc02_vid27_seg_cap_03b.png']
     for image_name in image_names:
         image_path = os.path.join(image_folder, image_name)
         import cv2
         binary_mask = (io.imread(image_path, as_gray=True) > 0.5).astype(int)
         print(binary_mask.shape)
-        skeleton, skeleton_longest, radii = make_skeletons(binary_mask, plot=False)
+        skeleton, skeleton_longest, radii = make_skeletons(binary_mask, plot=True)
         
         
         

@@ -27,18 +27,44 @@ from src.tools.enumerate_capillaries import enumerate_capillaries
 from src.tools.enumerate_capillaries2 import find_connected_components
 import warnings
 import pandas as pd
+from scipy.ndimage import convolve
+
 
 
 BRANCH_THRESH = 20
 MIN_CAP_LEN = 5
 
+def find_junctions(skel):
+    """Finds pixels with exactly three neighbors."""
+    kernel = np.array([
+        [1, 1, 1],
+        [1, 10, 1],
+        [1, 1, 1]
+    ])
+
+    neighbors_count = convolve(skel.astype(int), kernel, mode='constant', cval=0)
+    return (neighbors_count - 10 == 3) & skel
+def find_endpoints(skel):
+    # Define a kernel that counts the number of neighbors
+    kernel = np.array([
+        [1, 1, 1],
+        [1, 10, 1],
+        [1, 1, 1]
+    ])
+
+    neighbors_count = convolve(skel.astype(int), kernel, mode='constant', cval=0)
+    # Endpoints are skeleton points with only one neighbor
+    return (neighbors_count == 11) & skel
 
 def make_skeletons(binary_image, plot = False):
     """
     This function uses the FilFinder package to find and prune skeletons of images.
-    :param image: 2D numpy array or list of points that make up polygon mask
-    :return fil.skeleton: 2D numpy array with skeletons
-    :return radii: 1D numpy array that is a list of radii (which correspond to the skeleton coordinates)
+    Args:
+        image: 2D numpy array or list of points that make up polygon mask
+    Returns:
+        skeleton: 2D numpy array with skeletons
+        skeleton_longpath: 2D numpy array with skeletons that have been pruned to a single line
+        radii: 1D numpy array that is a list of radii (which correspond to the skeleton coordinates)
     """
    
     # Load in skeleton class for skeleton pruning
@@ -48,54 +74,67 @@ def make_skeletons(binary_image, plot = False):
     # This is a necessary step for the fil object. It does nothing.
     fil.preprocess_image(skip_flatten=True)
     # This makes the skeleton
-    fil.medskel(verbose=True)
+    fil.medskel(verbose=False)
     # find highest point in the skeleton (lowest row)
-    highest_point = np.argmin(np.nonzero(fil.skeleton)[0])
-    # do a depth first search, beginning at the highest point to find intersection points. if none, then it is a loop
-    # TODO: blast a whole, then search for junctions. If none, then it is a loop
+    junctions = np.asarray(np.nonzero(find_junctions(fil.skeleton))).shape[1]
+    endpoints = np.asarray(np.nonzero(find_endpoints(fil.skeleton))).shape[1]
+    print(f'Number of junctions is {junctions}')
+    print(f'Number of endpoints is {endpoints}')
+    print('-----------------------------------------------')
+    if junctions == 0 and endpoints == 0:
+        # Note: it's unclear if it is necessary to cut the loop. I think it makes sense for kymographs but it could work without.
+        print('This is a loop')
+        # POINTS_TO_CUT = 5
+        # rows, cols = np.nonzero(fil.skeleton)
+        # highest_point = (rows[0], cols[0])
+        # sorted_skeleton_coords, optimal_order = sort_continuous(np.asarray(np.nonzero(fil.skeleton)))
+        # top_points = np.concatenate((sorted_skeleton_coords[:POINTS_TO_CUT], sorted_skeleton_coords[-POINTS_TO_CUT:]), axis=1)
+        # # blast a hole at the top of the loop
+        # for point in top_points:
+        #     row = point[0]
+        #     col = point[1]
+        #     print(f'row: {row}, col: {col}')
+        #     fil.skeleton[row, col] = 0     
 
-    # def dfs(row, col, parent, visited, skeleton):
-    #     visited.add((row, col))
-    #     loop = []
-    #     for dr, dc in directions:
-    #         r = row + dr
-    #         c = col + dc
-    #         if 0 <= r < skeleton.shape[0] and 0 <= c < skeleton.shape[1] and skeleton[r, c] == 1 and (r, c) not in visited:
-    #             loop.append((r, c))
-    #             loop += dfs(r, c, (row, col), visited, skeleton)
-    #     return loop
+        #  # Multiply the radii by the skeleton, selects out the radii we care about.
+        distance_on_skeleton = distance * fil.skeleton
+        radii = distance[fil.skeleton.astype(bool)]
+        # This makes an overlay of the skeleton and the distance values
+        overlay = distance_on_skeleton + binary_image
 
+        if plot:
+            plt.imshow(overlay)
+            plt.show()
+        return fil.skeleton, fil.skeleton, radii
+    else:    
+        # This prunes the skeleton
+        fil.analyze_skeletons(branch_thresh=BRANCH_THRESH * u.pix, prune_criteria='length',
+                            skel_thresh=MIN_CAP_LEN * u.pix)
+        # Multiply the radii by the skeleton, selects out the radii we care about.
+        distance_on_skeleton = distance * fil.skeleton_longpath
+        radii = distance[fil.skeleton_longpath.astype(bool)]
+        # This makes an overlay of the skeleton and the distance values
+        overlay = distance_on_skeleton + binary_image
 
-
-    
-    # This prunes the skeleton
-    fil.analyze_skeletons(branch_thresh=BRANCH_THRESH * u.pix, prune_criteria='length',
-                          skel_thresh=MIN_CAP_LEN * u.pix)
-    # Multiply the radii by the skeleton, selects out the radii we care about.
-    distance_on_skeleton = distance * fil.skeleton_longpath
-    radii = distance[fil.skeleton_longpath.astype(bool)]
-    # This makes an overlay of the skeleton and the distance values
-    overlay = distance_on_skeleton + binary_image
-
-    # plot the skeleton and the pruned skeleton
-    if plot:
-        fig, axes = plt.subplots(1, 3, figsize=(16, 6), sharex=True, sharey=True)
-        ax = axes.ravel()
-        ax[0].imshow(binary_image, cmap=plt.cm.gray)
-        ax[0].axis('off')
-        ax[0].set_title('original', fontsize=20)
-        ax[1].imshow(fil.skeleton, cmap=plt.cm.gray)
-        ax[1].axis('off')
-        ax[1].set_title('skeleton', fontsize=20)
-        ax[2].imshow(fil.skeleton_longpath, cmap=plt.cm.gray)
-        ax[2].axis('off')
-        ax[2].set_title('cut', fontsize=20)
-        fig.tight_layout()        
-        plt.show()
-    if plot:
-        plt.imshow(overlay)
-        plt.show()
-    return fil.skeleton, fil.skeleton_longpath, radii
+        # plot the skeleton and the pruned skeleton
+        if plot:
+            fig, axes = plt.subplots(1, 3, figsize=(16, 6), sharex=True, sharey=True)
+            ax = axes.ravel()
+            ax[0].imshow(binary_image, cmap=plt.cm.gray)
+            ax[0].axis('off')
+            ax[0].set_title('original', fontsize=20)
+            ax[1].imshow(fil.skeleton, cmap=plt.cm.gray)
+            ax[1].axis('off')
+            ax[1].set_title('skeleton', fontsize=20)
+            ax[2].imshow(fil.skeleton_longpath, cmap=plt.cm.gray)
+            ax[2].axis('off')
+            ax[2].set_title('cut', fontsize=20)
+            fig.tight_layout()        
+            plt.show()
+        if plot:
+            plt.imshow(overlay)
+            plt.show()
+        return fil.skeleton, fil.skeleton_longpath, radii
 def add_radii_value(distance_array):
     """
     This function creates a list of radii for the skeleton of an image
