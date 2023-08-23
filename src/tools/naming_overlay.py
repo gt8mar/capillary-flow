@@ -62,7 +62,7 @@ def extract_file_info(filename):
     vid = "" if vmatch == None else "vid" + vmatch.group(1) + "_"
     return set_part_date, location, vid
 
-def make_overlays(path="E:\\Marcus\\gabby_test_data\\debugging\\part09\\230414\\loc02"):
+def make_overlays(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
     reg_moco_fp = os.path.join(path, "segmented", "moco_registered")
 
     resize_csv = os.path.join(path, "segmented", "resize_vals.csv")
@@ -144,7 +144,7 @@ def make_overlays(path="E:\\Marcus\\gabby_test_data\\debugging\\part09\\230414\\
                 overlay = overlay.astype(np.uint8)
                 overlayed = cv2.addWeighted(frame_img, 1, overlay, 1, 0)
 
-                c2match = re.search(r'cap_(\d{3})', cap)
+                c2match = re.search(r'cap_(.{3})', cap)
                 capnuma = "cap_" + c2match.group(1)
                 cv2.putText(overlayed, capnuma, (xcoord, ycoord), cv2.FONT_HERSHEY_PLAIN, 2, color, 2, cv2.FILLED)
 
