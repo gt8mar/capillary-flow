@@ -55,7 +55,7 @@ def rename_files(directory_path):
             os.rename(old_path, new_path)
 
 def extract_file_info(filename):
-    set_part_date = filename[:21] #with trailing underscore
+    set_part_date = filename[:20] #with trailing underscore
     lmatch = re.search(r'loc(\d{2})', filename)
     location = "" if lmatch == None else "loc" + lmatch.group(1) + "_"
     vmatch = re.search(r'vid(\d{2})', filename)
