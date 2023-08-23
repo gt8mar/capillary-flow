@@ -74,9 +74,9 @@ def make_overlays(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
         miny = abs(int(rows[0][2]))
         maxy = abs(int(rows[0][3]))
         minx = None if minx == 0 else -minx
-        maxx = None if maxx == 0 else maxx
+        #maxx = None if maxx == 0 else maxx
         miny = None if miny == 0 else -miny
-        maxy = None if maxy == 0 else maxy
+        #maxy = None if maxy == 0 else maxy
 
         predefined_colors = [
             (255, 0, 0),    # Red
