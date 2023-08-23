@@ -120,10 +120,10 @@ def make_overlays(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
 
                 cap_img = cv2.imread(os.path.join(path, "segmented", "individual_caps_translated", cap))
                 cap_img = rgb2gray(cap_img)
-                print("minx: " + minx)
-                print("maxx: " + maxx)
-                print("miny: " + miny)
-                print("maxy: " + maxy)
+                print("minx: " + str(minx))
+                print("maxx: " + str(maxx))
+                print("miny: " + str(miny))
+                print("maxy: " + str(maxy))
                 print("cap_img size: " + str(cap_img.shape))
                 if miny==0 and minx==0:
                     resized_cap = cap_img[maxy:, maxx:]
