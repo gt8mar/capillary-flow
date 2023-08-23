@@ -55,7 +55,7 @@ def rename_files(directory_path):
             os.rename(old_path, new_path)
 
 def extract_file_info(filename):
-    set_part_date = filename[:21] #with trailing underscore
+    set_part_date = filename[:20] #with trailing underscore
     lmatch = re.search(r'loc(\d{2})', filename)
     location = "" if lmatch == None else "loc" + lmatch.group(1) + "_"
     vmatch = re.search(r'vid(\d{2})', filename)
@@ -73,10 +73,10 @@ def make_overlays(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
         maxx = abs(int(rows[0][1]))
         miny = abs(int(rows[0][2]))
         maxy = abs(int(rows[0][3]))
-        minx = None if minx == 0 else -minx
-        maxx = None if maxx == 0 else maxx
-        miny = None if miny == 0 else -miny
-        maxy = None if maxy == 0 else maxy
+        #minx = None if minx == 0 else -minx
+        #maxx = None if maxx == 0 else maxx
+        #miny = None if miny == 0 else -miny
+        #maxy = None if maxy == 0 else maxy
 
         predefined_colors = [
             (255, 0, 0),    # Red
@@ -120,8 +120,20 @@ def make_overlays(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
 
                 cap_img = cv2.imread(os.path.join(path, "segmented", "individual_caps_translated", cap))
                 cap_img = rgb2gray(cap_img)
-                resized_cap = cap_img[maxy:miny, maxx:minx]
-                
+                print("minx: " + str(minx))
+                print("maxx: " + str(maxx))
+                print("miny: " + str(miny))
+                print("maxy: " + str(maxy))
+                print("cap_img size: " + str(cap_img.shape))
+                if miny==0 and minx==0:
+                    resized_cap = cap_img[maxy:, maxx:]
+                elif miny==0:
+                    resized_cap = cap_img[maxy:, maxx:minx]
+                elif minx==0:
+                    resized_cap = cap_img[maxy:miny, maxx:]
+                else:
+                    resized_cap = cap_img[maxy:miny, maxx:minx]
+                print("resized_cap_size: " + str(resized_cap.shape))
                 #get label coordinates
                 xcoord, ycoord = get_label_position(resized_cap)
 
@@ -141,13 +153,13 @@ def make_overlays(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
                 set_part_date, location, vid = extract_file_info(cap)
                 filename = set_part_date + location + vid + "overlay.png"
                 frame_img = overlayed
-        overlay_folder = os.path.join(path, "segmented", "overlays")
-        os.makedirs(overlay_folder, exist_ok=True)
-        cv2.imwrite(os.path.join(overlay_folder, filename), overlayed)
-        if platform.system() != 'Windows':
-            overlays_fp = '/hpc/projects/capillary-flow/results/size/overlays'
-            os.makedirs(overlays_fp, exist_ok=True)
-            cv2.imwrite(os.path.join(overlays_fp, filename), overlayed)
+                overlay_folder = os.path.join(path, "segmented", "overlays")
+                os.makedirs(overlay_folder, exist_ok=True)
+                cv2.imwrite(os.path.join(overlay_folder, filename), overlayed)
+                if platform.system() != 'Windows':
+                    overlays_fp = '/hpc/projects/capillary-flow/results/size/overlays'
+                    os.makedirs(overlays_fp, exist_ok=True)
+                    cv2.imwrite(os.path.join(overlays_fp, filename), overlayed)
 
 
 if __name__ == "__main__":
