@@ -92,10 +92,10 @@ def align_segmented(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
             cv2.imwrite(os.path.join(reg_moco_folder, os.path.basename(input_moco_fp)), registered_image)
 
     #get max size of segmented img
-    minx = min(min(entry[0], 0) for entry in translations)
-    maxx = max(max(entry[0], 0) for entry in translations)
-    miny = min(min(entry[1], 0) for entry in translations)
-    maxy = max(max(entry[1], 0) for entry in translations)
+    minx = min(0, min(entry[0] for entry in translations))
+    maxx = max(0, max(entry[0] for entry in translations))
+    miny = min(0, min(entry[1] for entry in translations))
+    maxy = max(0, max(entry[1] for entry in translations))
 
     resize_vals = []
 
