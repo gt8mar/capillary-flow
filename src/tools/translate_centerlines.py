@@ -66,6 +66,7 @@ def rename_caps(coords_fp, individual_caps_fp):
     names = []
     renamed_folder_fp = os.path.join(os.path.split(coords_fp)[0], "renamed")
     os.makedirs(renamed_folder_fp, exist_ok=True)
+    print("renamed folder created")
     for file in os.listdir(coords_fp):
         
         match = re.search(r'vid(\d{2})', file)
@@ -79,7 +80,7 @@ def rename_caps(coords_fp, individual_caps_fp):
             midpoint_row = rows[len(rows) // 2]
             midpoint_x = midpoint_row[0]
             midpoint_y = midpoint_row[1]
-            
+            print("midpoint_x: " + str(midpoint_x))
             for vid in vids:
                 image_array = cv2.imread(os.path.join(individual_caps_fp, vid))
                 gray_image = cv2.cvtColor(image_array, cv2.COLOR_BGR2GRAY)
@@ -87,9 +88,11 @@ def rename_caps(coords_fp, individual_caps_fp):
                 midpoint_y_int = int(float(midpoint_y))
                 num_matches = 0
                 if gray_image[midpoint_x_int][midpoint_y_int] > 0:
+                    print("at least 1 match")
                     for row in rows:
                         if gray_image[int(float(row[0]))][int(float(row[1]))] > 0:
                             num_matches += 1
+                    print("num_matches: " + str(num_matches))
                     if num_matches > 0.8*len(rows):
                         new_csv_filename = file[:-6] + vid[-11:-4] + ".csv"
                         shutil.copy(os.path.join(coords_fp, file), os.path.join(renamed_folder_fp, new_csv_filename))
