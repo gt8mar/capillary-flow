@@ -26,8 +26,6 @@ def rename(path):
             new_path = os.path.join(individual_caps_original_fp, new_filename)
             os.rename(original_path, new_path)
 
-    
-    
 
 if __name__ == "__main__":
     ticks = time.time()
