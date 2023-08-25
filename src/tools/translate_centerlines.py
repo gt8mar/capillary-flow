@@ -54,8 +54,8 @@ def translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_c
     os.makedirs(translated_coords_fp, exist_ok=True)
     #apply translation
     for x in range(len(grouped_coords_listdir)):
-        dy = int(float(translations[x][0])) - int(float(crops[x][0]) + maxy)
-        dx = int(float(translations[x][1])) - int(float(crops[x][3]) + maxx)
+        dy = int(float(translations[x][0])) - int(float(crops[x][0]) + int(maxy))
+        dx = int(float(translations[x][1])) - int(float(crops[x][3]) + int(maxx))
         for file in grouped_coords_listdir[x]:
             with open(os.path.join(coords_fp, file), 'r') as orig_coords:
                 reader = csv.reader(orig_coords)
