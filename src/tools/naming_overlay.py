@@ -62,7 +62,7 @@ def extract_file_info(filename):
     vid = "" if vmatch == None else "vid" + vmatch.group(1) + "_"
     return set_part_date, location, vid
 
-def make_overlays(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
+def make_overlays(path="E:\\Marcus\\gabby_test_data\\debugging\\part09\\230414\\loc02"):
     reg_moco_fp = os.path.join(path, "segmented", "moco_registered")
 
     resize_csv = os.path.join(path, "segmented", "resize_vals.csv")
