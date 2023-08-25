@@ -159,7 +159,7 @@ def plot_area_by_length(caps_fp, centerlines_fp, metadata_fp):
     caps_listdir_nobp = exclude_bp_scan(caps_listdir_nofrag, metadata_fp)
 
     plotinfo = []
-
+    print("1: " + str(len(caps_listdir_nobp)))
     for cap in caps_listdir_nobp:
         cap_img = cv2.imread(os.path.join(caps_fp, cap), cv2.IMREAD_GRAYSCALE)
         vmatch = re.search(r'vid(\d{2})', cap)
@@ -195,7 +195,7 @@ def plot_area_by_length(caps_fp, centerlines_fp, metadata_fp):
                 break
 
         plotinfo.append([area/length, pressure, capnum, vidnum])
-
+    print("2: " + str(len(plotinfo)))
     partnum = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(caps_fp)))))
     date = os.path.basename((os.path.dirname(os.path.dirname(os.path.dirname(caps_fp)))))
     location = os.path.basename(os.path.dirname(os.path.dirname(caps_fp)))
