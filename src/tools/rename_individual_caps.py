@@ -5,7 +5,7 @@ import pandas as pd
 def rename(path):
     individual_caps_translated_fp = os.path.join(path, "segmented", "individual_caps_translated")
     individual_caps_original_fp = os.path.join(path, "segmented", "individual_caps_original")
-    rename_map_fp = "/hpc/projects/capillary-flow/results/size/rename_map.xlsx "
+    rename_map_fp = "/hpc/projects/capillary-flow/results/size/rename_map.csv"
     df = pd.read_csv(rename_map_fp)
 
     #rename translated in loc folders
