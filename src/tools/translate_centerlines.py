@@ -18,7 +18,7 @@ import re
 import shutil
 
 #translates the y and x coordinates of centerlines by the translation values in ~/translations.csv and ~/crop_values.csv
-def translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_csv):
+def translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_csv, resize_csv):
     #group coords files by video
     pattern = r"vid(\d{2})"
     groups = {}
@@ -43,12 +43,18 @@ def translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_c
         for row in reader:
             crops.append(row)
 
+    #read resize csv
+    with open(resize_csv, 'r') as resize_file:
+        reader = csv.reader(resize_file)
+        maxx = reader[0][1]
+        maxy = reader[0][3]
+
     translated_coords_fp = os.path.join(os.path.dirname(coords_fp), "translated")
     os.makedirs(translated_coords_fp, exist_ok=True)
     #apply translation
     for x in range(len(grouped_coords_listdir)):
-        dy = int(float(translations[x][0])) - int(float(crops[x][0]))
-        dx = int(float(translations[x][1])) - int(float(crops[x][3]))
+        dy = int(float(translations[x][0])) - int(float(crops[x][0]) + maxy)
+        dx = int(float(translations[x][1])) - int(float(crops[x][3]) + maxx)
         for file in grouped_coords_listdir[x]:
             with open(os.path.join(coords_fp, file), 'r') as orig_coords:
                 reader = csv.reader(orig_coords)
@@ -66,9 +72,7 @@ def rename_caps(coords_fp, individual_caps_fp):
     names = []
     renamed_folder_fp = os.path.join(os.path.split(coords_fp)[0], "renamed")
     os.makedirs(renamed_folder_fp, exist_ok=True)
-    for file in os.listdir(coords_fp):
-        print("file")
-        
+    for file in os.listdir(coords_fp):        
         match = re.search(r'vid(\d{2})', file)
         vidnum = match.group(1)
         vids = [string for string in os.listdir(individual_caps_fp) if f"vid{vidnum}" in string]
@@ -91,7 +95,6 @@ def rename_caps(coords_fp, individual_caps_fp):
                         if gray_image[int(float(row[0]))][int(float(row[1]))] > 0:
                             num_matches += 1
                     if num_matches > 0.8*len(rows):
-                        print("append")
                         new_csv_filename = file[:-6] + vid[-11:-4] + ".csv"
                         shutil.copy(os.path.join(coords_fp, file), os.path.join(renamed_folder_fp, new_csv_filename))
                         names.append([file, new_csv_filename])
@@ -141,7 +144,7 @@ def show_centerlines(projected_caps_fp, coords_fp, individual_caps_fp):
         cv2.waitKey(0)  
 
 
-def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
+def main(path="E:\\Marcus\\gabby_test_data\\debugging\\part13\\230428\\loc02"):
     coords_fp = os.path.join(path, "centerlines", "coords")
     segmented_folder = os.path.join(path, "segmented")
 
@@ -149,9 +152,10 @@ def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
     translations_csv = os.path.join(segmented_folder, "translations.csv")
     projected_caps_fp = os.path.join(segmented_folder, "proj_caps")
     crops_csv = os.path.join(segmented_folder, "crop_values.csv")
+    resize_csv = os.path.join(segmented_folder, "resize_vals.csv")
     individual_caps_fp = os.path.join(segmented_folder, "individual_caps_translated")
 
-    translated_coords_fp = translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_csv)
+    translated_coords_fp = translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_csv, resize_csv)
     
     renamed_coords_fp = rename_caps(translated_coords_fp, individual_caps_fp)
     #show_centerlines(projected_caps_fp, renamed_coords_fp, individual_caps_fp)
