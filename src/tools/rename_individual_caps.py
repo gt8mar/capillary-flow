@@ -2,7 +2,7 @@ import time
 import os
 import pandas as pd
 
-def main(path):
+def rename(path):
     individual_caps_translated_fp = os.path.join(path, "segmented", "individual_caps_translated")
     individual_caps_original_fp = os.path.join(path, "segmented", "individual_caps_original")
     rename_map_fp = "/hpc/projects/capillary-flow/results/size/rename_map.xlsx "
@@ -31,6 +31,6 @@ def main(path):
 
 if __name__ == "__main__":
     ticks = time.time()
-    main()
+    rename()
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
