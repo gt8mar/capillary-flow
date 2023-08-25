@@ -75,7 +75,6 @@ def group_by_vidnum(plotinfo):
 def quantitative_subplots(plotinfo, partnum, date, location):
     grouped_plotinfo = group_by_cap(plotinfo)
     num_plots = len(grouped_plotinfo)
-    print("num_plots: " str(num_plots))
     num_cols = min(num_plots, 3)
     num_rows = (num_plots + num_cols - 1) // num_cols
     fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 5 * num_rows), sharey=True)
