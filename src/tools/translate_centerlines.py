@@ -46,8 +46,8 @@ def translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_c
     #read resize csv
     with open(resize_csv, 'r') as resize_file:
         reader = csv.reader(resize_file)
-        maxx = reader[0][1]
-        maxy = reader[0][3]
+        maxx = list(reader)[0][1]
+        maxy = list(reader)[0][3]
 
     translated_coords_fp = os.path.join(os.path.dirname(coords_fp), "translated")
     os.makedirs(translated_coords_fp, exist_ok=True)
