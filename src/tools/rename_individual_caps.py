@@ -1,0 +1,36 @@
+import time
+import os
+import pandas as pd
+
+def main(path):
+    individual_caps_translated_fp = os.path.join(path, "segmented", "individual_caps_translated")
+    individual_caps_original_fp = os.path.join(path, "segmented", "individual_caps_original")
+    rename_map_fp = "/hpc/projects/capillary-flow/results/size/rename_map.xlsx "
+    df = pd.read_excel(rename_map_fp)
+
+    #rename translated in loc folders
+    for file in os.listdir(individual_caps_translated_fp):
+        matching_row = df[df.iloc[:, 0] == file]
+        if not matching_row.empty:
+            new_filename = matching_row.iloc[0, 1]
+            original_path = os.path.join(individual_caps_translated_fp, file)
+            new_path = os.path.join(individual_caps_translated_fp, new_filename)
+            os.rename(original_path, new_path)
+
+    #rename original in loc folders
+    for file in os.listdir(individual_caps_original_fp):
+        matching_row = df[df.iloc[:, 0] == file]
+        if not matching_row.empty:
+            new_filename = matching_row.iloc[0, 1]
+            original_path = os.path.join(individual_caps_original_fp, file)
+            new_path = os.path.join(individual_caps_original_fp, new_filename)
+            os.rename(original_path, new_path)
+
+    
+    
+
+if __name__ == "__main__":
+    ticks = time.time()
+    main()
+    print("--------------------")
+    print("Runtime: " + str(time.time() - ticks))
