@@ -107,8 +107,10 @@ def quantitative_subplots(plotinfo, partnum, date, location):
         x_scatter_dec = [float(entry[1]) for entry in sorted_dec_cap]  
         y_scatter_dec = [entry[0] for entry in sorted_dec_cap]
 
+        ax = axes  # Use ax for the single subplot
         ax.scatter(x_scatter_inc, y_scatter_inc, c="Black")
         ax.scatter(x_scatter_dec, y_scatter_dec, c="Black")
+
 
         x_line_inc = [float(entry[1]) for entry in increasing_cap]
         y_line_inc = [entry[0] for entry in increasing_cap]
