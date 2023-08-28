@@ -47,15 +47,17 @@ def translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_c
     with open(resize_csv, 'r') as resize_file:
         reader = csv.reader(resize_file)
         row = next(reader)
+        minx = row[0]
         maxx = row[1]
+        miny = row[2]
         maxy = row[3]
 
     translated_coords_fp = os.path.join(os.path.dirname(coords_fp), "translated")
     os.makedirs(translated_coords_fp, exist_ok=True)
     #apply translation
     for x in range(len(grouped_coords_listdir)):
-        dy = int(float(translations[x][0])) - int(float(crops[x][0]) - int(maxy))
-        dx = int(float(translations[x][1])) - int(float(crops[x][3]) - int(maxx))
+        dy = int(float(translations[x][0])) - int(float(crops[x][0]) + int(maxx))
+        dx = int(float(translations[x][1])) - int(float(crops[x][3]) + int(maxy))
         for file in grouped_coords_listdir[x]:
             with open(os.path.join(coords_fp, file), 'r') as orig_coords:
                 reader = csv.reader(orig_coords)
@@ -109,7 +111,8 @@ def rename_caps(coords_fp, individual_caps_fp):
     return renamed_folder_fp
 
 def show_centerlines(projected_caps_fp, coords_fp, individual_caps_fp):
-    maxproj = np.zeros([1080,1440,3])
+    y, x, _ = cv2.imread(os.path.join(projected_caps_fp, os.listdir(projected_caps_fp)[0])).shape
+    maxproj = np.zeros([y,x,3])
     for cap in os.listdir(projected_caps_fp):
         maxproj += cv2.imread(os.path.join(projected_caps_fp, cap))
 
@@ -145,7 +148,7 @@ def show_centerlines(projected_caps_fp, coords_fp, individual_caps_fp):
         cv2.waitKey(0)  
 
 
-def main(path="E:\\Marcus\\gabby_test_data\\debugging\\part13\\230428\\loc02"):
+def main(path="E:\\Marcus\\gabby_test_data\\debugging\\part09\\230414\\loc04"):
     coords_fp = os.path.join(path, "centerlines", "coords")
     segmented_folder = os.path.join(path, "segmented")
 
