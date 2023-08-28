@@ -86,6 +86,63 @@ def quantitative_subplots(plotinfo, partnum, date, location):
     overall_min_x = float('inf')
     overall_max_x = float('-inf')
 
+    if num_plots == 1:  # Only one group in grouped_plotinfo
+        cap = grouped_plotinfo[0]
+        
+        max_index = len(cap)
+        for i in range(1, len(cap)):
+            if cap[i][1] < cap[i - 1][1]:
+                max_index = i
+                break
+
+        increasing_cap = cap[:max_index]
+        decreasing_cap = cap[max_index - 1:]
+
+        sorted_inc_cap = sorted(increasing_cap, key=lambda x: x[1])
+        sorted_dec_cap = sorted(decreasing_cap, key=lambda x: x[1])
+
+        x_scatter_inc = [float(entry[1]) for entry in sorted_inc_cap]  
+        y_scatter_inc = [entry[0] for entry in sorted_inc_cap]
+
+        x_scatter_dec = [float(entry[1]) for entry in sorted_dec_cap]  
+        y_scatter_dec = [entry[0] for entry in sorted_dec_cap]
+
+        ax.scatter(x_scatter_inc, y_scatter_inc, c="Black")
+        ax.scatter(x_scatter_dec, y_scatter_dec, c="Black")
+
+        x_line_inc = [float(entry[1]) for entry in increasing_cap]
+        y_line_inc = [entry[0] for entry in increasing_cap]
+
+        for i in range(len(x_line_inc) - 1):
+            ax.plot([x_line_inc[i], x_line_inc[i + 1]], [y_line_inc[i], y_line_inc[i + 1]], c="Blue")
+
+        x_line_dec = [float(entry[1]) for entry in decreasing_cap]
+        y_line_dec = [entry[0] for entry in decreasing_cap]
+
+        for i in range(len(x_line_dec) - 1):
+            ax.plot([x_line_dec[i], x_line_dec[i + 1]], [y_line_dec[i], y_line_dec[i + 1]], c="Red")
+
+        if len(x_line_inc) > 1:
+            inc_slope, _ = np.polyfit(x_line_inc, y_line_inc, 1)
+        else:
+            inc_slope = ""
+        line_name_inc = "inc_" + partnum + "_" + date + "_" + location + "_cap" + cap[0][2] 
+        if len(x_line_dec) > 1:
+            dec_slope, _ = np.polyfit(x_line_dec, y_line_dec, 1)
+        else:
+            dec_slope = ""
+        line_name_dec = "dec_" + partnum + "_" + date + "_" + location + "_cap" + cap[0][2] 
+        slope_data.append([line_name_inc, inc_slope])
+        slope_data.append([line_name_dec, dec_slope])
+
+        ax.set_xlabel('Pressure (psi)')
+        ax.set_ylabel('Area/Length')
+        ax.set_title("cap" + cap[0][2])
+
+        overall_min_x = min(chain([overall_min_x], x_scatter_inc, x_scatter_dec))
+        overall_max_x = max(chain([overall_max_x], x_scatter_inc, x_scatter_dec))
+
+
     for i, ax in enumerate(axes.flat):
         if i < num_plots:
             cap = grouped_plotinfo[i]
@@ -150,7 +207,7 @@ def quantitative_subplots(plotinfo, partnum, date, location):
     for ax in axes.flat[:num_plots]:
         ax.set_xlim(overall_min_x, overall_max_x)
 
-    plt.tight_layout()
+    #plt.tight_layout()
     plt.show()
     return fig, slope_data 
 
@@ -201,7 +258,7 @@ def plot_area_by_length(caps_fp, centerlines_fp, metadata_fp):
     location = os.path.basename(os.path.dirname(os.path.dirname(caps_fp)))
     return quantitative_subplots(plotinfo, partnum, date, location)
     
-def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
+def main(path="E:\\Marcus\\gabby_test_data\\debugging\\part09\\230414\\loc04"):
     participant = os.path.basename(os.path.dirname(os.path.dirname(path)))
     date = os.path.basename(os.path.dirname(path))
     location = os.path.basename(path)
