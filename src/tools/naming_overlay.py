@@ -62,21 +62,17 @@ def extract_file_info(filename):
     vid = "" if vmatch == None else "vid" + vmatch.group(1) + "_"
     return set_part_date, location, vid
 
-def make_overlays(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
+def make_overlays(path="E:\\Marcus\\gabby_test_data\\debugging\\part09\\230414\\loc02"):
     reg_moco_fp = os.path.join(path, "segmented", "moco_registered")
 
     resize_csv = os.path.join(path, "segmented", "resize_vals.csv")
     with open(resize_csv, 'r') as resize_values:
         reader = csv.reader(resize_values)
         rows = list(reader)
-        minx = abs(int(rows[0][0]))
-        maxx = abs(int(rows[0][1]))
-        miny = abs(int(rows[0][2]))
-        maxy = abs(int(rows[0][3]))
-        #minx = None if minx == 0 else -minx
-        #maxx = None if maxx == 0 else maxx
-        #miny = None if miny == 0 else -miny
-        #maxy = None if maxy == 0 else maxy
+        minx = int(rows[0][0])
+        maxx = int(rows[0][1])
+        miny = int(rows[0][2])
+        maxy = int(rows[0][3])
 
         predefined_colors = [
             (255, 0, 0),    # Red
@@ -120,11 +116,7 @@ def make_overlays(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
 
                 cap_img = cv2.imread(os.path.join(path, "segmented", "individual_caps_translated", cap))
                 cap_img = rgb2gray(cap_img)
-                print("minx: " + str(minx))
-                print("maxx: " + str(maxx))
-                print("miny: " + str(miny))
-                print("maxy: " + str(maxy))
-                print("cap_img size: " + str(cap_img.shape))
+
                 if miny==0 and minx==0:
                     resized_cap = cap_img[maxy:, maxx:]
                 elif miny==0:
@@ -133,7 +125,10 @@ def make_overlays(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
                     resized_cap = cap_img[maxy:miny, maxx:]
                 else:
                     resized_cap = cap_img[maxy:miny, maxx:minx]
-                print("resized_cap_size: " + str(resized_cap.shape))
+
+                if np.argwhere(resized_cap != 0).size == 0:
+                    continue
+
                 #get label coordinates
                 xcoord, ycoord = get_label_position(resized_cap)
 
@@ -148,7 +143,10 @@ def make_overlays(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
                                 
                 overlay = overlay.astype(np.uint8)
                 overlayed = cv2.addWeighted(frame_img, 1, overlay, 1, 0)
-                cv2.putText(overlayed, capnum, (xcoord, ycoord), cv2.FONT_HERSHEY_PLAIN, 2, color, 2, cv2.FILLED)
+
+                c2match = re.search(r'cap_(.{3})', cap)
+                capnuma = "cap_" + c2match.group(1)
+                cv2.putText(overlayed, capnuma, (xcoord, ycoord), cv2.FONT_HERSHEY_PLAIN, 2, color, 2, cv2.FILLED)
 
                 set_part_date, location, vid = extract_file_info(cap)
                 filename = set_part_date + location + vid + "overlay.png"

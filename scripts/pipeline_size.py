@@ -5,6 +5,7 @@ from src.tools import plot_area
 from src.tools import plot_size_slopes
 from src.tools.find_earliest_date_dir import find_earliest_date_dir
 from src.tools.naming_overlay import make_overlays
+from src.tools.rename_individual_caps import rename
 import os
 import sys
 import time
@@ -27,12 +28,13 @@ def main():
         print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
         ticks = time.time()
         location_path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, location)
-        align_segmented(location_path)
-        group_caps.main(location_path)
-        make_overlays(location_path)
-        # translate_centerlines.main(location_path)
-        # plot_area.main(location_path)
-        # plot_size_slopes.main(location_path)
+        #align_segmented(location_path)
+        #group_caps.main(location_path)
+        #make_overlays(location_path)
+        #rename(location_path)
+        translate_centerlines.main(location_path)
+        plot_area.main(location_path)
+        plot_size_slopes.main(location_path)
     
 
 if __name__ == "__main__":

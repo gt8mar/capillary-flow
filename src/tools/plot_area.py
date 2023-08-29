@@ -75,7 +75,7 @@ def group_by_vidnum(plotinfo):
 def quantitative_subplots(plotinfo, partnum, date, location):
     grouped_plotinfo = group_by_cap(plotinfo)
     num_plots = len(grouped_plotinfo)
-    num_cols = 3
+    num_cols = min(num_plots, 3)
     num_rows = (num_plots + num_cols - 1) // num_cols
     fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 5 * num_rows), sharey=True)
     fig.suptitle(partnum + " " + location + " capillary size vs. pressure")
@@ -85,6 +85,65 @@ def quantitative_subplots(plotinfo, partnum, date, location):
     # Find overall min and max x-values for all subplots
     overall_min_x = float('inf')
     overall_max_x = float('-inf')
+
+    if num_plots == 1:  # Only one group in grouped_plotinfo
+        cap = grouped_plotinfo[0]
+        
+        max_index = len(cap)
+        for i in range(1, len(cap)):
+            if cap[i][1] < cap[i - 1][1]:
+                max_index = i
+                break
+
+        increasing_cap = cap[:max_index]
+        decreasing_cap = cap[max_index - 1:]
+
+        sorted_inc_cap = sorted(increasing_cap, key=lambda x: x[1])
+        sorted_dec_cap = sorted(decreasing_cap, key=lambda x: x[1])
+
+        x_scatter_inc = [float(entry[1]) for entry in sorted_inc_cap]  
+        y_scatter_inc = [entry[0] for entry in sorted_inc_cap]
+
+        x_scatter_dec = [float(entry[1]) for entry in sorted_dec_cap]  
+        y_scatter_dec = [entry[0] for entry in sorted_dec_cap]
+
+        ax = axes  # Use ax for the single subplot
+        ax.scatter(x_scatter_inc, y_scatter_inc, c="Black")
+        ax.scatter(x_scatter_dec, y_scatter_dec, c="Black")
+
+
+        x_line_inc = [float(entry[1]) for entry in increasing_cap]
+        y_line_inc = [entry[0] for entry in increasing_cap]
+
+        for i in range(len(x_line_inc) - 1):
+            ax.plot([x_line_inc[i], x_line_inc[i + 1]], [y_line_inc[i], y_line_inc[i + 1]], c="Blue")
+
+        x_line_dec = [float(entry[1]) for entry in decreasing_cap]
+        y_line_dec = [entry[0] for entry in decreasing_cap]
+
+        for i in range(len(x_line_dec) - 1):
+            ax.plot([x_line_dec[i], x_line_dec[i + 1]], [y_line_dec[i], y_line_dec[i + 1]], c="Red")
+
+        if len(x_line_inc) > 1:
+            inc_slope, _ = np.polyfit(x_line_inc, y_line_inc, 1)
+        else:
+            inc_slope = ""
+        line_name_inc = "inc_" + partnum + "_" + date + "_" + location + "_cap" + cap[0][2] 
+        if len(x_line_dec) > 1:
+            dec_slope, _ = np.polyfit(x_line_dec, y_line_dec, 1)
+        else:
+            dec_slope = ""
+        line_name_dec = "dec_" + partnum + "_" + date + "_" + location + "_cap" + cap[0][2] 
+        slope_data.append([line_name_inc, inc_slope])
+        slope_data.append([line_name_dec, dec_slope])
+
+        ax.set_xlabel('Pressure (psi)')
+        ax.set_ylabel('Area/Length')
+        ax.set_title("cap" + cap[0][2])
+
+        overall_min_x = min(chain([overall_min_x], x_scatter_inc, x_scatter_dec))
+        overall_max_x = max(chain([overall_max_x], x_scatter_inc, x_scatter_dec))
+
 
     for i, ax in enumerate(axes.flat):
         if i < num_plots:
@@ -150,7 +209,7 @@ def quantitative_subplots(plotinfo, partnum, date, location):
     for ax in axes.flat[:num_plots]:
         ax.set_xlim(overall_min_x, overall_max_x)
 
-    plt.tight_layout()
+    #plt.tight_layout()
     plt.show()
     return fig, slope_data 
 
@@ -159,7 +218,7 @@ def plot_area_by_length(caps_fp, centerlines_fp, metadata_fp):
     caps_listdir_nobp = exclude_bp_scan(caps_listdir_nofrag, metadata_fp)
 
     plotinfo = []
-
+    print("1: " + str(len(caps_listdir_nobp)))
     for cap in caps_listdir_nobp:
         cap_img = cv2.imread(os.path.join(caps_fp, cap), cv2.IMREAD_GRAYSCALE)
         vmatch = re.search(r'vid(\d{2})', cap)
@@ -195,13 +254,13 @@ def plot_area_by_length(caps_fp, centerlines_fp, metadata_fp):
                 break
 
         plotinfo.append([area/length, pressure, capnum, vidnum])
-
+    print("2: " + str(len(plotinfo)))
     partnum = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(caps_fp)))))
     date = os.path.basename((os.path.dirname(os.path.dirname(os.path.dirname(caps_fp)))))
     location = os.path.basename(os.path.dirname(os.path.dirname(caps_fp)))
     return quantitative_subplots(plotinfo, partnum, date, location)
     
-def main(path="E:\\Marcus\\gabby_test_data\\part11\\230427\\loc02"):
+def main(path="E:\\Marcus\\gabby_test_data\\debugging\\part09\\230414\\loc04"):
     participant = os.path.basename(os.path.dirname(os.path.dirname(path)))
     date = os.path.basename(os.path.dirname(path))
     location = os.path.basename(path)
