@@ -31,8 +31,8 @@ from scipy.ndimage import convolve
 
 
 
-BRANCH_THRESH = 20
-MIN_CAP_LEN = 5
+BRANCH_THRESH = 40
+MIN_CAP_LEN = 50
 
 def find_junctions(skel):
     """Finds pixels with exactly three neighbors."""
@@ -219,9 +219,10 @@ def load_image_with_prefix(input_folder, segmented_filename):
         print("Image not found.")
         return None
 
-#  "F:\\Marcus\\data\\part09\\230414\\loc01"
+#  "F:\\Marcus\\data\\part09\\230414\\loc01" 'C:\\Users\\gt8mar\\capillary-flow\\tests\\part09\\230414\\loc02'
 
-def main(path ='C:\\Users\\gt8mar\\capillary-flow\\tests\\part18\\230502\\locEx', # 'C:\\Users\\gt8mar\\capillary-flow\\tests\\part09\\230414\\loc02', #
+
+def main(path ='F:\\Marcus\\data\\hasty_seg\\230626\\part10\\230425\\loc02', # 'C:\\Users\\gt8mar\\capillary-flow\\tests\\part09\\230414\\loc02', #
         verbose = False, write = False, plot=False):
     """ Isolates capillaries from segmented image and finds their centerlines and radii. 
 
@@ -284,7 +285,7 @@ def main(path ='C:\\Users\\gt8mar\\capillary-flow\\tests\\part18\\230502\\locEx'
                     print(f"Making skeleton for capillary {i}")
                     skeleton, skeleton_longpath, radii = make_skeletons(contours[i], plot=False)     # Skeletons come out in the shape of the image
                     if plot:
-                        fig, axes = plt.subplots(1,2, figsize=(10, 8), sharex=True, sharey=True)
+                        fig, axes = plt.subplots(1,3, figsize=(10, 8), sharex=True, sharey=True)
                         ax = axes.ravel()
                         ax[0].imshow(skeleton, cmap=plt.cm.gray)
                         ax[0].axis('off')
@@ -292,6 +293,9 @@ def main(path ='C:\\Users\\gt8mar\\capillary-flow\\tests\\part18\\230502\\locEx'
                         ax[1].imshow(skeleton_longpath, cmap=plt.cm.gray)
                         ax[1].axis('off')
                         ax[1].set_title('cut', fontsize=20)
+                        ax[2].imshow(contours[i], cmap=plt.cm.gray)
+                        ax[2].axis('off')
+                        ax[2].set_title('original', fontsize=20)
                         fig.tight_layout()
                         plt.show()
                     
@@ -350,6 +354,6 @@ def main(path ='C:\\Users\\gt8mar\\capillary-flow\\tests\\part18\\230502\\locEx'
 if __name__ == "__main__":
     ticks = time.time()
     # main(path = '/hpc/projects/capillary-flow/data/part09/230414/loc01', verbose = False, write = True)
-    main(verbose = False, write = False, plot=False)
+    main(verbose = False, write = True, plot=False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
