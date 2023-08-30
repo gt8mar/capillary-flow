@@ -211,6 +211,10 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
     os.makedirs(os.path.join(path, 'kymographs'), exist_ok=True)
     # os.makedirs(os.path.join(path, 'blood_flow', 'velocities'), exist_ok=True)
     output_folder = os.path.join(path, 'kymographs')
+    if platform.system() == 'Windows':
+        results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results'
+    else:
+        results_folder = '/hpc/projects/capillary-flow/results'
     
     centerline_dict = {}
     # make dictionary of centerline files with same video number
@@ -232,40 +236,36 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
     # loop through videos
     for video in centerline_dict.keys():
         number_of_capillaries = len(centerline_dict[video])
+
+        video_folder = os.path.join(path, 'vids', video, 'moco')
+        if os.path.exists(video_folder) == False:
+            print(f'No moco folder for {file_prefix} and {video_folder}') 
+        metadata_folder = os.path.join(path, 'vids', video, 'metadata')
+        participant, date, location, __, file_prefix = parse_filename(file)
+
+        # Get metadata
+        gap_left, gap_right, gap_bottom, gap_top = get_shifts(metadata_folder) # get gaps from the metadata
+        print(gap_left, gap_right, gap_bottom, gap_top)
+
+        # Get images
+        # Import images
+        start = time.time()
+        images = get_images(video_folder)
+        image_array = load_image_array(images, video_folder)      # this has the shape (frames, row, col)
+        example_image = image_array[0]
+        print(f"Loading images for {file_prefix} took {time.time() - start} seconds")
+        print("The size of the array is " + str(image_array.shape))
+
+        # Crop array based on shifts
+        image_array = image_array[:, gap_top:example_image.shape[0] + gap_bottom, gap_left:example_image.shape[1] + gap_right] 
+        start_time = time.time()
+
+        # loop through capillaries
         for i, file in enumerate(centerline_dict[video]):
-            participant, date, location, __, file_prefix = parse_filename(file)
             capillary_number = file.split('.')[0].split('_')[-1]    
             print(f'Processing {video} capillary {capillary_number}')
 
-
-            input_folder = os.path.join(path, 'vids', video, 'moco')
-            if os.path.exists(input_folder) == False:
-                print(f'No moco folder for {file_prefix} and {input_folder}') 
-            metadata_folder = os.path.join(path, 'vids', video, 'metadata')
-            
-            if platform.system() == 'Windows':
-                results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results'
-            else:
-                results_folder = '/hpc/projects/capillary-flow/results'
-
-
-            # Get metadata
-            gap_left, gap_right, gap_bottom, gap_top = get_shifts(metadata_folder) # get gaps from the metadata
-            print(gap_left, gap_right, gap_bottom, gap_top)
-
-            # Import images
-            start = time.time()
-            images = get_images(input_folder)
-            image_array = load_image_array(images, input_folder)      # this has the shape (frames, row, col)
-            example_image = image_array[0]
-            print(f"Loading images for {file_prefix} took {time.time() - start} seconds")
-            print("The size of the array is " + str(image_array.shape))
-
-            # Crop array based on shifts
-            image_array = image_array[:, gap_top:example_image.shape[0] + gap_bottom, gap_left:example_image.shape[1] + gap_right] 
-            start_time = time.time()
-            
-            # load csv file:
+            # load centerline file:
             skeleton = np.loadtxt(os.path.join(centerline_folder, 'coords', file), delimiter=',').astype(int)
 
             # build the kymograph
@@ -281,14 +281,14 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
 
             if write:
                     np.savetxt(os.path.join(output_folder, 
-                                            file_prefix + f'_kymograph_{str(i).zfill(2)}.csv'), 
+                                            file_prefix + f'_kymograph_{str(capillary_number).zfill(2)}.csv'), 
                                             kymograph, delimiter=',', fmt = '%s')
                     im = Image.fromarray(kymograph)
                     im.save(os.path.join(output_folder, 
-                                        file_prefix + f'_kymograph_{str(i).zfill(2)}.tiff'))
+                                        file_prefix + f'_kymograph_{str(capillary_number).zfill(2)}.tiff'))
                     # save to results folder
                     im.save(os.path.join(results_folder, 'kymographs',
-                                        file_prefix + f'_kymograph_{str(i).zfill(2)}.tiff'))
+                                        file_prefix + f'_kymograph_{str(capillary_number).zfill(2)}.tiff'))
 
             if verbose:
                 # Plot pixels vs time:
