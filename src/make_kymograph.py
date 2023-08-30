@@ -198,21 +198,21 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
     # Create output folders
     if platform.system() == 'Windows':
         if hasty:
-            centerline_folder = os.path.join('F:\\Marcus\\data\\hasty_seg\\230626\\part09\\230414\\loc01', 'centerlines', 'coords')
+            centerline_folder = os.path.join('F:\\Marcus\\data\\hasty_seg\\230626\\part09\\230414\\loc01', 'centerlines')
         else:
-            centerline_folder = os.path.join(path, 'centerlines', 'coords')
+            centerline_folder = os.path.join(path, 'centerlines')
     else:
         if hasty:
             # centerline_folder = os.path.join('/hpc/projects/capillary-flow/data/hasty_seg/230626/part09/230414/loc01', 'centerlines')
-            centerline_folder = os.path.join(path, 'centerlines_hasty', 'coords')
+            centerline_folder = os.path.join(path, 'centerlines_hasty')
         else:
-            centerline_folder = os.path.join(path, 'centerlines', 'coords')
+            centerline_folder = os.path.join(path, 'centerlines')
 
     os.makedirs(os.path.join(path, 'kymographs'), exist_ok=True)
     # os.makedirs(os.path.join(path, 'blood_flow', 'velocities'), exist_ok=True)
     output_folder = os.path.join(path, 'kymographs')
     
-    for file in os.listdir(centerline_folder):
+    for file in os.listdir(os.path.join(centerline_folder, 'coords')):
         if file.endswith(".csv"):
             participant, date, location, video, file_prefix = parse_filename(file)
             print(f"Processing {file_prefix}")
