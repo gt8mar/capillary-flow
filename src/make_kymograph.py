@@ -212,12 +212,35 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
     # os.makedirs(os.path.join(path, 'blood_flow', 'velocities'), exist_ok=True)
     output_folder = os.path.join(path, 'kymographs')
     
+    centerline_dict = {}
+    # make dictionary of centerline files with same video number
     for file in os.listdir(os.path.join(centerline_folder, 'coords')):
         if file.endswith(".csv"):
             participant, date, location, video, file_prefix = parse_filename(file)
-            print(f"Processing {file_prefix}")
+            # check if video ends with "bp"
+            if video.endswith('bp'):
+                video = video[:-2]
+            if video.endswith('scan'):
+                video = video[:-4]
+            
+            if video not in centerline_dict.keys():
+                centerline_dict[video] = [file]
+            else:
+                centerline_dict[video].append(file)
+    print(centerline_dict)
+
+    # loop through videos
+    for video in centerline_dict.keys():
+        number_of_capillaries = len(centerline_dict[video])
+        for i, file in enumerate(centerline_dict[video]):
+            participant, date, location, __, file_prefix = parse_filename(file)
+            capillary_number = file.split('.')[0].split('_')[-1]    
+            print(f'Processing {video} capillary {capillary_number}')
+
 
             input_folder = os.path.join(path, 'vids', video, 'moco')
+            if os.path.exists(input_folder) == False:
+                print(f'No moco folder for {file_prefix} and {input_folder}') 
             metadata_folder = os.path.join(path, 'vids', video, 'metadata')
             
             if platform.system() == 'Windows':
@@ -241,38 +264,39 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
             # Crop array based on shifts
             image_array = image_array[:, gap_top:example_image.shape[0] + gap_bottom, gap_left:example_image.shape[1] + gap_right] 
             start_time = time.time()
-            skeleton_data = load_csv_list(os.path.join(centerline_folder, 'coords'))
-            # iterate over the capillaries
-            for i in range(len(skeleton_data)):
-                # build the kymograph
-                start_time = time.time()
-                kymograph = build_centerline_vs_time_kernal(image_array, skeleton_data[i], long = True)
-                print(f"capillary {i} took {time.time() - start_time} seconds")
-                
-                # normalize the kymograph 
-                start_time = time.time()
-                # normalize intensity of the kymograph
-                kymograph = exposure.rescale_intensity(kymograph, in_range = 'image', out_range = np.uint8)
-                # print(f"the time to normalize the image is {time.time() - start_time} seconds")
+            
+            # load csv file:
+            skeleton = np.loadtxt(os.path.join(centerline_folder, 'coords', file), delimiter=',').astype(int)
 
-                if write:
-                        np.savetxt(os.path.join(output_folder, 'kymo', 
-                                                file_prefix + f'_blood_flow_{str(i).zfill(2)}.csv'), 
-                                                kymograph, delimiter=',', fmt = '%s')
-                        im = Image.fromarray(kymograph)
-                        im.save(os.path.join(output_folder, 'kymo', 
-                                            file_prefix + f'_blood_flow_{str(i).zfill(2)}.tiff'))
-                        # save to results folder
-                        im.save(os.path.join(results_folder, 'kymographs',
-                                            file_prefix + f'_blood_flow_{str(i).zfill(2)}.tiff'))
+            # build the kymograph
+            start_time = time.time()
+            kymograph = build_centerline_vs_time_kernal(image_array, skeleton, long = True)
+            print(f"capillary took {time.time() - start_time} seconds")
+            
+            # normalize the kymograph 
+            start_time = time.time()
+            # normalize intensity of the kymograph
+            kymograph = exposure.rescale_intensity(kymograph, in_range = 'image', out_range = np.uint8)
+            # print(f"the time to normalize the image is {time.time() - start_time} seconds")
 
-                if verbose:
-                    # Plot pixels vs time:
-                    plt.imshow(kymograph)
-                    plt.title('centerline pixel values per time')
-                    plt.xlabel('frame')
-                    plt.ylabel('centerline pixel')
-                    plt.show()
+            if write:
+                    np.savetxt(os.path.join(output_folder, 
+                                            file_prefix + f'_kymograph_{str(i).zfill(2)}.csv'), 
+                                            kymograph, delimiter=',', fmt = '%s')
+                    im = Image.fromarray(kymograph)
+                    im.save(os.path.join(output_folder, 
+                                        file_prefix + f'_kymograph_{str(i).zfill(2)}.tiff'))
+                    # save to results folder
+                    im.save(os.path.join(results_folder, 'kymographs',
+                                        file_prefix + f'_kymograph_{str(i).zfill(2)}.tiff'))
+
+            if verbose:
+                # Plot pixels vs time:
+                plt.imshow(kymograph)
+                plt.title('centerline pixel values per time')
+                plt.xlabel('frame')
+                plt.ylabel('centerline pixel')
+                plt.show()
     return 0
 
 
