@@ -138,17 +138,20 @@ def show_centerlines(projected_caps_fp, coords_fp, individual_caps_fp):
             if cap.__contains__("vid" + vidnum) and cap.__contains__("cap_" + capnum):
                 cap_img = cv2.imread(os.path.join(individual_caps_fp, cap))
                 break
-
+        if cap_img is None: 
+            continue
         with open(os.path.join(coords_fp, file), 'r') as coords:
             reader = csv.reader(coords)
             rows = list(reader)
             for row in rows:
                 cap_img[int(float(row[0]))][int(float(row[1]))] = [255, 0, 0]
-        cv2.imshow(str(file), cap_img)
-        cv2.waitKey(0)  
+
+        #cv2.imwrite(os.path.join("D:\\misc", str(file) + ".png"), cap_img)
+        #cv2.imshow(str(file), cap_img)
+        #cv2.waitKey(0)  
 
 
-def main(path="E:\\Marcus\\gabby_test_data\\debugging\\part09\\230414\\loc04"):
+def main(path="E:\\Marcus\\gabby_poster_data\\part09\\230414\\loc01"):
     coords_fp = os.path.join(path, "centerlines", "coords")
     segmented_folder = os.path.join(path, "segmented")
 
@@ -160,8 +163,8 @@ def main(path="E:\\Marcus\\gabby_test_data\\debugging\\part09\\230414\\loc04"):
     individual_caps_fp = os.path.join(segmented_folder, "individual_caps_translated")
 
     translated_coords_fp = translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_csv, resize_csv)
-    #show_centerlines(projected_caps_fp, translated_coords_fp, individual_caps_fp)
     renamed_coords_fp = rename_caps(translated_coords_fp, individual_caps_fp)
+    show_centerlines(projected_caps_fp, renamed_coords_fp, individual_caps_fp)
     
 
     
