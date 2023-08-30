@@ -16,6 +16,7 @@ from skimage.segmentation import find_boundaries
 import csv
 import re
 import shutil
+import platform
 
 #translates the y and x coordinates of centerlines by the translation values in ~/translations.csv and ~/crop_values.csv
 def translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_csv, resize_csv):
@@ -71,7 +72,7 @@ def translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_c
 
     return translated_coords_fp
 
-def rename_caps(coords_fp, individual_caps_fp):
+def rename_caps(coords_fp, individual_caps_fp, participant, date, location):
     names = []
     renamed_folder_fp = os.path.join(os.path.split(coords_fp)[0], "renamed")
     os.makedirs(renamed_folder_fp, exist_ok=True)
@@ -107,6 +108,13 @@ def rename_caps(coords_fp, individual_caps_fp):
     with open(map_fp, mode='w', newline='') as file:
         writer = csv.writer(file)
         writer.writerows(names)
+
+    if platform.system() != 'Windows':
+        os.makedirs('/hpc/projects/capillary-flow/results/size/name_maps', exist_ok=True)
+        map_fp = os.path.join('/hpc/projects/capillary-flow/results/size/name_maps', participant + "_" + date + "_" + location + "_name_map.csv")
+        with open(map_fp, mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerows(names)
     
     return renamed_folder_fp
 
@@ -138,30 +146,37 @@ def show_centerlines(projected_caps_fp, coords_fp, individual_caps_fp):
             if cap.__contains__("vid" + vidnum) and cap.__contains__("cap_" + capnum):
                 cap_img = cv2.imread(os.path.join(individual_caps_fp, cap))
                 break
-
+        if cap_img is None: 
+            continue
         with open(os.path.join(coords_fp, file), 'r') as coords:
             reader = csv.reader(coords)
             rows = list(reader)
             for row in rows:
                 cap_img[int(float(row[0]))][int(float(row[1]))] = [255, 0, 0]
-        cv2.imshow(str(file), cap_img)
-        cv2.waitKey(0)  
+
+        #cv2.imwrite(os.path.join("D:\\misc", str(file) + ".png"), cap_img)
+        #cv2.imshow(str(file), cap_img)
+        #cv2.waitKey(0)  
 
 
-def main(path="E:\\Marcus\\gabby_test_data\\debugging\\part09\\230414\\loc04"):
+def main(path="E:\\Marcus\\gabby_poster_data\\part09\\230414\\loc01"):
     coords_fp = os.path.join(path, "centerlines", "coords")
     segmented_folder = os.path.join(path, "segmented")
 
-    sorted_coords_listdir = sorted_seg_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(coords_fp, x)), os.listdir(coords_fp))) #sort numerically
+    sorted_coords_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(coords_fp, x)), os.listdir(coords_fp))) #sort numerically
     translations_csv = os.path.join(segmented_folder, "translations.csv")
     projected_caps_fp = os.path.join(segmented_folder, "proj_caps")
     crops_csv = os.path.join(segmented_folder, "crop_values.csv")
     resize_csv = os.path.join(segmented_folder, "resize_vals.csv")
     individual_caps_fp = os.path.join(segmented_folder, "individual_caps_translated")
 
+    participant = os.path.basename(os.path.dirname(os.path.dirname(path)))
+    date = os.path.basename(os.path.dirname(path))
+    location = os.path.basename(path)
+
     translated_coords_fp = translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_csv, resize_csv)
-    #show_centerlines(projected_caps_fp, translated_coords_fp, individual_caps_fp)
-    renamed_coords_fp = rename_caps(translated_coords_fp, individual_caps_fp)
+    renamed_coords_fp = rename_caps(translated_coords_fp, individual_caps_fp, participant, date, location)
+    #show_centerlines(projected_caps_fp, renamed_coords_fp, individual_caps_fp)
     
 
     

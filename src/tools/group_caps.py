@@ -123,7 +123,7 @@ def save_untranslated(registered_folder_fp):
 
                         cv2.imwrite(os.path.join(orig_fp, cap), crop_img)
             
-def main(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
+def main(path="D:\\gabby_poster_data\\part10\\230425\\loc01"):
     registered_fp = os.path.join(path, "segmented", "registered")
     sorted_seg_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(registered_fp, x)) and x.endswith('.png'), os.listdir(registered_fp)))
 
@@ -144,15 +144,6 @@ def main(path="E:\\Marcus\\gabby_test_data\\part09\\230414\\loc01"):
         filename = "cap_" + str(x).zfill(2) + ".png"
         cap_fp = os.path.join(caps_fp, filename)
         cv2.imwrite(str(cap_fp), caps[x])
-
-    #save to results
-    if platform.system() != 'Windows':
-        pc_results_fp = "/hpc/projects/capillary-flow/results/segmented/proj_caps"
-        os.makedirs(pc_results_fp, exist_ok=True)
-        for x in range(len(caps)):
-            filename = "cap_" + str(x).zfill(2) + ".png"
-            cap_fp = os.path.join(pc_results_fp, filename)
-            cv2.imwrite(str(cap_fp), caps[x])
 
     #save individual caps, named
     separate_caps(registered_fp)
