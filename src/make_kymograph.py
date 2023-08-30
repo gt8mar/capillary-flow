@@ -231,7 +231,8 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
                 centerline_dict[video] = [file]
             else:
                 centerline_dict[video].append(file)
-    print(centerline_dict)
+    if verbose:
+        print(centerline_dict)
 
     # loop through videos
     for video in centerline_dict.keys():
@@ -245,7 +246,8 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
 
         # Get metadata
         gap_left, gap_right, gap_bottom, gap_top = get_shifts(metadata_folder) # get gaps from the metadata
-        print(gap_left, gap_right, gap_bottom, gap_top)
+        if verbose:
+            print(gap_left, gap_right, gap_bottom, gap_top)
 
         # Get images
         # Import images
@@ -271,7 +273,7 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
             # build the kymograph
             start_time = time.time()
             kymograph = build_centerline_vs_time_kernal(image_array, skeleton, long = True)
-            print(f"capillary took {time.time() - start_time} seconds")
+            print(f"capillary {capillary_number} took {time.time() - start_time} seconds")
             
             # normalize the kymograph 
             start_time = time.time()
