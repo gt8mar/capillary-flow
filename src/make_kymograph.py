@@ -219,57 +219,59 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
             input_folder = os.path.join(path, 'vids', video, 'moco')
             metadata_folder = os.path.join(path, 'vids', video, 'metadata')
             
-            results_folder = '/hpc/projects/capillary-flow/results'
-            # results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results'    
+            if platform.system() == 'Windows':
+                results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results'
+            else:
+                results_folder = '/hpc/projects/capillary-flow/results'
 
 
-    # Get metadata
-    gap_left, gap_right, gap_bottom, gap_top = get_shifts(metadata_folder) # get gaps from the metadata
-    print(gap_left, gap_right, gap_bottom, gap_top)
+            # Get metadata
+            gap_left, gap_right, gap_bottom, gap_top = get_shifts(metadata_folder) # get gaps from the metadata
+            print(gap_left, gap_right, gap_bottom, gap_top)
 
-    # Import images
-    start = time.time()
-    images = get_images(input_folder)
-    image_array = load_image_array(images, input_folder)      # this has the shape (frames, row, col)
-    example_image = image_array[0]
-    print(f"Loading images for {file_prefix} took {time.time() - start} seconds")
-    print("The size of the array is " + str(image_array.shape))
+            # Import images
+            start = time.time()
+            images = get_images(input_folder)
+            image_array = load_image_array(images, input_folder)      # this has the shape (frames, row, col)
+            example_image = image_array[0]
+            print(f"Loading images for {file_prefix} took {time.time() - start} seconds")
+            print("The size of the array is " + str(image_array.shape))
 
-    # Crop array based on shifts
-    image_array = image_array[:, gap_top:example_image.shape[0] + gap_bottom, gap_left:example_image.shape[1] + gap_right] 
-    start_time = time.time()
-    skeleton_data = load_csv_list(os.path.join(centerline_folder, 'coords'))
-    # iterate over the capillaries
-    for i in range(len(skeleton_data)):
-        # build the kymograph
-        start_time = time.time()
-        kymograph = build_centerline_vs_time_kernal(image_array, skeleton_data[i], long = True)
-        print(f"capillary {i} took {time.time() - start_time} seconds")
-        
-        # normalize the kymograph 
-        start_time = time.time()
-        # normalize intensity of the kymograph
-        kymograph = exposure.rescale_intensity(kymograph, in_range = 'image', out_range = np.uint8)
-        # print(f"the time to normalize the image is {time.time() - start_time} seconds")
+            # Crop array based on shifts
+            image_array = image_array[:, gap_top:example_image.shape[0] + gap_bottom, gap_left:example_image.shape[1] + gap_right] 
+            start_time = time.time()
+            skeleton_data = load_csv_list(os.path.join(centerline_folder, 'coords'))
+            # iterate over the capillaries
+            for i in range(len(skeleton_data)):
+                # build the kymograph
+                start_time = time.time()
+                kymograph = build_centerline_vs_time_kernal(image_array, skeleton_data[i], long = True)
+                print(f"capillary {i} took {time.time() - start_time} seconds")
+                
+                # normalize the kymograph 
+                start_time = time.time()
+                # normalize intensity of the kymograph
+                kymograph = exposure.rescale_intensity(kymograph, in_range = 'image', out_range = np.uint8)
+                # print(f"the time to normalize the image is {time.time() - start_time} seconds")
 
-        if write:
-                np.savetxt(os.path.join(output_folder, 'kymo', 
-                                        file_prefix + f'_blood_flow_{str(i).zfill(2)}.csv'), 
-                                        kymograph, delimiter=',', fmt = '%s')
-                im = Image.fromarray(kymograph)
-                im.save(os.path.join(output_folder, 'kymo', 
-                                    file_prefix + f'_blood_flow_{str(i).zfill(2)}.tiff'))
-                # save to results folder
-                im.save(os.path.join(results_folder, 'kymographs',
-                                    file_prefix + f'_blood_flow_{str(i).zfill(2)}.tiff'))
+                if write:
+                        np.savetxt(os.path.join(output_folder, 'kymo', 
+                                                file_prefix + f'_blood_flow_{str(i).zfill(2)}.csv'), 
+                                                kymograph, delimiter=',', fmt = '%s')
+                        im = Image.fromarray(kymograph)
+                        im.save(os.path.join(output_folder, 'kymo', 
+                                            file_prefix + f'_blood_flow_{str(i).zfill(2)}.tiff'))
+                        # save to results folder
+                        im.save(os.path.join(results_folder, 'kymographs',
+                                            file_prefix + f'_blood_flow_{str(i).zfill(2)}.tiff'))
 
-        if verbose:
-            # Plot pixels vs time:
-            plt.imshow(kymograph)
-            plt.title('centerline pixel values per time')
-            plt.xlabel('frame')
-            plt.ylabel('centerline pixel')
-            plt.show()
+                if verbose:
+                    # Plot pixels vs time:
+                    plt.imshow(kymograph)
+                    plt.title('centerline pixel values per time')
+                    plt.xlabel('frame')
+                    plt.ylabel('centerline pixel')
+                    plt.show()
     return 0
 
 
