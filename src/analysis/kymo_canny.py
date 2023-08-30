@@ -16,12 +16,12 @@ import os
 import seaborn as sns
 import time
 from src.tools.get_images import get_images
-from src.tools.parse_vid_path import parse_vid_path
+from src.tools.parse_filename import parse_filename
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage import median_filter
 from sklearn.linear_model import Lasso
 
-FPS = 169.3
+FPS = 227.8 #169.3
 PIX_UM = 1.74
 CANNY_THRESH_1 = 20
 CANNY_THRESH_2 = 50
@@ -214,26 +214,36 @@ def find_slopes(image, filename, output_folder=None, method = 'ridge', verbose =
         plt.close()
     return weighted_average_slope
 
-def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test_part09', location = 1, verbose = False, write = False,
+def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write = False,
          test = False):
     # Set up paths
-    input_folder = os.path.join(path, 'F_blood_flow', 'kymo')
-    output_folder = os.path.join(path, 'F_blood_flow', 'velocities')
+    input_folder = os.path.join(path, 'kymographs')
+    os.makedirs(os.path.join(path, 'velocities'), exist_ok=True)
+    output_folder = os.path.join(path, 'velocities')
     if test:
-        metadata_folder = os.path.join(path, 'part_metadata')                           # This is for the test data
+        # metadata_folder = os.path.join(path, 'part_metadata')                           # This is for the test data
+        metadata_folder = os.path.join(os.path.dirname(os.path.dirname(path)), 'part_metadata')        # This is for the real data
         SET = "set_01"
         part = "part09"
         date = '230414'
+        location = path.split("\\")[-1]
+        # strip location of leading letters and zeros
+        loc_num = location.lstrip("loc")
+        loc_num = loc_num.lstrip("0")
+        loc_num = int(loc_num)
     else: 
-        metadata_folder = os.path.join(os.path.dirname(path), 'part_metadata')        # This is for the real data
-        participant, date, video, file_prefix = parse_vid_path(path)
+        metadata_folder = os.path.join(os.path.dirname(os.path.dirname(path)), 'part_metadata')        # This is for the real data
+        
+    # participant, date, video, file_prefix = parse_vid_path(path)
     
     metadata_name = f'{part}_{date}.xlsx'
-
     # Read in the metadata
     metadata = pd.read_excel(os.path.join(metadata_folder, metadata_name), sheet_name = 'Sheet1')
+
     # Select video rows with correct location
-    metadata = metadata[metadata['Location'] == location]
+    metadata = metadata[metadata['Location'] == loc_num]
+    print(metadata)
+
     
     # Run program on this data:
     column_names  = ['centerlines name', 'cap name']
@@ -241,7 +251,7 @@ def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test_part09', loca
 
     # Remove 'translated_' from all elements in the columns:
     name_map = name_map.apply(lambda x: x.str.replace('translated_', ''))
-    name_map = name_map.apply(lambda x: x.str.replace('centerline_coords', 'blood_flow'))
+    name_map = name_map.apply(lambda x: x.str.replace('centerline_coords', 'kymograph'))
     name_map = name_map.apply(lambda x: x.str.replace('csv', 'tiff'))
     # duplicate the cap name column
     name_map['cap name short'] = name_map['cap name']
@@ -250,14 +260,15 @@ def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test_part09', loca
         
     # Read in the kymographs
     images = get_images(input_folder, "tiff")
+    
     # Select images with correct location
     images = [image for image in images if image.split("_")[4] in metadata['Video'].values]
 
     # Create a dataframe to store the results
     df = pd.DataFrame(columns = ['Participant','Video', 'Pressure', 'Capillary', 'Weighted Average Slope'])
     for image in images:
+        __, __, __, video, file_prefix = parse_filename(image)
         kymo_raw = cv2.imread(os.path.join(input_folder, image), cv2.IMREAD_GRAYSCALE)
-        video = image.split("_")[4]
         # Get the metadata for the video
         video_metadata = metadata.loc[
                 (metadata['Video'] == video) |
@@ -266,23 +277,28 @@ def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test_part09', loca
                 ]
         # Get the pressure for the video
         pressure = video_metadata['Pressure'].values[0]
+        fps = video_metadata['FPS'].values[0]
         # Get the capillary name for the video
         old_capillary_name = image
-        capillary_name = name_map.loc[name_map['centerlines name'] == old_capillary_name]['cap name short'].values[0]
-        filename = f'{SET}_{part}_{video}_{str(int(pressure*10)).zfill(2)}_{capillary_name}'
-        kymo_blur = gaussian_filter(kymo_raw, sigma = 2)
-        
-        if write:
-            base_name, extension = os.path.splitext(image)            
-            weighted_average_slope = find_slopes(kymo_blur, filename, output_folder, method = 'lasso', verbose = False, write=True)
-        else:
-            weighted_average_slope = find_slopes(kymo_blur, filename, output_folder, method = 'lasso', verbose = verbose, write=False)
-        # transform slope from pixels/frames into um/s:
-        um_slope = np.absolute(weighted_average_slope) *FPS/PIX_UM
-        # add row to dataframe
-        new_data = pd.DataFrame([[part, video, pressure, capillary_name, um_slope]], columns = df.columns)
-        df = pd.concat([df, new_data], ignore_index=True)
+        if name_map['centerlines name'].str.contains(old_capillary_name).any():
+            capillary_name = name_map.loc[name_map['centerlines name'] == old_capillary_name]['cap name short'].values[0]
+       
+            filename = f'{file_prefix}_{str(int(pressure*10)).zfill(2)}_{capillary_name}'
+            kymo_blur = gaussian_filter(kymo_raw, sigma = 2)
+            
+            if write:
+                base_name, extension = os.path.splitext(image)            
+                weighted_average_slope = find_slopes(kymo_blur, filename, output_folder, method = 'lasso', verbose = False, write=True)
+            else:
+                weighted_average_slope = find_slopes(kymo_blur, filename, output_folder, method = 'lasso', verbose = verbose, write=False)
+            # transform slope from pixels/frames into um/s:
+            um_slope = np.absolute(weighted_average_slope) *fps/PIX_UM
+            # add row to dataframe
+            new_data = pd.DataFrame([[part, video, pressure, capillary_name, um_slope]], columns = df.columns)
+            df = pd.concat([df, new_data], ignore_index=True)
+        else: pass
 
+    # print(df)
     
     """
     --------------------------------- Plot the data---------------------------------------------------
@@ -334,23 +350,25 @@ def main(path='C:\\Users\\gt8mar\\capillary-flow\\tests\\kymo_test_part09', loca
     --------------------------------- Plot the data on the same graph ---------------------------------------------------
     """
     
-    fig, ax = plt.subplots()
-    for name, group in grouped_df:
-        ax.plot(group['Pressure'], group['Weighted Average Slope'], marker='o', linestyle='', ms=12, label=name)
+    # fig, ax = plt.subplots()
+    # for name, group in grouped_df:
+    #     ax.plot(group['Pressure'], group['Weighted Average Slope'], marker='o', linestyle='', ms=12, label=name)
     
-    ax.set_xlabel('Pressure (psi)')
-    ax.set_ylabel('Velocity (um/s)')
-    ax.set_title('Velocity vs. Pressure for each Capillary')
-    ax.legend()
-    plt.grid(True)
-    plt.tight_layout()
+    # ax.set_xlabel('Pressure (psi)')
+    # ax.set_ylabel('Velocity (um/s)')
+    # ax.set_title('Velocity vs. Pressure for each Capillary')
+    # ax.legend()
+    # plt.grid(True)
+    # plt.tight_layout()
 
-    if write:
-        plt.savefig(os.path.join(output_folder, "velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
-    if verbose:
-        plt.show()
-    else:
-        plt.close()
+    # if write:
+    #     plt.savefig(os.path.join(output_folder, "velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
+    # if verbose:
+    #     plt.show()
+    # else:
+    #     plt.close()
+
+
     # plot_box_swarm(data, ["0.2 psi", "0.4 psi", "0.6 psi", "0.8 psi"], 
     #                "velocity (um/s)", "Participant_4 cap_4", "figure 1")
     # plot_box_swarm(data_slice, ["0.2 psi", "0.4 psi", "0.6 psi", "0.8 psi"],
