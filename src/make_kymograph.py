@@ -7,7 +7,7 @@ By: Marcus Forst
 average_in_circle credit: Nicolas Gervais (https://stackoverflow.com/questions/49330080/numpy-2d-array-selecting-indices-in-a-circle)
 """
 
-import os, time, gc
+import os, time, gc, platform
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -16,6 +16,7 @@ from src.tools.get_images import get_images
 from src.tools.load_image_array import load_image_array
 from src.tools.load_csv_list import load_csv_list
 from src.tools.get_shifts import get_shifts
+from src.tools.parse_filename import parse_filename
 from scipy.ndimage import gaussian_filter
 from src.tools.parse_vid_path import parse_vid_path
 from scipy.ndimage import convolve
@@ -175,8 +176,8 @@ def normalize_row_and_col(image):
     new_new_image = normalize_row_and_col(image)
     return 0
 
-def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part13\\230428\\vid25', 
-         write = True, variable_radii = False, verbose = False):
+def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01', 
+         write = True, variable_radii = False, verbose = False, hasty = False):
     """
     This function takes a path to a video and calculates the blood flow.
 
@@ -193,64 +194,111 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part13\\230428\\vid25'
         kymograph (np.array): kymograph of the blood flow
         kymograph (png file): kymograph of the blood flow
     """
-    input_folder = os.path.join(path, 'moco')
-    metadata_folder = os.path.join(path, 'metadata')
-    centerline_folder = os.path.join(path, 'E_centerline')
-    results_folder = '/hpc/projects/capillary-flow/results'
     
     # Create output folders
-    os.makedirs(os.path.join(path, 'F_blood_flow', 'kymo'), exist_ok=True)
-    os.makedirs(os.path.join(path, 'F_blood_flow', 'velocities'), exist_ok=True)
-    output_folder = os.path.join(path, 'F_blood_flow')
+    if platform.system() == 'Windows':
+        if hasty:
+            centerline_folder = os.path.join('F:\\Marcus\\data\\hasty_seg\\230626\\part09\\230414\\loc01', 'centerlines')
+        else:
+            centerline_folder = os.path.join(path, 'centerlines')
+    else:
+        if hasty:
+            # centerline_folder = os.path.join('/hpc/projects/capillary-flow/data/hasty_seg/230626/part09/230414/loc01', 'centerlines')
+            centerline_folder = os.path.join(path, 'centerlines_hasty')
+        else:
+            centerline_folder = os.path.join(path, 'centerlines')
+
+    os.makedirs(os.path.join(path, 'kymographs'), exist_ok=True)
+    # os.makedirs(os.path.join(path, 'blood_flow', 'velocities'), exist_ok=True)
+    output_folder = os.path.join(path, 'kymographs')
+    if platform.system() == 'Windows':
+        results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results'
+    else:
+        results_folder = '/hpc/projects/capillary-flow/results'
     
-    # Get metadata
-    participant, date, video, file_prefix = parse_vid_path(path)
-    gap_left, gap_right, gap_bottom, gap_top = get_shifts(metadata_folder) # get gaps from the metadata
-    print(gap_left, gap_right, gap_bottom, gap_top)
+    centerline_dict = {}
+    # make dictionary of centerline files with same video number
+    for file in os.listdir(os.path.join(centerline_folder, 'coords')):
+        if file.endswith(".csv"):
+            participant, date, location, video, file_prefix = parse_filename(file)
+            # check if video ends with "bp"
+            if video.endswith('bp'):
+                video = video[:-2]
+            if video.endswith('scan'):
+                video = video[:-4]
+            
+            if video not in centerline_dict.keys():
+                centerline_dict[video] = [file]
+            else:
+                centerline_dict[video].append(file)
+    if verbose:
+        print(centerline_dict)
 
-    # Import images
-    start = time.time()
-    images = get_images(input_folder)
-    image_array = load_image_array(images, input_folder)      # this has the shape (frames, row, col)
-    example_image = image_array[0]
-    print(f"Loading images for {file_prefix} took {time.time() - start} seconds")
-    print("The size of the array is " + str(image_array.shape))
+    # loop through videos
+    for video in centerline_dict.keys():
+        number_of_capillaries = len(centerline_dict[video])
 
-    # Crop array based on shifts
-    image_array = image_array[:, gap_top:example_image.shape[0] + gap_bottom, gap_left:example_image.shape[1] + gap_right] 
-    start_time = time.time()
-    skeleton_data = load_csv_list(os.path.join(centerline_folder, 'coords'))
-    # iterate over the capillaries
-    for i in range(len(skeleton_data)):
-        # build the kymograph
-        start_time = time.time()
-        kymograph = build_centerline_vs_time_kernal(image_array, skeleton_data[i], long = True)
-        print(f"capillary {i} took {time.time() - start_time} seconds")
-        
-        # normalize the kymograph 
-        start_time = time.time()
-        # normalize intensity of the kymograph
-        kymograph = exposure.rescale_intensity(kymograph, in_range = 'image', out_range = np.uint8)
-        # print(f"the time to normalize the image is {time.time() - start_time} seconds")
+        video_folder = os.path.join(path, 'vids', video, 'moco')
+        if os.path.exists(video_folder) == False:
+            print(f'No moco folder for {file_prefix} and {video_folder}') 
+        metadata_folder = os.path.join(path, 'vids', video, 'metadata')
+        participant, date, location, __, file_prefix = parse_filename(file)
 
-        if write:
-                np.savetxt(os.path.join(output_folder, 'kymo', 
-                                        file_prefix + f'_blood_flow_{str(i).zfill(2)}.csv'), 
-                                        kymograph, delimiter=',', fmt = '%s')
-                im = Image.fromarray(kymograph)
-                im.save(os.path.join(output_folder, 'kymo', 
-                                    file_prefix + f'_blood_flow_{str(i).zfill(2)}.tiff'))
-                # save to results folder
-                im.save(os.path.join(results_folder, 'kymographs',
-                                    file_prefix + f'_blood_flow_{str(i).zfill(2)}.tiff'))
-
+        # Get metadata
+        gap_left, gap_right, gap_bottom, gap_top = get_shifts(metadata_folder) # get gaps from the metadata
         if verbose:
-            # Plot pixels vs time:
-            plt.imshow(kymograph)
-            plt.title('centerline pixel values per time')
-            plt.xlabel('frame')
-            plt.ylabel('centerline pixel')
-            plt.show()
+            print(gap_left, gap_right, gap_bottom, gap_top)
+
+        # Get images
+        # Import images
+        start = time.time()
+        images = get_images(video_folder)
+        image_array = load_image_array(images, video_folder)      # this has the shape (frames, row, col)
+        example_image = image_array[0]
+        print(f"Loading images for {file_prefix} took {time.time() - start} seconds")
+        print("The size of the array is " + str(image_array.shape))
+
+        # Crop array based on shifts
+        image_array = image_array[:, gap_top:example_image.shape[0] + gap_bottom, gap_left:example_image.shape[1] + gap_right] 
+        start_time = time.time()
+
+        # loop through capillaries
+        for i, file in enumerate(centerline_dict[video]):
+            capillary_number = file.split('.')[0].split('_')[-1]    
+            print(f'Processing {video} capillary {capillary_number}')
+
+            # load centerline file:
+            skeleton = np.loadtxt(os.path.join(centerline_folder, 'coords', file), delimiter=',').astype(int)
+
+            # build the kymograph
+            start_time = time.time()
+            kymograph = build_centerline_vs_time_kernal(image_array, skeleton, long = True)
+            print(f"capillary {capillary_number} took {time.time() - start_time} seconds")
+            
+            # normalize the kymograph 
+            start_time = time.time()
+            # normalize intensity of the kymograph
+            kymograph = exposure.rescale_intensity(kymograph, in_range = 'image', out_range = np.uint8)
+            # print(f"the time to normalize the image is {time.time() - start_time} seconds")
+
+            if write:
+                    np.savetxt(os.path.join(output_folder, 
+                                            file_prefix + f'_kymograph_{str(capillary_number).zfill(2)}.csv'), 
+                                            kymograph, delimiter=',', fmt = '%s')
+                    im = Image.fromarray(kymograph)
+                    im.save(os.path.join(output_folder, 
+                                        file_prefix + f'_kymograph_{str(capillary_number).zfill(2)}.tiff'))
+                    # save to results folder
+                    im.save(os.path.join(results_folder, 'kymographs',
+                                        file_prefix + f'_kymograph_{str(capillary_number).zfill(2)}.tiff'))
+
+            if verbose:
+                # Plot pixels vs time:
+                plt.imshow(kymograph)
+                plt.title('centerline pixel values per time')
+                plt.xlabel('frame')
+                plt.ylabel('centerline pixel')
+                plt.show()
     return 0
 
 
@@ -258,8 +306,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part13\\230428\\vid25'
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(path ='/hpc/projects/capillary-flow/data/part13/230428/vid25',
-          write=True)
+    main(write=True, hasty=True)
     # test2_normalize_row_and_col()
     # test()
     print("--------------------")
