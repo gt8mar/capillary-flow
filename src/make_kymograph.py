@@ -7,7 +7,7 @@ By: Marcus Forst
 average_in_circle credit: Nicolas Gervais (https://stackoverflow.com/questions/49330080/numpy-2d-array-selecting-indices-in-a-circle)
 """
 
-import os, time, gc
+import os, time, gc, platform
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -16,6 +16,7 @@ from src.tools.get_images import get_images
 from src.tools.load_image_array import load_image_array
 from src.tools.load_csv_list import load_csv_list
 from src.tools.get_shifts import get_shifts
+from src.tools.parse_filename import parse_filename
 from scipy.ndimage import gaussian_filter
 from src.tools.parse_vid_path import parse_vid_path
 from scipy.ndimage import convolve
@@ -175,8 +176,8 @@ def normalize_row_and_col(image):
     new_new_image = normalize_row_and_col(image)
     return 0
 
-def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part13\\230428\\vid25', 
-         write = True, variable_radii = False, verbose = False):
+def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01', 
+         write = True, variable_radii = False, verbose = False, hasty = False):
     """
     This function takes a path to a video and calculates the blood flow.
 
@@ -193,18 +194,36 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part13\\230428\\vid25'
         kymograph (np.array): kymograph of the blood flow
         kymograph (png file): kymograph of the blood flow
     """
-    input_folder = os.path.join(path, 'moco')
-    metadata_folder = os.path.join(path, 'metadata')
-    centerline_folder = os.path.join(path, 'E_centerline')
-    results_folder = '/hpc/projects/capillary-flow/results'
     
     # Create output folders
-    os.makedirs(os.path.join(path, 'F_blood_flow', 'kymo'), exist_ok=True)
-    os.makedirs(os.path.join(path, 'F_blood_flow', 'velocities'), exist_ok=True)
-    output_folder = os.path.join(path, 'F_blood_flow')
+    if platform.system() == 'Windows':
+        if hasty:
+            centerline_folder = os.path.join('F:\\Marcus\\data\\hasty_seg\\230626\\part09\\230414\\loc01', 'centerlines')
+        else:
+            centerline_folder = os.path.join(path, 'centerlines')
+    else:
+        if hasty:
+            # centerline_folder = os.path.join('/hpc/projects/capillary-flow/data/hasty_seg/230626/part09/230414/loc01', 'centerlines')
+            centerline_folder = os.path.join(path, 'centerlines_hasty')
+        else:
+            centerline_folder = os.path.join(path, 'centerlines')
+
+    os.makedirs(os.path.join(path, 'blood_flow', 'kymo'), exist_ok=True)
+    os.makedirs(os.path.join(path, 'blood_flow', 'velocities'), exist_ok=True)
+    output_folder = os.path.join(path, 'blood_flow')
     
+    for file in os.listdir(centerline_folder):
+        if file.endswith(".csv"):
+            participant, date, location, video, file_prefix = parse_filename(file)
+
+            input_folder = os.path.join(path, 'vids', video, 'moco')
+            metadata_folder = os.path.join(path, 'vids', video, 'metadata')
+            
+            results_folder = '/hpc/projects/capillary-flow/results'
+            # results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results'    
+
+
     # Get metadata
-    participant, date, video, file_prefix = parse_vid_path(path)
     gap_left, gap_right, gap_bottom, gap_top = get_shifts(metadata_folder) # get gaps from the metadata
     print(gap_left, gap_right, gap_bottom, gap_top)
 
@@ -258,8 +277,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part13\\230428\\vid25'
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(path ='/hpc/projects/capillary-flow/data/part13/230428/vid25',
-          write=True)
+    main(write=True, hasty=True)
     # test2_normalize_row_and_col()
     # test()
     print("--------------------")
