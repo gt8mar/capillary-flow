@@ -1,12 +1,17 @@
 import time
 import os
 import pandas as pd
+import platform
 
-def rename(path):
+def rename(path='D:\\gabby_poster_data\\part10\\230425\\loc02'):
     individual_caps_translated_fp = os.path.join(path, "segmented", "individual_caps_translated")
     individual_caps_original_fp = os.path.join(path, "segmented", "individual_caps_original")
-    rename_map_fp = "/hpc/projects/capillary-flow/results/size/rename_map.csv"
-    df = pd.read_csv(rename_map_fp)
+
+    if platform.system() == 'Windows':
+        rename_map_fp = "D:\\gabby_poster_data\\part10\\230425\\loc02\\rename_map.csv"
+    else:
+        rename_map_fp = "/hpc/projects/capillary-flow/results/size/rename_map.csv"
+    df = pd.read_csv(rename_map_fp, header=None)
 
     #rename translated in loc folders
     for file in os.listdir(individual_caps_translated_fp):
@@ -25,6 +30,7 @@ def rename(path):
             original_path = os.path.join(individual_caps_original_fp, file)
             new_path = os.path.join(individual_caps_original_fp, new_filename)
             os.rename(original_path, new_path)
+
 
 
 if __name__ == "__main__":
