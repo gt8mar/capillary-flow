@@ -178,7 +178,7 @@ def normalize_row_and_col(image):
     return 0
 
 def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01', 
-         write = True, variable_radii = False, verbose = False, hasty = False):
+         write = True, variable_radii = False, verbose = False, plot = False, hasty = False):
     """
     This function takes a path to a video and calculates the blood flow.
 
@@ -187,6 +187,7 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
         write (bool): whether to write the blood flow to a csv file
         variable_radii (bool): whether to use variable radii
         verbose (bool): whether to print the progress
+        plot (bool): whether to plot the kymographs
         hasty (bool): whether to use the hasty segmentation files
 
     Returns:
@@ -268,15 +269,19 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
         image_array = image_array[:, gap_top:example_image.shape[0] + gap_bottom, gap_left:example_image.shape[1] + gap_right] 
         start_time = time.time()
 
+        j = 0
         # loop through capillaries
         for i, file in enumerate(centerline_dict[video]):
             old_capillary_name = file
             # Check if centerline is in name map (TODO: fix the bug that causes this)
             if name_map['centerlines name'].str.contains(old_capillary_name).any():            
-                capillary_number = name_map[name_map['centerlines name'] == file]['cap name short'].values[0]   
+                capillary_number = name_map[name_map['centerlines name'] == file]['cap name short'].values[0] 
+                print(capillary_number)  
             else:
+                capillary_number = j
+                j+=1
                 missing_log.append(file)
-                continue
+                print(f'Centerline {file} not in name map. Using capillary number {capillary_number} instead.')
 
             print(f'Processing {video} capillary {capillary_number}')            
 
@@ -305,7 +310,7 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
                     im.save(os.path.join(results_folder, 'kymographs',
                                         file_prefix + f'_kymograph_{str(capillary_number).zfill(2)}.tiff'))
 
-            if verbose:
+            if plot:
                 # Plot pixels vs time:
                 plt.imshow(kymograph)
                 plt.title('centerline pixel values per time')
