@@ -44,6 +44,14 @@ def delete_centerlines_files(source_folder):
             if os.path.exists(overlays_fp):
                 shutil.rmtree(overlays_fp)
 
+            translated_centerlines = os.path.join(source_folder, participant, date, location, 'centerlines', 'translated')
+            if os.path.exists(translated_centerlines):
+                shutil.rmtree(translated_centerlines)
+            
+            renamed_centerlines = os.path.join(source_folder, participant, date, location, 'centerlines', 'renamed')
+            if os.path.exists(renamed_centerlines):
+                shutil.rmtree(renamed_centerlines)
+
 if __name__ == "__main__":
     source_folder = "/hpc/projects/capillary-flow/data"
     delete_centerlines_files(source_folder)
