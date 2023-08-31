@@ -16,6 +16,7 @@ import os
 import seaborn as sns
 import time
 from src.tools.get_images import get_images
+from src.tools.load_name_map import load_name_map
 from src.tools.parse_filename import parse_filename
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage import median_filter
@@ -244,20 +245,9 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     metadata = metadata[metadata['Location'] == loc_num]
     print(metadata)
 
-    
-    # Run program on this data:
-    column_names  = ['centerlines name', 'cap name']
-    name_map = pd.read_csv(os.path.join(metadata_folder, 'name_map.csv'), names = column_names)
-
-    # Remove 'translated_' from all elements in the columns:
-    name_map = name_map.apply(lambda x: x.str.replace('translated_', ''))
-    name_map = name_map.apply(lambda x: x.str.replace('centerline_coords', 'kymograph'))
-    name_map = name_map.apply(lambda x: x.str.replace('csv', 'tiff'))
-    # duplicate the cap name column
-    name_map['cap name short'] = name_map['cap name']
-    # remove the prefix from the short cap name
-    name_map['cap name short'] = name_map['cap name short'].apply(lambda x: x.split("_")[-1].split(".")[0])
-        
+    if test:
+        name_map = load_name_map(path, version = 'kymographs')
+      
     # Read in the kymographs
     images = get_images(input_folder, "tiff")
     
@@ -279,26 +269,29 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
         # Get the pressure for the video
         pressure = video_metadata['Pressure'].values[0]
         fps = video_metadata['FPS'].values[0]
+        
         # Get the capillary name for the video
-        old_capillary_name = image
-        if name_map['centerlines name'].str.contains(old_capillary_name).any():
-            capillary_name = name_map.loc[name_map['centerlines name'] == old_capillary_name]['cap name short'].values[0]
-       
-            filename = f'{file_prefix}_{str(int(pressure*10)).zfill(2)}_{capillary_name}'
-            kymo_blur = gaussian_filter(kymo_raw, sigma = 2)
-            
-            if write:
-                base_name, extension = os.path.splitext(image)            
-                weighted_average_slope = find_slopes(kymo_blur, filename, output_folder, method = 'lasso', verbose = False, write=True)
-            else:
-                weighted_average_slope = find_slopes(kymo_blur, filename, output_folder, method = 'lasso', verbose = verbose, write=False)
-            # transform slope from pixels/frames into um/s:
-            um_slope = np.absolute(weighted_average_slope) *fps/PIX_UM
-            # add row to dataframe
-            new_data = pd.DataFrame([[part, video, pressure, capillary_name, um_slope]], columns = df.columns)
-            df = pd.concat([df, new_data], ignore_index=True)
-        else: 
-            missing_log.append(image)
+        if test:
+            old_capillary_name = image
+            if name_map['centerlines name'].str.contains(old_capillary_name).any():
+                capillary_name = name_map.loc[name_map['centerlines name'] == old_capillary_name]['cap name short'].values[0]
+            else: 
+                missing_log.append(image)
+        else:
+            capillary_name = image.split(".")[0].split("_")[-1]
+        filename = f'{file_prefix}_{str(int(pressure*10)).zfill(2)}_{capillary_name}'
+        kymo_blur = gaussian_filter(kymo_raw, sigma = 2)
+        
+        if write:
+            weighted_average_slope = find_slopes(kymo_blur, filename, output_folder, method = 'lasso', verbose = False, write=True)
+        else:
+            weighted_average_slope = find_slopes(kymo_blur, filename, output_folder, method = 'lasso', verbose = verbose, write=False)
+        # transform slope from pixels/frames into um/s:
+        um_slope = np.absolute(weighted_average_slope) *fps/PIX_UM
+        # add row to dataframe
+        new_data = pd.DataFrame([[part, video, pressure, capillary_name, um_slope]], columns = df.columns)
+        df = pd.concat([df, new_data], ignore_index=True)
+        
 
     # Write the missing log to a file
     with open(os.path.join(output_folder, "missing_log.txt"), "w") as f:
