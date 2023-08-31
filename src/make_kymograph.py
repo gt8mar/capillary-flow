@@ -187,6 +187,7 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
         write (bool): whether to write the blood flow to a csv file
         variable_radii (bool): whether to use variable radii
         verbose (bool): whether to print the progress
+        hasty (bool): whether to use the hasty segmentation files
 
     Returns:
         blood_flow (np.array): blood flow
@@ -318,7 +319,11 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(write=True, hasty=True)
+    if platform == 'Windows':
+        main(write=True, hasty=True)
+    else:
+        path = '/hpc/projects/capillary-flow/data/part09/230414/loc01'
+        main(path, write = True)
     # test2_normalize_row_and_col()
     # test()
     print("--------------------")
