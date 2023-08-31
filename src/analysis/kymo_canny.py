@@ -266,6 +266,7 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
 
     # Create a dataframe to store the results
     df = pd.DataFrame(columns = ['Participant','Video', 'Pressure', 'Capillary', 'Weighted Average Slope'])
+    missing_log = []
     for image in images:
         __, __, __, video, file_prefix = parse_filename(image)
         kymo_raw = cv2.imread(os.path.join(input_folder, image), cv2.IMREAD_GRAYSCALE)
@@ -296,8 +297,15 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
             # add row to dataframe
             new_data = pd.DataFrame([[part, video, pressure, capillary_name, um_slope]], columns = df.columns)
             df = pd.concat([df, new_data], ignore_index=True)
-        else: pass
+        else: 
+            missing_log.append(image)
 
+    # Write the missing log to a file
+    with open(os.path.join(output_folder, "missing_log.txt"), "w") as f:
+        for image in missing_log:
+            f.write(image + "\n")
+    # Write the dataframe to a file
+    df.to_csv(os.path.join(output_folder, "velocity_data.csv"), index=False)    
     # print(df)
     
     """
@@ -350,23 +358,23 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     --------------------------------- Plot the data on the same graph ---------------------------------------------------
     """
     
-    # fig, ax = plt.subplots()
-    # for name, group in grouped_df:
-    #     ax.plot(group['Pressure'], group['Weighted Average Slope'], marker='o', linestyle='', ms=12, label=name)
+    fig, ax = plt.subplots()
+    for name, group in grouped_df:
+        ax.plot(group['Pressure'], group['Weighted Average Slope'], marker='o', linestyle='', ms=12, label=name)
     
-    # ax.set_xlabel('Pressure (psi)')
-    # ax.set_ylabel('Velocity (um/s)')
-    # ax.set_title('Velocity vs. Pressure for each Capillary')
-    # ax.legend()
-    # plt.grid(True)
-    # plt.tight_layout()
+    ax.set_xlabel('Pressure (psi)')
+    ax.set_ylabel('Velocity (um/s)')
+    ax.set_title('Velocity vs. Pressure for each Capillary')
+    ax.legend()
+    plt.grid(True)
+    plt.tight_layout()
 
-    # if write:
-    #     plt.savefig(os.path.join(output_folder, "velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
-    # if verbose:
-    #     plt.show()
-    # else:
-    #     plt.close()
+    if write:
+        plt.savefig(os.path.join(output_folder, "velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
+    if verbose:
+        plt.show()
+    else:
+        plt.close()
 
 
     # plot_box_swarm(data, ["0.2 psi", "0.4 psi", "0.6 psi", "0.8 psi"], 
@@ -384,6 +392,6 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(write = False, verbose= False, test = True)
+    main(write = True, verbose= False, test = True)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
