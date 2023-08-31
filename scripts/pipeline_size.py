@@ -28,13 +28,13 @@ def main():
         print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
         ticks = time.time()
         location_path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, location)
-        align_segmented(location_path)
-        group_caps.main(location_path)
-        make_overlays(location_path)
+        #align_segmented(location_path)
+        #group_caps.main(location_path)
+        #make_overlays(location_path)
         #rename(location_path)
-        #translate_centerlines.main(location_path)
-        #plot_area.main(location_path)
-        #plot_size_slopes.main(location_path)
+        translate_centerlines.main(location_path)
+        plot_area.main(location_path)
+        plot_size_slopes.main(location_path)
     
 
 if __name__ == "__main__":
