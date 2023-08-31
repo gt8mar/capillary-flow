@@ -20,6 +20,49 @@ from fil_finder import FilFinder2D
 import astropy.units as u
 from skimage.morphology import medial_axis
 
+import numpy as np
+import cv2 as cv
+
+FILTER_RADIUS = 10
+FILTER_SIZE = 2*FILTER_RADIUS + 1
+SIGMA = 20
+
+def smooth_raster_lines(im, filterRadius, filterSize, sigma):
+    smoothed = np.zeros_like(im)
+    contours, hierarchy = cv.findContours(im, cv.RETR_CCOMP, cv.CHAIN_APPROX_NONE)
+    hierarchy = hierarchy[0]
+    for countur_idx, contour in enumerate(contours):
+        len_ = len(contour) + 2 * filterRadius
+        idx = len(contour) - filterRadius
+
+        x = []
+        y = []    
+        for i in range(len_):
+            x.append(contour[(idx + i) % len(contour)][0][0])
+            y.append(contour[(idx + i) % len(contour)][0][1])
+
+        x = np.asarray(x, dtype=np.float32)
+        y = np.asarray(y, dtype=np.float32)
+
+        xFilt = cv.GaussianBlur(x, (filterSize, filterSize), sigma, sigma)
+        xFilt = [q[0] for q in xFilt]
+        yFilt = cv.GaussianBlur(y, (filterSize, filterSize), sigma, sigma)
+        yFilt = [q[0] for q in yFilt]
+
+
+        smoothContours = []
+        smooth = []
+        for i in range(filterRadius, len(contour) + filterRadius):
+            smooth.append([xFilt[i], yFilt[i]])
+
+        smoothContours = np.asarray([smooth], dtype=np.int32)
+
+
+        color = (0,0,0) if hierarchy[countur_idx][3] > 0 else (255,255,255)
+        cv.drawContours(smoothed, smoothContours, 0, color, -1)
+    
+    return(smoothed)
+
 
 # Skeletonize the binary mask
 def perform_skeletonization(binary_image):
@@ -133,16 +176,30 @@ def make_skeletons(binary_image, plot = False):
 
 if __name__ == "__main__":
     image_folder = 'C:\\Users\\gt8mar\\capillary-flow\\tests\\part09\\230414\\loc02\\segmented\\individual_caps_original'
-    # image_names = ['set01_part09_230414_loc02_vid19_seg_cap_06a.png','set01_part09_230414_loc02_vid22_seg_cap_06a.png']
-    image_names = ['set01_part09_230414_loc02_vid27_seg_cap_03b.png']
+    image_names = ['set01_part09_230414_loc02_vid19_seg_cap_06a.png','set01_part09_230414_loc02_vid22_seg_cap_06a.png']
+    # image_names = ['set01_part09_230414_loc02_vid27_seg_cap_03b.png']
     for image_name in image_names:
         image_path = os.path.join(image_folder, image_name)
         import cv2
         binary_mask = (io.imread(image_path, as_gray=True) > 0.5).astype(int)
         print(binary_mask.shape)
-        skeleton, skeleton_longest, radii = make_skeletons(binary_mask, plot=True)
-        
-        
+        skeleton, skeleton_longest, radii = make_skeletons(binary_mask, plot=False)
+        smoothed = smooth_raster_lines(binary_mask, FILTER_RADIUS, FILTER_SIZE, SIGMA)
+        skeleton2, skeleton_longest2, radii2 = make_skeletons(smoothed, plot=False)
+        __, distance = medial_axis(binary_mask, return_distance=True)
+        __, distance2 = medial_axis(smoothed, return_distance=True)
+        overlay = -5*(distance * skeleton_longest) + binary_mask
+        overlay2 = -5*(distance2 * skeleton_longest2) + smoothed
+        fig, axes = plt.subplots(1, 2, figsize=(16, 6), sharex=True, sharey=True)
+        ax = axes.ravel()
+        ax[0].imshow(overlay, cmap=plt.cm.gray)
+        ax[0].axis('off')
+        ax[0].set_title('original overlay', fontsize=20)
+        ax[1].imshow(overlay2, cmap=plt.cm.gray)
+        ax[1].axis('off')
+        ax[1].set_title('smoothed', fontsize=20)
+        fig.tight_layout()
+        plt.show()
         
 
 

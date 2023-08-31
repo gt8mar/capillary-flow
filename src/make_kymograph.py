@@ -14,6 +14,7 @@ import pandas as pd
 from PIL import Image
 from src.tools.get_images import get_images
 from src.tools.load_image_array import load_image_array
+from src.tools.load_name_map import load_name_map
 from src.tools.load_csv_list import load_csv_list
 from src.tools.get_shifts import get_shifts
 from src.tools.parse_filename import parse_filename
@@ -186,6 +187,7 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
         write (bool): whether to write the blood flow to a csv file
         variable_radii (bool): whether to use variable radii
         verbose (bool): whether to print the progress
+        hasty (bool): whether to use the hasty segmentation files
 
     Returns:
         blood_flow (np.array): blood flow
@@ -234,6 +236,10 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
     if verbose:
         print(centerline_dict)
 
+    # load name map to rename capillaries
+    name_map = load_name_map(path, version='centerlines')
+    missing_log = []
+    
     # loop through videos
     for video in centerline_dict.keys():
         number_of_capillaries = len(centerline_dict[video])
@@ -264,8 +270,15 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
 
         # loop through capillaries
         for i, file in enumerate(centerline_dict[video]):
-            capillary_number = file.split('.')[0].split('_')[-1]    
-            print(f'Processing {video} capillary {capillary_number}')
+            old_capillary_name = file
+            # Check if centerline is in name map (TODO: fix the bug that causes this)
+            if name_map['centerlines name'].str.contains(old_capillary_name).any():            
+                capillary_number = name_map[name_map['centerlines name'] == file]['cap name short'].values[0]   
+            else:
+                missing_log.append(file)
+                continue
+
+            print(f'Processing {video} capillary {capillary_number}')            
 
             # load centerline file:
             skeleton = np.loadtxt(os.path.join(centerline_folder, 'coords', file), delimiter=',').astype(int)
@@ -306,7 +319,11 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(write=True, hasty=True)
+    if platform == 'Windows':
+        main(write=True, hasty=True)
+    else:
+        path = '/hpc/projects/capillary-flow/data/part09/230414/loc01'
+        main(path, write = True)
     # test2_normalize_row_and_col()
     # test()
     print("--------------------")
