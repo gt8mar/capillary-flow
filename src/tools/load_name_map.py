@@ -31,10 +31,10 @@ def load_name_map(path, version = 'centerlines'):
 
     # Remove 'translated_' from all elements in the columns:
     name_map = name_map.apply(lambda x: x.str.replace('translated_', ''))
-    if version == ('kymograph'|'kymo'|'kymographs'):
+    if version in ('kymograph','kymo','kymographs'):
         name_map = name_map.apply(lambda x: x.str.replace('centerline_coords', 'kymograph'))
         name_map = name_map.apply(lambda x: x.str.replace('csv', 'tiff'))
-    elif version == ('centerline'|'centerlines'):
+    elif version in ('centerline','centerlines'):
         pass
     else:
         raise ValueError('Version not recognized. Use "centerline" or "kymograph".')
