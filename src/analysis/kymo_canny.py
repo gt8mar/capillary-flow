@@ -12,7 +12,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import cv2
-import os
+import os, platform
 import seaborn as sns
 import time
 from src.tools.get_images import get_images
@@ -209,6 +209,9 @@ def find_slopes(image, filename, output_folder=None, method = 'ridge', verbose =
     
     if write: 
         plt.savefig(os.path.join(output_folder, str(filename) + ".png"), bbox_inches='tight', dpi=400)
+        if platform != 'Windows':
+            results_folder = '/hpc/projects/capillary-flow/results/velocities'
+            plt.savefig(os.path.join(results_folder, str(filename) + ".png"), bbox_inches='tight', dpi=400)
     if verbose:
         plt.show()  
     else:
@@ -221,6 +224,9 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     input_folder = os.path.join(path, 'kymographs')
     os.makedirs(os.path.join(path, 'velocities'), exist_ok=True)
     output_folder = os.path.join(path, 'velocities')
+    if platform != "Windows":
+        os.makedirs('/hpc/projects/capillary-flow/results/velocities', exist_ok=True)
+        results_folder = '/hpc/projects/capillary-flow/results/velocities'
     if test:
         # metadata_folder = os.path.join(path, 'part_metadata')                           # This is for the test data
         metadata_folder = os.path.join(os.path.dirname(os.path.dirname(path)), 'part_metadata')        # This is for the real data
@@ -261,7 +267,7 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     df = pd.DataFrame(columns = ['Participant','Video', 'Pressure', 'Capillary', 'Weighted Average Slope'])
     missing_log = []
     for image in images:
-        __, __, __, video, file_prefix = parse_filename(image)
+        participant, __, __, video, file_prefix = parse_filename(image)
         kymo_raw = cv2.imread(os.path.join(input_folder, image), cv2.IMREAD_GRAYSCALE)
         # Get the metadata for the video
         video_metadata = metadata.loc[
@@ -344,7 +350,9 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     plt.tight_layout()
 
     if write:
-        plt.savefig(os.path.join(output_folder, "velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
+        plt.savefig(os.path.join(output_folder, f"{participant} {location} velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
+        if platform != 'Windows':
+            plt.savefig(os.path.join(results_folder, f"{participant} {location} velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
     if verbose:
         plt.show()
     else:
@@ -366,7 +374,10 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     plt.tight_layout()
 
     if write:
-        plt.savefig(os.path.join(output_folder, "velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
+        plt.savefig(os.path.join(output_folder, f"{participant} {location} velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
+        if platform != 'Windows':
+            plt.savefig(os.path.join(results_folder, f"{participant} {location} velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
+
     if verbose:
         plt.show()
     else:
