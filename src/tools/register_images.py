@@ -53,11 +53,13 @@ def register_images(reference_img, target_img, prevdx=0, prevdy=0):
     cv2.destroyAllWindows()"""
 
     #if no matches found, return (0,0) & untranslated image
-    if len(good_matches) == 0:
-        print("not translated")
+    if len(good_matches) <= 2:
+        #print("not translated")
         transformation_matrix = np.array([[1, 0, -(prevdx)], [0, 1, -(prevdy)]], dtype=np.float32)
-        shifted_image = cv2.warpAffine(target_img, transformation_matrix, (reference_img.shape[1], reference_img.shape[0]))
-        return (0, 0), shifted_image
+        target_img = np.pad(target_img, ((150, 100), (150, 100), (0, 0)))
+        shifted_image = cv2.warpAffine(target_img, transformation_matrix, (reference_img.shape[1] + 300, reference_img.shape[0] + 300))
+        contrast_shifted_image = cv2.equalizeHist(cv2.cvtColor(shifted_image, cv2.COLOR_BGR2GRAY))
+        return (0, 0), contrast_shifted_image
 
     #average translations across all matches
     dx_sum = dy_sum = 0.0
@@ -75,9 +77,11 @@ def register_images(reference_img, target_img, prevdx=0, prevdy=0):
 
     #transform
     transformation_matrix = np.array([[1, 0, -(dx_avg + prevdx)], [0, 1, -(dy_avg + prevdy)]], dtype=np.float32)
-    shifted_image = cv2.warpAffine(target_img, transformation_matrix, (reference_img.shape[1], reference_img.shape[0]))
+    target_img = np.pad(target_img, ((150, 150), (150, 150), (0, 0)))
+    shifted_image = cv2.warpAffine(target_img, transformation_matrix, (reference_img.shape[1] + 300, reference_img.shape[0] + 300))
+    contrast_shifted_image = cv2.equalizeHist(cv2.cvtColor(shifted_image, cv2.COLOR_BGR2GRAY))
 
-    return (dx_avg, dy_avg), shifted_image
+    return (dx_avg, dy_avg), contrast_shifted_image
 
 def main():
     reference_img = cv2.imread("E:\\Marcus\\gabby test data\\part14\\230428\\vid06\\moco\\vid06_moco_0000.tif")
