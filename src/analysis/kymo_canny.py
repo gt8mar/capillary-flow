@@ -225,25 +225,21 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     input_folder = os.path.join(path, 'kymographs')
     os.makedirs(os.path.join(path, 'velocities'), exist_ok=True)
     output_folder = os.path.join(path, 'velocities')
+    part, date, location, __, __ = parse_path(path)
+
     if platform != "Windows":
         os.makedirs('/hpc/projects/capillary-flow/results/velocities', exist_ok=True)
         results_folder = '/hpc/projects/capillary-flow/results/velocities'
         SET = 'set01'
-        part, date, location, __, __ = parse_path(path)
     if test:
         # metadata_folder = os.path.join(path, 'part_metadata')                           # This is for the test data
         metadata_folder = os.path.join(os.path.dirname(os.path.dirname(path)), 'part_metadata')        # This is for the real data
-        SET = "set01"
-        part = "part09"
-        date = '230414'
-        location = path.split("\\")[-1]
-        # strip location of leading letters and zeros
-        loc_num = location.lstrip("loc")
-        loc_num = loc_num.lstrip("0")
-        loc_num = int(loc_num)
     else: 
         # metadata_folder = os.path.join(os.path.dirname(os.path.dirname(path)), 'part_metadata')        # This is for the real data
         metadata_folder = '/hpc/projects/capillary-flow/metadata'
+    loc_num = location.lstrip("loc")
+    loc_num = loc_num.lstrip("0")
+    loc_num = int(loc_num)
     # participant, date, video, file_prefix = parse_vid_path(path)
     
     metadata_name = f'{part}_{date}.xlsx'
