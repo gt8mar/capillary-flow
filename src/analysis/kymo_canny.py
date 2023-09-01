@@ -242,8 +242,8 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
         loc_num = loc_num.lstrip("0")
         loc_num = int(loc_num)
     else: 
-        metadata_folder = os.path.join(os.path.dirname(os.path.dirname(path)), 'part_metadata')        # This is for the real data
-        
+        # metadata_folder = os.path.join(os.path.dirname(os.path.dirname(path)), 'part_metadata')        # This is for the real data
+        metadata_folder = '/hpc/projects/capillary-flow/metadata'
     # participant, date, video, file_prefix = parse_vid_path(path)
     
     metadata_name = f'{part}_{date}.xlsx'
