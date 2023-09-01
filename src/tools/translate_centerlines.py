@@ -155,11 +155,11 @@ def show_centerlines(projected_caps_fp, coords_fp, individual_caps_fp):
                 cap_img[int(float(row[0]))][int(float(row[1]))] = [255, 0, 0]
 
         #cv2.imwrite(os.path.join("D:\\misc", str(file) + ".png"), cap_img)
-        #cv2.imshow(str(file), cap_img)
-        #cv2.waitKey(0)  
+        cv2.imshow(str(file), cap_img)
+        cv2.waitKey(0)  
 
 
-def main(path="E:\\Marcus\\gabby_poster_data\\part09\\230414\\loc01"):
+def main(path="D:\\gabby_debugging\\part09\\230414\\loc01"):
     coords_fp = os.path.join(path, "centerlines", "coords")
     segmented_folder = os.path.join(path, "segmented")
 

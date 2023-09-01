@@ -123,7 +123,7 @@ def save_untranslated(registered_folder_fp):
 
                         cv2.imwrite(os.path.join(orig_fp, cap), crop_img)
             
-def main(path="D:\\gabby_poster_data\\part10\\230425\\loc01"):
+def main(path="D:\\gabby_debugging\\part09\\230414\\loc07"):
     registered_fp = os.path.join(path, "segmented", "registered")
     sorted_seg_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(registered_fp, x)) and x.endswith('.png'), os.listdir(registered_fp)))
 
