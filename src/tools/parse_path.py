@@ -20,7 +20,7 @@ def parse_path(path, video_path=False):
         date (str): the date the data was collected
         video (str): the video number for that day
     """
-    SET = 'set_01'
+    SET = 'set01'
 
     # Split the path into its directory names
     dir_names = path.split(os.path.sep)

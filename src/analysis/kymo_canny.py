@@ -252,6 +252,9 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     images = get_images(input_folder, "tiff")
     
     # Select images with correct location
+    for image in images:
+        # replace set_01 with set01
+        image = image.replace("set_01", "set01")
     images = [image for image in images if image.split("_")[4] in metadata['Video'].values]
 
     # Create a dataframe to store the results
@@ -385,6 +388,6 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(write = True, verbose= False, test = True)
+    main(write = True, verbose= False, test = False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
