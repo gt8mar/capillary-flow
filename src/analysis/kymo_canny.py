@@ -18,6 +18,7 @@ import time
 from src.tools.get_images import get_images
 from src.tools.load_name_map import load_name_map
 from src.tools.parse_filename import parse_filename
+from src.tools.parse_path import parse_path
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage import median_filter
 from sklearn.linear_model import Lasso
@@ -227,10 +228,12 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     if platform != "Windows":
         os.makedirs('/hpc/projects/capillary-flow/results/velocities', exist_ok=True)
         results_folder = '/hpc/projects/capillary-flow/results/velocities'
+        SET = 'set01'
+        part, date, location, __, __ = parse_path(path)
     if test:
         # metadata_folder = os.path.join(path, 'part_metadata')                           # This is for the test data
         metadata_folder = os.path.join(os.path.dirname(os.path.dirname(path)), 'part_metadata')        # This is for the real data
-        SET = "set_01"
+        SET = "set01"
         part = "part09"
         date = '230414'
         location = path.split("\\")[-1]
@@ -267,7 +270,7 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     df = pd.DataFrame(columns = ['Participant','Video', 'Pressure', 'Capillary', 'Weighted Average Slope'])
     missing_log = []
     for image in images:
-        participant, __, __, video, file_prefix = parse_filename(image)
+        __, __, __, video, file_prefix = parse_filename(image)
         kymo_raw = cv2.imread(os.path.join(input_folder, image), cv2.IMREAD_GRAYSCALE)
         # Get the metadata for the video
         video_metadata = metadata.loc[
@@ -350,9 +353,9 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     plt.tight_layout()
 
     if write:
-        plt.savefig(os.path.join(output_folder, f"{participant} {location} velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
+        plt.savefig(os.path.join(output_folder, f"{part} {location} velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
         if platform != 'Windows':
-            plt.savefig(os.path.join(results_folder, f"{participant} {location} velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
+            plt.savefig(os.path.join(results_folder, f"{part} {location} velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
     if verbose:
         plt.show()
     else:
@@ -374,9 +377,9 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     plt.tight_layout()
 
     if write:
-        plt.savefig(os.path.join(output_folder, f"{participant} {location} velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
+        plt.savefig(os.path.join(output_folder, f"{part} {location} velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
         if platform != 'Windows':
-            plt.savefig(os.path.join(results_folder, f"{participant} {location} velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
+            plt.savefig(os.path.join(results_folder, f"{part} {location} velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
 
     if verbose:
         plt.show()
