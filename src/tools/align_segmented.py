@@ -33,7 +33,7 @@ def uncrop_segmented(path, input_seg_img):
     return uncropped_input_seg_img, gap_left, gap_right, gap_bottom, gap_top
 
 #this function assumes moco folder & seg imgs folder contain the same number of files & they correspond to each other 
-def align_segmented(path="D:\\gabby_poster_data\\part10\\230425\\loc01"):
+def align_segmented(path="D:\\gabby_debugging\\part09\\230414\\loc07"):
     vid_folder_fp = os.path.join(path, "vids")
     segmented_folder_fp = os.path.join(path, "segmented")
 
@@ -53,7 +53,8 @@ def align_segmented(path="D:\\gabby_poster_data\\part10\\230425\\loc01"):
     reference_moco_img = cv2.imread(reference_moco_fp)
 
     #save reference moco
-    cv2.imwrite(os.path.join(reg_moco_folder, os.path. basename(reference_moco_fp)), reference_moco_img)
+    contrast_reference_moco_img = cv2.equalizeHist(cv2.cvtColor(reference_moco_img, cv2.COLOR_BGR2GRAY))
+    cv2.imwrite(os.path.join(reg_moco_folder, os.path. basename(reference_moco_fp)), np.pad(contrast_reference_moco_img, ((150, 150), (150, 150))))
 
     #make folder to save registered segmented imgs
     reg_folder_path = os.path.join(segmented_folder_fp, "registered")
