@@ -211,10 +211,10 @@ def quantitative_subplots(plotinfo, partnum, date, location):
             else:
                 ax.axis('off')
 
-    # Set the same x-axis limits for all subplots
-    for ax in axes.flat[:num_plots]:
-        ax.set_xlim(overall_min_x, overall_max_x)
-        ax.set_ylim(overall_min_y, overall_max_y)
+        # Set the same x-axis limits for all subplots
+        for ax in axes.flat[:num_plots]:
+            ax.set_xlim(overall_min_x, overall_max_x)
+            ax.set_ylim(overall_min_y, overall_max_y)
 
     #plt.tight_layout()
     plt.subplots_adjust(hspace=0.5)
@@ -268,7 +268,7 @@ def plot_area_by_length(caps_fp, centerlines_fp, metadata_fp):
     location = os.path.basename(os.path.dirname(os.path.dirname(caps_fp)))
     return quantitative_subplots(plotinfo, partnum, date, location)
     
-def main(path="E:\\Marcus\\gabby_poster_data\\part09\\230414\\loc01"):
+def main(path="D:\\gabby_debugging\\part09\\230414\\loc07"):
     participant = os.path.basename(os.path.dirname(os.path.dirname(path)))
     date = os.path.basename(os.path.dirname(path))
     location = os.path.basename(path)
