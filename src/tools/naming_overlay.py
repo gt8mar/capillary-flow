@@ -62,7 +62,7 @@ def extract_file_info(filename):
     vid = "" if vmatch == None else "vid" + vmatch.group(1) + "_"
     return set_part_date, location, vid
 
-def make_overlays(path="E:\\Marcus\\gabby_test_data\\debugging\\part09\\230414\\loc02"):
+def make_overlays(path="D:\\gabby_debugging\\part09\\230414\\loc07"):
     reg_moco_fp = os.path.join(path, "segmented", "moco_registered")
 
     resize_csv = os.path.join(path, "segmented", "resize_vals.csv")
@@ -128,6 +128,8 @@ def make_overlays(path="E:\\Marcus\\gabby_test_data\\debugging\\part09\\230414\\
 
                 if np.argwhere(resized_cap != 0).size == 0:
                     continue
+
+                resized_cap = np.pad(resized_cap, ((150, 150), (150, 150)))
 
                 #get label coordinates
                 xcoord, ycoord = get_label_position(resized_cap)
