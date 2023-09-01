@@ -7,6 +7,7 @@ By: Marcus Forst
 
 import os
 import pandas as pd
+from src.tools.parse_path import parse_path
 
 
 # Rename centerline files:
@@ -25,9 +26,13 @@ def load_name_map(path, version = 'centerlines'):
             with the columns 'centerlines name', 'cap name', 'cap name short'
             'cap name short' gives the short index of the capillaries
     """
+    participant, date, location, video, file_prefix = parse_path(path)
     column_names  = ['centerlines name', 'cap name']
-    name_map_folder = os.path.join(path, 'segmented')
-    name_map = pd.read_csv(os.path.join(name_map_folder, 'name_map.csv'), names = column_names)
+    # name_map_folder = os.path.join(path, 'segmented')
+    name_map_name = f'{participant}_{date}_{location}_name_map.csv'
+
+    name_map_folder = '/hpc/projects/capillary-flow/results/size/name_maps'
+    name_map = pd.read_csv(os.path.join(name_map_folder, name_map_name), names = column_names)
 
     # Remove 'translated_' from all elements in the columns:
     name_map = name_map.apply(lambda x: x.str.replace('translated_', ''))

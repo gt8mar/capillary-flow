@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 from src.tools.load_csv_list import load_csv_list
-from src.tools.parse_vid_path import parse_vid_path
+from src.tools.parse_path import parse_vid_path
 
 
 PIX_UM = 1.74

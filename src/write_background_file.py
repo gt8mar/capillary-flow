@@ -13,7 +13,7 @@ import pandas as pd
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.pyplot as plt
 import cv2
-from src.tools.parse_vid_path import parse_vid_path
+from src.tools.parse_path import parse_vid_path
 from src.tools.get_images import get_images
 from src.tools.pic2vid import pic2vid
 
