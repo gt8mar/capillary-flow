@@ -12,7 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os, time
 import platform
-from src.tools.parse_vid_path import parse_vid_path
+from src.tools.parse_path import parse_vid_path
 from src.tools.get_images import get_images
 from src.tools.load_image_array import load_image_array
 from src.tools.get_shifts import get_shifts

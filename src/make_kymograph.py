@@ -18,8 +18,6 @@ from src.tools.load_name_map import load_name_map
 from src.tools.load_csv_list import load_csv_list
 from src.tools.get_shifts import get_shifts
 from src.tools.parse_filename import parse_filename
-from scipy.ndimage import gaussian_filter
-from src.tools.parse_vid_path import parse_vid_path
 from scipy.ndimage import convolve
 from skimage import exposure
 
