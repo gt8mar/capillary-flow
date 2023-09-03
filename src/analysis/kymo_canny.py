@@ -221,6 +221,21 @@ def find_slopes(image, filename, output_folder=None, method = 'ridge', verbose =
 
 def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write = False,
          test = False):
+    """
+    This function takes in a path to a folder containing kymographs and outputs
+    a csv file with the average velocities for each capillary. It plots the
+    velocities vs. pressure for each capillary and all capillaries on the same
+    graph.
+
+    Args:
+        path (str): path to the folder containing kymographs
+        verbose (bool): If True, show plots
+        write (bool): If True, write plots to file
+        test (bool): If True, use test data
+
+    Returns:
+        0 if successful
+    """
     # Set up paths
     input_folder = os.path.join(path, 'kymographs')
     os.makedirs(os.path.join(path, 'velocities'), exist_ok=True)

@@ -270,6 +270,8 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
         j = 0
         # loop through capillaries
         for i, file in enumerate(centerline_dict[video]):
+            # TODO: fix bug with missing videos
+
             old_capillary_name = file
             # Check if centerline is in name map (TODO: fix the bug that causes this)
             if name_map['centerlines name'].str.contains(old_capillary_name).any():            
