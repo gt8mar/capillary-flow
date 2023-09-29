@@ -7,9 +7,6 @@ correct location folders.
 
 import os, platform
 import shutil
-import pandas as pd
-import numpy as np
-from tqdm import tqdm
 from src.tools.parse_filename import parse_filename
 
 def main():

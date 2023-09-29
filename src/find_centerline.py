@@ -223,13 +223,15 @@ def load_image_with_prefix(input_folder, segmented_filename):
 
 
 def main(path ='F:\\Marcus\\data\\hasty_seg\\230626\\part10\\230425\\loc02', # 'C:\\Users\\gt8mar\\capillary-flow\\tests\\part09\\230414\\loc02', #
-        verbose = False, write = False, plot=False):
+        verbose = False, write = False, plot=False, hasty = True):
     """ Isolates capillaries from segmented image and finds their centerlines and radii. 
 
     Args: 
         path (str): Path to the umbrella location folder.
         verbose: bool, shows plots if true
         write: bool, saves plots if true
+        plot: bool, shows plots if true
+        hasty: bool, if true, uses hasty segmentation. If false, uses normal segmentation.
 
     Returns: 0 if successful
 
@@ -240,7 +242,10 @@ def main(path ='F:\\Marcus\\data\\hasty_seg\\230626\\part10\\230425\\loc02', # '
     warnings.filterwarnings("ignore", category=UserWarning, module="fil_finder.filament")
     
     # segmented folder
-    segmented_folder = os.path.join(path, "segmented")
+    if hasty:
+        segmented_folder = os.path.join(path, "segmented", "hasty")
+    else:
+        segmented_folder = os.path.join(path, "segmented")
     os.makedirs(os.path.join(path, 'centerlines', 'coords'), exist_ok=True)
     os.makedirs(os.path.join(path, 'centerlines', 'images'), exist_ok=True)
     output_folder = os.path.join(path, 'centerlines')
