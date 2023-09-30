@@ -4,7 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import platform
 
-def main(path="E:\\Marcus\\gabby_test_data\\debugging\\part09\\230414\\loc04"):
+def main(path="E:\\Marcus\\gabby_poster_data\\part09\\230414\\loc01"):
     participant = os.path.basename(os.path.dirname(os.path.dirname(path)))
     date = os.path.basename(os.path.dirname(path))
     location = os.path.basename(path)

@@ -280,7 +280,7 @@ def main(path="D:\\gabby_debugging\\part09\\230414\\loc07"):
     date = os.path.basename(os.path.dirname(path))
     location = os.path.basename(path)
     
-    caps_fp = os.path.join(path, "segmented", "individual_caps_translated")
+    caps_fp = os.path.join(path, "segmented", "hasty", "individual_caps_translated")
     centerlines_fp = os.path.join(path, "centerlines", "renamed")
     metadata_fp = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(path)))), "metadata", participant + "_" + date + ".xlsx")
 

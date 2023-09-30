@@ -62,10 +62,10 @@ def extract_file_info(filename):
     vid = "" if vmatch == None else "vid" + vmatch.group(1) + "_"
     return set_part_date, location, vid
 
-def make_overlays(path="D:\\gabby_debugging\\part09\\230414\\loc07"):
-    reg_moco_fp = os.path.join(path, "segmented", "moco_registered")
+def make_overlays(path="D:\\gabby_debugging\\part10\\230425\\loc02"):
+    reg_moco_fp = os.path.join(path, "segmented", "hasty", "moco_registered")
 
-    resize_csv = os.path.join(path, "segmented", "resize_vals.csv")
+    resize_csv = os.path.join(path, "segmented", "hasty", "resize_vals.csv")
     with open(resize_csv, 'r') as resize_values:
         reader = csv.reader(resize_values)
         rows = list(reader)
@@ -100,7 +100,7 @@ def make_overlays(path="D:\\gabby_debugging\\part09\\230414\\loc07"):
         frame_img = cv2.imread(os.path.join(reg_moco_fp, frame))
         frame_img = cv2.cvtColor(frame_img, cv2.COLOR_BGR2BGRA)
         frame_img[:, :, 3] = 255
-        for cap in os.listdir(os.path.join(path, "segmented", "individual_caps_translated")):
+        for cap in os.listdir(os.path.join(path, "segmented", "hasty", "individual_caps_translated")):
             if "vid" + vidnum in cap:
                 cmatch = re.search(r'cap_(\d{2})', cap)
                 capnum = "cap_" + cmatch.group(1)
@@ -114,7 +114,7 @@ def make_overlays(path="D:\\gabby_debugging\\part09\\230414\\loc07"):
                     element_colors[capnum] = color
                 colored_elements.append((capnum, color))
 
-                cap_img = cv2.imread(os.path.join(path, "segmented", "individual_caps_translated", cap))
+                cap_img = cv2.imread(os.path.join(path, "segmented", "hasty", "individual_caps_translated", cap))
                 cap_img = rgb2gray(cap_img)
 
                 if miny==0 and minx==0:
@@ -153,7 +153,7 @@ def make_overlays(path="D:\\gabby_debugging\\part09\\230414\\loc07"):
                 set_part_date, location, vid = extract_file_info(cap)
                 filename = set_part_date + location + vid + "overlay.png"
                 frame_img = overlayed
-                overlay_folder = os.path.join(path, "segmented", "overlays")
+                overlay_folder = os.path.join(path, "segmented", "hasty", "overlays")
                 os.makedirs(overlay_folder, exist_ok=True)
                 cv2.imwrite(os.path.join(overlay_folder, filename), overlayed)
                 if platform.system() != 'Windows':

@@ -3,12 +3,12 @@ import os
 import pandas as pd
 import platform
 
-def rename(path='D:\\gabby_poster_data\\part10\\230425\\loc02'):
-    individual_caps_translated_fp = os.path.join(path, "segmented", "individual_caps_translated")
-    individual_caps_original_fp = os.path.join(path, "segmented", "individual_caps_original")
+def rename(path='D:\\gabby_debugging\\part10\\230425\\loc02'):
+    individual_caps_translated_fp = os.path.join(path, "segmented", "hasty", "individual_caps_translated")
+    individual_caps_original_fp = os.path.join(path, "segmented", "hasty", "individual_caps_original")
 
     if platform.system() == 'Windows':
-        rename_map_fp = "D:\\gabby_poster_data\\part10\\230425\\loc02\\rename_map.csv"
+        rename_map_fp = "D:\\gabby_debugging\\part10\\230425\\loc02\\rename_map.csv"
     else:
         rename_map_fp = "/hpc/projects/capillary-flow/results/size/rename_map.csv"
     df = pd.read_csv(rename_map_fp, header=None)

@@ -33,9 +33,9 @@ def uncrop_segmented(path, input_seg_img):
     return uncropped_input_seg_img, gap_left, gap_right, gap_bottom, gap_top
 
 #this function assumes moco folder & seg imgs folder contain the same number of files & they correspond to each other 
-def align_segmented(path="D:\\gabby_debugging\\part09\\230414\\loc07"):
+def align_segmented(path="D:\\gabby_debugging\\part10\\230425\\loc02"):
     vid_folder_fp = os.path.join(path, "vids")
-    segmented_folder_fp = os.path.join(path, "segmented")
+    segmented_folder_fp = os.path.join(path, "segmented", "hasty")
 
     #make folder to save registered moco images
     reg_moco_folder = os.path.join(segmented_folder_fp, "moco_registered")

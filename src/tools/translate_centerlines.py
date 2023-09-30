@@ -134,7 +134,6 @@ def show_centerlines(projected_caps_fp, coords_fp, individual_caps_fp):
     cv2.waitKey(0)
 
     for file in os.listdir(coords_fp):
-
         match1 = re.search(r'vid(\d{2})', file)
         vidnum = match1.group(1)
 
@@ -158,10 +157,9 @@ def show_centerlines(projected_caps_fp, coords_fp, individual_caps_fp):
         cv2.imshow(str(file), cap_img)
         cv2.waitKey(0)  
 
-
-def main(path="D:\\gabby_debugging\\part09\\230414\\loc01"):
+def main(path="D:\\gabby_debugging\\part10\\230425\\loc02"):
     coords_fp = os.path.join(path, "centerlines", "coords")
-    segmented_folder = os.path.join(path, "segmented")
+    segmented_folder = os.path.join(path, "segmented", "hasty")
 
     sorted_coords_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(coords_fp, x)), os.listdir(coords_fp))) #sort numerically
     translations_csv = os.path.join(segmented_folder, "translations.csv")
@@ -176,7 +174,7 @@ def main(path="D:\\gabby_debugging\\part09\\230414\\loc01"):
 
     translated_coords_fp = translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_csv, resize_csv)
     renamed_coords_fp = rename_caps(translated_coords_fp, individual_caps_fp, participant, date, location)
-    #show_centerlines(projected_caps_fp, renamed_coords_fp, individual_caps_fp)
+    show_centerlines(projected_caps_fp, renamed_coords_fp, individual_caps_fp)
     
 
     
