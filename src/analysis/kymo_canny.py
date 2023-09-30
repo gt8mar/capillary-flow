@@ -12,12 +12,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import cv2
-import os
+import os, platform
 import seaborn as sns
 import time
 from src.tools.get_images import get_images
 from src.tools.load_name_map import load_name_map
 from src.tools.parse_filename import parse_filename
+from src.tools.parse_path import parse_path
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage import median_filter
 from sklearn.linear_model import Lasso
@@ -209,6 +210,9 @@ def find_slopes(image, filename, output_folder=None, method = 'ridge', verbose =
     
     if write: 
         plt.savefig(os.path.join(output_folder, str(filename) + ".png"), bbox_inches='tight', dpi=400)
+        if platform != 'Windows':
+            results_folder = '/hpc/projects/capillary-flow/results/velocities'
+            plt.savefig(os.path.join(results_folder, str(filename) + ".png"), bbox_inches='tight', dpi=400)
     if verbose:
         plt.show()  
     else:
@@ -217,24 +221,40 @@ def find_slopes(image, filename, output_folder=None, method = 'ridge', verbose =
 
 def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write = False,
          test = False):
+    """
+    This function takes in a path to a folder containing kymographs and outputs
+    a csv file with the average velocities for each capillary. It plots the
+    velocities vs. pressure for each capillary and all capillaries on the same
+    graph.
+
+    Args:
+        path (str): path to the folder containing kymographs
+        verbose (bool): If True, show plots
+        write (bool): If True, write plots to file
+        test (bool): If True, use test data
+
+    Returns:
+        0 if successful
+    """
     # Set up paths
     input_folder = os.path.join(path, 'kymographs')
     os.makedirs(os.path.join(path, 'velocities'), exist_ok=True)
     output_folder = os.path.join(path, 'velocities')
+    part, date, location, __, __ = parse_path(path)
+
+    if platform != "Windows":
+        os.makedirs('/hpc/projects/capillary-flow/results/velocities', exist_ok=True)
+        results_folder = '/hpc/projects/capillary-flow/results/velocities'
+        SET = 'set01'
     if test:
         # metadata_folder = os.path.join(path, 'part_metadata')                           # This is for the test data
         metadata_folder = os.path.join(os.path.dirname(os.path.dirname(path)), 'part_metadata')        # This is for the real data
-        SET = "set_01"
-        part = "part09"
-        date = '230414'
-        location = path.split("\\")[-1]
-        # strip location of leading letters and zeros
-        loc_num = location.lstrip("loc")
-        loc_num = loc_num.lstrip("0")
-        loc_num = int(loc_num)
     else: 
-        metadata_folder = os.path.join(os.path.dirname(os.path.dirname(path)), 'part_metadata')        # This is for the real data
-        
+        # metadata_folder = os.path.join(os.path.dirname(os.path.dirname(path)), 'part_metadata')        # This is for the real data
+        metadata_folder = '/hpc/projects/capillary-flow/metadata'
+    loc_num = location.lstrip("loc")
+    loc_num = loc_num.lstrip("0")
+    loc_num = int(loc_num)
     # participant, date, video, file_prefix = parse_vid_path(path)
     
     metadata_name = f'{part}_{date}.xlsx'
@@ -252,6 +272,9 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     images = get_images(input_folder, "tiff")
     
     # Select images with correct location
+    for image in images:
+        # replace set_01 with set01
+        image = image.replace("set_01", "set01")
     images = [image for image in images if image.split("_")[4] in metadata['Video'].values]
 
     # Create a dataframe to store the results
@@ -341,7 +364,9 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     plt.tight_layout()
 
     if write:
-        plt.savefig(os.path.join(output_folder, "velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
+        plt.savefig(os.path.join(output_folder, f"{part} {location} velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
+        if platform != 'Windows':
+            plt.savefig(os.path.join(results_folder, f"{part} {location} velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
     if verbose:
         plt.show()
     else:
@@ -363,7 +388,10 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     plt.tight_layout()
 
     if write:
-        plt.savefig(os.path.join(output_folder, "velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
+        plt.savefig(os.path.join(output_folder, f"{part} {location} velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
+        if platform != 'Windows':
+            plt.savefig(os.path.join(results_folder, f"{part} {location} velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
+
     if verbose:
         plt.show()
     else:
@@ -385,6 +413,6 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(write = True, verbose= False, test = True)
+    main(write = True, verbose= False, test = False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))

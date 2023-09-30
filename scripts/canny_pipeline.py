@@ -10,6 +10,7 @@ By: Marcus Forst
 import os, sys, gc, time
 from src import find_centerline
 from src import make_kymograph
+from src.analysis import kymo_canny
 from src.tools.find_earliest_date_dir import find_earliest_date_dir
 
 SET = "set01"
@@ -59,8 +60,8 @@ def main():
         # print(f"completed centerlines for location {location} in {ticks-time.time()} seconds")
         
         # Make kymographs
-        make_kymograph.main(location_path, verbose=False, write=True)
-        print(f'completed kymographs for location {location} in {ticks-time.time()} seconds')
+        kymo_canny.main(location_path, verbose=False, write=True)
+        print(f'completed velocities for location {location} in {ticks-time.time()} seconds')
         print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
 
 
