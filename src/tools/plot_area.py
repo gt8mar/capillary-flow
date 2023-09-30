@@ -33,18 +33,18 @@ def exclude_bp_scan(caps_listdir, metadata_fp):
         vmatch = re.search(r'vid(\d{2})', cap)
         vidnum = vmatch.group(1)
         metadata = pd.read_excel(metadata_fp)
-        for index, row in metadata.iterrows():
-            if vidnum in str(row[3]):
-                if "bp" in str(row[3]) or "scan" in str(row[3]):
-                    break
-                else:
-                    new_caps_listdir.append(cap)
-                    break
-    return new_caps_listdir
 
-def exclude_twisty():
-    #TOWRITE
-    return 0
+        vidrow = None
+        for index, vid_entry in enumerate(metadata['Video']):
+            if vidnum in vid_entry:
+                vidrow = index
+                break
+        if 'bp' in str(vidrow) or 'scan' in str(vidrow):
+            pass
+        else:
+            new_caps_listdir.append(cap)
+
+    return new_caps_listdir
 
 def group_by_cap(plotinfo):
     grouped_caps = {}
@@ -257,10 +257,17 @@ def plot_area_by_length(caps_fp, centerlines_fp, metadata_fp):
         #get pressure
         pressure = 0
         metadata = pd.read_excel(metadata_fp)
-        for index, row in metadata.iterrows():
-            if vidnum in str(row[3]):
-                pressure = str(row[5])
+        vidrow = None
+        for index, vid_entry in enumerate(metadata['Video']):
+            if vidnum in str(vid_entry):
+                vidrow = index
                 break
+        pressure = metadata.iloc[vidrow]['Pressure']
+
+        """for index, row in metadata.iterrows():
+            if vidnum in str(metadata['Video']):
+                pressure = str(row[5])
+                break"""
 
         plotinfo.append([area/length, pressure, capnum, vidnum])
     partnum = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(caps_fp)))))
