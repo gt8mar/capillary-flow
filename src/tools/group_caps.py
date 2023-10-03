@@ -123,7 +123,7 @@ def save_untranslated(registered_folder_fp):
 
                         cv2.imwrite(os.path.join(orig_fp, cap), crop_img)
             
-def main(path="D:\\gabby_debugging\\part10\\230425\\loc02"):
+def main(path="D:\\data_gabby\\debugging\\localrun\\part17\\230502\\loc01"):
     registered_fp = os.path.join(path, "segmented", "hasty", "registered")
     sorted_seg_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(registered_fp, x)) and x.endswith('.png'), os.listdir(registered_fp)))
 
@@ -149,7 +149,7 @@ def main(path="D:\\gabby_debugging\\part10\\230425\\loc02"):
     separate_caps(registered_fp)
 
     #save untranslated individual caps, named
-    save_untranslated(registered_fp)
+    #save_untranslated(registered_fp)
     
 
 """
