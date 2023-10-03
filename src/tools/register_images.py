@@ -53,11 +53,11 @@ def register_images(reference_img, target_img, prevdx=0, prevdy=0):
     cv2.destroyAllWindows()"""
 
     #if no matches found, return (0,0) & untranslated image
-    if len(good_matches) <= 2:
+    if len(good_matches) <= 1:
         #print("not translated")
         transformation_matrix = np.array([[1, 0, -(prevdx)], [0, 1, -(prevdy)]], dtype=np.float32)
-        target_img = np.pad(target_img, ((150, 100), (150, 100), (0, 0)))
-        shifted_image = cv2.warpAffine(target_img, transformation_matrix, (reference_img.shape[1] + 300, reference_img.shape[0] + 300))
+        target_img = np.pad(target_img, ((250, 250), (250, 250), (0, 0)))
+        shifted_image = cv2.warpAffine(target_img, transformation_matrix, (reference_img.shape[1] + 500, reference_img.shape[0] + 500))
         contrast_shifted_image = cv2.equalizeHist(cv2.cvtColor(shifted_image, cv2.COLOR_BGR2GRAY))
         return (0, 0), contrast_shifted_image
 
@@ -77,8 +77,8 @@ def register_images(reference_img, target_img, prevdx=0, prevdy=0):
 
     #transform
     transformation_matrix = np.array([[1, 0, -(dx_avg + prevdx)], [0, 1, -(dy_avg + prevdy)]], dtype=np.float32)
-    target_img = np.pad(target_img, ((150, 150), (150, 150), (0, 0)))
-    shifted_image = cv2.warpAffine(target_img, transformation_matrix, (reference_img.shape[1] + 300, reference_img.shape[0] + 300))
+    target_img = np.pad(target_img, ((250, 250), (250, 250), (0, 0)))
+    shifted_image = cv2.warpAffine(target_img, transformation_matrix, (reference_img.shape[1] + 500, reference_img.shape[0] + 500))
     contrast_shifted_image = cv2.equalizeHist(cv2.cvtColor(shifted_image, cv2.COLOR_BGR2GRAY))
 
     return (dx_avg, dy_avg), contrast_shifted_image
