@@ -4,7 +4,6 @@ Filename: standard_dev.py
 Compare standard deviations of each pixel.
 
 By: Marcus Forst
-sort_nicely credit: Ned B (https://nedbatchelder.com/blog/200712/human_sorting.html)
 """
 
 import numpy as np
