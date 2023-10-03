@@ -1,12 +1,12 @@
 #!/bin/bash
 #
 #SBATCH --job-name=bkgdArray
-#SBATCH --array=23-25
+#SBATCH --array=21-27
 #SBATCH --time=04:00:00
 #SBATCH --nodes=3
 #SBATCH --ntasks-per-node=1
 #SBATCH --mem=50G
-#SBATCH --output=array_%A-%a.out
+#SBATCH --output=bkgd_array_%A-%a.out
 
 participants=(23 24 25)
 cd /hpc/projects/capillary-flow/scripts

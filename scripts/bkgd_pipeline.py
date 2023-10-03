@@ -63,21 +63,7 @@ def main():
 
     print(f'finished {participant} from the {date}')
     print(str(ticks_total-time.time()))    
-
-
-
-    """ Correlation files """
-    # for folder in os.listdir(UMBRELLA_FOLDER_MOCO):
-    #     path = os.path.join(UMBRELLA_FOLDER, folder)
-    #     pic2vid.main(path, folder, DATE, PARTICIPANT)
-    #     segmented_file_name = folder + '0000segmented'
-    #     correlation_with_cap_selection.main(path, UMBRELLA_FOLDER_MOCO, segmented_file_name)
-    #     auto_corr.main(UMBRELLA_FOLDER_MOCO, CAPILLARY_ROW, CAPILLARY_COL, BKGD_ROW, BKGD_COL)
-    #     correlation.main(UMBRELLA_FOLDER_MOCO)
-
-    # print("-------------------------------------")
-    # print("Correlation Runtime: " + str(time.time() - ticks))
-    # ticks = time.time()
+   
     return 0
 
 

@@ -75,6 +75,9 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
     else:
         raise ValueError("Invalid operation entered, please enter either 'median' or 'mean'.")
 
+    # Enhance contrast
+    background = cv2.equalizeHist(background)
+
 
     # """
     # Extra functions
@@ -92,7 +95,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
     #     print(np.min(image_files))
 
     # Add background file
-    bkgd_name = f'set_01_{participant}_{date}_{video}_background.tiff'
+    bkgd_name = f'set01_{participant}_{date}_{video}_background.tiff'
     cv2.imwrite(os.path.join(output_folder, bkgd_name), background)
     cv2.imwrite(os.path.join(results_folder, bkgd_name), background)
     return 0
