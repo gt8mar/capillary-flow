@@ -9,7 +9,7 @@ import os
 import shutil
 from src.tools.find_earliest_date_dir import find_earliest_date_dir
 
-def delete_centerlines_files(source_folder):
+def delete_size_files(source_folder):
     """
     This function removes all files and folders within the size folder
 
@@ -31,4 +31,4 @@ def delete_centerlines_files(source_folder):
 
 if __name__ == "__main__":
     source_folder = "/hpc/projects/capillary-flow/data"
-    delete_centerlines_files(source_folder)
+    delete_size_files(source_folder)

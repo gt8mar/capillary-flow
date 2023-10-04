@@ -9,7 +9,7 @@ import os
 import shutil
 from src.tools.find_earliest_date_dir import find_earliest_date_dir
 
-def delete_centerlines_files(source_folder):
+def delete_seg_folders_files(source_folder):
     """
     This function removes the folders created by the size pipeline in the segmented folder if they exist.
 
@@ -20,27 +20,27 @@ def delete_centerlines_files(source_folder):
         participant = 'part' + str(i).zfill(2)
         date = find_earliest_date_dir(os.path.join(source_folder, participant))
         for location in os.listdir(os.path.join(source_folder, participant, date)):
-            registered_fp = os.path.join(source_folder, participant, date, location, 'segmented', 'registered')
+            registered_fp = os.path.join(source_folder, participant, date, location, 'segmented', 'hasty', 'registered')
             if os.path.exists(registered_fp):
                 shutil.rmtree(registered_fp)
 
-            projcaps_fp = os.path.join(source_folder, participant, date, location, 'segmented', 'proj_caps')
+            projcaps_fp = os.path.join(source_folder, participant, date, location, 'segmented', 'hasty', 'proj_caps')
             if os.path.exists(projcaps_fp):
                 shutil.rmtree(projcaps_fp)
 
-            mocoreg_fp = os.path.join(source_folder, participant, date, location, 'segmented', 'moco_registered')     
+            mocoreg_fp = os.path.join(source_folder, participant, date, location, 'segmented', 'hasty', 'moco_registered')     
             if os.path.exists(mocoreg_fp):
                 shutil.rmtree(mocoreg_fp)   
 
-            indicapstrans_fp = os.path.join(source_folder, participant, date, location, 'segmented', 'individual_caps_translated')     
+            indicapstrans_fp = os.path.join(source_folder, participant, date, location, 'segmented', 'hasty', 'individual_caps_translated')     
             if os.path.exists(indicapstrans_fp):
                 shutil.rmtree(indicapstrans_fp) 
 
-            indicapsorig_fp = os.path.join(source_folder, participant, date, location, 'segmented', 'individual_caps_original')     
+            indicapsorig_fp = os.path.join(source_folder, participant, date, location, 'segmented', 'hasty', 'individual_caps_original')     
             if os.path.exists(indicapsorig_fp):
                 shutil.rmtree(indicapsorig_fp)
             
-            overlays_fp = os.path.join(source_folder, participant, date, location, 'segmented', 'overlays')     
+            overlays_fp = os.path.join(source_folder, participant, date, location, 'segmented', 'hasty', 'overlays')     
             if os.path.exists(overlays_fp):
                 shutil.rmtree(overlays_fp)
 
@@ -54,4 +54,4 @@ def delete_centerlines_files(source_folder):
 
 if __name__ == "__main__":
     source_folder = "/hpc/projects/capillary-flow/data"
-    delete_centerlines_files(source_folder)
+    delete_seg_folders_files(source_folder)
