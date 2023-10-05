@@ -174,7 +174,7 @@ def main(path="D:\\gabby_debugging\\part10\\230425\\loc02"):
 
     translated_coords_fp = translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_csv, resize_csv)
     renamed_coords_fp = rename_caps(translated_coords_fp, individual_caps_fp, participant, date, location)
-    show_centerlines(projected_caps_fp, renamed_coords_fp, individual_caps_fp)
+    #show_centerlines(projected_caps_fp, renamed_coords_fp, individual_caps_fp)
     
 
     
