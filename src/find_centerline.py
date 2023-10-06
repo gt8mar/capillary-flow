@@ -222,7 +222,7 @@ def load_image_with_prefix(input_folder, segmented_filename):
 #  "F:\\Marcus\\data\\part09\\230414\\loc01" 'C:\\Users\\gt8mar\\capillary-flow\\tests\\part09\\230414\\loc02'
 
 
-def main(path ='F:\\Marcus\\data\\hasty_seg\\230626\\part10\\230425\\loc02', # 'C:\\Users\\gt8mar\\capillary-flow\\tests\\part09\\230414\\loc02', #
+def main(path ='F:\\Marcus\\data\\hasty_seg\\230626\\part10\\230425\\loc01', # 'C:\\Users\\gt8mar\\capillary-flow\\tests\\part09\\230414\\loc02', #
         verbose = False, write = False, plot=False, hasty = True):
     """ Isolates capillaries from segmented image and finds their centerlines and radii. 
 

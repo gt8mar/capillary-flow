@@ -35,10 +35,12 @@ def parse_path(path, video_path=False):
     location = [item for item in dir_names if item.startswith('loc')][0]
     # remove bp from the video name
     if video_path:
-        video = [item for item in dir_names if item.startswith('vid')][0]
-        video = dir_names[-1].replace('bp', '')
+        video_list = [item for item in dir_names if item.startswith('vid')]
+        # remove 'vids' from the list:
+        video_list.remove('vids')
+        video = video_list[0].replace('bp', '')
         video = video.replace('scan', '')
-        file_prefix = f'{SET}_{participant}_{date}_{location}_{video}'
+        file_prefix = f'{SET}_{participant}_{date}_{location}' #_{video}
     else: 
         video=None
         file_prefix = f'{SET}_{participant}_{date}_{location}'
