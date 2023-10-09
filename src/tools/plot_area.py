@@ -270,12 +270,12 @@ def plot_area_by_length(caps_fp, centerlines_fp, metadata_fp):
                 break"""
 
         plotinfo.append([area/length, pressure, capnum, vidnum])
-    partnum = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(caps_fp)))))
+    partnum = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(caps_fp))))))
     date = os.path.basename((os.path.dirname(os.path.dirname(os.path.dirname(caps_fp)))))
     location = os.path.basename(os.path.dirname(os.path.dirname(caps_fp)))
     return quantitative_subplots(plotinfo, partnum, date, location)
     
-def main(path="D:\\gabby_debugging\\part09\\230414\\loc07"):
+def main(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12\\230428\\loc03"):
     participant = os.path.basename(os.path.dirname(os.path.dirname(path)))
     date = os.path.basename(os.path.dirname(path))
     location = os.path.basename(path)
