@@ -218,7 +218,7 @@ def quantitative_subplots(plotinfo, partnum, date, location):
 
     #plt.tight_layout()
     plt.subplots_adjust(hspace=0.5)
-    plt.show()
+    #plt.show()
     return fig, slope_data 
 
 def plot_area_by_length(caps_fp, centerlines_fp, metadata_fp):
