@@ -63,6 +63,7 @@ def calculate_focus_measure(image,method='LAPE'):
         focus_measure = np.std(image,axis=None)# GLVA
     return focus_measure
 def extract_metadata(path, video):
+    print(video)
     """input path: string; outputs pressure: string, frame rate: integer"""
     metadata = pd.read_excel(path)
     pressure = metadata.loc[(metadata['Video'] == video )| 
@@ -76,8 +77,8 @@ def extract_metadata(path, video):
 
     return pressure, frame_rate
 
-def pic2vid(path, images, participant = 'part_11', date = '230427', location = 'loc01',
-            video_folder = 'vid1', color = False, compress = True, overlay = True):
+def pic2vid(images, participant = 'part11', date = '230427', location = 'loc01',
+            video_folder = 'vid01', color = False, compress = True, overlay = True):
     """
     Takes a list of image files or numpy array and makes a movie with overlays
     
@@ -95,12 +96,12 @@ def pic2vid(path, images, participant = 'part_11', date = '230427', location = '
 
     Saves: video file in results folder
     """
-    SET = 'set_01'
+    SET = 'set01'
     images = np.array(images)
     output_path = '/hpc/projects/capillary-flow/results/videos'
     if overlay:
-        metadata_path = os.path.join('hpc/projects/capillary-flow/data', participant, date, 'part_metadata', f'{participant}_{date}.xlsx')
-        pressure, frame_rate = extract_metadata(metadata_path, video)
+        metadata_path = f'/hpc/projects/capillary-flow/metadata/{participant}_{date}.xlsx'
+        pressure, frame_rate = extract_metadata(metadata_path, video_folder)
         print(frame_rate)
     else:
         frame_rate = 227.8/2
@@ -129,7 +130,7 @@ def pic2vid(path, images, participant = 'part_11', date = '230427', location = '
         # add frame counter
         add_overlay(img, timecode, (frame.shape[1]//2 - 100, 50))
         # add set and sample overlay details
-        set_string = str(SET).split('_')[0] + ": " + str(SET).split('_')[1]
+        set_string = str(SET)
         participant_string = str(participant)
         date_string = str(date)
         location_string = str(location)

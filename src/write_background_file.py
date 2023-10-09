@@ -13,7 +13,7 @@ import pandas as pd
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.pyplot as plt
 import cv2
-from src.tools.parse_path import parse_vid_path
+from src.tools.parse_path import parse_path
 from src.tools.get_images import get_images
 from src.tools.pic2vid import pic2vid
 
@@ -40,7 +40,8 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
     os.makedirs(os.path.join(location_folder, 'backgrounds'), exist_ok=True)
     output_folder = os.path.join(os.path.dirname(path), 'backgrounds')
     results_folder = '/hpc/projects/capillary-flow/results/backgrounds'  # I want to save all the backgrounds to the same folder for easy transfer to hasty.ai
-    participant, date, video, file_prefix = parse_vid_path(path)
+    participant, date, location, video, file_prefix = parse_path(path, video_path=True)
+    print(f'participant is {participant}, date is {date}, location is {location}, video is {video}, file_prefix is {file_prefix}')
 
     # Read in shift values from stabilization algorithm
     shifts = pd.read_csv(os.path.join(path, 'metadata', 'Results.csv'))
@@ -95,7 +96,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
     #     print(np.min(image_files))
 
     # Add background file
-    bkgd_name = f'set01_{participant}_{date}_{video}_background.tiff'
+    bkgd_name = f'{file_prefix}_{video}_background.tiff'
     cv2.imwrite(os.path.join(output_folder, bkgd_name), background)
     cv2.imwrite(os.path.join(results_folder, bkgd_name), background)
     return 0
