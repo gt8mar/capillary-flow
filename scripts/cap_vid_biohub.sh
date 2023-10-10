@@ -2,8 +2,7 @@
 #
 #SBATCH --job-name=cap_vidArray
 #SBATCH --time=10:00:00
-#SBATCH --gpus=2
-#SBATCH --partition=gpu
+#SBATCH --partition=cpu
 #SBATCH --mem=150G
 #SBATCH --output=cap_vid_array_%A-%a.out
 #SBATCH --array=11-20

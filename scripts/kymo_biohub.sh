@@ -2,8 +2,7 @@
 #
 #SBATCH --job-name=kymographArray
 #SBATCH --time=10:00:00
-#SBATCH --gpus=2
-#SBATCH --partition=gpu
+#SBATCH --partition=cpu
 #SBATCH --mem=150G
 #SBATCH --output=kymo_array_%A-%a.out
 #SBATCH --array=10-20
