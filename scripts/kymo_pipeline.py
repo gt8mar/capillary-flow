@@ -50,32 +50,25 @@ def main():
     date = find_earliest_date_dir(os.path.join('/hpc/projects/capillary-flow/data', participant))
     locations = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date))
     for location in locations:
-        print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-        print(f"beginning centerlines and kymographs for location {location}")
-        print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-        ticks = time.time()
-        location_path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, location)
-        # find_centerline.main(location_path, verbose=False, write=True)
-        # print(f"completed centerlines for location {location} in {ticks-time.time()} seconds")
-        
-        # Make kymographs
-        make_kymograph.main(location_path, verbose=False, write=True)
-        print(f'completed kymographs for location {location} in {ticks-time.time()} seconds')
-        print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+        # Omit locScan, locTemp, and locEx from this analysis
+        if location == 'locScan' or location == 'locTemp' or location == 'locEx':
+            continue
+        else:
+            print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+            print(f"beginning centerlines and kymographs for location {location}")
+            print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+            ticks = time.time()
+            location_path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, location)
+            # find_centerline.main(location_path, verbose=False, write=True)
+            # print(f"completed centerlines for location {location} in {ticks-time.time()} seconds")
+            
+            # Make kymographs
+            make_kymograph.main(location_path, verbose=False, write=True)
+            print(f'completed kymographs for location {location} in {ticks-time.time()} seconds')
+            print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
 
 
         print(f'finished {participant} from the date {date} in {ticks_total-time.time()} seconds')
-    
-    # ticks = time.time()
-    # location = 'loc01'
-    # location_path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, location)
-    # # find_centerline.main(location_path, verbose=False, write=True)
-    # # print(f"completed centerlines for location {location} in {ticks-time.time()} seconds")
-    
-    # # Make kymographs
-    # make_kymograph.main(location_path, verbose=False, write=True)
-    # print(f'completed kymographs for location {location} in {ticks-time.time()} seconds')
-    # print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
     return 0
 
 
