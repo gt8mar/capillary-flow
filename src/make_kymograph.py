@@ -324,8 +324,9 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    if platform == 'Windows':
-        main(write=True, hasty=True)
+    if platform.system() == 'Windows':
+        path = 'F:\\Marcus\\data\\part09\\230414\\loc01'
+        main(path, write=False, hasty=True, verbose=True)
     else:
         path = '/hpc/projects/capillary-flow/data/part09/230414/loc01'
         main(path, write = True)
