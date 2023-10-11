@@ -252,6 +252,7 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
         # Get metadata
         gap_left, gap_right, gap_bottom, gap_top = get_shifts(metadata_folder) # get gaps from the metadata
         if verbose:
+            print(video, file_prefix)
             print(gap_left, gap_right, gap_bottom, gap_top)
 
         # Get images
