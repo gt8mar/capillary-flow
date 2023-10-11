@@ -224,10 +224,11 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
             participant, date, location, video, file_prefix = parse_filename(file)
             # check if video ends with "bp"
             if video.endswith('bp'):
-                video = video[:-2]
-            if video.endswith('scan'):
-                video = video[:-4]
+                video = video.replace('bp', '')
+            elif video.endswith('scan'):
+                continue # skip scan video for kymographs, the frame is moving
             
+            # check if video is in dictionary, if not add it
             if video not in centerline_dict.keys():
                 centerline_dict[video] = [file]
             else:
@@ -247,12 +248,14 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
         if os.path.exists(video_folder) == False:
             print(f'No moco folder for {file_prefix} and {video_folder}') 
         metadata_folder = os.path.join(path, 'vids', video, 'metadata')
-        participant, date, location, __, file_prefix = parse_filename(file)
+        participant, date, location, video_parsed, file_prefix = parse_filename(file)
 
         # Get metadata
         gap_left, gap_right, gap_bottom, gap_top = get_shifts(metadata_folder) # get gaps from the metadata
         if verbose:
             print(video, file_prefix)
+            if video != video_parsed:
+                print(f'Video name mismatch: {video} vs {video_parsed}')
             print(gap_left, gap_right, gap_bottom, gap_top)
 
         # Get images
@@ -270,7 +273,7 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
 
         j = 0
         # loop through capillaries
-        for i, file in enumerate(centerline_dict[video]):
+        for file in centerline_dict[video]:
             # TODO: fix bug with missing videos
 
             old_capillary_name = file
