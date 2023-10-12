@@ -17,6 +17,11 @@ import csv
 import re
 import shutil
 import platform
+import pandas as pd
+if platform.system() != 'Windows':
+    from src.tools.get_directory import get_directory_at_level
+else:
+    from get_directory import get_directory_at_level
 
 #translates the y and x coordinates of centerlines by the translation values in ~/translations.csv and ~/crop_values.csv
 def translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_csv, resize_csv):
@@ -31,44 +36,36 @@ def translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_c
     grouped_coords_listdir = list(groups.values())
 
     #read translation csv
-    with open(translations_csv, 'r') as translations_file:
-        reader = csv.reader(translations_file)
-        translations = []
-        for row in reader:
-            translations.append(row)
+    translations = pd.read_csv(translations_csv, header=None)
 
     #read crop csv
-    with open(crops_csv, 'r') as crops_file:
-        reader = csv.reader(crops_file)
-        crops = []
-        for row in reader:
-            crops.append(row)
+    crops = pd.read_csv(crops_csv, header=None)
 
     #read resize csv
-    with open(resize_csv, 'r') as resize_file:
-        reader = csv.reader(resize_file)
-        row = next(reader)
-        minx = row[0]
-        maxx = row[1]
-        miny = row[2]
-        maxy = row[3]
+    resize_df = pd.read_csv(resize_csv)
+    minx = resize_df.iloc[0, 0]
+    maxx = resize_df.iloc[0, 1]
+    miny = resize_df.iloc[0, 2]
+    maxy = resize_df.iloc[0, 3]
 
     translated_coords_fp = os.path.join(os.path.dirname(coords_fp), "translated")
     os.makedirs(translated_coords_fp, exist_ok=True)
     #apply translation
     for x in range(len(grouped_coords_listdir)):
-        dy = int(float(translations[x][0])) - int(float(crops[x][0]) + int(maxx))
-        dx = int(float(translations[x][1])) - int(float(crops[x][3]) + int(maxy))
+        dy = int(float(translations.iloc[x][0])) - int(float(crops.iloc[x][0]) + int(maxx))
+        dx = int(float(translations.iloc[x][1])) - int(float(crops.iloc[x][3]) + int(maxy))
         for file in grouped_coords_listdir[x]:
-            with open(os.path.join(coords_fp, file), 'r') as orig_coords:
-                reader = csv.reader(orig_coords)
-                with open(os.path.join(translated_coords_fp, "translated_" + file), 'w', newline='') as translated_coords:
-                    writer = csv.writer(translated_coords)
-                    for row in reader:
-                        xcol = float(row[0])
-                        ycol = float(row[1])
-                        translated_row = [xcol - dx, ycol - dy, *row[2:]]
-                        writer.writerow(translated_row)
+            orig_coords_path = os.path.join(coords_fp, file)
+            translated_coords_path = os.path.join(translated_coords_fp, "translated_" + file)
+
+            orig_df = pd.read_csv(orig_coords_path, header=None)
+
+            #translate
+            orig_df.iloc[:, 0] = orig_df.iloc[:, 0] - dx
+            orig_df.iloc[:, 1] = orig_df.iloc[:, 1] - dy
+
+            #save
+            orig_df.to_csv(translated_coords_path, index=False, header=False, float_format='%.6f')
 
     return translated_coords_fp
 
@@ -82,27 +79,28 @@ def rename_caps(coords_fp, individual_caps_fp, participant, date, location):
         vids = [string for string in os.listdir(individual_caps_fp) if f"vid{vidnum}" in string]
 
         #get centerline midpoint x and y values
-        with open(os.path.join(coords_fp, file), 'r') as coords:
-            reader = csv.reader(coords)
-            rows = list(reader)
-            midpoint_row = rows[len(rows) // 2]
-            midpoint_x = midpoint_row[0]
-            midpoint_y = midpoint_row[1]
-            for vid in vids:
-                image_array = cv2.imread(os.path.join(individual_caps_fp, vid))
-                gray_image = cv2.cvtColor(image_array, cv2.COLOR_BGR2GRAY)
-                midpoint_x_int = int(float(midpoint_x))
-                midpoint_y_int = int(float(midpoint_y))
-                num_matches = 0
-                if gray_image[midpoint_x_int][midpoint_y_int] > 0:
-                    for row in rows:
-                        if gray_image[int(float(row[0]))][int(float(row[1]))] > 0:
-                            num_matches += 1
-                    if num_matches > 0.8*len(rows):
-                        new_csv_filename = file[:-6] + vid[-11:-4] + ".csv"
-                        shutil.copy(os.path.join(coords_fp, file), os.path.join(renamed_folder_fp, new_csv_filename))
-                        names.append([file, new_csv_filename])
-                        break
+        coords_df = pd.read_csv(os.path.join(coords_fp, file), header=None)
+        rows = coords_df.to_numpy()
+        midpoint_index = len(rows) // 2
+        midpoint_x, midpoint_y = rows[midpoint_index][:2]
+
+        for vid in vids:
+            image_array = cv2.imread(os.path.join(individual_caps_fp, vid))
+            gray_image = cv2.cvtColor(image_array, cv2.COLOR_BGR2GRAY)
+            midpoint_x_int = int(float(midpoint_x))
+            midpoint_y_int = int(float(midpoint_y))
+            num_matches = 0
+            if gray_image[midpoint_x_int][midpoint_y_int] > 0:
+                for row in rows:
+                    if gray_image[int(float(row[0]))][int(float(row[1]))] > 0:
+                        num_matches += 1
+                #if 80% of the centerline matches the capillary, rename the centerline file
+                if num_matches > 0.8*len(rows): 
+                    new_csv_filename = file[:-6] + vid[-11:-4] + ".csv"
+                    shutil.copy(os.path.join(coords_fp, file), os.path.join(renamed_folder_fp, new_csv_filename))
+                    names.append([file, new_csv_filename])
+                    break
+
     #save old to new name map
     map_fp = os.path.join(os.path.dirname(coords_fp), "name_map.csv")
     with open(map_fp, mode='w', newline='') as file:
@@ -153,34 +151,29 @@ def show_centerlines(projected_caps_fp, coords_fp, individual_caps_fp):
             for row in rows:
                 cap_img[int(float(row[0]))][int(float(row[1]))] = [255, 0, 0]
 
-        #cv2.imwrite(os.path.join("D:\\misc", str(file) + ".png"), cap_img)
         cv2.imshow(str(file), cap_img)
         cv2.waitKey(0)  
 
-def main(path="D:\\gabby_debugging\\part10\\230425\\loc02"):
+def main(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12\\230428\\loc03"):
     coords_fp = os.path.join(path, "centerlines", "coords")
     segmented_folder = os.path.join(path, "segmented", "hasty")
 
     sorted_coords_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(coords_fp, x)), os.listdir(coords_fp))) #sort numerically
+    
     translations_csv = os.path.join(segmented_folder, "translations.csv")
-    projected_caps_fp = os.path.join(segmented_folder, "proj_caps")
     crops_csv = os.path.join(segmented_folder, "crop_values.csv")
     resize_csv = os.path.join(segmented_folder, "resize_vals.csv")
     individual_caps_fp = os.path.join(segmented_folder, "individual_caps_translated")
 
-    participant = os.path.basename(os.path.dirname(os.path.dirname(path)))
-    date = os.path.basename(os.path.dirname(path))
-    location = os.path.basename(path)
+    participant = get_directory_at_level(path, 2)
+    date = get_directory_at_level(path, 1)
+    location = get_directory_at_level(path, 0)
 
     translated_coords_fp = translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_csv, resize_csv)
     renamed_coords_fp = rename_caps(translated_coords_fp, individual_caps_fp, participant, date, location)
-    #show_centerlines(projected_caps_fp, renamed_coords_fp, individual_caps_fp)
+    #show_centerlines(os.path.join(segmented_folder, "proj_caps"), renamed_coords_fp, individual_caps_fp)
     
-
     
-
-
-
 """
 -----------------------------------------------------------------------------
 """
