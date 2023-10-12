@@ -100,9 +100,13 @@ def quantitative_subplots(plotinfo, partnum, date, location):
 
         increasing_cap = cap[:max_index]
         decreasing_cap = cap[max_index - 1:]
+        print('increasing_cap: ' + str(increasing_cap))
+        print('decreasing_cap: ' + str(decreasing_cap))
 
         sorted_inc_cap = sorted(increasing_cap, key=lambda x: x[1])
         sorted_dec_cap = sorted(decreasing_cap, key=lambda x: x[1])
+        print('sorted_inc_cap: ' + str(sorted_inc_cap))
+        print('sorted_dec_cap: ' + str(sorted_dec_cap))
 
         x_scatter_inc = [float(entry[1]) for entry in sorted_inc_cap]  
         y_scatter_inc = [entry[0] for entry in sorted_inc_cap]
@@ -152,7 +156,7 @@ def quantitative_subplots(plotinfo, partnum, date, location):
         for i, ax in enumerate(axes.flat):
             if i < num_plots:
                 cap = grouped_plotinfo[i]
-
+                cap = sorted(cap, key=lambda x: x[3]) #sort by vidnum
                 max_index = len(cap)
                 for i in range(1, len(cap)):
                     if cap[i][1] < cap[i - 1][1]:
