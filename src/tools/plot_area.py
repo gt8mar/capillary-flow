@@ -62,13 +62,13 @@ def group_by_cap(plotinfo):
     result_list = list(grouped_caps.values())
     return result_list   
 
-def make_subplots(plotinfo, partnum, date, location):
+def make_subplots(plotinfo, participant, date, location):
     grouped_plotinfo = group_by_cap(plotinfo)
     num_plots = len(grouped_plotinfo)
     num_cols = min(num_plots, 3) # Max 3 columns
     num_rows = (num_plots + num_cols - 1) // num_cols
     fig, axes = plt.subplots(num_rows, num_cols, figsize=(15, 5 * num_rows))
-    fig.suptitle(partnum + " " + location + " capillary size vs. pressure")
+    fig.suptitle(participant + " " + location + " capillary size vs. pressure")
 
     slope_data = []
 
@@ -107,38 +107,39 @@ def make_subplots(plotinfo, partnum, date, location):
             x_scatter_dec = [float(entry[1]) for entry in sorted_dec_cap]  
             y_scatter_dec = [float(entry[0]) for entry in sorted_dec_cap]
 
+            # Plot scatter points
             ax.scatter(x_scatter_inc, y_scatter_inc, c="Black")
             ax.scatter(x_scatter_dec, y_scatter_dec, c="Black")
 
+            # Plot lines: blue for increasing pressure, red for decreasing
             x_line_inc = [float(entry[1]) for entry in increasing_cap]
             y_line_inc = [entry[0] for entry in increasing_cap]
-
             for k in range(len(x_line_inc) - 1):
                 ax.plot([x_line_inc[k], x_line_inc[k + 1]], [y_line_inc[k], y_line_inc[k + 1]], c="Blue")
 
             x_line_dec = [float(entry[1]) for entry in decreasing_cap]
             y_line_dec = [entry[0] for entry in decreasing_cap]
-
             for k in range(len(x_line_dec) - 1):
                 ax.plot([x_line_dec[k], x_line_dec[k + 1]], [y_line_dec[k], y_line_dec[k + 1]], c="Red")
 
+            # Calculate slopes
             if len(x_line_inc) > 1:
                 inc_slope, _ = np.polyfit(x_line_inc, y_line_inc, 1)
             else:
                 inc_slope = ""
-            line_name_inc = "inc_" + partnum + "_" + date + "_" + location + "_cap" + cap[0][2] 
+            line_name_inc = "inc_" + participant + "_" + date + "_" + location + "_cap" + cap[0][2] 
             if len(x_line_dec) > 1:
                 dec_slope, _ = np.polyfit(x_line_dec, y_line_dec, 1)
             else:
                 dec_slope = ""
-            line_name_dec = "dec_" + partnum + "_" + date + "_" + location + "_cap" + cap[0][2] 
+            line_name_dec = "dec_" + participant + "_" + date + "_" + location + "_cap" + cap[0][2] 
             slope_data.append([line_name_inc, inc_slope])
             slope_data.append([line_name_dec, dec_slope])
 
             ax.set_xlabel('Pressure (psi)')
             #ax.set_ylabel('Area/Length')
             ax.set_ylabel('Area')
-            ax.set_title(partnum + " cap" + cap[0][2])
+            ax.set_title(participant + " cap" + cap[0][2])
 
             # Update overall min and max x-values
             overall_min_x = min(chain([overall_min_x], x_scatter_inc, x_scatter_dec))
