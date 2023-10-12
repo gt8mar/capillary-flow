@@ -7,6 +7,7 @@ By: Marcus Forst
 
 import os
 import pandas as pd
+import platform
 from src.tools.parse_path import parse_path
 
 
@@ -30,8 +31,10 @@ def load_name_map(path, version = 'centerlines'):
     column_names  = ['centerlines name', 'cap name']
     # name_map_folder = os.path.join(path, 'segmented')
     name_map_name = f'{participant}_{date}_{location}_name_map.csv'
-
-    name_map_folder = '/hpc/projects/capillary-flow/results/size/name_maps'
+    if platform.system() == 'Windows':
+        name_map_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\size\\name_maps'
+    else:
+        name_map_folder = '/hpc/projects/capillary-flow/results/size/name_maps'
     name_map = pd.read_csv(os.path.join(name_map_folder, name_map_name), names = column_names)
 
     # Remove 'translated_' from all elements in the columns:

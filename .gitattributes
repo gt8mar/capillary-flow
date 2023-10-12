@@ -1,0 +1,7 @@
+# FILEPATH: /c:/Users/gt8mar/capillary-flow/.gitattributes
+
+# All files are checked into the repo with LF
+* text=auto 
+
+# Convert to LF on checkout
+eol=lf
