@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 from skimage.color import rgb2gray
 import platform
+import pandas as pd
 
 def get_label_position(input_array):
     # Find the indices of non-zero elements in the array
@@ -62,35 +63,33 @@ def extract_file_info(filename):
     vid = "" if vmatch == None else "vid" + vmatch.group(1) + "_"
     return set_part_date, location, vid
 
-def make_overlays(path="D:\\data_gabby\\debugging\\localrun\\part17\\230502\\loc01"):
+def make_overlays(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12\\230428\\loc03"):
     reg_moco_fp = os.path.join(path, "segmented", "hasty", "moco_registered")
 
     resize_csv = os.path.join(path, "segmented", "hasty", "resize_vals.csv")
-    with open(resize_csv, 'r') as resize_values:
-        reader = csv.reader(resize_values)
-        rows = list(reader)
-        minx = int(rows[0][0])
-        maxx = int(rows[0][1])
-        miny = int(rows[0][2])
-        maxy = int(rows[0][3])
+    resize_df = pd.read_csv(resize_csv, header=None)
+    minx = int(resize_df.iloc[0, 0])
+    maxx = int(resize_df.iloc[0, 1])
+    miny = int(resize_df.iloc[0, 2])
+    maxy = int(resize_df.iloc[0, 3])
 
-        predefined_colors = [
-            (255, 0, 0),    # Red
-            (0, 255, 0),    # Green
-            (0, 0, 255),    # Blue
-            (255, 255, 0),  # Yellow
-            (255, 0, 255),  # Magenta
-            (0, 255, 255),  # Cyan
-            (128, 0, 0),    # Maroon
-            (0, 128, 0),    # Green (different shade)
-            (0, 0, 128),    # Navy
-            (128, 128, 0),  # Olive
-            (128, 0, 128),  # Purple
-            (0, 128, 128),  # Teal
-            (255, 165, 0),  # Orange
-            (139, 69, 19),  # Saddle Brown
-            (0, 128, 128),  # Teal (different shade)
-        ]
+    predefined_colors = [
+        (255, 0, 0),    # Red
+        (0, 255, 0),    # Lime
+        (0, 0, 255),    # Blue
+        (255, 255, 0),  # Yellow
+        (255, 0, 255),  # Magenta
+        (0, 255, 255),  # Cyan
+        (255, 165, 0),  # Orange
+        (255, 140, 0),  # Dark Orange
+        (0, 128, 128),  # Teal
+        (128, 128, 0),  # Olive
+        (128, 0, 128),  # Purple
+        (0, 128, 128),  # Light Teal
+        (139, 69, 19),  # Saddle Brown
+        (255, 69, 0),   # Red-Orange
+        (128, 0, 0),    # Maroon
+    ]
     element_colors = {}
     colored_elements = []
     rename_files(reg_moco_fp)
@@ -100,10 +99,14 @@ def make_overlays(path="D:\\data_gabby\\debugging\\localrun\\part17\\230502\\loc
         frame_img = cv2.imread(os.path.join(reg_moco_fp, frame))
         frame_img = cv2.cvtColor(frame_img, cv2.COLOR_BGR2BGRA)
         frame_img[:, :, 3] = 255
+        
+        #get all caps in vid
         for cap in os.listdir(os.path.join(path, "segmented", "hasty", "individual_caps_translated")):
-            if "vid" + vidnum in cap:
+            if "vid" + vidnum in cap: 
                 cmatch = re.search(r'cap_(\d{2})', cap)
                 capnum = "cap_" + cmatch.group(1)
+
+                #match to previous color if used, else pop from predefined colors
                 if capnum in element_colors:
                     color = element_colors[capnum]
                 else:
@@ -117,10 +120,10 @@ def make_overlays(path="D:\\data_gabby\\debugging\\localrun\\part17\\230502\\loc
                 cap_img = cv2.imread(os.path.join(path, "segmented", "hasty", "individual_caps_translated", cap))
                 cap_img = rgb2gray(cap_img)
 
-                #resized_cap = cap_img[maxy:, maxx:]
+                #pad cap to match frame
                 cap_img = np.pad(cap_img, ((250, 250), (250, 250)))
 
-
+                #translate cap
                 if miny==0 and minx==0:
                     resized_cap = cap_img[maxy:, maxx:]
                 elif miny==0:
@@ -138,26 +141,31 @@ def make_overlays(path="D:\\data_gabby\\debugging\\localrun\\part17\\230502\\loc
 
                 height, width = len(resized_cap), len(resized_cap[0])
                 
+                #make overlay
                 overlay = np.zeros_like(frame_img)
                 for y in range(height):
                     for x in range(width):
                         if resized_cap[y][x] != 0:
                             alpha = int(0.5 * resized_cap[y][x])
                             overlay[y, x] = [color[0], color[1], color[2], alpha]
-                                
                 overlay = overlay.astype(np.uint8)
                 overlayed = cv2.addWeighted(frame_img, 1, overlay, 1, 0)
 
+                #add label
                 c2match = re.search(r'cap_(.{3})', cap)
                 capnuma = "cap_" + c2match.group(1)
-                cv2.putText(overlayed, capnuma, (xcoord, ycoord), cv2.FONT_HERSHEY_PLAIN, 2, color, 2, cv2.FILLED)
+                cv2.putText(overlayed, capnuma, (xcoord, ycoord), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 0), 3, cv2.LINE_AA) #black outline
+                cv2.putText(overlayed, capnuma, (xcoord, ycoord), cv2.FONT_HERSHEY_PLAIN, 2, (225, 225, 225), 2, cv2.LINE_AA) #white text
 
+                #save to location folder
                 set_part_date, location, vid = extract_file_info(cap)
                 filename = set_part_date + location + vid + "overlay.png"
                 frame_img = overlayed
                 overlay_folder = os.path.join(path, "segmented", "hasty", "overlays")
                 os.makedirs(overlay_folder, exist_ok=True)
                 cv2.imwrite(os.path.join(overlay_folder, filename), overlayed)
+
+                #save to results
                 if platform.system() != 'Windows':
                     overlays_fp = '/hpc/projects/capillary-flow/results/size/overlays'
                     os.makedirs(overlays_fp, exist_ok=True)

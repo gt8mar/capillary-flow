@@ -10,9 +10,10 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
-import csv
 import re
 import platform
+import pandas as pd
+import itertools
 if platform.system() == 'Windows':
     from enumerate_capillaries2 import find_connected_components
 else:
@@ -35,31 +36,35 @@ def separate_caps(registered_folder_fp):
     new_folder_fp = os.path.join(os.path.dirname(registered_folder_fp), "individual_caps_translated")
     os.makedirs(new_folder_fp, exist_ok=True)
 
+    #save individual caps, named
     for vid in os.listdir(registered_folder_fp):
         if vid.endswith('.png'):
             individual_caps = find_connected_components(cv2.imread(os.path.join(registered_folder_fp, vid), cv2.IMREAD_GRAYSCALE))
             filenames = []
             for cap in individual_caps:
                 renamed = False
-                for row in range(cap.shape[0]):
-                    if renamed == True: break
-                    for col in range(cap.shape[1]):
-                        if renamed == True: break
-                        if cap[row][col] > 0:
-                            for projcap in os.listdir(os.path.join(os.path.dirname(registered_folder_fp), "proj_caps")):
-                                projcap_fp = os.path.join(os.path.dirname(registered_folder_fp), "proj_caps", projcap)
-                                if cv2.imread(projcap_fp, cv2.IMREAD_GRAYSCALE)[row][col] > 0:
-                                    capnum = projcap[:-4] + "a" 
-                                    counter = 0
+                #iterate through each pixel in cap
+                for row, col in itertools.product(range(cap.shape[0]), range(cap.shape[1])):
+                    #if cap already found, break
+                    if renamed == True: 
+                        break
+                    #if pixel is part of cap
+                    if cap[row][col] > 0:
+                        for projcap in os.listdir(os.path.join(os.path.dirname(registered_folder_fp), "proj_caps")):
+                            projcap_fp = os.path.join(os.path.dirname(registered_folder_fp), "proj_caps", projcap)
+                            if cv2.imread(projcap_fp, cv2.IMREAD_GRAYSCALE)[row][col] > 0:
+                                capnum = projcap[:-4] + "a" 
+                                counter = 0
+                                filename = os.path.join(new_folder_fp, vid[:-4] + "_" + capnum + ".png")
+                                #name fragments b, c, d, etc. if capnum already exists
+                                while filename in filenames:
+                                    counter += 1
+                                    capnum = projcap[:-4] + chr(97 + counter) 
                                     filename = os.path.join(new_folder_fp, vid[:-4] + "_" + capnum + ".png")
-                                    while filename in filenames:
-                                        counter += 1
-                                        capnum = projcap[:-4] + chr(97 + counter) 
-                                        filename = os.path.join(new_folder_fp, vid[:-4] + "_" + capnum + ".png")
-                                    cv2.imwrite(filename, cap)
-                                    filenames.append(filename)
-                                    renamed = True
-                                    break
+                                cv2.imwrite(filename, cap)
+                                filenames.append(filename)
+                                renamed = True
+                                break
 
 def save_untranslated(registered_folder_fp):
     indi_caps_fp = os.path.join(os.path.dirname(registered_folder_fp), "individual_caps_translated")
@@ -70,60 +75,60 @@ def save_untranslated(registered_folder_fp):
     orig_fp = os.path.join(os.path.dirname(registered_folder_fp), "individual_caps_original")
     os.makedirs(orig_fp, exist_ok=True)
 
-    grouped_by_vid = group_by_vid(os.listdir(indi_caps_fp))
+    indi_caps_listdir = os.listdir(indi_caps_fp)
+    sorted_indi_caps = sorted(indi_caps_listdir, key=lambda x: int(re.search(r'vid(\d{2})', x).group(1)))
 
-    with open(translations_csv, 'r') as translations:
-        t_reader = csv.reader(translations)
-        translated_rows = list(t_reader)
+    grouped_by_vid = group_by_vid(sorted_indi_caps)
 
-        with open(resize_vals_csv, 'r') as resizes:
-            r_reader = csv.reader(resizes)
-            resize_row = list(r_reader)[0]
+    translated_df = pd.read_csv(translations_csv, header=None)
+    translated_rows = translated_df.values.tolist()
 
-            with open(crops_csv, 'r') as crops:
-                c_reader = csv.reader(crops)
-                crop_rows = list(c_reader)
+    resize_df = pd.read_csv(resize_vals_csv, header=None)
+    resize_row = resize_df.values.tolist()[0]
 
-                minx = abs(int(resize_row[0]))
-                maxx = abs(int(resize_row[1]))
-                miny = abs(int(resize_row[2]))
-                maxy = abs(int(resize_row[3]))
+    crops_df = pd.read_csv(crops_csv, header=None)
+    crop_rows = crops_df.values.tolist()
 
-                for i in range(len(grouped_by_vid)):
-                    x, y = translated_rows[i] 
-                    xint = int(float(x))
-                    xint = xint
-                    yint = int(float(y))
-                    yint = yint
+    minx = abs(int(resize_row[0]))
+    maxx = abs(int(resize_row[1]))
+    miny = abs(int(resize_row[2]))
+    maxy = abs(int(resize_row[3]))
 
-                    l, r, b, t = crop_rows[i]
-                    lint = int(l)
-                    rint = int(r)
-                    bint = int(b)
-                    tint = int(t)
-                    
-                    for cap in grouped_by_vid[i]:
-                        img = cv2.imread(os.path.join(indi_caps_fp, cap), cv2.IMREAD_GRAYSCALE)
+    for i in range(len(grouped_by_vid)):
+        x, y = translated_rows[i] 
+        xint = int(float(x))
+        xint = xint
+        yint = int(float(y))
+        yint = yint
 
-                        ystart = maxy - yint
-                        yend = -(miny + yint)
-                        xstart = maxx - xint
-                        xend = -(minx + xint)
+        l, r, b, t = crop_rows[i]
+        lint = int(l)
+        rint = int(r)
+        bint = int(b)
+        tint = int(t)
+        
+        for cap in grouped_by_vid[i]:
+            img = cv2.imread(os.path.join(indi_caps_fp, cap), cv2.IMREAD_GRAYSCALE)
 
-                        ystart = None if ystart == 0 else ystart
-                        yend = None if yend == 0 else yend
-                        xstart = None if xstart == 0 else xstart
-                        xend = None if xend == 0 else xend
+            ystart = maxy - yint
+            yend = -(miny + yint)
+            xstart = maxx - xint
+            xend = -(minx + xint)
 
-                        untrans_img = img[ystart:yend, xstart:xend]
-                        
-                        bint = None if bint == 0 else bint
-                        rint = None if rint == 0 else rint
-                        crop_img = untrans_img[tint:bint, lint:rint]
+            ystart = None if ystart == 0 else ystart
+            yend = None if yend == 0 else yend
+            xstart = None if xstart == 0 else xstart
+            xend = None if xend == 0 else xend
 
-                        cv2.imwrite(os.path.join(orig_fp, cap), crop_img)
+            untrans_img = img[ystart:yend, xstart:xend]
             
-def main(path="D:\\data_gabby\\debugging\\localrun\\part17\\230502\\loc01"):
+            bint = None if bint == 0 else bint
+            rint = None if rint == 0 else rint
+            crop_img = untrans_img[tint:bint, lint:rint]
+
+            cv2.imwrite(os.path.join(orig_fp, cap), crop_img)
+            
+def main(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12\\230428\\loc03"):
     registered_fp = os.path.join(path, "segmented", "hasty", "registered")
     sorted_seg_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(registered_fp, x)) and x.endswith('.png'), os.listdir(registered_fp)))
 
@@ -149,7 +154,7 @@ def main(path="D:\\data_gabby\\debugging\\localrun\\part17\\230502\\loc01"):
     separate_caps(registered_fp)
 
     #save untranslated individual caps, named
-    #save_untranslated(registered_fp)
+    save_untranslated(registered_fp)
     
 
 """

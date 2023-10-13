@@ -15,10 +15,10 @@ import matplotlib.colors as mcolors
 import pandas as pd
 import platform
 from itertools import chain
-if platform.system() == 'Windows':
-    from get_directory import get_directory_at_level
-else:
+if platform.system() != 'Windows':
     from src.tools.get_directory import get_directory_at_level
+else:
+    from get_directory import get_directory_at_level
 
 def exclude_fragmented(caps_fp):
     caps_listdir = []
@@ -208,7 +208,7 @@ def main(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12\\230428\
     
     caps_fp = os.path.join(path, "segmented", "hasty", "individual_caps_translated")
     centerlines_fp = os.path.join(path, "centerlines", "renamed")
-    metadata_fp = os.path.join(get_directory_at_level(path, 4, False), "metadata", participant + "_" + date + ".xlsx")
+    metadata_fp = os.path.join(get_directory_at_level(path, 4, only_dir=False), "metadata", participant + "_" + date + ".xlsx")
 
     plotinfo = get_plotinfo(caps_fp, centerlines_fp, metadata_fp)
     size_plot, slopes = make_subplots(plotinfo, participant, date, location)
