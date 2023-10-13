@@ -23,15 +23,13 @@ def rename(path='D:\\gabby_debugging\\part10\\230425\\loc02'):
             os.rename(original_path, new_path)
 
     #rename original in loc folders
-    """for file in os.listdir(individual_caps_original_fp):
+    for file in os.listdir(individual_caps_original_fp):
         matching_row = df[df.iloc[:, 0] == file]
         if not matching_row.empty:
             new_filename = matching_row.iloc[0, 1]
             original_path = os.path.join(individual_caps_original_fp, file)
             new_path = os.path.join(individual_caps_original_fp, new_filename)
-            os.rename(original_path, new_path)"""
-
-
+            os.rename(original_path, new_path)
 
 if __name__ == "__main__":
     ticks = time.time()
