@@ -22,7 +22,7 @@ def parse_filename(filename):
         date (str): Date of the video
         location (str): Location of the video
         video (str): Video number
-        file_prefix (str): Prefix of the filename. format: set_participant_date_location_video
+        file_prefix (str): Prefix of the filename. format: set_participant_date_location
     """
     filename_no_ext = filename.split('.')[0].replace('contrast_', '').replace('_background', '').replace('_seg', '')
     filename_list = filename_no_ext.split('_')
@@ -48,7 +48,7 @@ def parse_filename(filename):
     else:
         location = "loc" + str(location).zfill(2)
     
-    file_prefix = f'set01_{participant}_{date}_{location}_{video}'
+    file_prefix = f'set01_{participant}_{date}_{location}'
     return participant, date, location, video, file_prefix
 
 if __name__ == "__main__":
