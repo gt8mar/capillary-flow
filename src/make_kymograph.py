@@ -219,9 +219,9 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
     
     centerline_dict = {}
     # make dictionary of centerline files with same video number
-    for file in os.listdir(os.path.join(centerline_folder, 'coords')):
-        if file.endswith(".csv"):
-            participant, date, location, video, file_prefix = parse_filename(file)
+    for centerline_file in os.listdir(os.path.join(centerline_folder, 'coords')):
+        if centerline_file.endswith(".csv"):
+            participant, date, location, video, file_prefix = parse_filename(centerline_file)
             # check if video ends with "bp"
             if video.endswith('bp'):
                 video = video.replace('bp', '')
@@ -230,11 +230,17 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
             
             # check if video is in dictionary, if not add it
             if video not in centerline_dict.keys():
-                centerline_dict[video] = [file]
+                centerline_dict[video] = [centerline_file]
             else:
-                centerline_dict[video].append(file)
+                centerline_dict[video].append(centerline_file)
     if verbose:
-        print(centerline_dict)
+        # check dictionary to see if videos match up with the key
+        for video in centerline_dict.keys():
+            print(video)
+            for test_file in centerline_dict[video]:
+                __, __, __, video_parsed, __ = parse_filename(test_file)
+                if video != video_parsed:
+                    print(f'Video name mismatch: {video} vs {video_parsed}')
 
     # load name map to rename capillaries
     name_map = load_name_map(path, version='centerlines')
@@ -248,14 +254,10 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
         if os.path.exists(video_folder) == False:
             print(f'No moco folder for {file_prefix} and {video_folder}') 
         metadata_folder = os.path.join(path, 'vids', video, 'metadata')
-        participant, date, location, video_parsed, file_prefix = parse_filename(file)
 
         # Get metadata
         gap_left, gap_right, gap_bottom, gap_top = get_shifts(metadata_folder) # get gaps from the metadata
         if verbose:
-            print(video, file_prefix)
-            if video != video_parsed:
-                print(f'Video name mismatch: {video} vs {video_parsed}')
             print(gap_left, gap_right, gap_bottom, gap_top)
 
         # Get images
@@ -264,7 +266,7 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
         images = get_images(video_folder)
         image_array = load_image_array(images, video_folder)      # this has the shape (frames, row, col)
         example_image = image_array[0]
-        print(f"Loading images for {file_prefix} took {time.time() - start} seconds")
+        print(f"Loading images for {file_prefix} {video} took {time.time() - start} seconds")
         print("The size of the array is " + str(image_array.shape))
 
         # Crop array based on shifts
@@ -272,9 +274,11 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
         start_time = time.time()
 
         j = 0
+        print('right before the capillary loop')
         # loop through capillaries
         for file in centerline_dict[video]:
             # TODO: fix bug with missing videos
+            participant, date, location, video_parsed, file_prefix = parse_filename(file)
 
             old_capillary_name = file
             # Check if centerline is in name map (TODO: fix the bug that causes this)
@@ -301,18 +305,21 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
             start_time = time.time()
             # normalize intensity of the kymograph
             kymograph = exposure.rescale_intensity(kymograph, in_range = 'image', out_range = np.uint8)
-            # print(f"the time to normalize the image is {time.time() - start_time} seconds")
+            if verbose:
+                print(f"the time to normalize the image is {time.time() - start_time} seconds")
+#TODO fix file naming
 
+            # save the kymograph
             if write:
                     np.savetxt(os.path.join(output_folder, 
-                                            file_prefix + f'_kymograph_{str(capillary_number).zfill(2)}.csv'), 
+                                            file_prefix + video + f'_kymograph_{str(capillary_number).zfill(2)}.csv'), 
                                             kymograph, delimiter=',', fmt = '%s')
                     im = Image.fromarray(kymograph)
                     im.save(os.path.join(output_folder, 
-                                        file_prefix + f'_kymograph_{str(capillary_number).zfill(2)}.tiff'))
+                                        file_prefix + video + f'_kymograph_{str(capillary_number).zfill(2)}.tiff'))
                     # save to results folder
                     im.save(os.path.join(results_folder, 'kymographs',
-                                        file_prefix + f'_kymograph_{str(capillary_number).zfill(2)}.tiff'))
+                                        file_prefix + video + f'_kymograph_{str(capillary_number).zfill(2)}.tiff'))
 
             if plot:
                 # Plot pixels vs time:

@@ -294,38 +294,41 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
 
             print(f'Processing {video} capillary {capillary_number}')            
 
-        #     # load centerline file:
-        #     skeleton = np.loadtxt(os.path.join(centerline_folder, 'coords', file), delimiter=',').astype(int)
+            # load centerline file:
+            skeleton = np.loadtxt(os.path.join(centerline_folder, 'coords', file), delimiter=',').astype(int)
 
-        #     # build the kymograph
-        #     start_time = time.time()
-        #     kymograph = build_centerline_vs_time_kernal(image_array, skeleton, long = True)
-        #     print(f"capillary {capillary_number} took {time.time() - start_time} seconds")
+            # build the kymograph
+            start_time = time.time()
+            kymograph = build_centerline_vs_time_kernal(image_array, skeleton, long = True)
+            print(f"capillary {capillary_number} took {time.time() - start_time} seconds")
             
-        #     # normalize the kymograph 
-        #     start_time = time.time()
-        #     # normalize intensity of the kymograph
-        #     kymograph = exposure.rescale_intensity(kymograph, in_range = 'image', out_range = np.uint8)
-        #     # print(f"the time to normalize the image is {time.time() - start_time} seconds")
+            # normalize the kymograph 
+            start_time = time.time()
+            # normalize intensity of the kymograph
+            kymograph = exposure.rescale_intensity(kymograph, in_range = 'image', out_range = np.uint8)
+            if verbose:
+                print(f"the time to normalize the image is {time.time() - start_time} seconds")
 #TODO fix file naming
-        #     if write:
-        #             np.savetxt(os.path.join(output_folder, 
-        #                                     file_prefix + f'_kymograph_{str(capillary_number).zfill(2)}.csv'), 
-        #                                     kymograph, delimiter=',', fmt = '%s')
-        #             im = Image.fromarray(kymograph)
-        #             im.save(os.path.join(output_folder, 
-        #                                 file_prefix + f'_kymograph_{str(capillary_number).zfill(2)}.tiff'))
-        #             # save to results folder
-        #             im.save(os.path.join(results_folder, 'kymographs',
-        #                                 file_prefix + f'_kymograph_{str(capillary_number).zfill(2)}.tiff'))
 
-        #     if plot:
-        #         # Plot pixels vs time:
-        #         plt.imshow(kymograph)
-        #         plt.title('centerline pixel values per time')
-        #         plt.xlabel('frame')
-        #         plt.ylabel('centerline pixel')
-        #         plt.show()
+            # save the kymograph
+            if write:
+                    np.savetxt(os.path.join(output_folder, 
+                                            file_prefix + video + f'_kymograph_{str(capillary_number).zfill(2)}.csv'), 
+                                            kymograph, delimiter=',', fmt = '%s')
+                    im = Image.fromarray(kymograph)
+                    im.save(os.path.join(output_folder, 
+                                        file_prefix + video + f'_kymograph_{str(capillary_number).zfill(2)}.tiff'))
+                    # save to results folder
+                    im.save(os.path.join(results_folder, 'kymographs',
+                                        file_prefix + video + f'_kymograph_{str(capillary_number).zfill(2)}.tiff'))
+
+            if plot:
+                # Plot pixels vs time:
+                plt.imshow(kymograph)
+                plt.title('centerline pixel values per time')
+                plt.xlabel('frame')
+                plt.ylabel('centerline pixel')
+                plt.show()
     return 0
 
 
