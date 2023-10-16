@@ -2,10 +2,9 @@
 #
 #SBATCH --job-name=kymographArray
 #SBATCH --time=10:00:00
-#SBATCH --partition=cpu
 #SBATCH --mem=150G
 #SBATCH --output=kymo_array_%A-%a.out
-#SBATCH --array=10-20
+#SBATCH --array=9-20
 
 cd /hpc/projects/capillary-flow/scripts
 module load anaconda
