@@ -36,24 +36,31 @@ def translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_c
     grouped_coords_listdir = list(groups.values())
 
     #read translation csv
-    translations = pd.read_csv(translations_csv, header=None)
+    with open(translations_csv, 'r') as csvfile:
+        csvreader = csv.reader(csvfile)
+        data = [row for row in csvreader]
+        translations = np.array(data).astype(float)
 
     #read crop csv
-    crops = pd.read_csv(crops_csv, header=None)
+    with open(crops_csv, 'r') as csvfile:
+        csvreader = csv.reader(csvfile)
+        crops = list(csvreader)
 
     #read resize csv
-    resize_df = pd.read_csv(resize_csv)
-    minx = resize_df.iloc[0, 0]
-    maxx = resize_df.iloc[0, 1]
-    miny = resize_df.iloc[0, 2]
-    maxy = resize_df.iloc[0, 3]
+    with open(resize_csv, 'r') as csvfile:
+        csvreader = csv.reader(csvfile)
+        data = [row for row in csvreader]
+        minx = float(data[0][0])
+        maxx = float(data[0][1])
+        miny = float(data[0][2])
+        maxy = float(data[0][3])
 
     translated_coords_fp = os.path.join(os.path.dirname(coords_fp), "translated")
     os.makedirs(translated_coords_fp, exist_ok=True)
     #apply translation
     for x in range(len(grouped_coords_listdir)):
-        dy = int(float(translations.iloc[x][0])) - int(float(crops.iloc[x][0]) + int(maxx))
-        dx = int(float(translations.iloc[x][1])) - int(float(crops.iloc[x][3]) + int(maxy))
+        dy = int(float(translations[x][0])) - int(float(crops[x][0]) + int(maxx))
+        dx = int(float(translations[x][1])) - int(float(crops[x][3]) + int(maxy))
         for file in grouped_coords_listdir[x]:
             orig_coords_path = os.path.join(coords_fp, file)
             translated_coords_path = os.path.join(translated_coords_fp, "translated_" + file)
@@ -116,7 +123,7 @@ def rename_caps(coords_fp, individual_caps_fp, participant, date, location):
     
     return renamed_folder_fp
 
-def show_centerlines(projected_caps_fp, coords_fp, individual_caps_fp):
+def show_centerlines(projected_caps_fp, coords_fp, individual_caps_fp, registered_caps_fp):
     y, x, _ = cv2.imread(os.path.join(projected_caps_fp, os.listdir(projected_caps_fp)[0])).shape
     maxproj = np.zeros([y,x,3])
     for cap in os.listdir(projected_caps_fp):
@@ -131,7 +138,23 @@ def show_centerlines(projected_caps_fp, coords_fp, individual_caps_fp):
     cv2.imshow(str(file), maxproj)
     cv2.waitKey(0)
 
-    for file in os.listdir(coords_fp):
+    for vid in os.listdir(registered_caps_fp):
+        vid_img = cv2.imread(os.path.join(registered_caps_fp, vid))
+        vidnum = re.search(r'vid(\d{2})', vid).group(1)
+        for file in os.listdir(coords_fp):
+            ctrl_vidnum = re.search(r'vid(\d{2})', file).group(1)
+            if vidnum == ctrl_vidnum:
+                with open(os.path.join(coords_fp, file), 'r') as coords:
+                    reader = csv.reader(coords)
+                    rows = list(reader)
+                    for row in rows:
+                        vid_img[int(float(row[0]))][int(float(row[1]))] = [255, 0, 0]
+            else:
+                continue
+        cv2.imshow(str(file), vid_img)
+        cv2.waitKey(0)
+
+    """for file in os.listdir(coords_fp):
         match1 = re.search(r'vid(\d{2})', file)
         vidnum = match1.group(1)
 
@@ -152,9 +175,9 @@ def show_centerlines(projected_caps_fp, coords_fp, individual_caps_fp):
                 cap_img[int(float(row[0]))][int(float(row[1]))] = [255, 0, 0]
 
         cv2.imshow(str(file), cap_img)
-        cv2.waitKey(0)  
+        cv2.waitKey(0)  """
 
-def main(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12\\230428\\loc03"):
+def main(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part10\\230425\\loc01"):
     coords_fp = os.path.join(path, "centerlines", "coords")
     segmented_folder = os.path.join(path, "segmented", "hasty")
 
@@ -171,7 +194,7 @@ def main(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12\\230428\
 
     translated_coords_fp = translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_csv, resize_csv)
     renamed_coords_fp = rename_caps(translated_coords_fp, individual_caps_fp, participant, date, location)
-    #show_centerlines(os.path.join(segmented_folder, "proj_caps"), renamed_coords_fp, individual_caps_fp)
+    #show_centerlines(os.path.join(segmented_folder, "proj_caps"), translated_coords_fp, individual_caps_fp, os.path.join(segmented_folder, "registered"))
     
     
 """
