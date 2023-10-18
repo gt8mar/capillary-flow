@@ -5,11 +5,9 @@
 #SBATCH --time=04:00:00
 #SBATCH --nodes=3
 #SBATCH --ntasks-per-node=1
-#SBATCH --partition=cpu
 #SBATCH --mem=50G
 #SBATCH --output=bkgd_array_%A-%a.out
 
-participants=(23 24 25)
 cd /hpc/projects/capillary-flow/scripts
 module load anaconda
 conda activate capillary-flow
