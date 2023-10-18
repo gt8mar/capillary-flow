@@ -34,7 +34,13 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
         background (tiff image): background of stabilized images
         video (.avi): video of stabilized images
     """  
-    input_folder = os.path.join(path, 'moco')
+    # check to see if 'mocoslice' folder exists
+    if os.path.exists(os.path.join(path, 'mocoslice')):
+        input_folder = os.path.join(path, 'mocoslice')
+    elif os.path.exists(os.path.join(path, 'mocosplit')):
+        input_folder = os.path.join(path, 'mocosplit')
+    else:
+        input_folder = os.path.join(path, 'moco')
     location_folder = os.path.dirname(os.path.dirname((path)))
     location = os.path.basename(location_folder)
     os.makedirs(os.path.join(location_folder, 'backgrounds'), exist_ok=True)

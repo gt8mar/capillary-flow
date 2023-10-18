@@ -228,7 +228,7 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     graph.
 
     Args:
-        path (str): path to the folder containing kymographs
+        path (str): path to the location folder containing kymographs
         verbose (bool): If True, show plots
         write (bool): If True, write plots to file
         test (bool): If True, use test data
@@ -302,7 +302,7 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
                 missing_log.append(image)
         else:
             capillary_name = image.split(".")[0].split("_")[-1]
-        filename = f'{file_prefix}_{str(int(pressure*10)).zfill(2)}_{capillary_name}'
+        filename = f'{file_prefix}_{video}_{str(int(pressure*10)).zfill(2)}_{capillary_name}'
         kymo_blur = gaussian_filter(kymo_raw, sigma = 2)
         
         if write:
@@ -321,7 +321,7 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
         for image in missing_log:
             f.write(image + "\n")
     # Write the dataframe to a file
-    df.to_csv(os.path.join(output_folder, "velocity_data.csv"), index=False)    
+    df.to_csv(os.path.join(output_folder, f"{file_prefix}_velocity_data.csv"), index=False)    
     # print(df)
     
     """
