@@ -45,7 +45,12 @@ def align_segmented(path="D:\\data_gabby\\debugging\\part09\\230414\\loc06"):
     moco_vids_fp = []
     sorted_vids_listdir = sorted(filter(lambda x: os.path.exists(os.path.join(vid_folder_fp, x)), os.listdir(vid_folder_fp))) #sort numerically
     for vid in sorted_vids_listdir:
-        moco_folder_fp = os.path.join(vid_folder_fp, vid, "moco")
+        if os.path.exists(os.path.join(vid_folder_fp, vid, "mocoslice")):
+            moco_folder_fp = os.path.join(vid_folder_fp, vid, "mocoslice")
+        elif os.path.exists(os.path.join(vid_folder_fp, vid, "mocosplit")):
+            moco_folder_fp = os.path.join(vid_folder_fp, vid, "mocosplit")
+        else:
+            moco_folder_fp = os.path.join(vid_folder_fp, vid, "moco")
         sorted_moco_ld = sorted(filter(lambda x: os.path.exists(os.path.join(moco_folder_fp, x)), os.listdir(moco_folder_fp)))
         moco_vids_fp.append(os.path.join(moco_folder_fp, sorted_moco_ld[0]))
 
