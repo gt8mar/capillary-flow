@@ -62,6 +62,19 @@ def group_by_cap(plotinfo):
     result_list = list(grouped_caps.values())
     return result_list   
 
+def save_plotinfo(plotinfo, participant, date, location):
+    grouped_plotinfo = group_by_cap(plotinfo)
+    complete_plotinfo = []
+    for cap in grouped_plotinfo:
+        sorted_cap = sorted(cap, key=lambda x: x[3]) #sort by vidnum
+        for entry in sorted_cap:
+            complete_plotinfo.append([participant, date, location] + entry)
+    
+    filename = 
+    if platform.system() != 'Windows':
+        results_path = "/hpc/projects/capillary-flow/results/size/plotinfo.csv"
+
+
 def make_subplots(plotinfo, participant, date, location):
     grouped_plotinfo = group_by_cap(plotinfo)
     num_plots = len(grouped_plotinfo)
