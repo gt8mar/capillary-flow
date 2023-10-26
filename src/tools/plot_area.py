@@ -62,6 +62,29 @@ def group_by_cap(plotinfo):
     result_list = list(grouped_caps.values())
     return result_list   
 
+def save_plotinfo(path, plotinfo, participant, date, location):
+    # complete_plotinfo (grouped by capnum and sorted by vidnum) is in the format:
+    # [[participant, date, location, area, pressure, capnum, vidnum], ...]
+    grouped_plotinfo = group_by_cap(plotinfo)
+    complete_plotinfo = []
+    complete_plotinfo.append(["participant", "date", "location", "area", "pressure", "capnum", "vidnum"])
+    for cap in grouped_plotinfo:
+        sorted_cap = sorted(cap, key=lambda x: x[3]) #sort by vidnum
+        for entry in sorted_cap:
+            complete_plotinfo.append([participant, date, location] + entry)
+
+    df = pd.DataFrame(complete_plotinfo)
+    #save to results folder
+    filename = participant + '_' + date + '_' + location + '_size_data.csv'
+    if platform.system() != 'Windows':
+        results_fp = '/hpc/projects/capillary-flow/results/size/size_data'
+        os.makedirs(results_fp, exist_ok=True)
+        df.to_csv(os.path.join(results_fp, filename), header=True, index=False)
+    #save to location folder
+    plotinfo_fp = os.path.join(path, "size", "size_data")
+    os.makedirs(plotinfo_fp, exist_ok=True)
+    df.to_csv(os.path.join(plotinfo_fp, filename), header=False, index=False)
+
 def make_subplots(plotinfo, participant, date, location):
     grouped_plotinfo = group_by_cap(plotinfo)
     num_plots = len(grouped_plotinfo)
@@ -201,7 +224,7 @@ def get_plotinfo(caps_fp, centerlines_fp, metadata_fp):
 
     return plotinfo
     
-def main(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12\\230428\\loc03"):
+def main(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part10\\230425\\loc01"):
     participant = get_directory_at_level(path, 2)
     date = get_directory_at_level(path, 1)
     location = get_directory_at_level(path, 0)
@@ -211,6 +234,7 @@ def main(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12\\230428\
     metadata_fp = os.path.join(get_directory_at_level(path, 4, only_dir=False), "metadata", participant + "_" + date + ".xlsx")
 
     plotinfo = get_plotinfo(caps_fp, centerlines_fp, metadata_fp)
+    save_plotinfo(path, plotinfo, participant, date, location)
     size_plot, slopes = make_subplots(plotinfo, participant, date, location)
 
     #save to plot folder in data/part/date/loc/size/plots

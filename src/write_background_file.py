@@ -13,9 +13,16 @@ import pandas as pd
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.pyplot as plt
 import cv2
-from src.tools.parse_path import parse_path
-from src.tools.get_images import get_images
-from src.tools.pic2vid import pic2vid
+import platform
+if platform.system() != 'Windows':
+    from src.tools.parse_path import parse_path
+    from src.tools.get_images import get_images
+    from src.tools.pic2vid import pic2vid
+else:
+    from tools.parse_path import parse_path
+    from tools.get_images import get_images
+    from tools.pic2vid import pic2vid
+import platform
 
 def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01\\vids\\vid01', 
          method = "mean", color = False):  
@@ -34,6 +41,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
         background (tiff image): background of stabilized images
         video (.avi): video of stabilized images
     """  
+    print(path)
     # check to see if 'mocoslice' folder exists
     if os.path.exists(os.path.join(path, 'mocoslice')):
         input_folder = os.path.join(path, 'mocoslice')
@@ -45,7 +53,10 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
     location = os.path.basename(location_folder)
     os.makedirs(os.path.join(location_folder, 'backgrounds'), exist_ok=True)
     output_folder = os.path.join(os.path.dirname(path), 'backgrounds')
-    results_folder = '/hpc/projects/capillary-flow/results/backgrounds'  # I want to save all the backgrounds to the same folder for easy transfer to hasty.ai
+    if platform.system() != 'Windows':
+        results_folder = '/hpc/projects/capillary-flow/results/backgrounds'  # I want to save all the backgrounds to the same folder for easy transfer to hasty.ai
+    else:
+        results_folder = 'C:\\Users\\Luke\\Documents\\capillary-flow\\backgrounds'
     participant, date, location, video, file_prefix = parse_path(path, video_path=True)
     print(f'participant is {participant}, date is {date}, location is {location}, video is {video}, file_prefix is {file_prefix}')
 
@@ -55,6 +66,16 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
     gap_right = shifts['x'].min()
     gap_bottom = shifts['y'].min()
     gap_top = shifts['y'].max()
+
+    if gap_left < 0:
+        gap_left = 0
+    if gap_top < 0:
+        gap_top = 0
+    if gap_right > 0:
+        gap_right = 0
+    if gap_bottom > 0:
+        gap_bottom = 0
+
     print(f'gap left is {gap_left}')
     print(f'gap right is {gap_right}')
     print(f'gap bottom is {gap_bottom}')
@@ -72,7 +93,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
     # Convert to numpy array
     image_files = np.array(image_files)
     # save video
-    pic2vid(image_files, participant=participant, date=date, location = location, video_folder=video, color=color, overlay=True) 
+    #pic2vid(image_files, participant=participant, date=date, location = location, video_folder=video, color=color, overlay=True) 
     ROWS, COLS = image_files[0].shape
     
     if method == "mean":
@@ -103,7 +124,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
 
     # Add background file
     bkgd_name = f'{file_prefix}_{video}_background.tiff'
-    cv2.imwrite(os.path.join(output_folder, bkgd_name), background)
+    #cv2.imwrite(os.path.join(output_folder, bkgd_name), background)
     cv2.imwrite(os.path.join(results_folder, bkgd_name), background)
     return 0
 
