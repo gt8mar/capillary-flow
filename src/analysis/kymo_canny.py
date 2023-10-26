@@ -219,7 +219,7 @@ def find_slopes(image, filename, output_folder=None, method = 'ridge', verbose =
         plt.close()
     return weighted_average_slope
 
-def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write = False,
+def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write = False, write_data = False,
          test = False):
     """
     This function takes in a path to a folder containing kymographs and outputs
@@ -278,10 +278,10 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     images = [image for image in images if image.split("_")[4] in metadata['Video'].values]
 
     # Create a dataframe to store the results
-    df = pd.DataFrame(columns = ['Participant','Video', 'Pressure', 'Capillary', 'Weighted Average Slope'])
+    df = pd.DataFrame(columns = ['Participant','Date', 'Location', 'Video', 'Pressure', 'Capillary', 'Weighted Average Slope'])
     missing_log = []
     for image in images:
-        __, __, __, video, file_prefix = parse_filename(image)
+        part, date, location, video, file_prefix = parse_filename(image)
         kymo_raw = cv2.imread(os.path.join(input_folder, image), cv2.IMREAD_GRAYSCALE)
         # Get the metadata for the video
         video_metadata = metadata.loc[
@@ -312,7 +312,7 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
         # transform slope from pixels/frames into um/s:
         um_slope = np.absolute(weighted_average_slope) *fps/PIX_UM
         # add row to dataframe
-        new_data = pd.DataFrame([[part, video, pressure, capillary_name, um_slope]], columns = df.columns)
+        new_data = pd.DataFrame([[part, date, location, video, pressure, capillary_name, um_slope]], columns = df.columns)
         df = pd.concat([df, new_data], ignore_index=True)
         
 
@@ -321,7 +321,11 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
         for image in missing_log:
             f.write(image + "\n")
     # Write the dataframe to a file
-    df.to_csv(os.path.join(output_folder, f"{file_prefix}_velocity_data.csv"), index=False)    
+    
+    if write_data:
+        df.to_csv(os.path.join(output_folder, f"{file_prefix}_velocity_data.csv"), index=False)    
+        df.to_csv(os.path.join(results_folder, f"{file_prefix}_velocity_data.csv"), index=False)    
+
     # print(df)
     
     """
@@ -413,6 +417,6 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(write = True, verbose= False, test = False)
+    main(write = False, write_data=True, verbose= False, test = False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))

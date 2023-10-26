@@ -256,8 +256,8 @@ def main(path ='F:\\Marcus\\data\\hasty_seg\\230626\\part10\\230425\\loc01', # '
 
             # Define the varying parts of the filename
             segmented_filename = file
-            skeleton_filename = file_prefix + "_skeletons.png"
-            cap_map_filename = file_prefix + "_cap_map.png"
+            skeleton_filename = file_prefix + f"_{video}_skeletons.png"
+            cap_map_filename = file_prefix + f"_{video}_cap_map.png"
          
             # Read in the mask
             segmented = load_image_with_prefix(segmented_folder, segmented_filename)
@@ -331,13 +331,13 @@ def main(path ='F:\\Marcus\\data\\hasty_seg\\230626\\part10\\230425\\loc01', # '
                         if write:
                             # Save centerline and radii information
                             for i in range(len(skeleton_coords)):
-                                np.savetxt(os.path.join(output_folder, "coords", file_prefix + f'_centerline_coords_{str(i).zfill(2)}.csv'), 
+                                np.savetxt(os.path.join(output_folder, "coords", file_prefix + f'_{video}_centerline_coords_{str(i).zfill(2)}.csv'), 
                                         skeleton_data[i], delimiter=',', fmt = "%s")
                                 if platform.system() == 'Windows':
                                     pass
                                 else:
                                     os.makedirs('/hpc/projects/capillary-flow/results/centerlines', exist_ok=True)
-                                    np.savetxt(os.path.join('/hpc/projects/capillary-flow/results/centerlines', file_prefix + f'_centerline_coords_{str(i).zfill(2)}.csv'), 
+                                    np.savetxt(os.path.join('/hpc/projects/capillary-flow/results/centerlines', file_prefix + f'_{video}_centerline_coords_{str(i).zfill(2)}.csv'), 
                                                 skeleton_data[i], delimiter=',', fmt = "%s")
                                 
 
