@@ -311,15 +311,15 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
 
             # save the kymograph
             if write:
-                    np.savetxt(os.path.join(output_folder, 
-                                            f'{file_prefix}_{video}_kymograph_{str(capillary_number).zfill(2)}.csv'), 
-                                            kymograph, delimiter=',', fmt = '%s')
-                    im = Image.fromarray(kymograph)
-                    im.save(os.path.join(output_folder, 
-                                        f'{file_prefix}_{video}_kymograph_{str(capillary_number).zfill(2)}.tiff'))
-                    # save to results folder
-                    im.save(os.path.join(results_folder, 'kymographs',
-                                        f'{file_prefix}_{video}_kymograph_{str(capillary_number).zfill(2)}.tiff'))
+                np.savetxt(os.path.join(output_folder, 
+                                        f'{file_prefix}_{video}_kymograph_{str(capillary_number).zfill(2)}.csv'), 
+                                        kymograph, delimiter=',', fmt = '%s')
+                im = Image.fromarray(kymograph)
+                im.save(os.path.join(output_folder, 
+                                    f'{file_prefix}_{video}_kymograph_{str(capillary_number).zfill(2)}.tiff'))
+                # save to results folder
+                im.save(os.path.join(results_folder, 'kymographs',
+                                    f'{file_prefix}_{video}_kymograph_{str(capillary_number).zfill(2)}.tiff'))
 
             if plot:
                 # Plot pixels vs time:

@@ -207,12 +207,16 @@ def find_slopes(image, filename, output_folder=None, method = 'ridge', verbose =
     plot_title = f"Average Slope: {weighted_average_slope:.3f}"
     plt.suptitle(filename + "\n" + plot_title)
     plt.tight_layout()
+
+    if platform.system() != 'Windows':
+        results_folder = '/hpc/projects/capillary-flow/results/velocities'
+    else:
+        results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities'
     
     if write: 
         plt.savefig(os.path.join(output_folder, str(filename) + ".png"), bbox_inches='tight', dpi=400)
-        if platform != 'Windows':
-            results_folder = '/hpc/projects/capillary-flow/results/velocities'
-            plt.savefig(os.path.join(results_folder, str(filename) + ".png"), bbox_inches='tight', dpi=400)
+        plt.savefig(os.path.join(results_folder, str(filename) + ".png"), bbox_inches='tight', dpi=400)
+        
     if verbose:
         plt.show()  
     else:
@@ -242,16 +246,22 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     output_folder = os.path.join(path, 'velocities')
     part, date, location, __, __ = parse_path(path)
 
-    if platform != "Windows":
+    if platform.system() != "Windows":
         os.makedirs('/hpc/projects/capillary-flow/results/velocities', exist_ok=True)
         results_folder = '/hpc/projects/capillary-flow/results/velocities'
+        SET = 'set01'
+    else:
+        os.makedirs('C:\\Users\\gt8mar\\capillary-flow\\results\\velocities', exist_ok=True)
+        results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities'
         SET = 'set01'
     if test:
         # metadata_folder = os.path.join(path, 'part_metadata')                           # This is for the test data
         metadata_folder = os.path.join(os.path.dirname(os.path.dirname(path)), 'part_metadata')        # This is for the real data
     else: 
-        # metadata_folder = os.path.join(os.path.dirname(os.path.dirname(path)), 'part_metadata')        # This is for the real data
-        metadata_folder = '/hpc/projects/capillary-flow/metadata'
+        if platform.system() == "Windows":
+            metadata_folder = 'C:\\Users\\gt8mar\\capillary-flow\\metadata'
+        else: # metadata_folder = os.path.join(os.path.dirname(os.path.dirname(path)), 'part_metadata')        # This is for the real data
+            metadata_folder = '/hpc/projects/capillary-flow/metadata'
     loc_num = location.lstrip("loc")
     loc_num = loc_num.lstrip("0")
     loc_num = int(loc_num)
