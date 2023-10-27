@@ -53,9 +53,8 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
     location_folder = os.path.dirname(os.path.dirname((path)))
     location = os.path.basename(location_folder)
     os.makedirs(os.path.join(location_folder, 'backgrounds'), exist_ok=True)
-    # output_folder = os.path.join(os.path.dirname(path), 'backgrounds')
-    # output_folder = 'C:\\Users\\gt8mar\\capillary-flow'
-    output_folder = 'C:\\Users\\ejerison\\capillary-flow'
+    output_folder = os.path.join(location_folder, 'backgrounds')
+
     if platform.system() != 'Windows':
         results_folder = '/hpc/projects/capillary-flow/results/backgrounds'  # I want to save all the backgrounds to the same folder for easy transfer to hasty.ai
     else:
@@ -140,7 +139,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
     bkgd_name = f'{file_prefix}_{video}_background.tiff'
     print(f'background name is {bkgd_name}')
     cv2.imwrite(os.path.join(output_folder, bkgd_name), background)
-    # cv2.imwrite(os.path.join(results_folder, bkgd_name), background)
+    cv2.imwrite(os.path.join(results_folder, bkgd_name), background)
     
     return 0
 
