@@ -23,9 +23,10 @@ else:
     from tools.get_images import get_images
     from tools.pic2vid import pic2vid
 import platform
+from tifffile import imwrite
 
 def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01\\vids\\vid01', 
-         method = "mean", color = False):  
+         method = "mean", make_video = True, color = False, verbose=False, plot=False):  
     """
     Writes a background file and a video into results and C_background.
 
@@ -52,7 +53,9 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
     location_folder = os.path.dirname(os.path.dirname((path)))
     location = os.path.basename(location_folder)
     os.makedirs(os.path.join(location_folder, 'backgrounds'), exist_ok=True)
-    output_folder = os.path.join(os.path.dirname(path), 'backgrounds')
+    # output_folder = os.path.join(os.path.dirname(path), 'backgrounds')
+    # output_folder = 'C:\\Users\\gt8mar\\capillary-flow'
+    output_folder = 'C:\\Users\\ejerison\\capillary-flow'
     if platform.system() != 'Windows':
         results_folder = '/hpc/projects/capillary-flow/results/backgrounds'  # I want to save all the backgrounds to the same folder for easy transfer to hasty.ai
     else:
@@ -90,14 +93,25 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
         # Crop image using shifts so that there is not a black border around the outside of the video
         cropped_image = image[gap_top:image.shape[0] + gap_bottom, gap_left:image.shape[1] + gap_right]
         image_files.append(cropped_image)
+        if verbose:
+            print(f'cropped image shape is {cropped_image.shape}')
     # Convert to numpy array
     image_files = np.array(image_files)
+    if verbose:
+        print(f'image_files shape is {image_files.shape}')
     # save video
-    #pic2vid(image_files, participant=participant, date=date, location = location, video_folder=video, color=color, overlay=True) 
+    if make_video:
+        pic2vid(image_files, participant=participant, date=date, location = location, video_folder=video, color=color, overlay=True) 
+    # Get dimensions of images
     ROWS, COLS = image_files[0].shape
     
     if method == "mean":
         background = np.mean(image_files, axis=0).astype('uint8') 
+        if verbose:
+            print(f'background shape is {background.shape}')
+        if plot:
+            plt.imshow(background)
+            plt.show()
     elif method =="median":
         background = np.median(image_files, axis=0).astype('uint8') # median instead of mean
     else:
@@ -124,8 +138,10 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
 
     # Add background file
     bkgd_name = f'{file_prefix}_{video}_background.tiff'
-    #cv2.imwrite(os.path.join(output_folder, bkgd_name), background)
-    cv2.imwrite(os.path.join(results_folder, bkgd_name), background)
+    print(f'background name is {bkgd_name}')
+    cv2.imwrite(os.path.join(output_folder, bkgd_name), background)
+    # cv2.imwrite(os.path.join(results_folder, bkgd_name), background)
+    
     return 0
 
 """
@@ -135,6 +151,11 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main()
+    # path = 'D:\\Marcus\\backup\\data\\part25\\230601\\loc02\\vids\\vid27'
+    short_path = 'D:\\Marcus\\backup\\data\\part24\\230601\\loc03\\vids'
+    vids = ['vid' + str(i) for i in range(38, 49)]
+    for vid in vids:
+        long_path = os.path.join(short_path, vid)
+        main(path=long_path, method="mean", make_video=False, color=False, verbose=False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
