@@ -28,9 +28,8 @@ PIX_UM = 1.74
 CANNY_THRESH_1 = 20
 CANNY_THRESH_2 = 50
 
-# TODO: play around with these parameters
-# TODO: zero speed capillaries handling
-# TODO: data aggregation
+# TODO: Long term: zero speed capillaries handling
+# TODO: clean up results folder saving stuff
 
 def average_array(array):
     """
