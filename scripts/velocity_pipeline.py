@@ -10,7 +10,7 @@ By: Marcus Forst
 import os, sys, gc, time
 from src import find_centerline
 from src import make_kymograph
-from src.analysis import kymo_canny
+from src.analysis import make_velocities
 from src.tools.find_earliest_date_dir import find_earliest_date_dir
 
 SET = "set01"
@@ -58,7 +58,7 @@ def main():
         location_path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, location)
         
         # Make kymographs
-        kymo_canny.main(location_path, verbose=False, write=True)
+        make_velocities.main(location_path, verbose=False, write=True)
         print(f'completed velocities for location {location} in {ticks-time.time()} seconds')
         print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
 
