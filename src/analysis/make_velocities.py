@@ -1,5 +1,5 @@
 """
-Filename: kymo_canny.py
+Filename: make_velocities.py
 -------------------------------------------------
 This file uses canny edge detection to call average velocities from
 kymographs. 
@@ -377,9 +377,9 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     plt.tight_layout()
 
     if write:
-        plt.savefig(os.path.join(output_folder, f"{part} {location} velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
+        plt.savefig(os.path.join(output_folder, f"{part}_{location}_velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
         if platform != 'Windows':
-            plt.savefig(os.path.join(results_folder, f"{part} {location} velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
+            plt.savefig(os.path.join(results_folder, f"{part}_{location}_velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
     if verbose:
         plt.show()
     else:
@@ -401,9 +401,9 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     plt.tight_layout()
 
     if write:
-        plt.savefig(os.path.join(output_folder, f"{part} {location} velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
+        plt.savefig(os.path.join(output_folder, f"{part}_{location}_velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
         if platform != 'Windows':
-            plt.savefig(os.path.join(results_folder, f"{part} {location} velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
+            plt.savefig(os.path.join(results_folder, f"{part}_{location}_velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
 
     if verbose:
         plt.show()
