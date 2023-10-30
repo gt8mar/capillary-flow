@@ -222,7 +222,7 @@ def find_slopes(image, filename, output_folder=None, method = 'ridge', verbose =
         plt.close()
     return weighted_average_slope
 
-def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write = False, write_data = False,
+def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write = False, write_data = True,
          test = False):
     """
     This function takes in a path to a folder containing kymographs and outputs
