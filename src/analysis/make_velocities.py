@@ -1,5 +1,5 @@
 """
-Filename: kymo_canny.py
+Filename: make_velocities.py
 -------------------------------------------------
 This file uses canny edge detection to call average velocities from
 kymographs. 
@@ -222,7 +222,7 @@ def find_slopes(image, filename, output_folder=None, method = 'ridge', verbose =
         plt.close()
     return weighted_average_slope
 
-def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write = False, write_data = False,
+def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write = False, write_data = True,
          test = False):
     """
     This function takes in a path to a folder containing kymographs and outputs
@@ -377,9 +377,9 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     plt.tight_layout()
 
     if write:
-        plt.savefig(os.path.join(output_folder, f"{part} {location} velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
+        plt.savefig(os.path.join(output_folder, f"{part}_{location}_velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
         if platform != 'Windows':
-            plt.savefig(os.path.join(results_folder, f"{part} {location} velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
+            plt.savefig(os.path.join(results_folder, f"{part}_{location}_velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
     if verbose:
         plt.show()
     else:
@@ -401,9 +401,9 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     plt.tight_layout()
 
     if write:
-        plt.savefig(os.path.join(output_folder, f"{part} {location} velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
+        plt.savefig(os.path.join(output_folder, f"{part}_{location}_velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
         if platform != 'Windows':
-            plt.savefig(os.path.join(results_folder, f"{part} {location} velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
+            plt.savefig(os.path.join(results_folder, f"{part}_{location}_velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
 
     if verbose:
         plt.show()

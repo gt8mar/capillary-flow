@@ -62,7 +62,7 @@ def main():
             location_path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, location)
             
             # Make kymographs
-            make_velocities.main(location_path, verbose=False, write=True)
+            make_velocities.main(location_path, verbose=False, write=True, write_data=True)
             print(f'completed velocities for location {location} in {ticks-time.time()} seconds')
             print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
 

@@ -358,7 +358,8 @@ def main(path ='F:\\Marcus\\data\\hasty_seg\\230626\\part10\\230425\\loc01', # '
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
+    test_path = 'C:\\Users\\gt8mar\\Downloads'
     # main(path = '/hpc/projects/capillary-flow/data/part09/230414/loc01', verbose = False, write = True)
-    main(verbose = False, write = True, plot=False)
+    main(path = test_path, verbose = True, write = True, plot=True)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
