@@ -22,7 +22,7 @@ def main():
 
     for file in files:
         participant, date, location, video, file_prefix = parse_filename(file)
-        filename = file_prefix + f'{video}_seg.png'
+        filename = file_prefix + f'_{video}_seg.png'
         # create the new path
         if platform.system() == 'Windows':
             new_path = f'C:\\Users\\gt8mar\\capillary-flow\\data\\{participant}\\{date}\\{location}\\segmented\\hasty\\' 
