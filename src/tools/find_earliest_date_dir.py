@@ -22,6 +22,8 @@ def find_earliest_date_dir(path='F:\\Marcus\\data\\part13'):
     # remove 'part_metadata' from the list if it is in the list
     if 'part_metadata' in folder_list:
         folder_list.remove('part_metadata')
+    # remove all files from the list
+    folder_list = [folder for folder in folder_list if os.path.isdir(os.path.join(path, folder))]
     # read remaining folders as integers 
     folder_list = [int(folder) for folder in folder_list]
     # return the minimum value
