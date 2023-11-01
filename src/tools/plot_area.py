@@ -79,7 +79,7 @@ def save_plotinfo(path, plotinfo, participant, date, location):
     if platform.system() != 'Windows':
         results_fp = '/hpc/projects/capillary-flow/results/size/size_data'
         os.makedirs(results_fp, exist_ok=True)
-        df.to_csv(os.path.join(results_fp, filename), header=True, index=False)
+        df.to_csv(os.path.join(results_fp, filename), header=False, index=False)
     #save to location folder
     plotinfo_fp = os.path.join(path, "size", "size_data")
     os.makedirs(plotinfo_fp, exist_ok=True)
