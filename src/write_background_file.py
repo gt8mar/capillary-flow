@@ -69,6 +69,7 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
     gap_bottom = shifts['y'].min()
     gap_top = shifts['y'].max()
 
+    # Check to make sure that the shifts are not negative
     if gap_left < 0:
         gap_left = 0
     if gap_top < 0:
