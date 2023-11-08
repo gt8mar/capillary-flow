@@ -249,8 +249,14 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
     # loop through videos
     for video in centerline_dict.keys():
         number_of_capillaries = len(centerline_dict[video])
+        # check to see if mocoslice or mocosplit folder exists
+        if os.path.exists(os.path.join(path, 'vids', video, 'mocoslice')):
+            video_folder = os.path.join(path, 'vids', video, 'mocoslice')
+        elif os.path.exists(os.path.join(path, 'vids', video, 'mocosplit')):
+            video_folder = os.path.join(path, 'vids', video, 'mocosplit')
+        else:
+            video_folder = os.path.join(path, 'moco')
 
-        video_folder = os.path.join(path, 'vids', video, 'moco')
         if os.path.exists(video_folder) == False:
             print(f'No moco folder for {file_prefix} and {video_folder}') 
         metadata_folder = os.path.join(path, 'vids', video, 'metadata')
