@@ -27,13 +27,23 @@ def uncrop_segmented(path, input_seg_img):
     gap_bottom = np.min(0, shifts['y'].min())
     gap_top = np.max(0, shifts['y'].max())
 
+    # Check to make sure that the shifts are not negative
+    if gap_left < 0:
+        gap_left = 0
+    if gap_top < 0:
+        gap_top = 0
+    if gap_right > 0:
+        gap_right = 0
+    if gap_bottom > 0:
+        gap_bottom = 0
+
     input_seg_img = rgb2gray(input_seg_img)
 
     uncropped_input_seg_img = np.pad(input_seg_img, ((abs(gap_top), abs(gap_bottom)), (abs(gap_left), abs(gap_right))), mode='constant', constant_values=0)
     return uncropped_input_seg_img, gap_left, gap_right, gap_bottom, gap_top
 
 #this function assumes moco folder & seg imgs folder contain the same number of files & they correspond to each other 
-def align_segmented(path="D:\\data_gabby\\debugging\\part09\\230414\\loc06"):
+def align_segmented(path="D:\\data_gabby\\debugging\\part09\\230414\\loc06", verbose=False):
     vid_folder_fp = os.path.join(path, "vids")
     segmented_folder_fp = os.path.join(path, "segmented", "hasty")
 
@@ -52,6 +62,8 @@ def align_segmented(path="D:\\data_gabby\\debugging\\part09\\230414\\loc06"):
         else:
             moco_folder_fp = os.path.join(vid_folder_fp, vid, "moco")
         sorted_moco_ld = sorted(filter(lambda x: os.path.exists(os.path.join(moco_folder_fp, x)), os.listdir(moco_folder_fp)))
+        if verbose:
+            print(sorted_moco_ld)
         moco_vids_fp.append(os.path.join(moco_folder_fp, sorted_moco_ld[0]))
 
     #set reference
