@@ -27,6 +27,16 @@ def uncrop_segmented(path, input_seg_img):
     gap_bottom = shifts['y'].min()
     gap_top = shifts['y'].max()
 
+    # Check to make sure that the shifts are not negative
+    if gap_left < 0:
+        gap_left = 0
+    if gap_top < 0:
+        gap_top = 0
+    if gap_right > 0:
+        gap_right = 0
+    if gap_bottom > 0:
+        gap_bottom = 0
+
     input_seg_img = rgb2gray(input_seg_img)
 
     uncropped_input_seg_img = np.pad(input_seg_img, ((abs(gap_top), abs(gap_bottom)), (abs(gap_left), abs(gap_right))), mode='constant', constant_values=0)
