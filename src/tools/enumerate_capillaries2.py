@@ -1,6 +1,8 @@
 import numpy as np
 from collections import deque
 
+MIN_CAP_AREA = 100
+
 def find_connected_components(input_array):
     def bfs(row, col, label):
         queue = deque([(row, col)])
@@ -43,7 +45,7 @@ def find_connected_components(input_array):
     result = []
     for component in output_array:
         nonzero_count = np.count_nonzero(component)
-        if nonzero_count >= 2000:
+        if nonzero_count >= MIN_CAP_AREA:
             result.append(component)
     
     # Convert the list of 2D arrays to a 3D numpy array
