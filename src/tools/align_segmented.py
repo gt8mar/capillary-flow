@@ -27,15 +27,15 @@ def uncrop_segmented(path, input_seg_img):
     gap_bottom = np.min(0, shifts['y'].min())
     gap_top = np.max(0, shifts['y'].max())
 
-    # Check to make sure that the shifts are not negative
-    if gap_left < 0:
-        gap_left = 0
-    if gap_top < 0:
-        gap_top = 0
-    if gap_right > 0:
-        gap_right = 0
-    if gap_bottom > 0:
-        gap_bottom = 0
+    # # Check to make sure that the shifts are not negative
+    # if gap_left < 0:
+    #     gap_left = 0
+    # if gap_top < 0:
+    #     gap_top = 0
+    # if gap_right > 0:
+    #     gap_right = 0
+    # if gap_bottom > 0:
+    #     gap_bottom = 0
 
     input_seg_img = rgb2gray(input_seg_img)
 
@@ -62,6 +62,7 @@ def align_segmented(path="D:\\data_gabby\\debugging\\part09\\230414\\loc06", ver
         else:
             moco_folder_fp = os.path.join(vid_folder_fp, vid, "moco")
         sorted_moco_ld = sorted(filter(lambda x: os.path.exists(os.path.join(moco_folder_fp, x)), os.listdir(moco_folder_fp)))
+        
         #added for debugging, gives array of filenames
         if verbose:
             print(f'the vid is {vid}: the length is {len(sorted_moco_ld)}')
