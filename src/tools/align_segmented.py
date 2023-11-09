@@ -22,10 +22,10 @@ from skimage import io
 
 def uncrop_segmented(path, input_seg_img):
     shifts = pd.read_csv(os.path.join(path, 'metadata', 'Results.csv'))
-    gap_left = shifts['x'].max()
-    gap_right = shifts['x'].min()
-    gap_bottom = shifts['y'].min()
-    gap_top = shifts['y'].max()
+    gap_left = np.max(0, shifts['x'].max())
+    gap_right = np.min(0, shifts['x'].min())
+    gap_bottom = np.min(0, shifts['y'].min())
+    gap_top = np.max(0, shifts['y'].max())
 
     # Check to make sure that the shifts are not negative
     if gap_left < 0:
