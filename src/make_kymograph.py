@@ -256,7 +256,7 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
         elif os.path.exists(os.path.join(path, 'vids', video, 'mocosplit')):
             video_folder = os.path.join(path, 'vids', video, 'mocosplit')
         else:
-            video_folder = os.path.join(path, 'moco')
+            video_folder = os.path.join(path, 'vids', video, 'moco')
 
         if os.path.exists(video_folder) == False:
             print(f'No moco folder for {file_prefix} and {video_folder}') 
