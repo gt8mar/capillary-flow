@@ -222,8 +222,10 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
     for centerline_file in os.listdir(os.path.join(centerline_folder, 'coords')):
         if centerline_file.endswith(".csv"):
             participant, date, location, video, file_prefix = parse_filename(centerline_file)
+            if video.endswith('bp'):
+                video.replace('bp', '')
             # check if video ends with "scan"
-            if video.endswith('scan'):
+            elif video.endswith('scan'):
                 continue # skip scan video for kymographs, the frame is moving
             
             # check if video is in dictionary, if not add it
@@ -237,6 +239,8 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
             print(video)
             for test_file in centerline_dict[video]:
                 __, __, __, video_parsed, __ = parse_filename(test_file)
+                if video_parsed.endswith('bp'):
+                    video_parsed.replace('bp', '')
                 if video != video_parsed:
                     print(f'Video name mismatch: {video} vs {video_parsed}')
 
@@ -279,12 +283,12 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
         image_array = image_array[:, gap_top:example_image.shape[0] + gap_bottom, gap_left:example_image.shape[1] + gap_right] 
         start_time = time.time()
 
-        j = 0
         print('right before the capillary loop')
         # loop through capillaries
         for file in centerline_dict[video_key]:
             participant, date, location, video_parsed, file_prefix = parse_filename(file)
-
+            if video_parsed.endswith('bp'):
+                video_parsed.replace('bp', '')
             # Check if centerline is in name map (TODO: fix the bug that causes this)
             if name_map['centerlines name'].str.contains(file).any():            
                 capillary_number = name_map[name_map['centerlines name'] == file]['cap name short'].values[0] 
@@ -292,6 +296,7 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
             else:
                 missing_log.append(file)
                 print(f'Centerline {file} not in name map. Skipping.')
+                continue
 
             print(f'Processing {video_key} capillary {capillary_number}')            
 
