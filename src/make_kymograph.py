@@ -223,7 +223,7 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
         if centerline_file.endswith(".csv"):
             participant, date, location, video, file_prefix = parse_filename(centerline_file)
             if video.endswith('bp'):
-                video.replace('bp', '')
+                video = video.replace('bp', '')
             # check if video ends with "scan"
             elif video.endswith('scan'):
                 continue # skip scan video for kymographs, the frame is moving
@@ -240,7 +240,7 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
             for test_file in centerline_dict[video]:
                 __, __, __, video_parsed, __ = parse_filename(test_file)
                 if video_parsed.endswith('bp'):
-                    video_parsed.replace('bp', '')
+                    video_parsed = video_parsed.replace('bp', '')
                 if video != video_parsed:
                     print(f'Video name mismatch: {video} vs {video_parsed}')
 
@@ -252,7 +252,7 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
     for video_key in centerline_dict.keys():
         number_of_capillaries = len(centerline_dict[video_key])
         if video_key.endswith('bp'):
-            video_key.replace('bp', '')
+            video_key = video_key.replace('bp', '')
         
         # check to see if mocoslice or mocosplit folder exists
         if os.path.exists(os.path.join(path, 'vids', video_key, 'mocoslice')):
@@ -290,7 +290,7 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
         for file in centerline_dict[video_key]:
             participant, date, location, video_parsed, file_prefix = parse_filename(file)
             if video_parsed.endswith('bp'):
-                video_parsed.replace('bp', '')
+                video_parsed = video_parsed.replace('bp', '')
             # Check if centerline is in name map (TODO: fix the bug that causes this)
             if name_map['centerlines name'].str.contains(file).any():            
                 capillary_number = name_map[name_map['centerlines name'] == file]['cap name short'].values[0] 
