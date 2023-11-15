@@ -27,6 +27,9 @@ def delete_velocity_files(source_folder):
             # delete all files and folders in the centerlines
             folder_list = []
             file_list = []
+            # check if path is empty:
+            if os.path.exists(os.path.join(source_folder, participant, date, location, 'velocities')) == False:
+                continue
             for file in os.listdir(os.path.join(source_folder, participant, date, location, 'velocities')):
                 if os.path.isdir(os.path.join(source_folder, participant, date, location, 'velocities', file)):
                     folder_list.append(file)

@@ -27,6 +27,11 @@ def delete_kymo_files(source_folder):
             # delete all files and folders in the centerlines
             folder_list = []
             file_list = []
+            # check if path is empty:
+            if os.path.exists(os.path.join(source_folder, participant, date, location, 'kymographs')) == False:
+                continue
+            
+            # iterate through files and folders until all are deleted
             for file in os.listdir(os.path.join(source_folder, participant, date, location, 'kymographs')):
                 if os.path.isdir(os.path.join(source_folder, participant, date, location, 'kymographs', file)):
                     folder_list.append(file)

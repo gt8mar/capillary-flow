@@ -26,6 +26,9 @@ def delete_seg_files(source_folder):
             # delete all files and folders in the centerlines
             folder_list = []
             file_list = []
+            # check if path is empty:
+            if os.path.exists(os.path.join(source_folder, participant, date, location, 'segmented', 'hasty')) == False:
+                continue
             for file in os.listdir(os.path.join(source_folder, participant, date, location, 'segmented', 'hasty')):
                 if os.path.isdir(os.path.join(source_folder, participant, date, location, 'segmented', 'hasty', file)):
                     folder_list.append(file)
