@@ -24,7 +24,7 @@ from scipy.ndimage import median_filter
 from sklearn.linear_model import Lasso
 
 FPS = 227.8 #169.3
-PIX_UM = 1.74
+PIX_UM = 2.44 #1.74
 CANNY_THRESH_1 = 20
 CANNY_THRESH_2 = 50
 
@@ -287,7 +287,7 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     images = [image for image in images if image.split("_")[4] in metadata['Video'].values]
 
     # Create a dataframe to store the results
-    df = pd.DataFrame(columns = ['Participant','Date', 'Location', 'Video', 'Pressure', 'Capillary', 'Weighted Average Slope'])
+    df = pd.DataFrame(columns = ['Participant','Date', 'Location', 'Video', 'Pressure', 'Capillary', 'Velocity'])
     missing_log = []
     for image in images:
         part, date, location, video, file_prefix = parse_filename(image)
