@@ -12,22 +12,23 @@ from src.tools.parse_path import parse_path
 
 
 # Rename centerline files:
-def load_name_map(path, version = 'centerlines'):
+def load_name_map(participant, date, location, version = 'centerlines'):
     """
     Loads the name map from the segmented folder, removes the prefix from the cap name,
     and adds a column with the actual capillary name.
 
     Args:
-        path (str): path to the folder containing the segmented folder
+        participant (str): participant number
+        date (str): date of the experiment
+        location (str): location on the finger   
         version (str): version of the name map to load. Default: 'centerlines'
             options: 'centerlines', 'centerline', 'kymograph', 'kymo, 'kymographs'
     
     Returns:
         name_map (pd.DataFrame): DataFrame containing the name map 
-            with the columns 'centerlines name', 'cap name', 'cap name short'
+            with the columns 'centerlines name', 'cap name', 'cap name short';
             'cap name short' gives the short index of the capillaries
     """
-    participant, date, location, video, file_prefix = parse_path(path)
     column_names  = ['centerlines name', 'cap name']
     # name_map_folder = os.path.join(path, 'segmented')
     name_map_name = f'{participant}_{date}_{location}_name_map.csv'

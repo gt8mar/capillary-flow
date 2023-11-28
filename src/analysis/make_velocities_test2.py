@@ -275,7 +275,7 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     print(metadata)
 
     if test:
-        name_map = load_name_map(path, version = 'kymographs')
+        name_map = load_name_map(part, date, location, version = 'kymographs')
       
     # Read in the kymographs
     images = get_images(input_folder, "tiff")

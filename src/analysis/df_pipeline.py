@@ -10,6 +10,87 @@ By: Marcus Forst
 import os, numpy, platform, time
 import pandas as pd
 from src.tools.find_earliest_date_dir import find_earliest_date_dir
+from src.tools.load_name_map import load_name_map
+from src.tools.parse_filename import parse_filename
+
+def make_big_name_map(participant):
+    if platform.system() == 'Windows':
+        name_map_path = 'C:\\Users\\gt8mar\\capillary-flow\\results\\size\\name_maps'
+        data_path = 'C:\\Users\\gt8mar\\capillary-flow\\data'
+    else:
+        name_map_path = '/hpc/projects/capillary-flow/results/size/name_maps'
+        data_path = '/hpc/projects/capillary-flow/data'
+    # load name maps for each location for the participant, concatenate them
+    name_map_list = []
+    for filename in os.listdir(name_map_path):
+        if filename.startswith(participant):
+            # get date and location from filename
+            date = filename.split('_')[1]
+            location = filename.split('_')[2]
+            name_map_list.append(load_name_map(participant, date, location, version = 'centerlines'))
+    name_map_df = pd.concat(name_map_list)
+    return name_map_df
+
+def make_centerline_df(participant, date, location):
+    """
+    This function takes in the participant, date, and location
+    and returns a dataframe with the length of capillaries.
+
+    Args:
+        participant (str): The participant number
+        date (str): The date of the experiment
+        location (str): The location on the finger
+
+    Returns:
+        centerline_df (pd.DataFrame): A dataframe with length of capillary centerlines
+
+    """
+    # Create output folders
+    if platform.system() == 'Windows':
+        capillary_path = 'C:\\Users\\gt8mar\\capillary-flow'
+    else:
+        capillary_path = '/hpc/projects/capillary-flow'
+
+    results_path = os.path.join(capillary_path, 'results')
+    centerline_path = os.path.join(results_path, 'centerlines')
+
+    name_map = load_name_map(participant, date, location, version = 'centerlines')
+
+    # Create a dataframe with columns 'Participant', 'Date', 'Location', 'Video', 'Capillary', 'Centerline Length'
+    centerline_df = pd.DataFrame(columns=['Participant', 'Date', 'Location', 'Video', 'Capillary', 'Centerline Length'])
+    
+    for filename in os.listdir(centerline_path):
+        if filename.startswith(f'set_01_{participant}') and filename.endswith('.csv'):
+            # switch to set01
+            filename = filename.replace('set_01', 'set01')
+        elif filename.startswith(f'set01_{participant}') and filename.endswith('.csv'):
+            # Get the video number from the filename
+            pass
+        else:
+            continue
+        _, _, _, video, _ = parse_filename(filename)
+        centerline_coords = pd.read_csv(os.path.join(centerline_path, filename))
+        # The number of rows of the centerline_coords dataframe is the length of the capillary
+        cap_length = len(centerline_coords)
+        # Check if filename is in name_map
+        if filename not in name_map['centerlines name'].values:
+            print(f'{filename} not in name_map')
+            continue
+        # Get the capillary number from the name map and filename
+        cap_num = name_map[name_map['centerlines name'] == filename]['cap name short'].values[0]
+        # Add a row to the centerline_df dataframe
+        new_row_df = pd.DataFrame([{'Participant': participant, 
+                                    'Date': date, 
+                                    'Location': location, 
+                                    'Video': video, 
+                                    'Capillary': cap_num, 
+                                    'Centerline Length': cap_length}])
+        centerline_df = pd.concat([centerline_df, new_row_df], ignore_index=True)
+    return centerline_df
+            
+            
+    
+    
 
 def main(participant, verbose=False, write = True):
     """
@@ -37,6 +118,10 @@ def main(participant, verbose=False, write = True):
 
     results_path = os.path.join(capillary_path, 'results')
     metadata_path = os.path.join(capillary_path, 'metadata')
+    centerline_path = os.path.join(results_path, 'centerlines')
+    # load name maps for each location for the participant, concatenate them
+    name_map_df = make_big_name_map(participant)
+    
 
     size_path = os.path.join(results_path, 'size', 'size_data')
     vel_path = os.path.join(results_path, 'velocities')
@@ -53,11 +138,14 @@ def main(participant, verbose=False, write = True):
             continue
         else:
             location_path = os.path.join(capillary_path, 'data', participant, date, location)
-            centerline_folder = os.path.join(location_path, 'centerlines')
+            centerline_df = make_centerline_df(participant, date, location)
             size_df = pd.read_csv(os.path.join(size_path, f'{participant}_{date}_{location}_size_data.csv'))
             vel_df = pd.read_csv(os.path.join(vel_path, f'{SET}_{participant}_{date}_{location}_velocity_data.csv'))
             metadata_df = pd.read_excel(os.path.join(metadata_path, f'{participant}_{date}.xlsx'))
             
+            # Merge the centerline_df and vel_df dataframes
+            vel_df = pd.merge(vel_df, centerline_df, on=['Participant', 'Date', 'Location', 'Video', 'Capillary'], how='outer')
+
             # Rename columns of the size dataframe
             size_df.rename(columns={'participant': 'Participant',
                                     'date':'Date',
@@ -66,9 +154,11 @@ def main(participant, verbose=False, write = True):
                                     'area':'Area',
                                     'pressure':'Pressure'
                                     }, inplace=True)
-            # Rename columns of the velocity dataframe
-            vel_df.rename(columns={'Weighted Average Slope': 'Velocity'
-                                   }, inplace=True)
+            # Check if 'Weighted Average Slope' is in the columns of the velocity dataframe
+            if 'Weighted Average Slope' in vel_df.columns:
+                # Rename columns of the velocity dataframe
+                vel_df.rename(columns={'Weighted Average Slope': 'Velocity'
+                                    }, inplace=True)
             # Replace column vidnum with 'Video' by adding 'vid' to the beginning of the number
             size_df['Video'] = 'vid' + size_df['vidnum'].astype(str).apply(lambda x: x.zfill(2))
             # Drop the vidnum column
@@ -76,7 +166,7 @@ def main(participant, verbose=False, write = True):
             # Convert capillary number to string in size_df
             size_df['Capillary'] = size_df['Capillary'].astype(str)
             # Drop a from end of capillary number in vel_df
-            vel_df['Capillary'] = vel_df['Capillary'].replace({'a':''}, regex=True)
+            vel_df['Capillary'] = vel_df['Capillary'].replace({'a':''}, regex=True).replace({'b':''}, regex=True)
             # Convert capillary number to int64 in vel_df
             vel_df['Capillary'] = vel_df['Capillary'].astype(int).astype(str)
 
@@ -101,6 +191,8 @@ def main(participant, verbose=False, write = True):
 
     # Concatenate all the csv files into one big csv file
     total_big_df = pd.concat(dataframe_list)
+    # Reorder entries by video number and then by capillary number including leading zeros
+    total_big_df = total_big_df.sort_values(by=['Video', 'Capillary'], key=lambda x: x.str.zfill(2))
     
     # check if there are entries in the video column that have bp at the end. add these to a list:
     bp_list = []
@@ -133,7 +225,11 @@ def main(participant, verbose=False, write = True):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main('part09', verbose=True, write=True)
+    for i in range(10,28):
+        if i == 24:
+            continue
+        participant = 'part' + str(i).zfill(2)
+        main(participant, verbose=True, write=True)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
 
