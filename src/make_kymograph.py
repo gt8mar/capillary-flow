@@ -245,7 +245,7 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
                     print(f'Video name mismatch: {video} vs {video_parsed}')
 
     # load name map to rename capillaries
-    name_map = load_name_map(path, version='centerlines')
+    name_map = load_name_map(participant, date, location, version='centerlines')
     missing_log = []
     
     # loop through videos

@@ -1,5 +1,5 @@
 """
-Filename: make_velocities.py
+Filename: make_velocities_test.py
 -------------------------------------------------
 This file uses canny edge detection to call average velocities from
 kymographs. 
@@ -24,7 +24,7 @@ from scipy.ndimage import median_filter
 from sklearn.linear_model import Lasso
 
 FPS = 227.8 #169.3
-PIX_UM = 2.44 #1.74
+PIX_UM = 1.74
 CANNY_THRESH_1 = 20
 CANNY_THRESH_2 = 50
 
@@ -284,137 +284,132 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     for image in images:
         # replace set_01 with set01
         image = image.replace("set_01", "set01")
-    images = [image for image in images if image.split("_")[4] in metadata['Video'].values]
+    
+    # remove images with 'bp' or 'scan' in the name
+    images = [image for image in images if 'bp' not in image and 'scan' not in image]
 
     # Create a dataframe to store the results
-    df = pd.DataFrame(columns = ['Participant','Date', 'Location', 'Video', 'Pressure', 'Capillary', 'Velocity'])
+    df = pd.DataFrame(columns = ['Participant','Date', 'Location', 'Video', 'Pressure', 'Capillary', 'Weighted Average Slope'])
     missing_log = []
     for image in images:
+        print(image)
         part, date, location, video, file_prefix = parse_filename(image)
-        kymo_raw = cv2.imread(os.path.join(input_folder, image), cv2.IMREAD_GRAYSCALE)
-        # Get the metadata for the video
-        video_metadata = metadata.loc[
-                (metadata['Video'] == video) |
-                (metadata['Video'] == video + 'bp') |
-                (metadata['Video'] == video + 'scan')
-                ]
-        # Get the pressure for the video
-        pressure = video_metadata['Pressure'].values[0]
-        fps = video_metadata['FPS'].values[0]
+        if video != image.split(".")[0].split("_")[-3]:
+            print(f'{video} is not the same as the name which is {image.split(".")[0].split("_")[-3]}?')
+
+        # kymo_raw = cv2.imread(os.path.join(input_folder, image), cv2.IMREAD_GRAYSCALE)
+        # # Get the metadata for the video
+        # video_metadata = metadata.loc[metadata['Video'] == video]
+        # # Get the pressure for the video
+        # pressure = video_metadata['Pressure'].values[0]
+        # fps = video_metadata['FPS'].values[0]
         
-        # Get the capillary name for the video
-        if test:
-            old_capillary_name = image
-            if name_map['centerlines name'].str.contains(old_capillary_name).any():
-                capillary_name = name_map.loc[name_map['centerlines name'] == old_capillary_name]['cap name short'].values[0]
-            else: 
-                missing_log.append(image)
-        else:
-            capillary_name = image.split(".")[0].split("_")[-1]
-        filename = f'{file_prefix}_{video}_{str(int(pressure*10)).zfill(2)}_{capillary_name}'
-        kymo_blur = gaussian_filter(kymo_raw, sigma = 2)
+        # # Get the capillary name for the video
+        # capillary_name = image.split(".")[0].split("_")[-1]
+        # filename = f'{file_prefix}_{video}_{str(int(pressure*10)).zfill(2)}_{capillary_name}'
+        # kymo_blur = gaussian_filter(kymo_raw, sigma = 2)
         
-        if write:
-            weighted_average_slope = find_slopes(kymo_blur, filename, output_folder, method = 'lasso', verbose = False, write=True)
-        else:
-            weighted_average_slope = find_slopes(kymo_blur, filename, output_folder, method = 'lasso', verbose = verbose, write=False)
-        # transform slope from pixels/frames into um/s:
-        um_slope = np.absolute(weighted_average_slope) *fps/PIX_UM
-        # add row to dataframe
-        new_data = pd.DataFrame([[part, date, location, video, pressure, capillary_name, um_slope]], columns = df.columns)
-        df = pd.concat([df, new_data], ignore_index=True)
+        # if write:
+        #     weighted_average_slope = find_slopes(kymo_blur, filename, output_folder, method = 'lasso', verbose = False, write=True)
+        # else:
+        #     weighted_average_slope = find_slopes(kymo_blur, filename, output_folder, method = 'lasso', verbose = verbose, write=False)
+        # # transform slope from pixels/frames into um/s:
+        # um_slope = np.absolute(weighted_average_slope) *fps/PIX_UM
+        # # add row to dataframe
+        # new_data = pd.DataFrame([[part, date, location, video, pressure, capillary_name, um_slope]], columns = df.columns)
+        # df = pd.concat([df, new_data], ignore_index=True)
         
 
-    # Write the missing log to a file
-    with open(os.path.join(output_folder, "missing_log.txt"), "w") as f:
-        for image in missing_log:
-            f.write(image + "\n")
-    # Write the dataframe to a file
+    # # Write the missing log to a file
+    # with open(os.path.join(output_folder, "missing_log.txt"), "w") as f:
+    #     for image in missing_log:
+    #         f.write(image + "\n")
+    # # Write the dataframe to a file
     
-    if write_data:
-        df.to_csv(os.path.join(output_folder, f"{file_prefix}_velocity_data.csv"), index=False)    
-        df.to_csv(os.path.join(results_folder, f"{file_prefix}_velocity_data.csv"), index=False)    
+    # if write_data:
+    #     df.to_csv(os.path.join(output_folder, f"{file_prefix}_velocity_data.csv"), index=False)    
+    #     df.to_csv(os.path.join(results_folder, f"{file_prefix}_velocity_data.csv"), index=False)    
 
-    # print(df)
+    # # print(df)
     
-    """
-    --------------------------------- Plot the data---------------------------------------------------
-    """
-    # Group the data by 'Capillary'
-    grouped_df = df.groupby('Capillary')
-    # Get the unique capillary names
-    capillaries = df['Capillary'].unique()
+    # """
+    # --------------------------------- Plot the data---------------------------------------------------
+    # """
+    # # Group the data by 'Capillary'
+    # grouped_df = df.groupby('Capillary')
+    # # Get the unique capillary names
+    # capillaries = df['Capillary'].unique()
 
-    # Create subplots
-    num_plots = len(capillaries)
-    num_rows = (num_plots + 3) // 4  # Round up to the nearest integer
+    # # Create subplots
+    # num_plots = len(capillaries)
+    # num_rows = (num_plots + 3) // 4  # Round up to the nearest integer
 
-    # Create subplots
-    fig, axes = plt.subplots(nrows=num_rows, ncols=4, figsize=(10, 2 * num_rows), sharey=True, sharex=True)
+    # # Create subplots
+    # fig, axes = plt.subplots(nrows=num_rows, ncols=4, figsize=(10, 2 * num_rows), sharey=True, sharex=True)
 
-    # Flatten the 2x2 subplot array to make it easier to iterate over
-    axes = axes.flatten()
+    # # Flatten the 2x2 subplot array to make it easier to iterate over
+    # axes = axes.flatten()
 
-    # Plot each capillary's data in separate subplots
-    for i, capillary in enumerate(capillaries):
-        capillary_data = grouped_df.get_group(capillary)
-        ax = axes[i]
-        ax.plot(capillary_data['Pressure'], capillary_data['Weighted Average Slope'], marker='o', linestyle='-')
-        # Label all points which decrease in pressure with a red dot
-        ax.plot(capillary_data.loc[capillary_data['Pressure'].diff() < 0, 'Pressure'],
-                capillary_data.loc[capillary_data['Pressure'].diff() < 0, 'Weighted Average Slope'],
-                marker='o', linestyle='-', color='red')
-        ax.set_xlabel('Pressure (psi)')
-        ax.set_ylabel('Velocity (um/s)')
-        ax.set_title(f'Capillary {capillary}')
-        ax.grid(True)
+    # # Plot each capillary's data in separate subplots
+    # for i, capillary in enumerate(capillaries):
+    #     capillary_data = grouped_df.get_group(capillary)
+    #     ax = axes[i]
+    #     ax.plot(capillary_data['Pressure'], capillary_data['Weighted Average Slope'], marker='o', linestyle='-')
+    #     # Label all points which decrease in pressure with a red dot
+    #     ax.plot(capillary_data.loc[capillary_data['Pressure'].diff() < 0, 'Pressure'],
+    #             capillary_data.loc[capillary_data['Pressure'].diff() < 0, 'Weighted Average Slope'],
+    #             marker='o', linestyle='-', color='red')
+    #     ax.set_xlabel('Pressure (psi)')
+    #     ax.set_ylabel('Velocity (um/s)')
+    #     ax.set_title(f'Capillary {capillary}')
+    #     ax.grid(True)
 
-    # If there are unused subplots, remove them
-    for i in range(num_plots, num_rows * 2):
-        fig.delaxes(axes[i])
+    # # If there are unused subplots, remove them
+    # for i in range(num_plots, num_rows * 2):
+    #     fig.delaxes(axes[i])
 
-    # Adjust spacing between subplots
-    plt.tight_layout()
+    # # Adjust spacing between subplots
+    # plt.tight_layout()
 
-    if write:
-        plt.savefig(os.path.join(output_folder, f"{part}_{location}_velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
-        if platform != 'Windows':
-            plt.savefig(os.path.join(results_folder, f"{part}_{location}_velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
-    if verbose:
-        plt.show()
-    else:
-        plt.close()
+    # if write:
+    #     plt.savefig(os.path.join(output_folder, f"{part}_{location}_velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
+    #     if platform != 'Windows':
+    #         plt.savefig(os.path.join(results_folder, f"{part}_{location}_velocity_vs_pressure_per_cap.png"), bbox_inches='tight', dpi=400)
+    # if verbose:
+    #     plt.show()
+    # else:
+    #     plt.close()
     
-    """
-    --------------------------------- Plot the data on the same graph ---------------------------------------------------
-    """
+    # """
+    # --------------------------------- Plot the data on the same graph ---------------------------------------------------
+    # """
     
-    fig, ax = plt.subplots()
-    for name, group in grouped_df:
-        ax.plot(group['Pressure'], group['Weighted Average Slope'], marker='o', linestyle='', ms=12, label=name)
+    # fig, ax = plt.subplots()
+    # for name, group in grouped_df:
+    #     ax.plot(group['Pressure'], group['Weighted Average Slope'], marker='o', linestyle='', ms=12, label=name)
     
-    ax.set_xlabel('Pressure (psi)')
-    ax.set_ylabel('Velocity (um/s)')
-    ax.set_title('Velocity vs. Pressure for each Capillary')
-    ax.legend()
-    plt.grid(True)
-    plt.tight_layout()
+    # ax.set_xlabel('Pressure (psi)')
+    # ax.set_ylabel('Velocity (um/s)')
+    # ax.set_title('Velocity vs. Pressure for each Capillary')
+    # ax.legend()
+    # plt.grid(True)
+    # plt.tight_layout()
 
-    if write:
-        plt.savefig(os.path.join(output_folder, f"{part}_{location}_velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
-        if platform != 'Windows':
-            plt.savefig(os.path.join(results_folder, f"{part}_{location}_velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
+    # if write:
+    #     plt.savefig(os.path.join(output_folder, f"{part}_{location}_velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
+    #     if platform != 'Windows':
+    #         plt.savefig(os.path.join(results_folder, f"{part}_{location}_velocity_vs_pressure.png"), bbox_inches='tight', dpi=400)
 
-    if verbose:
-        plt.show()
-    else:
-        plt.close()
+    # if verbose:
+    #     plt.show()
+    # else:
+    #     plt.close()
 
 
-    # plot_box_swarm(data, ["0.2 psi", "0.4 psi", "0.6 psi", "0.8 psi"], 
-    #                "velocity (um/s)", "Participant_4 cap_4", "figure 1")
-    # plot_box_swarm(data_slice, ["0.2 psi", "0.4 psi", "0.6 psi", "0.8 psi"],
-    #                  "velocity (um/s)", "slice", "figure 2")
+    # # plot_box_swarm(data, ["0.2 psi", "0.4 psi", "0.6 psi", "0.8 psi"], 
+    # #                "velocity (um/s)", "Participant_4 cap_4", "figure 1")
+    # # plot_box_swarm(data_slice, ["0.2 psi", "0.4 psi", "0.6 psi", "0.8 psi"],
+    # #                  "velocity (um/s)", "slice", "figure 2")
     return 0
 
 
