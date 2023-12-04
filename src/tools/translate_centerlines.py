@@ -135,8 +135,8 @@ def show_centerlines(projected_caps_fp, coords_fp, individual_caps_fp, registere
             rows = list(reader)
             for row in rows:
                 maxproj[int(float(row[0]))][int(float(row[1]))] = [255, 0, 0]
-    cv2.imshow(str(file), maxproj)
-    cv2.waitKey(0)
+    #cv2.imshow(str(file), maxproj)
+    #cv2.waitKey(0)
 
     for vid in os.listdir(registered_caps_fp):
         vid_img = cv2.imread(os.path.join(registered_caps_fp, vid))
@@ -151,8 +151,10 @@ def show_centerlines(projected_caps_fp, coords_fp, individual_caps_fp, registere
                         vid_img[int(float(row[0]))][int(float(row[1]))] = [255, 0, 0]
             else:
                 continue
-        cv2.imshow(str(file), vid_img)
-        cv2.waitKey(0)
+        #cv2.imshow(str(vid), vid_img)
+        #cv2.waitKey(0)
+        os.makedirs(os.path.join(os.path.dirname(coords_fp), 'centerline_images'), exist_ok=True)
+        cv2.imwrite(os.path.join(os.path.dirname(coords_fp), 'centerline_images', vid), vid_img)
 
     """for file in os.listdir(coords_fp):
         match1 = re.search(r'vid(\d{2})', file)
@@ -177,7 +179,7 @@ def show_centerlines(projected_caps_fp, coords_fp, individual_caps_fp, registere
         cv2.imshow(str(file), cap_img)
         cv2.waitKey(0)  """
 
-def main(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part10\\230425\\loc01"):
+def main(path="C:\\Users\\Luke\\Documents\\capillary-flow\\temp\\part19\\230503\\loc01"):
     coords_fp = os.path.join(path, "centerlines", "coords")
     segmented_folder = os.path.join(path, "segmented", "hasty")
 
@@ -194,7 +196,7 @@ def main(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part10\\230425\
 
     translated_coords_fp = translate_coords(coords_fp, sorted_coords_listdir, translations_csv, crops_csv, resize_csv)
     renamed_coords_fp = rename_caps(translated_coords_fp, individual_caps_fp, participant, date, location)
-    #show_centerlines(os.path.join(segmented_folder, "proj_caps"), translated_coords_fp, individual_caps_fp, os.path.join(segmented_folder, "registered"))
+    show_centerlines(os.path.join(segmented_folder, "proj_caps"), translated_coords_fp, individual_caps_fp, os.path.join(segmented_folder, "registered"))
     
     
 """
