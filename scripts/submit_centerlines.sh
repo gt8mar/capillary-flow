@@ -3,7 +3,7 @@
 #SBATCH --job-name=centerlineArray
 #SBATCH --time=10:00:00
 #SBATCH --partition=cpu
-#SBATCH --mem=250G
+#SBATCH --mem=150G
 #SBATCH --output=cent_array_%A-%a.out
 #SBATCH --array=9-23
 
