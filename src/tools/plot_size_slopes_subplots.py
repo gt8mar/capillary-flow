@@ -5,8 +5,7 @@ from natsort import natsorted  # for natural sorting of participant names
 import time
 
 def plot_size_slopes():
-    # Assuming your CSV file is named 'your_file.csv'
-    file_path = 'C:\\Users\\Luke\\Documents\\capillary-flow\\slopes.csv'
+    file_path = "C:\\Users\\Luke\\Documents\\capillary-flow\\temp\\slopes.csv"
 
     # Read the CSV file into a DataFrame
     df = pd.read_csv(file_path, header=None, names=['Name', 'Slope'])
@@ -22,18 +21,36 @@ def plot_size_slopes():
 
     # Sort the DataFrame by the 'SortOrder' column
     df = df.sort_values(by='SortOrder', key=lambda x: natsorted(x))
-    print(df)
 
-    # Create a violin plot
-    plt.figure(figsize=(10, 6))
-    sns.violinplot(x='SortOrder', y='Slope', data=df, order=natsorted(df['SortOrder'].unique()))
-    plt.xlabel('Participant and Direction')
-    plt.ylabel('Slope Values')
-    plt.title('Violin Plot of Slope Values by Participant and Direction')
-    plt.xticks(rotation=45, ha='right')  # Rotate x-axis labels for better visibility
+    # Create subplots with two columns
+    fig, axs = plt.subplots(1, 2, figsize=(15, 6), sharey=True)
+
+    # Plot for increasing values (left subplot)
+    inc_df = df[df['Direction'] == 'inc']
+    sns.violinplot(ax=axs[0], x='Participant', y='Slope', data=inc_df, order=natsorted(inc_df['Participant'].unique()))
+    axs[0].set_title('Increasing Values')
+    axs[0].set_xlabel('Participant')
+    axs[0].set_ylabel('Slope Values')
+
+    # Plot for decreasing values (right subplot)
+    dec_df = df[df['Direction'] == 'dec']
+    sns.violinplot(ax=axs[1], x='Participant', y='Slope', data=dec_df, order=natsorted(dec_df['Participant'].unique()))
+    axs[1].set_title('Decreasing Values')
+    axs[1].set_xlabel('Participant')
+    axs[1].set_ylabel('Slope Values')
+
+    # Set x-axis ticks for each subplot based on the data
+    axs[0].set_xticks(range(len(inc_df['Participant'].unique())))
+    axs[0].set_xticklabels(natsorted(inc_df['Participant'].unique()), rotation=45, ha='right')
+
+    axs[1].set_xticks(range(len(dec_df['Participant'].unique())))
+    axs[1].set_xticklabels(natsorted(dec_df['Participant'].unique()), rotation=45, ha='right')
+
+    # Adjust layout
     plt.tight_layout()
     plt.show()
 
+    
 def plot_slope_variance():
     # Read the CSV file into a DataFrame
     df = pd.read_csv('C:\\Users\\Luke\\Documents\\capillary-flow\\slopes.csv', header=None, names=['Name', 'Slope'])
