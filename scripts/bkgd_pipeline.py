@@ -13,7 +13,7 @@ from src import write_background_file
 # from src import segment
 from src.tools.find_earliest_date_dir import find_earliest_date_dir
 
-SET = "set_01"
+SET = "set01"
 
 def list_only_folders(path):
     """
