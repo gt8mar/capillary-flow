@@ -3,9 +3,9 @@
 #SBATCH --job-name=centerlineArray
 #SBATCH --time=10:00:00
 #SBATCH --partition=cpu
-#SBATCH --mem=150G
+#SBATCH --mem=250G
 #SBATCH --output=cent_array_%A-%a.out
-#SBATCH --array=9-20
+#SBATCH --array=9-23
 
 cd /hpc/projects/capillary-flow/scripts
 module load anaconda
