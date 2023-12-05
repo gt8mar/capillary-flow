@@ -28,7 +28,7 @@ from tifffile import imwrite
 def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01\\vids\\vid01', 
          method = "mean", make_video = True, color = False, verbose=False, plot=False):  
     """
-    Writes a background file and a video into results and C_background.
+    Writes a background file and a video into results and backgrounds.
 
     Args: 
         path (str): Path to the umbrella video folder within the location and vids folder.
