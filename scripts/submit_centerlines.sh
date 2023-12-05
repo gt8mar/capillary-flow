@@ -5,7 +5,7 @@
 #SBATCH --partition=cpu
 #SBATCH --mem=150G
 #SBATCH --output=cent_array_%A-%a.out
-#SBATCH --array=9-20
+#SBATCH --array=9-23
 
 cd /hpc/projects/capillary-flow/scripts
 module load anaconda

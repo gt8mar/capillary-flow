@@ -2,7 +2,7 @@
 #
 #SBATCH --job-name=kymographArray
 #SBATCH --time=10:00:00
-#SBATCH --mem=150G
+#SBATCH --mem=250G
 #SBATCH --output=kymo_array_%A-%a.out
 #SBATCH --array=9-20
 
