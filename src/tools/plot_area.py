@@ -4,6 +4,8 @@ Filename: plot_area.py
 by: Gabby Rincon 
 """
 
+MAX_CENTERLINE_LENGTH = 50
+
 import os
 import time
 import numpy as np
@@ -187,6 +189,7 @@ def get_plotinfo(caps_fp, centerlines_fp, metadata_fp):
 
     plotinfo = []
     for cap in caps_listdir_nobp:
+        print(cap)
         cap_img = cv2.imread(os.path.join(caps_fp, cap), cv2.IMREAD_GRAYSCALE)
 
         #get vidnum and capnum
@@ -204,10 +207,12 @@ def get_plotinfo(caps_fp, centerlines_fp, metadata_fp):
             if "vid" + vidnum in centerline and "cap_" + capnum in centerline:
                 centerline_file = centerline
                 break
-        if centerline_file == "": continue #skip cap if no centerline file found
+        if centerline_file == "": 
+            print("No centerline file found for cap " + capnum + " vid " + vidnum)
+            continue #skip cap if no centerline file found
         df = pd.read_csv(os.path.join(centerlines_fp, centerline_file))
         length = len(df)
-        if length < 100: #skip cap if centerline is too short
+        if length < MAX_CENTERLINE_LENGTH: #skip cap if centerline is too short
             continue
         
         #get pressure
@@ -224,7 +229,7 @@ def get_plotinfo(caps_fp, centerlines_fp, metadata_fp):
 
     return plotinfo
     
-def main(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part10\\230425\\loc01"):
+def main(path="C:\\Users\\Luke\\Documents\\capillary-flow\\temp\\part25\\230601\\loc02"):
     participant = get_directory_at_level(path, 2)
     date = get_directory_at_level(path, 1)
     location = get_directory_at_level(path, 0)
