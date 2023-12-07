@@ -359,10 +359,10 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     for i, capillary in enumerate(capillaries):
         capillary_data = grouped_df.get_group(capillary)
         ax = axes[i]
-        ax.plot(capillary_data['Pressure'], capillary_data['Weighted Average Slope'], marker='o', linestyle='-')
+        ax.plot(capillary_data['Pressure'], capillary_data['Velocity'], marker='o', linestyle='-')
         # Label all points which decrease in pressure with a red dot
         ax.plot(capillary_data.loc[capillary_data['Pressure'].diff() < 0, 'Pressure'],
-                capillary_data.loc[capillary_data['Pressure'].diff() < 0, 'Weighted Average Slope'],
+                capillary_data.loc[capillary_data['Pressure'].diff() < 0, 'Velocity'],
                 marker='o', linestyle='-', color='red')
         ax.set_xlabel('Pressure (psi)')
         ax.set_ylabel('Velocity (um/s)')
@@ -391,7 +391,7 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     
     fig, ax = plt.subplots()
     for name, group in grouped_df:
-        ax.plot(group['Pressure'], group['Weighted Average Slope'], marker='o', linestyle='', ms=12, label=name)
+        ax.plot(group['Pressure'], group['Velocity'], marker='o', linestyle='', ms=12, label=name)
     
     ax.set_xlabel('Pressure (psi)')
     ax.set_ylabel('Velocity (um/s)')
