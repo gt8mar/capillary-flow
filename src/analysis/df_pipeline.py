@@ -29,9 +29,14 @@ def make_big_name_map(participant):
             location = filename.split('_')[2]
             name_map_list.append(load_name_map(participant, date, location, version = 'centerlines'))
     name_map_df = pd.concat(name_map_list)
+    # print full text of first 5 entries of 'centerlines name' in name_map_df
+    with pd.option_context('display.max_colwidth', None):
+        print(name_map_df['centerlines name'].head)
+        # print number of rows in name_map_df
+        print(len(name_map_df))
     return name_map_df
 
-def make_centerline_df(participant, date, location):
+def make_centerline_df(participant, date, location, verbose=False):
     """
     This function takes in the participant, date, and location
     and returns a dataframe with the length of capillaries.
@@ -40,6 +45,7 @@ def make_centerline_df(participant, date, location):
         participant (str): The participant number
         date (str): The date of the experiment
         location (str): The location on the finger
+        verbose (bool): Whether to print to terminal or not
 
     Returns:
         centerline_df (pd.DataFrame): A dataframe with length of capillary centerlines
@@ -73,9 +79,16 @@ def make_centerline_df(participant, date, location):
         # The number of rows of the centerline_coords dataframe is the length of the capillary
         cap_length = len(centerline_coords)
         # Check if filename is in name_map
-        if filename not in name_map['centerlines name'].values:
-            print(f'{filename} not in name_map')
+        if name_map['centerlines name'].str.contains(filename).any(): 
+            if verbose:           
+                print(f'{filename} in name_map')
+            pass
+        elif location in filename:
+            print(f'{filename} in location {location} not in name_map')
             continue
+        else:
+            continue
+
         # Get the capillary number from the name map and filename
         cap_num = name_map[name_map['centerlines name'] == filename]['cap name short'].values[0]
         # Add a row to the centerline_df dataframe
@@ -88,10 +101,6 @@ def make_centerline_df(participant, date, location):
         centerline_df = pd.concat([centerline_df, new_row_df], ignore_index=True)
     return centerline_df
             
-            
-    
-    
-
 def main(participant, verbose=False, write = True):
     """
     This function takes in the participant path and compiles the 
@@ -119,14 +128,16 @@ def main(participant, verbose=False, write = True):
     results_path = os.path.join(capillary_path, 'results')
     metadata_path = os.path.join(capillary_path, 'metadata')
     centerline_path = os.path.join(results_path, 'centerlines')
-    # load name maps for each location for the participant, concatenate them
-    name_map_df = make_big_name_map(participant)
-    
-
     size_path = os.path.join(results_path, 'size', 'size_data')
     vel_path = os.path.join(results_path, 'velocities')
 
+    # load name maps for each location for the participant, concatenate them
+    name_map_df = make_big_name_map(participant)
+
+    # Get the earliest date for the participant
     date = find_earliest_date_dir(os.path.join(capillary_path, 'data', participant))
+
+    # Get the locations for the participant
     locations = os.listdir(os.path.join(capillary_path, 'data', participant, date))
 
     # Create a dataframe for each location
@@ -137,14 +148,24 @@ def main(participant, verbose=False, write = True):
         if location == 'locScan' or location == 'locTemp' or location == 'locEx':
             continue
         else:
+            print(f'constructing dataframe for {location}')
             location_path = os.path.join(capillary_path, 'data', participant, date, location)
-            centerline_df = make_centerline_df(participant, date, location)
             size_df = pd.read_csv(os.path.join(size_path, f'{participant}_{date}_{location}_size_data.csv'))
             vel_df = pd.read_csv(os.path.join(vel_path, f'{SET}_{participant}_{date}_{location}_velocity_data.csv'))
             metadata_df = pd.read_excel(os.path.join(metadata_path, f'{participant}_{date}.xlsx'))
             
+            # Create a dataframe with length of capillaries
+            centerline_df = make_centerline_df(participant, date, location)
+
+            # Change date in centerline_df to int64 to match vel_df
+            centerline_df['Date'] = centerline_df['Date'].astype(int)
+
             # Merge the centerline_df and vel_df dataframes
             vel_df = pd.merge(vel_df, centerline_df, on=['Participant', 'Date', 'Location', 'Video', 'Capillary'], how='outer')
+
+            with pd.option_context('display.max_colwidth', None) and pd.option_context('display.max_rows', None):
+                print(vel_df)
+                print(vel_df.dtypes)
 
             # Rename columns of the size dataframe
             size_df.rename(columns={'participant': 'Participant',
@@ -166,7 +187,7 @@ def main(participant, verbose=False, write = True):
             # Convert capillary number to string in size_df
             size_df['Capillary'] = size_df['Capillary'].astype(str)
             # Drop a from end of capillary number in vel_df
-            vel_df['Capillary'] = vel_df['Capillary'].replace({'a':''}, regex=True).replace({'b':''}, regex=True)
+            vel_df['Capillary'] = vel_df['Capillary'].replace({'a':''}, regex=True).replace({'b':''}, regex=True).replace({'c':''}, regex=True) 
             # Convert capillary number to int64 in vel_df
             vel_df['Capillary'] = vel_df['Capillary'].astype(int).astype(str)
 
@@ -216,6 +237,8 @@ def main(participant, verbose=False, write = True):
     print(total_big_df.dtypes)
     
     if write:
+        # Create a folder for the total files if it does not exist
+        os.makedirs(os.path.join(results_path, 'total'), exist_ok=True)
         # Save the dataframe as a csv
         total_big_df.to_csv(os.path.join(results_path, 'total', f'{participant}_{date}_total_data.csv'), index=False)
     
@@ -225,7 +248,7 @@ def main(participant, verbose=False, write = True):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    for i in range(10,28):
+    for i in range(9,28):
         if i == 24:
             continue
         participant = 'part' + str(i).zfill(2)
