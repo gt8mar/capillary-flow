@@ -45,10 +45,8 @@ def main():
     print(i)
     ticks_total = time.time()
     participant = 'part' + str(i).zfill(2) 
-    # Load the date and video numbers
-    date_folders = list_only_folders(os.path.join('/hpc/projects/capillary-flow/data', participant))
-    # date is the folder with only numbers in the title
-    date = find_earliest_date_dir(date_folders)
+    participant_path = os.path.join('/hpc/projects/capillary-flow/data', participant)    
+    date = find_earliest_date_dir(participant_path)
     
     locations = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date))
     for location in locations:
