@@ -20,6 +20,8 @@ import csv
 from skimage.color import rgb2gray
 from skimage import io
 
+PAD_VALUE = 250
+
 def uncrop_segmented(path, input_seg_img):
     shifts = pd.read_csv(os.path.join(path, 'metadata', 'Results.csv'))
     gap_left = shifts['x'].max()
@@ -70,7 +72,7 @@ def align_segmented(path="D:\\data_gabby\\debugging\\part09\\230414\\loc06"):
 
     #save reference moco
     contrast_reference_moco_img = cv2.equalizeHist(cv2.cvtColor(reference_moco_img, cv2.COLOR_BGR2GRAY))
-    cv2.imwrite(os.path.join(reg_moco_folder, os.path. basename(reference_moco_fp)), np.pad(contrast_reference_moco_img, ((250, 250), (250, 250))))
+    cv2.imwrite(os.path.join(reg_moco_folder, os.path. basename(reference_moco_fp)), np.pad(contrast_reference_moco_img, ((PAD_VALUE, PAD_VALUE), (PAD_VALUE, PAD_VALUE))))
 
     #make folder to save registered segmented imgs
     reg_folder_path = os.path.join(segmented_folder_fp, "registered")
