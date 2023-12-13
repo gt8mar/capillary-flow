@@ -8,6 +8,8 @@ from skimage.color import rgb2gray
 import platform
 import pandas as pd
 
+PAD_VALUE = 250
+
 def get_label_position(input_array):
     # Find the indices of non-zero elements in the array
     non_zero_indices = np.argwhere(input_array != 0)
@@ -121,7 +123,7 @@ def make_overlays(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12
                 cap_img = rgb2gray(cap_img)
 
                 #pad cap to match frame
-                cap_img = np.pad(cap_img, ((250, 250), (250, 250)))
+                cap_img = np.pad(cap_img, ((PAD_VALUE, PAD_VALUE), (PAD_VALUE, PAD_VALUE)))
 
                 #translate cap
                 if miny==0 and minx==0:
