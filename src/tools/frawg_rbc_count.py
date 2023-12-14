@@ -1,65 +1,44 @@
-import time
 import os
-import csv
-import numpy as np
+import time
 import cv2
+import numpy as np
+import pandas as pd
 
 def main(path):
-    centerline_folder = os.path.join(path, 'centerlines', 'coords')
-    output_folder = os.path.join(path, 'rbc')
-    os.makedirs(output_folder, exist_ok=True)
-    for centerline in os.listdir(centerline_folder):
-        print(centerline)
-        date = centerline.split(' ')[0]
-        video = centerline.split(' ')[1].split('_')[0]
-        capnum = centerline[-6:-4]
-
-        video_folder = os.path.join(os.path.dirname(path), 'pair_vids')
-        for vid in os.listdir(video_folder):
-            if date in vid and video in vid:
-                video_file = os.path.join(video_folder, vid)
-                break
-
-        centerline_file = os.path.join(centerline_folder, centerline)
-        with open(centerline_file, 'r') as f:
-            reader = csv.reader(f)
-            rows = list(reader)
-
-        caplength = len(rows)
-        intervals = [round(caplength * i/100) for i in [25, 50, 75]]
-        intervals_list = ['25', '50', '75']
-        for point in intervals:
-            names = intervals_list.copy()
-            radius = int(float(rows[point][2]))
-            perp_coords = []
-            for i in range(point - radius + 1, point + radius):
-                perp_coords.append([rows[i][1], rows[i][0]])
-
-                frames = os.listdir(video_file)
-                frames = [frame for frame in frames if frame.endswith('.tiff')]
-                num_frames = len(frames)
-
-            rbc_img = np.zeros((len(perp_coords), num_frames))
-            for j in range(num_frames):
-                print(frames[j])
-                frame = cv2.imread(os.path.join(video_file, frames[j]), cv2.IMREAD_GRAYSCALE)
-                frame2 = np.copy(frame)
-                for i in range(len(perp_coords)):
-                    frame2[int(float(perp_coords[i][0]))][int(float(perp_coords[i][1]))] = 255
-                cv2.imshow('frame', frame2)
-                cv2.waitKey(0)
-                for i in range(len(perp_coords)):
-                    rbc_img[i][j] = frame[int(float(perp_coords[i][0]))][int(float(perp_coords[i][1]))]
-                    rbc_img = rbc_img.astype(np.uint8)
-            cv2.imwrite(os.path.join(output_folder, date + ' ' + video + '_' + capnum + '_' + names.pop(0) + '.tiff'), rbc_img)
-
-
-                
+    rbc_img_folder = os.path.join(path, 'rbc')
+    df = pd.DataFrame(columns = ['Date', 'Video','Capillary', 'Position', 'RBC Count'])
+    for img in os.listdir(rbc_img_folder):
         
+        date = img.split(' ')[0]
+        video = img.split(' ')[1].split('_')[0]
+        capnum = img.split(' ')[1].split('_')[1]
+        position = img.split(' ')[1].split('_')[2][:-5]
+
+        image = cv2.imread(os.path.join(rbc_img_folder, img), cv2.IMREAD_GRAYSCALE)
+        equalized_image = cv2.equalizeHist(image)
+        _, binary_image = cv2.threshold(equalized_image, 20, 255, cv2.THRESH_BINARY_INV)
+        _, labeled_regions = cv2.connectedComponents(binary_image)
         
+        min_size = 1
+        maxima_count = 0
+
+        for label in range(1, np.max(labeled_regions) + 1):
+            region_mask = np.uint8(labeled_regions == label)
+            maxima_coords = np.argwhere(region_mask * (image == np.max(image * region_mask)))
+            
+            if len(maxima_coords) > 0:
+                # Check if the connected component size is greater than min_size
+                if np.sum(region_mask) > min_size:
+                    maxima_count += 1
+        
+        #save
+        new_data = pd.DataFrame([[date, video, capnum, position, maxima_count]], columns = df.columns)
+        df = pd.concat([df, new_data], ignore_index=True)
+    df.to_csv(os.path.join(rbc_img_folder, "rbc_counts.csv"), index=False)
+
 
 if __name__ == '__main__':
     ticks = time.time()
-    main(path = 'E:\\frawg\\Wake Sleep Pairs\\gabby_analysis')
+    main(path = 'D:\\frawg\\Wake Sleep Pairs\\gabby_analysis')
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))    
