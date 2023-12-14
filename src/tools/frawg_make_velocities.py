@@ -21,7 +21,7 @@ from scipy.ndimage import median_filter
 from sklearn.linear_model import Lasso
 
 FPS = 227.8 #169.3
-PIX_UM = 1.74
+PIX_UM = 4.64
 CANNY_THRESH_1 = 20
 CANNY_THRESH_2 = 50
 
@@ -227,7 +227,7 @@ def find_slopes(image, filename, output_folder=None, method = 'ridge', verbose =
         plt.close()
     return weighted_average_slope
 
-def main(path='E:\\frawg', verbose = False, write = False, write_data = True,
+def main(path, verbose = False, write = False, write_data = True,
          test = False):
     """
     This function takes in a path to a folder containing kymographs and outputs
@@ -248,44 +248,6 @@ def main(path='E:\\frawg', verbose = False, write = False, write_data = True,
     input_folder = os.path.join(path, 'kymographs')
     os.makedirs(os.path.join(path, 'velocities'), exist_ok=True)
     output_folder = os.path.join(path, 'velocities')
-    """part, date, location, __, __ = parse_path(path)
-
-    
-    os.makedirs('C:\\Users\\gt8mar\\capillary-flow\\results\\velocities', exist_ok=True)
-    results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities'
-    SET = 'set01'
-    if test:
-        # metadata_folder = os.path.join(path, 'part_metadata')                           # This is for the test data
-        metadata_folder = os.path.join(os.path.dirname(os.path.dirname(path)), 'part_metadata')        # This is for the real data
-    else: 
-        if platform.system() == "Windows":
-            metadata_folder = 'C:\\Users\\gt8mar\\capillary-flow\\metadata'
-        else: # metadata_folder = os.path.join(os.path.dirname(os.path.dirname(path)), 'part_metadata')        # This is for the real data
-            metadata_folder = '/hpc/projects/capillary-flow/metadata'
-    loc_num = location.lstrip("loc")
-    loc_num = loc_num.lstrip("0")
-    loc_num = int(loc_num)
-    # participant, date, video, file_prefix = parse_vid_path(path)
-    
-    metadata_name = f'{part}_{date}.xlsx'
-    # Read in the metadata
-    metadata = pd.read_excel(os.path.join(metadata_folder, metadata_name), sheet_name = 'Sheet1')
-
-    # Select video rows with correct location
-    metadata = metadata[metadata['Location'] == loc_num]
-    print(metadata)
-
-    if test:
-        name_map = load_name_map(path, version = 'kymographs')
-      
-    # Read in the kymographs
-    images = get_images(input_folder, "tiff")
-    
-    # Select images with correct location
-    for image in images:
-        # replace set_01 with set01
-        image = image.replace("set_01", "set01")
-    images = [image for image in images if image.split("_")[4] in metadata['Video'].values]"""
 
     # Read in the kymographs
     images = get_images(input_folder, "tiff")
@@ -295,6 +257,7 @@ def main(path='E:\\frawg', verbose = False, write = False, write_data = True,
     missing_log = []
     for image in images:
         date = image.split(" ")[0]
+        print(image)
         video = image.split(" ")[1].split("_")[0]
 
         kymo_raw = cv2.imread(os.path.join(input_folder, image), cv2.IMREAD_GRAYSCALE)
@@ -302,8 +265,8 @@ def main(path='E:\\frawg', verbose = False, write = False, write_data = True,
         fps = FPS
         
         # Get the capillary name for the video
-        capillary_name = image.split(".")[0].split("_")[-1]
-        filename = f'{date}_{video}_{capillary_name}'
+        capillary_name = image[-7:-5]
+        filename = f'{date} {video}_{capillary_name}'
         kymo_blur = gaussian_filter(kymo_raw, sigma = 2)
         
         if write:
@@ -318,7 +281,7 @@ def main(path='E:\\frawg', verbose = False, write = False, write_data = True,
 
     # Write the dataframe to a file
     if write_data:
-        df.to_csv(os.path.join(output_folder, f"{date}_{video}_velocity_data.csv"), index=False)    
+        df.to_csv(os.path.join(output_folder, f"{date} {video}_velocity_data.csv"), index=False)    
         #df.to_csv(os.path.join(results_folder, f"{file_prefix}_velocity_data.csv"), index=False)    
 
     # print(df)
@@ -412,6 +375,6 @@ def main(path='E:\\frawg', verbose = False, write = False, write_data = True,
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(write = True, write_data=True, verbose= False, test = False)
+    main(path = 'E:\\frawg\\Wake Sleep Pairs\\gabby_analysis', write = True, write_data=True, verbose= False, test = False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))

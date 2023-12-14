@@ -12,12 +12,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from PIL import Image
-from tools.get_images import get_images
-from tools.load_image_array import load_image_array
-from tools.load_name_map import load_name_map
-from tools.load_csv_list import load_csv_list
-from tools.get_shifts import get_shifts
-from tools.parse_filename import parse_filename
+from get_images import get_images
+from load_image_array import load_image_array
 from scipy.ndimage import convolve
 from skimage import exposure
 
@@ -176,8 +172,7 @@ def normalize_row_and_col(image):
     new_new_image = normalize_row_and_col(image)
     return 0
 
-def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01', 
-         write = True, variable_radii = False, verbose = False, plot = False, hasty = False):
+def main(path, write = True, variable_radii = False, verbose = False, plot = False, hasty = False):
     """
     This function takes a path to a video and calculates the blood flow.
 
@@ -198,8 +193,7 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
     """
     
     # Create output folders
-    if platform.system() == 'Windows':
-        centerline_folder = os.path.join(path, 'centerlines')
+    centerline_folder = os.path.join(path, 'centerlines')
 
     os.makedirs(os.path.join(path, 'kymographs'), exist_ok=True)
     output_folder = os.path.join(path, 'kymographs')
@@ -209,57 +203,19 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
     # make dictionary of centerline files with same video number
     for centerline_file in os.listdir(os.path.join(centerline_folder, 'coords')):
         if centerline_file.endswith(".csv"):
-            #participant, date, location, video, file_prefix = parse_filename(centerline_file)
-            video = centerline_file.split('_')[0] + ' ' + centerline_file.split('_')[1]
-            if video.endswith('bp'):
-                video = video.replace('bp', '')
-            # check if video ends with "scan"
-            elif video.endswith('scan'):
-                continue # skip scan video for kymographs, the frame is moving
+            video = centerline_file.split('_')[0] 
             
             # check if video is in dictionary, if not add it
             if video not in centerline_dict.keys():
                 centerline_dict[video] = [centerline_file]
             else:
                 centerline_dict[video].append(centerline_file)
-    """if verbose:
-        # check dictionary to see if videos match up with the key
-        for video in centerline_dict.keys():
-            print(video)
-            for test_file in centerline_dict[video]:
-                #__, __, __, video_parsed, __ = parse_filename(test_file)
-                if video_parsed.endswith('bp'):
-                    video_parsed = video_parsed.replace('bp', '')
-                if video != video_parsed:
-                    print(f'Video name mismatch: {video} vs {video_parsed}')
-
-    # load name map to rename capillaries
-    name_map = load_name_map(path, version='centerlines')
-    missing_log = []"""
     
     # loop through videos
     for video_key in centerline_dict.keys():
         number_of_capillaries = len(centerline_dict[video_key])
-        
-        """# check to see if mocoslice or mocosplit folder exists
-        if os.path.exists(os.path.join(path, 'vids', video_key, 'mocoslice')):
-            video_folder = os.path.join(path, 'vids', video_key, 'mocoslice')
-        elif os.path.exists(os.path.join(path, 'vids', video_key, 'mocosplit')):
-            video_folder = os.path.join(path, 'vids', video_key, 'mocosplit')
-        else:
-            video_folder = os.path.join(path, 'vids', video_key, 'moco')
 
-        # check to see if moco folder exists
-        if os.path.exists(video_folder) == False:
-            print(f'No moco folder for {file_prefix} and {video_folder}') 
-        metadata_folder = os.path.join(path, 'vids', video_key, 'metadata')
-
-        # Get metadata
-        gap_left, gap_right, gap_bottom, gap_top = get_shifts(metadata_folder) # get gaps from the metadata
-        if verbose:
-            print(gap_left, gap_right, gap_bottom, gap_top)"""
-
-        video_folder = os.path.join(path, 'vids', video_key)
+        video_folder = os.path.join(os.path.dirname(path), 'pair_vids', video_key)
 
         # Get images
         # Import images
@@ -277,7 +233,7 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
         for file in centerline_dict[video_key]:
             # participant, date, location, video_parsed, file_prefix = parse_filename(file)
 
-            capillary_number = file.split('_')[4]
+            capillary_number = file.split('_')[3][:-4]
 
             print(f'Processing {video_key} capillary {capillary_number}')            
 
@@ -295,8 +251,6 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
             kymograph = exposure.rescale_intensity(kymograph, in_range = 'image', out_range = np.uint8)
             if verbose:
                 print(f"the time to normalize the image is {time.time() - start_time} seconds")
-
-            file_prefix = file.split('.')[0]
 
             # save the kymograph
             if write:
@@ -323,14 +277,8 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    if platform.system() == 'Windows':
-        path = 'E:\\frawg'
-        main(path, write=True, hasty=True, verbose=False)
-    else:
-        path = '/hpc/projects/capillary-flow/data/part09/230414/loc01'
-        main(path, write = True)
-    # test2_normalize_row_and_col()
-    # test()
+    path = 'E:\\frawg\\Wake Sleep Pairs\\gabby_analysis'
+    main(path, write=True, hasty=True, verbose=False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
 
