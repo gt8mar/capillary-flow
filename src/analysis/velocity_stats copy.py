@@ -1,5 +1,4 @@
 import os, platform
-import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 # from src.tools.load_name_map import load_name_map
@@ -125,7 +124,7 @@ def make_big_name_map(participant, verbose=False):
         print(name_map_df.head)
     return name_map_df
 
-def check_correlations(csv_file_path, test=True, plot = False, write = True):
+def check_correlations(csv_file_path, test=True):
     df = pd.read_csv(csv_file_path)
 
     if test:
@@ -141,35 +140,31 @@ def check_correlations(csv_file_path, test=True, plot = False, write = True):
         
         # Search big_name_map for files that have 'loc' in them and print value following the 'loc'
         # print(big_name_map)
+        locations = big_name_map[big_name_map['centerlines name'].str.contains('loc')]['centerlines name'].str.split('_').str[3].values
+        # remove redundant values
+        locations = list(dict.fromkeys(locations))
+        for location in locations:
+            print(f'making centerline_df for {location}')
+            centerline_df = make_centerline_df(participant, date, location)
 
-    #     locations = big_name_map[big_name_map['centerlines name'].str.contains('loc')]['centerlines name'].str.split('_').str[3].values
-    #     # remove redundant values
-    #     locations = list(dict.fromkeys(locations))
-    #     for location in locations:
-    #         print(f'making centerline_df for {location}')
-    #         centerline_df = make_centerline_df(participant, date, location)
-
-    #         # Adjust format of capillary number to match total data file 
-    #         # Drop a from end of capillary number in vel_df
-    #         centerline_df['Capillary'] = centerline_df['Capillary'].replace({'a':''}, regex=True).replace({'b':''}, regex=True)
-    #         # Convert capillary number to int64 in vel_df
-    #         centerline_df['Capillary'] = centerline_df['Capillary'].astype(int)
-    #         # make date column an int
-    #         centerline_df['Date'] = centerline_df['Date'].astype(int)
+            # Adjust format of capillary number to match total data file 
+            # Drop a from end of capillary number in vel_df
+            centerline_df['Capillary'] = centerline_df['Capillary'].replace({'a':''}, regex=True).replace({'b':''}, regex=True)
+            # Convert capillary number to int64 in vel_df
+            centerline_df['Capillary'] = centerline_df['Capillary'].astype(int)
+            # make date column an int
+            centerline_df['Date'] = centerline_df['Date'].astype(int)
 
             
-    #         print(centerline_df.head)
+            print(centerline_df.head)
 
-    #         # merge centerline_df and df
-    #         df = pd.merge(df, centerline_df, how='left', on=['Participant', 'Date', 'Location', 'Video', 'Capillary'])
-    # else:
-    #     # participant, date, location, video, _ = parse_filename(csv_file_path)
-    #     # big_name_map = make_big_name_map(participant)
-    #     df = pd.read_csv(csv_file_path)
+            # merge centerline_df and df
+            df = pd.merge(df, centerline_df, how='left', on=['Participant', 'Date', 'Location', 'Video', 'Capillary'])
+    else:
+        # participant, date, location, video, _ = parse_filename(csv_file_path)
+        # big_name_map = make_big_name_map(participant)
+        df = pd.read_csv(csv_file_path)
     
-    
-    # if BP column has NaN values, fill them with the string '0/0'
-    df['BP'].fillna('0/0', inplace=True)
     # Use BP column to make systolic and diastolic blood pressure columns
     df['Systolic BP'] = df['BP'].apply(lambda x: x.split('/')[0])
     df['Diastolic BP'] = df['BP'].apply(lambda x: x.split('/')[1])
@@ -180,15 +175,13 @@ def check_correlations(csv_file_path, test=True, plot = False, write = True):
     print(df[['Systolic BP', 'Diastolic BP', 'Pulse']].head)
 
     # Use area and velocity columns to make velocity per diameter column
-    # df['Diameter'] = df['Area'] / df['Centerline Length']
-    # df['Velocity per Diameter'] = df['Velocity'] / df['Diameter']
+    df['Diameter'] = df['Area'] / df['Centerline Length']
+    df['Velocity per Diameter'] = df['Velocity'] / df['Diameter']
 
  
     # Reorder columns to place systolic and diastolic blood pressure columns next to pulse column
-    df = df[['Participant', 'Date', 'Location', 'Video', 'Pressure', 'Capillary', 'Velocity', 
-             'BP', 'Systolic BP', 'Diastolic BP', 'Pulse', 'Area']]
-    # df = df[['Participant', 'Date', 'Location', 'Video', 'Pressure', 'Capillary', 'Diameter',  'Velocity', 
-    #          'BP', 'Systolic BP', 'Diastolic BP', 'Pulse', 'Velocity per Diameter', 'Area','Centerline Length']]
+    df = df[['Participant', 'Date', 'Location', 'Video', 'Pressure', 'Capillary', 'Diameter',  'Velocity', 
+             'BP', 'Systolic BP', 'Diastolic BP', 'Pulse', 'Velocity per Diameter', 'Area','Centerline Length']]
     # list columns
     print(df.head)
     # make NaN values 0
@@ -204,42 +197,7 @@ def check_correlations(csv_file_path, test=True, plot = False, write = True):
     ax.set_xticklabels(correlations.columns)
     ax.set_yticklabels(correlations.columns)
     plt.xticks(rotation=90)
-    plt.title(f'Correlations between variables in participant {participant} on {date}')
-    # print correlations on top of heatmap
-    for (i, j), z in np.ndenumerate(correlations):
-        ax.text(j, i, '{:0.2f}'.format(z), ha='center', va='center', fontsize=10)
-    if write: 
-        plt.savefig(f'C:\\Users\\gt8mar\\capillary-flow\\results\\archive\\231205\\correlations\\{participant}_{date}_correlations.png')
-        pass
-    if plot:
-        plt.show()
-    else:
-        plt.close()
-    
-    # # plot the correlations for Pressure, velocity, area, systolic blood pressure, and pulse
-    # fig, ax = plt.subplots(figsize=(10,10))
-    
-    # # make new dataframe with only the Participant, pressure, velocity, area, systolic blood pressure, and pulse columns
-    # df_concise = df[['Pressure', 'Velocity', 'Area', 'Systolic BP', 'Pulse']]
-    # correlations_slice = df_concise.corr()
-    
-    # # print(correlations_slice)
-    # ax.matshow(correlations_slice)
-    # ax.set_xticks(range(len(correlations_slice.columns)))
-    # ax.set_yticks(range(len(correlations_slice.columns)))
-    # ax.set_xticklabels(correlations_slice.columns)
-    # ax.set_yticklabels(correlations_slice.columns)
-    # plt.xticks(rotation=90)
-    # plt.title(f'Correlations between variables in participant {participant} on {date}')
-    # # print correlations on top of heatmap
-    # for (i, j), z in np.ndenumerate(correlations_slice):
-    #     ax.text(j, i, '{:0.2f}'.format(z), ha='center', va='center', fontsize=10)
-    # if write:
-    #     plt.savefig(f'C:\\Users\\gt8mar\\capillary-flow\\results\\archive\\231205\\correlations_concise\\{participant}_{date}_correlations.png')
-    # if plot:
-    #     plt.show()
-    # else:
-    #     plt.close()
+    plt.show()
 
     # run other analysis on the data
     df.describe()
@@ -249,49 +207,9 @@ def check_correlations(csv_file_path, test=True, plot = False, write = True):
 # ------------------------- Main -------------------------
 if __name__ == "__main__":
     total_path = 'C:\\Users\\gt8mar\\capillary-flow\\results\\archive\\231205\\total' # part17_230502_total_data_MF231120.csv
-    correlation_df = pd.DataFrame(columns=['Participant', 'Pressure v Velocity', 'Pressure v Area', 'Velocity v Area', 'Velocity v Pulse', 'Area v Pulse', 'Velocity v Pressure', 'Pulse v Pressure', 'Area v Pressure', 'Pressure v Pulse', 'Pulse v Velocity', 'Area v Velocity', 'Pulse v Area', 'Velocity v Velocity', 'Area v Area', 'Pulse v Pulse', 'Pressure v Pressure'])
     for filename in os.listdir(total_path):
-        if filename.endswith('.csv') and filename.endswith('total_data_MF231120.csv'):
-            continue
-        elif filename.endswith('.csv'):
+        if filename.endswith('.csv'):
             print(filename)
             data_path = os.path.join(total_path, filename)
             correlations = check_correlations(data_path, test=True)
-            # Add row to correlation_df
-            new_row_df = pd.DataFrame([{'Participant': filename.split('_')[0], 
-                                        'Pressure v Velocity': correlations['Pressure']['Velocity'], 
-                                        'Pressure v Area': correlations['Pressure']['Area'], 
-                                        'Velocity v Area': correlations['Velocity']['Area'], 
-                                        'Velocity v Pulse': correlations['Velocity']['Pulse'], 
-                                        'Area v Pulse': correlations['Area']['Pulse'], 
-                                        'Velocity v Pressure': correlations['Velocity']['Pressure'], 
-                                        'Pulse v Pressure': correlations['Pulse']['Pressure'], 
-                                        'Area v Pressure': correlations['Area']['Pressure'], 
-                                        'Pressure v Pulse': correlations['Pressure']['Pulse'], 
-                                        'Pulse v Velocity': correlations['Pulse']['Velocity'], 
-                                        'Area v Velocity': correlations['Area']['Velocity'], 
-                                        'Pulse v Area': correlations['Pulse']['Area'], 
-                                        'Velocity v Velocity': correlations['Velocity']['Velocity'], 
-                                        'Area v Area': correlations['Area']['Area'], 
-                                        'Pulse v Pulse': correlations['Pulse']['Pulse'], 
-                                        'Pressure v Pressure': correlations['Pressure']['Pressure']}])
-            correlation_df = pd.concat([correlation_df, new_row_df], ignore_index=True)
             print(correlations)
-        else: continue
-    # Plot Pressure v Velocity correlation
-    fig, ax = plt.subplots(figsize=(10,10))
-    ax.scatter(correlation_df['Pressure v Velocity'], correlation_df['Participant'])
-    plt.title('Correlation between Pressure and Velocity')
-    plt.xlabel('Correlation')
-    plt.ylabel('Participant')
-    plt.show()
-
-    # Plot Pressure v Area correlation
-    fig, ax = plt.subplots(figsize=(10,10))
-    ax.scatter(correlation_df['Pressure v Area'], correlation_df['Participant'])
-    plt.title('Correlation between Pressure and Area')
-    plt.xlabel('Correlation')
-    plt.ylabel('Participant')
-    plt.show()
-    
-
