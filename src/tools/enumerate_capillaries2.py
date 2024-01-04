@@ -4,6 +4,15 @@ from collections import deque
 MIN_CAP_AREA = 100
 
 def find_connected_components(input_array):
+    """
+    Find connected components in a 2D array using BFS.
+
+    Args:
+        input_array (np.array): 2D array containing the input image
+    
+    Returns:
+        output_array (np.array): 3D array containing the connected components (2D contours in a z stack)
+    """
     def bfs(row, col, label):
         queue = deque([(row, col)])
         component_size = 0
