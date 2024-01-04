@@ -3,6 +3,9 @@
 #SBATCH --job-name=capSize
 #SBATCH --time=10:00:00
 #SBATCH --mem=150G
+#SBATCH --partition=cpu
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
 #SBATCH --output=cap_size_array_%A-%a.out
 #SBATCH --array=9-20
 
