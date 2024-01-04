@@ -4,8 +4,11 @@
 #SBATCH --time=10:00:00
 #SBATCH --partition=cpu
 #SBATCH --mem=150G
+#SBATCH --partition=cpu
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
 #SBATCH --output=cent_array_%A-%a.out
-#SBATCH --array=9-23
+#SBATCH --array=9-27
 
 cd /hpc/projects/capillary-flow/scripts
 module load anaconda
