@@ -59,8 +59,6 @@ def main():
             print(f"%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
             ticks = time.time()
             location_path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, location)
-            # find_centerline.main(location_path, verbose=False, write=True)
-            # print(f"completed centerlines for location {location} in {ticks-time.time()} seconds")
             
             # Make kymographs
             make_kymograph.main(location_path, verbose=False, write=True)
