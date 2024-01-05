@@ -291,6 +291,7 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     missing_log = []
     for image in images:
         part, date, location, video, file_prefix = parse_filename(image)
+        velocity_filename = image.replace("kymograph", "velocity")
         kymo_raw = cv2.imread(os.path.join(input_folder, image), cv2.IMREAD_GRAYSCALE)
         # Get the metadata for the video
         video_metadata = metadata.loc[
@@ -303,21 +304,13 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
         fps = video_metadata['FPS'].values[0]
         
         # Get the capillary name for the video
-        if test:
-            old_capillary_name = image
-            if name_map['centerlines name'].str.contains(old_capillary_name).any():
-                capillary_name = name_map.loc[name_map['centerlines name'] == old_capillary_name]['cap name short'].values[0]
-            else: 
-                missing_log.append(image)
-        else:
-            capillary_name = image.split(".")[0].split("_")[-1]
-        filename = f'{file_prefix}_{video}_{str(int(pressure*10)).zfill(2)}_{capillary_name}'
+        capillary_name = image.split(".")[0].split("_")[-1]
         kymo_blur = gaussian_filter(kymo_raw, sigma = 2)
         
         if write:
-            weighted_average_slope = find_slopes(kymo_blur, filename, output_folder, method = 'lasso', verbose = False, write=True)
+            weighted_average_slope = find_slopes(kymo_blur, velocity_filename, output_folder, method = 'lasso', verbose = False, write=True)
         else:
-            weighted_average_slope = find_slopes(kymo_blur, filename, output_folder, method = 'lasso', verbose = verbose, write=False)
+            weighted_average_slope = find_slopes(kymo_blur, velocity_filename, output_folder, method = 'lasso', verbose = verbose, write=False)
         # transform slope from pixels/frames into um/s:
         um_slope = np.absolute(weighted_average_slope) *fps/PIX_UM
         # add row to dataframe
@@ -325,10 +318,6 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
         df = pd.concat([df, new_data], ignore_index=True)
         
 
-    # Write the missing log to a file
-    with open(os.path.join(output_folder, "missing_log.txt"), "w") as f:
-        for image in missing_log:
-            f.write(image + "\n")
     # Write the dataframe to a file
     
     if write_data:
