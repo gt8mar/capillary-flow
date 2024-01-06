@@ -291,7 +291,7 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     missing_log = []
     for image in images:
         part, date, location, video, file_prefix = parse_filename(image)
-        velocity_filename = image.replace("kymograph", "velocity")
+        velocity_filename = image.replace("kymograph", "velocity").replace("tiff", "")
         kymo_raw = cv2.imread(os.path.join(input_folder, image), cv2.IMREAD_GRAYSCALE)
         # Get the metadata for the video
         video_metadata = metadata.loc[
