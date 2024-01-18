@@ -39,8 +39,10 @@ def separate_caps(registered_folder_fp):
     #save individual caps, named
     for vid in os.listdir(registered_folder_fp):
         if vid.endswith('.png'):
-            individual_caps = find_connected_components(cv2.imread(os.path.join(registered_folder_fp, vid), cv2.IMREAD_GRAYSCALE))
+            # Create a list of individual caps (contours)
+            individual_caps = find_connected_components(cv2.imread(os.path.join(registered_folder_fp, vid), cv2.IMREAD_GRAYSCALE)) 
             filenames = []
+            # Iterate through each capillary contour
             for cap in individual_caps:
                 renamed = False
                 #iterate through each pixel in cap
@@ -48,12 +50,16 @@ def separate_caps(registered_folder_fp):
                     #if cap already found, break
                     if renamed == True: 
                         break
-                    #if pixel is part of cap
+                    # if pixel is part of a capillary, then name it based on its position and the
+                    # positions of capillaries before it. 
+                    # Ex: check through pixels until you get a hit. Then check each projected capillary to see if
+                    # that pixel is part of it. If it is, then name it based on the projected capillary's name. 
+                    # If the projected capillary has already claimed another capillary, then add a letter to the end. 
                     if cap[row][col] > 0:
                         for projcap in os.listdir(os.path.join(os.path.dirname(registered_folder_fp), "proj_caps")):
                             projcap_fp = os.path.join(os.path.dirname(registered_folder_fp), "proj_caps", projcap)
                             if cv2.imread(projcap_fp, cv2.IMREAD_GRAYSCALE)[row][col] > 0:
-                                capnum = projcap[:-4] + "a" 
+                                capnum = projcap.replace('.png', '') + "a" 
                                 counter = 0
                                 filename = os.path.join(new_folder_fp, vid[:-4] + "_" + capnum + ".png")
                                 #name fragments b, c, d, etc. if capnum already exists
@@ -129,7 +135,24 @@ def save_untranslated(registered_folder_fp):
             cv2.imwrite(os.path.join(orig_fp, cap), crop_img)
             
 def main(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12\\230428\\loc03"):
+    """
+    Groups capillaries from different videos and saves individual caps with names based on
+    this grouping.
+
+    Args:
+        path (str): The path to the location directory for a given participant. 
+            This will be used to load in registered segmentation files. 
+
+    Returns:
+        0, if run correctly
+        
+    Saves:
+        - Individual caps as separate images in the 'proj_caps' directory.
+        - Individual caps as separate images in the 'registered' directory.
+        - Untranslated individual caps as separate images in the 'registered' directory.
+    """
     registered_fp = os.path.join(path, "segmented", "hasty", "registered")
+    
     sorted_seg_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(registered_fp, x)) and x.endswith('.png'), os.listdir(registered_fp)))
 
     #get max projection
@@ -155,6 +178,8 @@ def main(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12\\230428\
 
     #save untranslated individual caps, named
     save_untranslated(registered_fp)
+
+    return 0
     
 
 """
