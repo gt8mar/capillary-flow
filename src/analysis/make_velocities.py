@@ -15,13 +15,14 @@ import cv2
 import os, platform
 import seaborn as sns
 import time
+from scipy.ndimage import gaussian_filter
+from scipy.ndimage import median_filter
+from sklearn.linear_model import Lasso
 from src.tools.get_images import get_images
 from src.tools.load_name_map import load_name_map
 from src.tools.parse_filename import parse_filename
 from src.tools.parse_path import parse_path
-from scipy.ndimage import gaussian_filter
-from scipy.ndimage import median_filter
-from sklearn.linear_model import Lasso
+
 
 FPS = 227.8 #169.3
 PIX_UM = 2.44 #1.74
@@ -116,8 +117,8 @@ def plot_box_swarm(data, x_labels, y_axis_label,  plot_title, figure_name,
             else: plt.close()
         if verbose: plt.show()
     return 0
-def find_slopes(image, filename, output_folder=None, method = 'ridge', verbose = False, write = False, 
-                plot_title = "Kymograph", remove_outliers = False):
+def find_slopes(image, filename, output_folder=None, method = 'lasso', verbose = False, write = False, 
+                plot_title = "Kymograph", too_fast = False, too_slow = False):
     edges = cv2.Canny(image, CANNY_THRESH_1, CANNY_THRESH_2)
     # To save edge images:
     # Create a 1x3 grid for subplots
@@ -162,36 +163,28 @@ def find_slopes(image, filename, output_folder=None, method = 'ridge', verbose =
             start_x, end_x = 0, image.shape[1]-1
             start_y, end_y = lasso.predict([[start_x]]), lasso.predict([[end_x]])
             slope = (end_y-start_y)/(end_x-start_x)
-            if np.absolute(slope) <= 1:
+            
+            if (too_slow==True and np.absolute(slope) <= 0.75):
                 # cv2.line(image, (int((end_x-start_x)//4), int((end_y-start_y)//4)), (int(3*(end_x-start_x)//4), int(3*(end_y-start_y)//4)), (0,255,0), 2)
-                pass
-            else:
-                # Draw the line on the original image
-                # cv2.line(image, (int(start_x), int(start_y)), (int(end_x), int(end_y)), (0,255,0), 2)
-                pass
+                continue
+
+            if (too_fast ==True and np.absolute(slope) >= 8.0):
+                continue
+            
             # weight the slope by the length of the contour
             length = len(contour)
             lengths.append(length)
 
             # Add line to list of lines
-            slopes.append(slope[0])
+            slopes.append(slope[0])        
 
-    # Plot the image with the lines
-    if remove_outliers:
-        slopes_clipped, outliers = select_outliers(slopes)
-        if len(slopes_clipped) == 0:
-            average_slope = 0
-            weighted_average_slope = 0
-        else:
-            average_slope = np.absolute(np.mean(np.array(slopes_clipped, dtype = float)))
-            weighted_average_slope = np.absolute(np.average(np.array(slopes_clipped, dtype = float), weights = np.array(lengths, dtype = float)))
+   
+    if len(slopes) == 0:
+        average_slope = 0
+        weighted_average_slope = 0
     else:
-        if len(slopes) == 0:
-            average_slope = 0
-            weighted_average_slope = 0
-        else:
-            weighted_average_slope = np.average(np.array(slopes, dtype = float), weights = np.array(lengths, dtype = float))
-            average_slope = np.mean(np.array(slopes, dtype = float))
+        weighted_average_slope = np.average(np.array(slopes, dtype = float), weights = np.array(lengths, dtype = float))
+        average_slope = np.mean(np.array(slopes, dtype = float))
     
     # Display the original image with lines drawn on it
     if weighted_average_slope == 0:
@@ -210,10 +203,26 @@ def find_slopes(image, filename, output_folder=None, method = 'ridge', verbose =
     if platform.system() != 'Windows':
         results_folder = '/hpc/projects/capillary-flow/results/velocities'
     else:
-        results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities'
+        if 'gt8mar' in os.getcwd():
+            if too_fast:
+                results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\too_fast'
+            elif too_slow:
+                results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\too_slow'
+            else:
+                results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities'
+        else:
+            if too_fast:
+                results_folder = 'C:\\Users\\gt8ma\\capillary-flow\\results\\velocities\\too_fast'
+                filename = filename + "_toofast"
+            elif too_slow:
+                results_folder = 'C:\\Users\\gt8ma\\capillary-flow\\results\\velocities\\too_slow'
+                filename = filename + "_tooslow"
+            else:
+                results_folder = 'C:\\Users\\gt8ma\\capillary-flow\\results\\velocities'
     
     if write: 
-        plt.savefig(os.path.join(output_folder, str(filename) + ".png"), bbox_inches='tight', dpi=400)
+        if output_folder != None:
+            plt.savefig(os.path.join(output_folder, str(filename) + ".png"), bbox_inches='tight', dpi=400)
         plt.savefig(os.path.join(results_folder, str(filename) + ".png"), bbox_inches='tight', dpi=400)
         
     if verbose:
@@ -250,15 +259,22 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
         results_folder = '/hpc/projects/capillary-flow/results/velocities'
         SET = 'set01'
     else:
-        os.makedirs('C:\\Users\\gt8mar\\capillary-flow\\results\\velocities', exist_ok=True)
-        results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities'
+        if 'gt8mar' in os.getcwd():
+            os.makedirs('C:\\Users\\gt8mar\\capillary-flow\\results\\velocities', exist_ok=True)
+            results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities'
+        else:
+            os.makedirs('C:\\Users\\gt8ma\\capillary-flow\\results\\velocities', exist_ok=True)
+            results_folder = 'C:\\Users\\gt8ma\\capillary-flow\\results\\velocities'
         SET = 'set01'
     if test:
         # metadata_folder = os.path.join(path, 'part_metadata')                           # This is for the test data
         metadata_folder = os.path.join(os.path.dirname(os.path.dirname(path)), 'part_metadata')        # This is for the real data
     else: 
         if platform.system() == "Windows":
-            metadata_folder = 'C:\\Users\\gt8mar\\capillary-flow\\metadata'
+            if 'gt8mar' in os.getcwd():
+                metadata_folder = 'C:\\Users\\gt8mar\\capillary-flow\\metadata'
+            else:
+                metadata_folder = 'C:\\Users\\gt8ma\\capillary-flow\\metadata'
         else: # metadata_folder = os.path.join(os.path.dirname(os.path.dirname(path)), 'part_metadata')        # This is for the real data
             metadata_folder = '/hpc/projects/capillary-flow/metadata'
     loc_num = location.lstrip("loc")

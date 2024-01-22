@@ -71,13 +71,13 @@ def plot_velocities(df, write = True, verbose = False):
 
     # Adjust spacing between subplots
     plt.tight_layout()
-    plt.subplots_adjust(top=0.88)
+    # plt.subplots_adjust(top=0.8)
 
-    plt.suptitle(f'Participant {participant}, Location {location}', y=0.98)
+    # plt.suptitle(f'Participant {participant}, Location {location}', y=0.98)
 
     if write:
         if platform.system() == 'Windows':
-            output_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\corrected'
+            output_folder = 'C:\\Users\\gt8ma\\capillary-flow\\results\\velocities\\velocities\\corrected'
             os.makedirs(output_folder, exist_ok=True)
             plt.savefig(os.path.join(output_folder, f"{participant}_{location}_velocity_vs_pressure_per_cap_corrected.png"), bbox_inches='tight', dpi=400)
         else:
@@ -103,13 +103,13 @@ def plot_velocities(df, write = True, verbose = False):
     ax.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.subplots_adjust(top=0.88)
+    # plt.subplots_adjust(top=0.88)
     # Set title to be participant and location:
-    plt.suptitle(f'Participant {participant}, Location {location}', y=0.98)
+    # plt.suptitle(f'Participant {participant}, Location {location}', y=0.98)
 
     if write:
         if platform.system() == 'Windows':
-            output_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\corrected'
+            output_folder = 'C:\\Users\\gt8ma\\capillary-flow\\results\\velocities\\velocities\\corrected'
             os.makedirs(output_folder, exist_ok=True)
             plt.savefig(os.path.join(output_folder, f"{participant}_{location}_velocity_vs_pressure_corrected.png"), bbox_inches='tight', dpi=400)
         else:
@@ -195,7 +195,7 @@ def update_velocities(csv_path):
 if __name__ == '__main__':
     # Usage example
     if platform.system() == 'Windows':
-        velocities_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities'
+        velocities_folder = 'C:\\Users\\gt8ma\\capillary-flow\\results\\velocities\\velocities'
         for csv_file in os.listdir(velocities_folder):
             if csv_file.endswith('Copy.csv'):
                 csv_file_path = os.path.join(velocities_folder, csv_file)
