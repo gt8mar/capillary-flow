@@ -77,7 +77,10 @@ def plot_velocities(df, write = True, verbose = False):
 
     if write:
         if platform.system() == 'Windows':
-            output_folder = 'C:\\Users\\gt8ma\\capillary-flow\\results\\velocities\\velocities\\corrected'
+            if 'gt8mar' in os.getcwd():
+                output_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\corrected'
+            else: 
+                output_folder = 'C:\\Users\\gt8ma\\capillary-flow\\results\\velocities\\velocities\\corrected'
             os.makedirs(output_folder, exist_ok=True)
             plt.savefig(os.path.join(output_folder, f"{participant}_{location}_velocity_vs_pressure_per_cap_corrected.png"), bbox_inches='tight', dpi=400)
         else:
@@ -109,7 +112,10 @@ def plot_velocities(df, write = True, verbose = False):
 
     if write:
         if platform.system() == 'Windows':
-            output_folder = 'C:\\Users\\gt8ma\\capillary-flow\\results\\velocities\\velocities\\corrected'
+            if 'gt8mar' in os.getcwd():
+                output_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\corrected'
+            else:
+                output_folder = 'C:\\Users\\gt8ma\\capillary-flow\\results\\velocities\\velocities\\corrected'
             os.makedirs(output_folder, exist_ok=True)
             plt.savefig(os.path.join(output_folder, f"{participant}_{location}_velocity_vs_pressure_corrected.png"), bbox_inches='tight', dpi=400)
         else:

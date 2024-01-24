@@ -119,6 +119,27 @@ def plot_box_swarm(data, x_labels, y_axis_label,  plot_title, figure_name,
     return 0
 def find_slopes(image, filename, output_folder=None, method = 'lasso', verbose = False, write = False, 
                 plot_title = "Kymograph", too_fast = False, too_slow = False):
+    """
+    This function takes in an image and finds the slope of the line using edge
+    detection and computes a weighted average using either ridge regression or
+    lasso regression. It then plots the image with the line drawn on it and 
+    returns the slope.
+
+    Args:
+        image (numpy array): the image to be analyzed
+        filename (str): the filename of the image
+        output_folder (str): the folder to write images to
+        method (str): the regression method to use. Either 'ridge' or 'lasso'
+        verbose (bool): If True, show plots
+        write (bool): If True, write plots to file
+        plot_title (str): The title of the plot
+        too_fast (bool): If True, exclude slopes that are too fast
+        too_slow (bool): If True, exclude slopes that are too slow
+    
+    Returns:
+        slope (float): the slope of the line
+    """
+    filename = filename.replace(".tiff", "")
     edges = cv2.Canny(image, CANNY_THRESH_1, CANNY_THRESH_2)
     # To save edge images:
     # Create a 1x3 grid for subplots
@@ -206,8 +227,12 @@ def find_slopes(image, filename, output_folder=None, method = 'lasso', verbose =
         if 'gt8mar' in os.getcwd():
             if too_fast:
                 results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\too_fast'
+                os.makedirs(results_folder, exist_ok=True)
+                filename = filename + "_toofast"
             elif too_slow:
                 results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\too_slow'
+                filename = filename + "_tooslow"
+                os.makedirs(results_folder, exist_ok=True)
             else:
                 results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities'
         else:
