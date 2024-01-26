@@ -38,32 +38,38 @@ def update_velocities2(csv_path):
         if 'gt8mar' in os.getcwd():
             results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results'
             metadata_folder = 'C:\\Users\\gt8mar\\capillary-flow\\metadata'
+            output_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\corrected\\individual'
+            os.makedirs(output_folder, exist_ok=True)
         else:
             results_folder = 'C:\\Users\\gt8ma\\capillary-flow\\results'
             metadata_folder = 'C:\\Users\\gt8ma\\capillary-flow\\metadata'
+            output_folder = 'C:\\Users\\gt8ma\\capillary-flow\\results\\velocities\\velocities\\corrected\\individual'
+            os.makedirs(output_folder, exist_ok=True)
     else:
         results_folder = '/hpc/projects/capillary-flow/results'
         metadata_folder = '/hpc/projects/capillary-flow/metadata'
-# Import copy velocity file
-# Read the csv file
+        output_folder = '/hpc/projects/capillary-flow/results/velocities/corrected/individual'
+        os.makedirs(output_folder, exist_ok=True)
+    # Import copy velocity file
+    # Read the csv file
     df = pd.read_csv(csv_path)
 
     # Get the participant, date, and part from the csv file name
     csv_filename = os.path.basename(csv_path)
-
     filename_no_ext = csv_filename.split('.')[0].replace('contrast_', '').replace('_background', '').replace('_seg', '')
     filename_list = filename_no_ext.split('_')
-    # find participant
     participant = [item for item in filename_list if item.startswith('part')][0]
     date = [item for item in filename_list if (item.startswith('230') |
                                                item.startswith('231') |
                                                item.startswith('240') |
                                                item.startswith('241'))][0]
     
+    # Get the metadata file name
     metadata_name = f'{participant}_{date}.xlsx'
     # Read in the metadata
     metadata = pd.read_excel(os.path.join(metadata_folder, metadata_name), sheet_name = 'Sheet1') 
 
+    # Get the max velocity
     Maxes = []
     # Iterate through each row
     for i in range(len(df)):
@@ -84,28 +90,27 @@ def update_velocities2(csv_path):
     # make new column for corrected velocities
     df['Corrected Velocity'] = df['Velocity']
 
+    # Check each velocity row to see if it is true or false
+    # if true, continue
+    # if false, check if zero or max, adjust accordingly
     for i in range(len(df)):
         video = df['Video'][i]
         video_metadata = metadata.loc[(metadata['Video'] == video) |
                                         (metadata['Video'] == video + 'bp') |
                                         (metadata['Video'] == video + 'scan')
                                         ]
-        
-        # Get the pressure for the video
         pressure = video_metadata['Pressure'].values[0]
         fps = video_metadata['FPS'].values[0]
         age = calculate_age_on_date(date, str(video_metadata['Birthday'].values[0]))
+        
+        # Add age and pressure to df
         df.loc[i, 'Age'] = age
         # print(f'age = {age}')
         sys_bp = video_metadata['BP'].values[0].split('/')[0]
         # print(f'sys_bp = {sys_bp}')
         df.loc[i, 'SYS_BP'] = sys_bp
         
-            
-
-        # Check each velocity row to see if it is true or false
-        # if true, continue
-        # if false, check if zero or max
+        # Check each velocity row 
         if (df['Correct'][i] == 'f' and df['Zero'][i]=='t'):
             # If zero, set to zero
             df.loc[i,'Corrected Velocity'] = 0
@@ -119,8 +124,10 @@ def update_velocities2(csv_path):
                 kymograph = cv2.imread(filepath, cv2.IMREAD_GRAYSCALE)
                 kymo_blur = gaussian_filter(kymograph, sigma = 2)
                 # print(filename)
-                slope = find_slopes(kymo_blur, filename, verbose=False, too_slow = True, write = False)
-               
+                slope = find_slopes(kymo_blur, filename, output_folder=output_folder, verbose=False, 
+                                    too_slow = True, write = True)
+
+                # Check edge conditions where slope is None or 0               
                 if (slope == None):
                     # df.loc[i, 'Corrected Velocity'][i] = df.loc[i,'Velocity']
                     print('No slope found')
@@ -142,12 +149,11 @@ def update_velocities2(csv_path):
             kymograph = cv2.imread(filepath, cv2.IMREAD_GRAYSCALE)
             kymo_blur = gaussian_filter(kymograph, sigma = 2)
             # print(filename)
-            slope = find_slopes(kymo_blur, filename, verbose=False, too_fast = True, write = True)
+            slope = find_slopes(kymo_blur, filename, output_folder=output_folder, verbose=False, too_fast = True, write = True)
             
             
-
+            # Check edge conditions where slope is None 
             if (slope == None):
-                # df.loc[i, 'Corrected Velocity'][i] = df.loc[i,'Velocity']
                 print('No slope found')                
             else:
                 um_slope = np.absolute(slope) *fps/PIX_UM
@@ -157,7 +163,7 @@ def update_velocities2(csv_path):
     # print(df.head())
 
     # plot the corrected velocities organized by capillary:
-    # plot_velocities(df, write = False, verbose = True)
+    plot_velocities(df, write = True, verbose = False)
 
     return df
 
@@ -167,7 +173,7 @@ if __name__ == '__main__':
     # Usage example
     if platform.system() == 'Windows':
         if 'gt8mar' in os.getcwd():
-            velocities_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\velocities'
+            velocities_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities'
         else:
             velocities_folder = 'C:\\Users\\gt8ma\\capillary-flow\\results\\velocities\\velocities'
         for csv_file in os.listdir(velocities_folder):
@@ -178,12 +184,15 @@ if __name__ == '__main__':
                     big_df_count += 1
                 else:
                     big_df = pd.concat([big_df, update_velocities2(csv_file_path)])
-        big_df.to_csv('C:\\Users\\gt8ma\\capillary-flow\\results\\velocities\\velocities\\big_df.csv', index=False)
+        big_df.to_csv(os.path.join(velocities_folder, 'big_df.csv'), index=False)
     else:
-        csv_file_path = '/hpc/projects/capillary-flow/results/velocities'
-        if big_df_count == 0:
-            big_df = update_velocities2(csv_file_path)
-            big_df_count += 1
-        else:
-            big_df = pd.concat([big_df, update_velocities2(csv_file_path)])
-        big_df.to_csv('/hpc/projects/capillary-flow/results/velocities/velocities/big_df.csv', index=False)
+        velocities_folder = '/hpc/projects/capillary-flow/results/velocities'
+        for csv_file in os.listdir(velocities_folder):
+            if csv_file.endswith('Copy.csv'):
+                csv_file_path = os.path.join(velocities_folder, csv_file)
+                if big_df_count == 0:
+                    big_df = update_velocities2(csv_file_path)
+                    big_df_count += 1
+                else:
+                    big_df = pd.concat([big_df, update_velocities2(csv_file_path)])
+        big_df.to_csv('/hpc/projects/capillary-flow/results/velocities/big_df.csv', index=False)
