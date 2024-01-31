@@ -37,7 +37,12 @@ for participant in os.listdir(base_directory):
                     source_file = os.path.join(source_path, file)
                     destination_file = os.path.join(result_directory, file)
 
-                    # Copy the file
-                    shutil.copy(source_file, destination_file)
+                    # if the file isn't already in the destination directory
+                    if not os.path.isfile(destination_file):
+                        # Copy the file
+                        shutil.copy(source_file, destination_file)
+                    else:
+                        print(f'{file} already exists in {result_directory}')
+
 
 print("Files copied successfully.")
