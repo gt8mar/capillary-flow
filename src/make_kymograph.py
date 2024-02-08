@@ -176,7 +176,7 @@ def normalize_row_and_col(image):
     return 0
 
 def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01', 
-         write = True, variable_radii = False, verbose = False, plot = False):
+         write = True, variable_radii = False, verbose = False, plot = False, test = False):
     """
     This function takes a path to a video and calculates the blood flow.
 
@@ -186,7 +186,6 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
         variable_radii (bool): whether to use variable radii
         verbose (bool): whether to print the progress
         plot (bool): whether to plot the kymographs
-        hasty (bool): whether to use the hasty segmentation files
 
     Returns:
         blood_flow (np.array): blood flow
@@ -257,6 +256,17 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
 
         # Get metadata
         gap_left, gap_right, gap_bottom, gap_top = get_shifts(metadata_folder) # get gaps from the metadata
+
+        # Check to make sure that the shifts are not negative
+        if gap_left < 0:
+            gap_left = 0
+        if gap_top < 0:
+            gap_top = 0
+        if gap_right > 0:
+            gap_right = 0
+        if gap_bottom > 0:
+            gap_bottom = 0
+
         if verbose:
             print(gap_left, gap_right, gap_bottom, gap_top)
 
@@ -304,8 +314,9 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
                     im = Image.fromarray(kymograph)
                     im.save(os.path.join(output_folder, 
                                         kymograph_filename))
-                    # save to results folder
-                    im.save(os.path.join(results_folder, 'kymographs',
+                    if not test:
+                        # save to results folder
+                        im.save(os.path.join(results_folder, 'kymographs',
                                         kymograph_filename))
                 else:
                     print(f'video {video_parsed} does not match video key {video_key}')
@@ -324,8 +335,9 @@ def main(path = 'F:\\Marcus\\data\\part09\\230414\\loc01',
 if __name__ == "__main__":
     ticks = time.time()
     if platform.system() == 'Windows':
-        path = 'F:\\Marcus\\data\\part09\\230414\\loc01'
-        main(path, write=False, hasty=True, verbose=True)
+        # path = 'F:\\Marcus\\data\\part09\\230414\\loc01'
+        path = 'C:\\Users\\gt8mar\\capillary-flow\\tests\\part22\\230530\\loc02'
+        main(path, write=False, verbose=True)
     else:
         path = '/hpc/projects/capillary-flow/data/part09/230414/loc01'
         main(path, write = True)
