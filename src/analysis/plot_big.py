@@ -226,22 +226,85 @@ def plot_caps_by_size(summary_df):
     main(smaller_diameter_df, 'SYS_BP', diam_slice = 'smaller')
     main(larger_diameter_df, 'SYS_BP', diam_slice = 'larger')
     return 0
+def plot_median_diameter(summary_df):
+    """
+    Plot the median diameter for each participant.
 
-def main(df):
-    
-    
-       
+    Args:
+        summary_df (DataFrame): the DataFrame to be plotted, containing 'Participant', 'Diameter', and 'Age' columns
+    Returns:
+        0 if successful
+    """
+    # find the median diameter for each participant
+    median_diameter_per_participant = summary_df.groupby('Participant')['Diameter'].median().sort_values()
+    sorted_participant_indices = {participant: index for index, participant in enumerate(median_diameter_per_participant.index)}
 
-    
-
-
-
-
-
-    
+    # plot the median diameter for each participant
+    fig, ax = plt.subplots(1, 1, figsize=(10, 6), constrained_layout=True)
+    # make blue bars hollow and the edges thick
+    ax2 = ax.twinx()
+    ax.bar(sorted_participant_indices.values(), median_diameter_per_participant.values, width=0.5)
+    # add a red dot for the age of each participant on second y-axis
+    ax2.plot(sorted_participant_indices.values(), summary_df.groupby('Participant')['Age'], '.', color='black', markersize=10)
+    ax.set_xlabel('Participant')
+    ax.set_ylabel('Median Diameter')
+    ax2.set_ylabel('Age')
+    ax.set_title('Median Diameter for Each Participant')
+    ax.set_xticks(list(sorted_participant_indices.values()), list(sorted_participant_indices.keys()))
+    plt.show()
     return 0
-    
-if __name__ == '__main__':
+def compile_metadata():
+    metadata_folder = 'C:\\Users\\gt8mar\\capillary-flow\\metadata'
+    # Read the metadata files if they are csvs
+    metadata_files = [f for f in os.listdir(metadata_folder) if f.endswith('.xlsx')]
+    metadata_dfs = [pd.read_excel(os.path.join(metadata_folder, f)) for f in metadata_files]
+    metadata_df = pd.concat(metadata_dfs)
+
+    # make slice of metadata_df with only bp measurements
+    non_bp_metadata = metadata_df[~metadata_df['Video'].str.contains('bp')]
+   
+    # add 'loc' and a leading zero to the location column
+    non_bp_metadata['Location'] = 'loc' + non_bp_metadata['Location'].astype(str).str.zfill(2)
+
+    # Convert 'Video' identifiers to integers for comparison
+    non_bp_metadata['VideoID'] = non_bp_metadata['Video'].str.extract('(\d+)').astype(int)
+
+    # remove all part09 videos greater than vid59:
+    non_bp_metadata = non_bp_metadata[~((non_bp_metadata['Participant'] == 'part09') & (non_bp_metadata['VideoID'] > 59))]
+
+    # keep only participant, date, location, and video columns
+    non_bp_metadata = non_bp_metadata[['Participant', 'Date', 'Location', 'Video']]
+    return non_bp_metadata
+
+def check_inserted_rows(summary_df):
+     # if the row has 'inserted' in the notes column, that means that the area is the same as the original area from the 'Capillary' column
+    condition_inserted = summary_df['Notes'].str.contains('inserted')
+    # print the rows that have 'inserted' in the notes column
+    print(summary_df[condition_inserted][['Participant', 'Date', 'Location', 'Video', 'Capillary', 'Capillary_new', 'Area']])
+
+    # print all part26 loc01 rows
+    print(summary_df[(summary_df['Participant'] == 'part26') & (summary_df['Location'] == 'loc01') & (summary_df['Video'] == 'vid05')][['Participant', 'Date', 'Location', 'Video', 'Capillary', 'Capillary_new', 'Area', 'Corrected Velocity', 'Diameter']])
+    return 0
+def handle_dotted_evac(summary_df):
+    # Fill NaN values in the 'Notes' column with an empty string
+    summary_df['Notes'] = summary_df['Notes'].fillna('')
+    # Now it is time to handle the added rows in velocity_df
+
+    # if the row has 'dotted' in the notes column, that means that the velocity and area are zero.
+    # if the row has 'evac' in the notes column, that means that the velocity is zero and the area is zero.
+
+    # Condition to find rows with 'NaN' in 'Area' and 'dotted' in 'Notes'
+    condition = summary_df['Area'].isna() & summary_df['Notes'].str.contains('dotted')
+    condition_evac = summary_df['Area'].isna() & summary_df['Notes'].str.contains('evac')
+    summary_df.loc[condition, 'Area'] = 0
+    summary_df.loc[condition, 'Diameter'] = 0
+    summary_df.loc[condition, 'Corrected Velocity'] = 0
+    summary_df.loc[condition_evac, 'Area'] = 0
+    summary_df.loc[condition_evac, 'Diameter'] = 0
+    summary_df.loc[condition_evac, 'Corrected Velocity'] = 0
+    return summary_df
+
+def main(verbose = False):
     # if platform.system() == 'Windows':
     #     if 'gt8mar' in os.getcwd():
     #         path = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\big_df.csv'
@@ -253,76 +316,85 @@ if __name__ == '__main__':
     size_df = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\results\\cap_diameters.csv')
     velocity_df = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\big_df - Copy.csv')
     velocity_df_old = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\big_df.csv')
+    metadata_df = compile_metadata()
+    print(metadata_df.head)
 
-    # different_rows, different_participants = compare_participants(velocity_df_old, velocity_df)
-    # print(different_rows)
-    # print(different_participants)
+    # modify size_df to remove all bp measurements
+    print(f'size_df shape: {size_df.shape}')
+    
+    # remove 'bp' from the video column
+    size_df['Video'] = size_df['Video'].str.replace('bp', '')
 
-    # strip all columns of leading and trailing whitespace
-    size_df.columns = size_df.columns.str.strip()
-    velocity_df.columns = velocity_df.columns.str.strip()
+    # use outer merge to find the rows in size_df that are not bp measurements
+    size_df = size_df.merge(metadata_df, on=['Participant', 'Date', 'Location', 'Video'], how='inner', indicator=False)
+    print(f'new size_df shape: {size_df.shape}')
+    print(size_df.head())
 
-    pd.set_option('display.max_rows', None)
+    different_rows, different_participants = compare_participants(size_df, velocity_df)
+    # save
+    size_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\size_test.csv', index=False)
+    velocity_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\velocity_test.csv', index=False)
+    # remove part22 and part23 from different rows
+    different_rows = [row for row in different_rows if row[0] != 'part22' and row[0] != 'part23']
+    print(different_rows)
+    print(different_participants)
 
-    print(velocity_df[velocity_df['Participant'] == 'part15'][['Participant', 'Date', 'Location', 'Video', 'Capillary', 'Corrected Velocity']])
-    velocity_part15_shape = velocity_df[velocity_df['Participant'] == 'part15'].shape
-    print(f'Velocity df shape: {velocity_part15_shape}')
-    print(size_df[size_df['Participant'] == 'part15'][['Participant', 'Date', 'Location', 'Video', 'Capillary', 'Diameter']])
-    size_part15_shape = size_df[size_df['Participant'] == 'part15'].shape
-    print(f'Size df shape: {size_part15_shape}')
+    # pd.set_option('display.max_rows', None)
+
+    # print(velocity_df[velocity_df['Participant'] == 'part15'][['Participant', 'Date', 'Location', 'Video', 'Capillary', 'Corrected Velocity']])
+    # velocity_part15_shape = velocity_df[velocity_df['Participant'] == 'part15'].shape
+    # print(f'Velocity df shape: {velocity_part15_shape}')
+    # print(size_df[size_df['Participant'] == 'part15'][['Participant', 'Date', 'Location', 'Video', 'Capillary', 'Diameter']])
+    # size_part15_shape = size_df[size_df['Participant'] == 'part15'].shape
+    # print(f'Size df shape: {size_part15_shape}')
+
     # Merge the DataFrames
-    summary_df = pd.merge(size_df, velocity_df, how='left', on=['Participant', 'Date', 'Location', 'Video', 'Capillary', 'SYS_BP', 'Age'])
+    summary_df = pd.merge(size_df, velocity_df, how='right', on=['Participant', 'Date', 'Location', 'Video', 'Capillary', 'SYS_BP', 'Age'])
+    
+    summary_df = handle_dotted_evac(summary_df)
+
+    if verbose: 
+        check_inserted_rows(summary_df)
+    
+    # print any rows where area is NaN
+    print(summary_df[summary_df['Area'].isna()][['Participant', 'Date', 'Location', 'Video', 'Capillary', 'Area', 'Corrected Velocity', 'Diameter']])
+    
+    # save summary_df to csv
+    summary_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\summary_df_test.csv', index=False)
+
     summary_df = summary_df.drop(columns=['Capillary'])
     summary_df = summary_df.rename(columns={'Capillary_new': 'Capillary'})
-    print(summary_df[summary_df['Participant'] == 'part15'][['Participant', 'Date', 'Location', 'Video', 'Capillary', 'Corrected Velocity', 'SYS_BP', 'Age', 'Diameter']])
+    
 
     # plot_histograms(summary_df, 'Age')
     # plot_histograms(summary_df, 'SYS_BP')
     # # print(summary_df.head())
-    # print locations from participant 15
-    pd.set_option('display.max_rows', None)
-    print(summary_df[summary_df['Participant'] == 'part15'])
+
+    # # print locations from participant 15
+    # pd.set_option('display.max_rows', None)
+    # print(summary_df[summary_df['Participant'] == 'part15'])
+    # print(summary_df[summary_df['Participant'] == 'part15'][['Participant', 'Date', 'Location', 'Video', 'Capillary', 'Corrected Velocity', 'SYS_BP', 'Age', 'Diameter']])
+
   
+    # ####### Favorite Capillaries ######
+    # favorite_capillaries = pd.read_excel('C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\chosen_caps.xlsx', sheet_name='Sheet1')
+    # favorite_capillaries = favorite_capillaries.rename(columns={'Chosen Capillary': 'Capillary'})
+    # print(favorite_capillaries.dtypes)
+    # print(summary_df.dtypes)
 
+    # # slice summary_df into favorite capillaries if capillary, location, and participant match
+    # favorite_df = summary_df.merge(favorite_capillaries, on=['Participant', 'Location', 'Capillary'], how='outer')
+
+    # # save to csv
+    # # favorite_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\favorite_caps.csv', index=False)
+    # print(favorite_df.columns)
     
-
-    ####### Favorite Capillaries ######
-    favorite_capillaries = pd.read_excel('C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\chosen_caps.xlsx', sheet_name='Sheet1')
-    favorite_capillaries = favorite_capillaries.rename(columns={'Chosen Capillary': 'Capillary'})
-    print(favorite_capillaries.dtypes)
-    print(summary_df.dtypes)
-    # slice summary_df into favorite capillaries if capillary, location, and participant match
-    favorite_df = summary_df.merge(favorite_capillaries, on=['Participant', 'Location', 'Capillary'], how='outer')
-
-    # save to csv
-    # favorite_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\favorite_caps.csv', index=False)
-    print(favorite_df.columns)
-    # # Remove "Capillary" column, rename "Capillary_new" to "Capillary"
-    # favorite_df = favorite_df.drop(columns=['Capillary'])
-    # favorite_df = favorite_df.rename(columns={'Capillary_new': 'Capillary'})
-
-    # main(favorite_df, 'Age')
-    # main(favorite_df, 'SYS_BP')
-
+    # # plot_histograms(favorite_df, 'Age')
+    # # plot_histograms(favorite_df, 'SYS_BP')
+        
+    return 0
     
-
-    
-
-    # # plot the median diameter for each participant
-    # fig, ax = plt.subplots(1, 1, figsize=(10, 6), constrained_layout=True)
-    # # make blue bars hollow and the edges thick
-    # ax2 = ax.twinx()
-    # ax.bar(sorted_participant_indices.values(), median_diameter_per_participant.values, width=0.5)
-    # # add a red dot for the age of each participant on second y-axis
-    # ax2.plot(sorted_participant_indices.values(), summary_df.groupby('Participant')['Age'], '.', color='black', markersize=10)
-    # ax.set_xlabel('Participant')
-    # ax.set_ylabel('Median Diameter')
-    # ax2.set_ylabel('Age')
-    # ax.set_title('Median Diameter for Each Participant')
-    # ax.set_xticks(list(sorted_participant_indices.values()), list(sorted_participant_indices.keys()))
-    # plt.show()
-
-
-    # main(, 'Age')
+if __name__ == '__main__':
+    main()
 
     
