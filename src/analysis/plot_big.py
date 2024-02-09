@@ -299,9 +299,11 @@ def handle_dotted_evac(summary_df):
     summary_df.loc[condition, 'Area'] = 0
     summary_df.loc[condition, 'Diameter'] = 0
     summary_df.loc[condition, 'Corrected Velocity'] = 0
+    summary_df.loc[condition, 'Centerline'] = 0
     summary_df.loc[condition_evac, 'Area'] = 0
     summary_df.loc[condition_evac, 'Diameter'] = 0
     summary_df.loc[condition_evac, 'Corrected Velocity'] = 0
+    summary_df.loc[condition_evac, 'Centerline'] = 0
     return summary_df
 
 def main(verbose = False):
@@ -331,9 +333,11 @@ def main(verbose = False):
     print(size_df.head())
 
     different_rows, different_participants = compare_participants(size_df, velocity_df)
-    # save
-    size_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\size_test.csv', index=False)
-    velocity_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\velocity_test.csv', index=False)
+
+    # save for testing
+    # size_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\size_test.csv', index=False)
+    # velocity_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\velocity_test.csv', index=False)
+
     # remove part22 and part23 from different rows
     different_rows = [row for row in different_rows if row[0] != 'part22' and row[0] != 'part23']
     print(different_rows)
@@ -348,8 +352,11 @@ def main(verbose = False):
     # size_part15_shape = size_df[size_df['Participant'] == 'part15'].shape
     # print(f'Size df shape: {size_part15_shape}')
 
+    # remove SYS_BP column from size_df
+    size_df = size_df.drop(columns=['SYS_BP'])
+
     # Merge the DataFrames
-    summary_df = pd.merge(size_df, velocity_df, how='right', on=['Participant', 'Date', 'Location', 'Video', 'Capillary', 'SYS_BP', 'Age'])
+    summary_df = pd.merge(size_df, velocity_df, how='outer',on=['Participant', 'Date', 'Location', 'Video', 'Capillary', 'Age'], indicator=True)
     
     summary_df = handle_dotted_evac(summary_df)
 
