@@ -228,22 +228,28 @@ def find_slopes(image, filename, output_folder=None, method = 'lasso', verbose =
             if too_fast:
                 results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\too_fast'
                 os.makedirs(results_folder, exist_ok=True)
+                filename = filename.replace(".tiff", "")
                 filename = filename + "_toofast"
             elif too_slow:
                 results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\too_slow'
+                filename = filename.replace(".tiff", "")
                 filename = filename + "_tooslow"
                 os.makedirs(results_folder, exist_ok=True)
             else:
                 results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities'
+                filename = filename.replace(".tiff", "")
         else:
             if too_fast:
                 results_folder = 'C:\\Users\\gt8ma\\capillary-flow\\results\\velocities\\too_fast'
+                filename = filename.replace(".tiff", "")
                 filename = filename + "_toofast"
             elif too_slow:
                 results_folder = 'C:\\Users\\gt8ma\\capillary-flow\\results\\velocities\\too_slow'
+                filename = filename.replace(".tiff", "")
                 filename = filename + "_tooslow"
             else:
                 results_folder = 'C:\\Users\\gt8ma\\capillary-flow\\results\\velocities'
+                filename = filename.replace(".tiff", "")
     
     if write: 
         if output_folder != None:
@@ -332,7 +338,7 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
     missing_log = []
     for image in images:
         part, date, location, video, file_prefix = parse_filename(image)
-        velocity_filename = image.replace("kymograph", "velocity").replace("tiff", "")
+        velocity_filename = image.replace("kymograph", "velocity").replace(".tiff", "")
         kymo_raw = cv2.imread(os.path.join(input_folder, image), cv2.IMREAD_GRAYSCALE)
         # Get the metadata for the video
         video_metadata = metadata.loc[
