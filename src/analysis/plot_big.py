@@ -5,12 +5,14 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from matplotlib.patches import Patch
 import seaborn as sns
+from scipy.integrate import simps, trapezoid
+
 
 
 # Function to create a color map for a given column
 def create_color_map(df, column, cmap='viridis'):
     unique_values = sorted(df[column].unique())
-    colors = sns.color_palette(cmap, len(unique_values))    
+    colors = sns.color_palette(cmap, len(unique_values))  
     return dict(zip(unique_values, colors))
 
 def compare_participants(df1, df2):
@@ -100,6 +102,81 @@ def plot_pressure_vs_diameter(df, hue = 'Age'):
     plt.show()
     return 0
 
+def plot_loc_histograms(df, variable):
+    if variable == 'Age':
+        point_variable = 'SYS_BP'
+    else:
+        point_variable = 'Age'
+
+    # Create color map for 'Age' and 'SYS_BP'
+    variable_color_map = create_color_map(df, variable)
+    point_color_map = create_color_map(df, point_variable)
+
+    fig, ax = plt.subplots(1, 1, figsize=(12, 6), constrained_layout=True)
+    num_bins = 5  # Specify the number of bins for the histograms
+    
+    # Create a unique identifier for each participant-location combination
+    df['Participant_Location'] = df['Participant'] + "-" + df['Location']
+    unique_ids = df['Participant_Location'].unique()
+    
+    # Compute median values for the histogram variable for each participant-location
+    median_values_hist = df.groupby('Participant_Location')[variable].median()
+    median_values_point = df.groupby('Participant_Location')[point_variable].median()
+
+    # Create a mapping for x-axis positions
+    x_positions = {id: index for index, id in enumerate(unique_ids)}
+
+    for id in unique_ids:
+        participant_data = df[df['Participant_Location'] == id]
+        x_position = x_positions[id]
+
+        # Calculate bins and frequencies
+        velocities = participant_data['Corrected Velocity']
+        bins = np.linspace(velocities.min(), velocities.max(), num_bins + 1)
+        bin_indices = np.digitize(velocities, bins) - 1  # Bin index for each velocity
+
+        # Normalize the bar heights
+        total_measurements = len(velocities)
+        bin_heights = np.array([np.sum(bin_indices == bin_index) for bin_index in range(num_bins)]) / total_measurements
+
+        # Get the median value for the histogram variable
+        hist_attribute_median = median_values_hist[id]
+
+        # Plot bars for each bin
+        for bin_index, bar_height in enumerate(bin_heights):
+            if bar_height == 0:
+                continue
+            color = variable_color_map[hist_attribute_median]
+            ax.bar(x_position + (bin_index - num_bins / 2) * 0.1, bar_height, color=color, width=0.1, align='center')
+
+    # Customize the plot
+    ax.set_xlabel('Participant-Location')
+    ax.set_ylabel(f'Frequency of {variable}')
+    ax.set_title(f'Histogram of Velocities by Participant and Location\nColored by {variable}')
+    
+    # Secondary y-axis for the points
+    ax2 = ax.twinx()
+    for id in unique_ids:
+        x_position = x_positions[id]
+        point_attribute_median = median_values_point[id]
+        point_color = point_color_map[point_attribute_median]
+        ax2.plot(x_position, point_attribute_median, 'X', color='red', markersize=10)
+
+    ax2.set_ylabel(f'{point_variable} Value')
+
+    # Set x-ticks to be the participant-location names
+    ax.set_xticks(list(x_positions.values()))
+    ax.set_xticklabels(list(x_positions.keys()), rotation=45)
+
+    # Legends
+    hist_legend_elements = [Patch(facecolor=color, edgecolor='gray', label=label) for label, color in variable_color_map.items()]
+    ax.legend(handles=hist_legend_elements, title=variable, bbox_to_anchor=(1.05, 1), loc='upper left')
+
+    point_legend_elements = [Patch(facecolor='red', edgecolor='red', label=point_variable)]
+    ax2.legend(handles=point_legend_elements, title=point_variable, bbox_to_anchor=(1.15, 0.9), loc='upper left')
+
+    plt.show()
+    return 0
 def plot_histograms(df, variable = 'Age', diam_slice = None, normalize_bins = 'Total'):
     """
     Plot histograms of the velocities for each participant, colored by the specified variable.
@@ -177,6 +254,13 @@ def plot_histograms(df, variable = 'Age', diam_slice = None, normalize_bins = 'T
         
         # Get the attribute value for the points
         point_attribute_median = median_values_point[participant]
+        print(point_color_map)
+        # if point_attribute_median has a decimal, round to the nearest whole number
+        if point_attribute_median % 1 >= 0.5:
+            point_attribute_median = np.ceil(point_attribute_median)
+        else:
+            point_attribute_median = np.floor(point_attribute_median)
+
         point_color = point_color_map[point_attribute_median]
         
         # Plot the point
@@ -198,7 +282,65 @@ def plot_histograms(df, variable = 'Age', diam_slice = None, normalize_bins = 'T
     ax2.legend(handles=point_legend_elements, title=point_variable, bbox_to_anchor=(1.15, 0.9), loc='upper left')
     plt.show()
     return 0
+def plot_velocities(participant_df):
+    # Group the data by 'Capillary'
+    grouped_df = participant_df.groupby('Capillary')
+    # Get the unique capillary names
+    capillaries = participant_df['Capillary'].unique()
+    participant = participant_df['Participant'].unique()[0]
 
+    # Create subplots
+    num_plots = len(capillaries)
+    num_rows = (num_plots + 3) // 4  # Calculate the number of rows needed
+
+    # Create subplots
+    fig, axes = plt.subplots(nrows=num_rows, ncols=4, figsize=(20, 2 * num_rows), sharey=True, sharex=True)
+
+    # Flatten the axes array to make it easier to iterate over
+    axes = axes.flatten()
+
+    # Plot each capillary's data in separate subplots
+    for i, capillary in enumerate(capillaries):
+        capillary_data = grouped_df.get_group(capillary)
+        ax = axes[i]
+        # ax.plot(capillary_data['Pressure'], capillary_data['Corrected Velocity'], marker='o', linestyle='-', label='Velocity')
+        # Label all points which decrease in pressure with a red dot
+        capillary_data = capillary_data.copy()
+        # decreases = capillary_data['Pressure'].diff() < 0
+        
+        # print(decreases)  
+
+        # create column for "Up/down" in pressure by calling all videos after the maximum pressure 'down'
+        capillary_data.loc[:, 'Up/Down'] = 'Up'
+        max_pressure = capillary_data['Pressure'].max()
+        max_index = capillary_data['Pressure'].idxmax()
+        capillary_data.loc[max_index:, 'Up/Down'] = 'Down'
+
+        # create function to fit a curve to the up and down data, respectively
+        data_up = capillary_data[capillary_data['Up/Down'] == 'Up']
+        data_down = capillary_data[capillary_data['Up/Down'] == 'Down']
+        # Plot data up
+        ax.plot(data_up['Pressure'], data_up['Corrected Velocity'],
+                marker = 'o', linestyle = '-', label='Increase in Pressure')  # Use 'ro' for red dots
+        # Plot data down in purple
+        ax.plot(data_down['Pressure'], data_down['Corrected Velocity'], color= 'purple', 
+                marker = 'o', linestyle = '-', label='Decrease in Pressure')  # Use 'ro' for red dots
+        ax.set_xlabel('Pressure (psi)')
+        ax.set_ylabel('Velocity (um/s)')
+        ax.set_title(f'{participant} Capillary {capillary}')
+        ax.grid(True)
+        
+        # Add a legend to the subplot
+        ax.legend()
+
+    # If there are unused subplots, remove them
+    for i in range(num_plots, len(axes)):
+        fig.delaxes(axes[i])
+
+    # Adjust spacing between subplots to prevent label overlap
+    plt.tight_layout()
+    plt.show()
+    return 0
 def plot_caps_by_size(summary_df):
     """
     Plot the histograms of velocities for the 9 smallest diameter participants and the 9 largest diameter participants.
@@ -305,16 +447,7 @@ def handle_dotted_evac(summary_df):
     summary_df.loc[condition_evac, 'Corrected Velocity'] = 0
     summary_df.loc[condition_evac, 'Centerline'] = 0
     return summary_df
-
-def main(verbose = False):
-    # if platform.system() == 'Windows':
-    #     if 'gt8mar' in os.getcwd():
-    #         path = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\big_df.csv'
-    #     else:
-    #         path = 'C:\\Users\\gt8ma\\capillary-flow\\results\\velocities\\velocities\\big_df.csv'
-    # else:
-    #     path = '/hpc/projects/capillary-flow/results/velocities/big_df.csv'
-        
+def merge_vel_size(verbose=False):
     size_df = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\results\\cap_diameters.csv')
     velocity_df = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\big_df - Copy.csv')
     velocity_df_old = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\big_df.csv')
@@ -368,7 +501,97 @@ def main(verbose = False):
     
     # save summary_df to csv
     summary_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\summary_df_test.csv', index=False)
+    return summary_df
 
+def plot_and_calculate_area(df, method='trapezoidal', plot = False, normalize = False):
+    """
+    Plot 'Pressure' vs. 'Corrected Velocity' from a DataFrame and calculate the area under the curve.
+    
+    Args:
+        df (DataFrame): pressure and velocity data from a specific capillary location and up or down run. 
+        method (str): The method to be used for the area calculation. Options are 'trapezoidal' and 'simpson'.
+    
+    Returns:
+        area (float): The area under the curve calculated using the specified method.
+    """
+    df = df.copy()
+    # Check if required columns are in the DataFrame
+    if 'Pressure' not in df.columns or 'Corrected Velocity' not in df.columns:
+        raise ValueError("DataFrame must contain 'Pressure' and 'Corrected Velocity' columns")
+    
+    # Normalization and hysteresis plotting
+    if normalize:
+        max_velocity = df['Corrected Velocity'].max()
+        if max_velocity > 161:
+            bins = [0, 5, 55, 161, max_velocity+1]
+        else:
+            bins = [0, 5, 55, 161, 161+1]
+        bin_labels = [0, 1, 2, 3]  # Assigning a specific value to each bin
+        df.loc[:, 'Velocity Binned'] = pd.cut(df['Corrected Velocity'].copy(), bins=bins, labels=bin_labels)
+        if plot:
+            plt.figure(figsize=(10, 6))
+            for label in bin_labels:
+                subset = df[df['Velocity Binned'] == label]
+                plt.plot(subset['Pressure'], subset['Velocity Binned'], label=f'Bin {label}', marker='o')
+            
+            plt.title('Hysteresis Plot')
+            plt.xlabel('Pressure')
+            plt.ylabel('Binned Corrected Velocity')
+            plt.legend()
+            plt.grid(True)
+            plt.show()
+        print(f'the binned velocities are: {df["Velocity Binned"]}')
+        # Area calculation    
+        if method == 'trapezoidal':
+            area = trapezoid(df['Velocity Binned'], df['Pressure'])
+        elif method == 'simpson' and len(df) % 2 == 0:
+            # Simpson's rule requires an even number of samples, adding a check
+            print("Warning: Simpson's rule requires an even number of intervals. Adjusting by removing the last data point.")
+            area = simps(df['Velocity Binned'][:-1], df['Pressure'][:-1])
+        elif method == 'simpson':
+            area = simps(df['Velocity Binned'], df['Pressure'])
+        else:
+            raise ValueError("Method must be either 'trapezoidal' or 'simpson'")
+        
+        print(f"Calculated normalized area under the curve using {method} rule: {area}")
+    else:
+        if plot:
+            # Plotting
+            plt.figure(figsize=(10, 6))
+            plt.plot(df['Pressure'], df['Corrected Velocity'], label='Corrected Velocity vs. Pressure', marker='o')
+            plt.fill_between(df['Pressure'], df['Corrected Velocity'], alpha=0.2)
+            plt.title('Corrected Velocity vs. Pressure')
+            plt.xlabel('Pressure')
+            plt.ylabel('Corrected Velocity')
+            plt.legend()
+            plt.grid(True)
+            plt.show()
+        
+        # Area calculation
+        if method == 'trapezoidal':
+            area = trapezoid(df['Corrected Velocity'], df['Pressure'])
+        elif method == 'simpson' and len(df) % 2 == 0:
+            # Simpson's rule requires an even number of samples, adding a check
+            print("Warning: Simpson's rule requires an even number of intervals. Adjusting by removing the last data point.")
+            area = simps(df['Corrected Velocity'][:-1], df['Pressure'][:-1])
+        elif method == 'simpson':
+            area = simps(df['Corrected Velocity'], df['Pressure'])
+        else:
+            raise ValueError("Method must be either 'trapezoidal' or 'simpson'")
+        
+        print(f"Calculated area under the curve using {method} rule: {area}")
+    return area
+
+def main(verbose = False):
+    if platform.system() == 'Windows':
+        if 'gt8mar' in os.getcwd():
+            path = 'C:\\Users\\gt8mar\\capillary-flow\\results\\summary_df_test.csv'
+        else:
+            path = 'C:\\Users\\gt8ma\\capillary-flow\\results\\summary_df_test.csv'
+    else:
+        path = '/hpc/projects/capillary-flow/results/summary_df_test.csv'
+
+    summary_df = pd.read_csv(path)
     summary_df = summary_df.drop(columns=['Capillary'])
     summary_df = summary_df.rename(columns={'Capillary_new': 'Capillary'})
     
@@ -377,28 +600,83 @@ def main(verbose = False):
     # plot_histograms(summary_df, 'SYS_BP')
     # # print(summary_df.head())
 
-    # # print locations from participant 15
-    # pd.set_option('display.max_rows', None)
-    # print(summary_df[summary_df['Participant'] == 'part15'])
-    # print(summary_df[summary_df['Participant'] == 'part15'][['Participant', 'Date', 'Location', 'Video', 'Capillary', 'Corrected Velocity', 'SYS_BP', 'Age', 'Diameter']])
-
+    
   
     # ####### Favorite Capillaries ######
     # favorite_capillaries = pd.read_excel('C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\chosen_caps.xlsx', sheet_name='Sheet1')
-    # favorite_capillaries = favorite_capillaries.rename(columns={'Chosen Capillary': 'Capillary'})
-    # print(favorite_capillaries.dtypes)
-    # print(summary_df.dtypes)
+    favorite_capillaries = pd.read_excel('C:\\Users\\gt8ma\\capillary-flow\\results\\chosen_caps.xlsx', sheet_name='Sheet1')
+    favorite_capillaries = favorite_capillaries.rename(columns={'Chosen Capillary': 'Capillary'})
 
-    # # slice summary_df into favorite capillaries if capillary, location, and participant match
-    # favorite_df = summary_df.merge(favorite_capillaries, on=['Participant', 'Location', 'Capillary'], how='outer')
+    # slice summary_df into favorite capillaries if capillary, location, and participant match
+    favorite_df = summary_df.merge(favorite_capillaries, on=['Participant', 'Location', 'Capillary'], how='inner')
 
-    # # save to csv
-    # # favorite_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\favorite_caps.csv', index=False)
+    # save to csv
+    # favorite_df.to_csv('C:\\Users\\gt8ma\\capillary-flow\\favorite_caps.csv', index=False)
     # print(favorite_df.columns)
+
+    # remove part22 and part23
+    favorite_df = favorite_df[~favorite_df['Participant'].isin(['part22', 'part23'])]
     
-    # # plot_histograms(favorite_df, 'Age')
-    # # plot_histograms(favorite_df, 'SYS_BP')
+    
+    # plot_loc_histograms(favorite_df, 'Age')
+    # plot_loc_histograms(favorite_df, 'SYS_BP')
+
+    # plot velocities for each participant:
+    for participant in favorite_df['Participant'].unique():
+        favorite_df_copy = favorite_df.copy()
+        participant_df = favorite_df_copy[favorite_df_copy['Participant'] == participant]
+        # plot_velocities(participant_df)
+    
+        # Group the data by 'Capillary'
+        grouped_df = participant_df.groupby('Capillary')
+        # Get the unique capillary names
+        capillaries = participant_df['Capillary'].unique()
+        participant = participant_df['Participant'].unique()[0]
         
+
+
+        # Plot each capillary's data in separate subplots
+        for i, capillary in enumerate(capillaries):
+            print(f'Participant: {participant}, Capillary: {capillary}')
+            capillary_data = grouped_df.get_group(capillary)
+            capillary_data = capillary_data.copy()
+            # decreases = capillary_data['Pressure'].diff() < 0
+            
+            # print(decreases)  
+
+            # create column for "Up/down" in pressure by calling all videos after the maximum pressure 'down'
+            capillary_data.loc[:, 'Up/Down'] = 'Up'
+            max_pressure = capillary_data['Pressure'].max()
+            max_index = capillary_data['Pressure'].idxmax()
+            capillary_data.loc[max_index:, 'Up/Down'] = 'Down'
+
+            # create function to fit a curve to the up and down data, respectively
+            data_up = capillary_data[capillary_data['Up/Down'] == 'Up']
+            data_down = capillary_data[capillary_data['Up/Down'] == 'Down']
+            curve_up = plot_and_calculate_area(data_up, plot = True, normalize = True)
+            curve_down = plot_and_calculate_area(data_down, plot = True, normalize = True)
+            hysterisis = curve_up - curve_down
+            print(f'Participant: {participant}, Capillary: {capillary}, Hysterisis: {hysterisis}')
+            
+            # add hysterisis to the favorite_df
+            favorite_df.loc[(favorite_df['Participant'] == participant) & (favorite_df['Capillary'] == capillary), 'Hysterisis'] = hysterisis
+            
+    # Plot scatter of age vs hysterisis 
+    plt.figure(figsize=(10, 6))
+    sns.scatterplot(x='Age', y='Hysterisis', data=favorite_df)
+    plt.title('Hysterisis vs Age')
+    plt.xlabel('Age')
+    plt.ylabel('Hysterisis')
+    plt.show()
+
+    
+
+           
+
+                          
+        
+
+
     return 0
     
 if __name__ == '__main__':
