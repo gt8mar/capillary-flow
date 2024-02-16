@@ -6,8 +6,16 @@ import matplotlib.colors as mcolors
 from matplotlib.patches import Patch
 import seaborn as sns
 from scipy.integrate import simps, trapezoid
+from scipy.stats import skew, kurtosis  
 
-
+def calculate_metrics(velocities):
+    metrics = {}
+    metrics['std_dev'] = np.std(velocities)
+    metrics['skewness'] = skew(velocities)
+    metrics['kurtosis'] = kurtosis(velocities, fisher=False)  # Fisher=False for Pearson's definition of kurtosis
+    metrics['peakiness'] = max(velocities) / metrics['std_dev']  # Example definition for peakiness
+    metrics['coeff_variation'] = metrics['std_dev'] / np.mean(velocities)
+    return metrics
 
 # Function to create a color map for a given column
 def create_color_map(df, column, cmap='viridis'):
@@ -102,7 +110,7 @@ def plot_pressure_vs_diameter(df, hue = 'Age'):
     plt.show()
     return 0
 
-def plot_loc_histograms(df, variable):
+def plot_loc_histograms(df, variable, metrics = False):
     if variable == 'Age':
         point_variable = 'SYS_BP'
     else:
@@ -215,9 +223,14 @@ def plot_histograms(df, variable = 'Age', diam_slice = None, normalize_bins = 'T
         participant_data = df[df['Participant'] == participant]
         participant_index = participant_order[participant]
         participant_velocities = participant_data['Corrected Velocity']
+        max_velocity = participant_velocities.max()
+        if max_velocity > 2000:
+            bins = [-0.0001, 5, calc_vel_bins(15), calc_vel_bins(30), calc_vel_bins(45), calc_vel_bins(60), calc_vel_bins(75), 2000, max_velocity+1]
+        else:
+            bins = [-0.0001, 5, calc_vel_bins(15), calc_vel_bins(30), calc_vel_bins(45), calc_vel_bins(60), calc_vel_bins(75), 2000]
         
         # bins = np.linspace(velocities.min(), velocities.max(), num_bins + 1)
-        bins = [0, 5, 55, 161, df['Corrected Velocity'].max()]
+        # bins = [0, 5, 55, 161, df['Corrected Velocity'].max()]
         num_bins = len(bins) - 1
         bin_indices = np.digitize(participant_velocities, bins) - 1  # Bin index for each velocity
 
@@ -502,8 +515,11 @@ def merge_vel_size(verbose=False):
     # save summary_df to csv
     summary_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\summary_df_test.csv', index=False)
     return summary_df
+def calc_vel_bins(theta):
+    v_tan = np.tan(np.radians(theta))*2.44*(227.8/2)
+    return v_tan
 
-def plot_and_calculate_area(df, method='trapezoidal', plot = False, normalize = False):
+def plot_and_calculate_area(df, method='trapezoidal', plot = False, normalize = False, verbose=False):
     """
     Plot 'Pressure' vs. 'Corrected Velocity' from a DataFrame and calculate the area under the curve.
     
@@ -522,25 +538,23 @@ def plot_and_calculate_area(df, method='trapezoidal', plot = False, normalize = 
     # Normalization and hysteresis plotting
     if normalize:
         max_velocity = df['Corrected Velocity'].max()
-        if max_velocity > 161:
-            bins = [0, 5, 55, 161, max_velocity+1]
+        if max_velocity > 2000:
+            bins = [-0.0001, 5, calc_vel_bins(15), calc_vel_bins(30), calc_vel_bins(45), calc_vel_bins(60), calc_vel_bins(75), 2000, max_velocity+1]
         else:
-            bins = [0, 5, 55, 161, 161+1]
-        bin_labels = [0, 1, 2, 3]  # Assigning a specific value to each bin
+            bins = [-0.0001, 5, calc_vel_bins(15), calc_vel_bins(30), calc_vel_bins(45), calc_vel_bins(60), calc_vel_bins(75), 2000]
+        bin_labels = range(len(bins)-1)  # Assigning a specific value to each bin
         df.loc[:, 'Velocity Binned'] = pd.cut(df['Corrected Velocity'].copy(), bins=bins, labels=bin_labels)
         if plot:
             plt.figure(figsize=(10, 6))
-            for label in bin_labels:
-                subset = df[df['Velocity Binned'] == label]
-                plt.plot(subset['Pressure'], subset['Velocity Binned'], label=f'Bin {label}', marker='o')
-            
+            plt.plot(df['Pressure'], df['Velocity Binned'])
             plt.title('Hysteresis Plot')
             plt.xlabel('Pressure')
             plt.ylabel('Binned Corrected Velocity')
             plt.legend()
             plt.grid(True)
             plt.show()
-        print(f'the binned velocities are: {df["Velocity Binned"]}')
+        if verbose:
+            print(f'the binned velocities are: {df['Corrected Velocity']} to {df["Velocity Binned"]}')
         # Area calculation    
         if method == 'trapezoidal':
             area = trapezoid(df['Velocity Binned'], df['Pressure'])
@@ -600,6 +614,9 @@ def main(verbose = False):
     # plot_histograms(summary_df, 'SYS_BP')
     # # print(summary_df.head())
 
+    summary_metrics = calculate_metrics(summary_df['Corrected Velocity'])
+    print(summary_metrics)
+
     
   
     # ####### Favorite Capillaries ######
@@ -617,9 +634,13 @@ def main(verbose = False):
     # remove part22 and part23
     favorite_df = favorite_df[~favorite_df['Participant'].isin(['part22', 'part23'])]
     
+    # plot_histograms(favorite_df, 'Age')
+    # plot_histograms(favorite_df, 'SYS_BP')
     
     # plot_loc_histograms(favorite_df, 'Age')
     # plot_loc_histograms(favorite_df, 'SYS_BP')
+
+    favorite_metrics = calculate_metrics(favorite_df['Corrected Velocity'])
 
     # plot velocities for each participant:
     for participant in favorite_df['Participant'].unique():
@@ -653,21 +674,21 @@ def main(verbose = False):
             # create function to fit a curve to the up and down data, respectively
             data_up = capillary_data[capillary_data['Up/Down'] == 'Up']
             data_down = capillary_data[capillary_data['Up/Down'] == 'Down']
-            curve_up = plot_and_calculate_area(data_up, plot = True, normalize = True)
-            curve_down = plot_and_calculate_area(data_down, plot = True, normalize = True)
-            hysterisis = curve_up - curve_down
+            curve_up = plot_and_calculate_area(data_up, plot = False, normalize = False)
+            curve_down = plot_and_calculate_area(data_down, plot = False, normalize = False)
+            hysterisis = curve_up + curve_down
             print(f'Participant: {participant}, Capillary: {capillary}, Hysterisis: {hysterisis}')
             
             # add hysterisis to the favorite_df
             favorite_df.loc[(favorite_df['Participant'] == participant) & (favorite_df['Capillary'] == capillary), 'Hysterisis'] = hysterisis
             
-    # Plot scatter of age vs hysterisis 
-    plt.figure(figsize=(10, 6))
-    sns.scatterplot(x='Age', y='Hysterisis', data=favorite_df)
-    plt.title('Hysterisis vs Age')
-    plt.xlabel('Age')
-    plt.ylabel('Hysterisis')
-    plt.show()
+    # # Plot scatter of age vs hysterisis 
+    # plt.figure(figsize=(10, 6))
+    # sns.scatterplot(x='Age', y='Hysterisis', data=favorite_df)
+    # plt.title('Hysterisis vs Age')
+    # plt.xlabel('Age')
+    # plt.ylabel('Hysterisis')
+    # plt.show()
 
     
 
