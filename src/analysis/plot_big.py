@@ -4,11 +4,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from matplotlib.patches import Patch
+from matplotlib.cm import ScalarMappable
 import seaborn as sns
 from scipy.integrate import simps, trapezoid
 from scipy.stats import skew, kurtosis  
 
 def calculate_metrics(velocities):
+    # Remove NaN values from the velocities
+    velocities = velocities.dropna()
     metrics = {}
     metrics['std_dev'] = np.std(velocities)
     metrics['skewness'] = skew(velocities)
@@ -159,7 +162,7 @@ def plot_loc_histograms(df, variable, metrics = False):
 
     # Customize the plot
     ax.set_xlabel('Participant-Location')
-    ax.set_ylabel(f'Frequency of {variable}')
+    ax.set_ylabel(f'Frequency of velocity')
     ax.set_title(f'Histogram of Velocities by Participant and Location\nColored by {variable}')
     
     # Secondary y-axis for the points
@@ -185,7 +188,7 @@ def plot_loc_histograms(df, variable, metrics = False):
 
     plt.show()
     return 0
-def plot_histograms(df, variable = 'Age', diam_slice = None, normalize_bins = 'Total'):
+def plot_histograms(df, variable = 'Age', diam_slice = None, normalize_bins = 'Total', gradient = True):
     """
     Plot histograms of the velocities for each participant, colored by the specified variable.
 
@@ -204,9 +207,15 @@ def plot_histograms(df, variable = 'Age', diam_slice = None, normalize_bins = 'T
     else:
         point_variable = 'Age'
 
-    # Create color map for 'Age' and 'SYS_BP'
-    variable_color_map = create_color_map(df, variable)
-    point_color_map = create_color_map(df, point_variable)
+    if gradient:
+        # Determine the range of the variable for the gradient
+        variable_range = (df[variable].min(), df[variable].max())
+        norm = mcolors.Normalize(vmin=variable_range[0], vmax=variable_range[1])
+        scalar_map = ScalarMappable(norm=norm, cmap='viridis')  
+    else:
+        # Create color map for 'Age' and 'SYS_BP'
+        variable_color_map = create_color_map(df, variable)
+        point_color_map = create_color_map(df, point_variable)
 
     # Calculate the median 'variable' for each participant and sort them
     median_variable_per_participant = df.groupby('Participant')[variable].median().sort_values()
@@ -245,13 +254,16 @@ def plot_histograms(df, variable = 'Age', diam_slice = None, normalize_bins = 'T
         for bin_index, bar_height in enumerate(bin_heights):
             if bar_height == 0:
                 continue
-            color = variable_color_map[hist_attribute_median]
+            if gradient:
+                color = scalar_map.to_rgba(hist_attribute_median)
+            else:
+                color = variable_color_map[hist_attribute_median]
             ax.bar(participant_index + (bin_index - num_bins / 2) * 0.1, bar_height,
                    color=color, width=0.1, align='center')
 
     # Customize the plot
     ax.set_xlabel('Participant')
-    ax.set_ylabel(f'Frequency of {variable}')
+    ax.set_ylabel(f'Frequency of velocity')
     if diam_slice == 'smaller':
         ax.set_title(f'Histogram of Velocities by Participant\nColored by {variable} \n(Smaller Diameters)')
     elif diam_slice == 'larger':
@@ -267,17 +279,15 @@ def plot_histograms(df, variable = 'Age', diam_slice = None, normalize_bins = 'T
         
         # Get the attribute value for the points
         point_attribute_median = median_values_point[participant]
-        print(point_color_map)
+
         # if point_attribute_median has a decimal, round to the nearest whole number
         if point_attribute_median % 1 >= 0.5:
             point_attribute_median = np.ceil(point_attribute_median)
         else:
             point_attribute_median = np.floor(point_attribute_median)
-
-        point_color = point_color_map[point_attribute_median]
         
         # Plot the point
-        ax2.plot(participant_index, point_attribute_median, 'X', color='red', markersize=10)         # could make this point color
+        ax2.plot(participant_index, point_attribute_median, 'o', color='red', markersize=5)         # could make this point color
     
     ax2.set_ylabel(f'{point_variable} Value')
 
@@ -285,13 +295,17 @@ def plot_histograms(df, variable = 'Age', diam_slice = None, normalize_bins = 'T
     ax.set_xticks(list(participant_order.values()))
     ax.set_xticklabels(list(participant_order.keys()))
 
-    # Create a legend for the attribute
-    hist_legend_elements = [Patch(facecolor=color, edgecolor='gray', label=label)
+    if gradient:
+        hist_legend_elements = [Patch(facecolor=scalar_map.to_rgba(value), edgecolor='gray', label=value)
+                                 for value in median_variable_per_participant.values]
+    else:
+        # Create a legend for the attribute
+        hist_legend_elements = [Patch(facecolor=color, edgecolor='gray', label=label)
                        for label, color in variable_color_map.items()]
     ax.legend(handles=hist_legend_elements, title=variable, bbox_to_anchor=(1.05, 1), loc='upper left')
 
     # Create a legend for the points
-    point_legend_elements = [Patch(facecolor='red', edgecolor='red', label=variable)]
+    point_legend_elements = [Patch(facecolor='red', edgecolor='red', label=point_variable)]
     ax2.legend(handles=point_legend_elements, title=point_variable, bbox_to_anchor=(1.15, 0.9), loc='upper left')
     plt.show()
     return 0
@@ -566,8 +580,8 @@ def plot_and_calculate_area(df, method='trapezoidal', plot = False, normalize = 
             area = simps(df['Velocity Binned'], df['Pressure'])
         else:
             raise ValueError("Method must be either 'trapezoidal' or 'simpson'")
-        
-        print(f"Calculated normalized area under the curve using {method} rule: {area}")
+        if verbose:
+            print(f"Calculated normalized area under the curve using {method} rule: {area}")
     else:
         if plot:
             # Plotting
@@ -592,8 +606,8 @@ def plot_and_calculate_area(df, method='trapezoidal', plot = False, normalize = 
             area = simps(df['Corrected Velocity'], df['Pressure'])
         else:
             raise ValueError("Method must be either 'trapezoidal' or 'simpson'")
-        
-        print(f"Calculated area under the curve using {method} rule: {area}")
+        if verbose:
+            print(f"Calculated area under the curve using {method} rule: {area}")
     return area
 
 def main(verbose = False):
@@ -616,6 +630,109 @@ def main(verbose = False):
 
     summary_metrics = calculate_metrics(summary_df['Corrected Velocity'])
     print(summary_metrics)
+    skewness = []
+    kurtosis = []
+    for participant in summary_df['Participant'].unique():
+        participant_df = summary_df[summary_df['Participant'] == participant]
+        participant_metrics = calculate_metrics(participant_df['Corrected Velocity'])
+        skewness.append([participant,participant_metrics['skewness']])
+        kurtosis.append([participant,participant_metrics['kurtosis']])
+    
+        # # Plot density
+        # sns.kdeplot(summary_df['Corrected Velocity'], label='Entire Dataset', fill=True)
+        # sns.kdeplot(participant_df['Corrected Velocity'], label=participant, fill=True, alpha=0.5)
+        # plt.legend()
+        # plt.title('Density Plot of Entire Dataset vs. Subset')
+        # plt.show()
+    
+    # # Subset data into old vs young
+    # old_df = summary_df[summary_df['Age'] > 50]
+    # young_df = summary_df[summary_df['Age'] <= 50]
+    # # Plot density
+    # sns.kdeplot(summary_df['Corrected Velocity'], label='Entire Dataset', fill=True)
+    # sns.kdeplot(old_df['Corrected Velocity'], label='old', fill=True, alpha=0.5)
+    # sns.kdeplot(young_df['Corrected Velocity'], label='young', fill=True, alpha=0.5)
+    # plt.legend()
+    # plt.title('Density Plot of Entire Dataset vs. Subset')
+    # plt.show()
+
+    # # Subset data into low BP vs high BP
+    # normBP_df = summary_df[summary_df['SYS_BP'] <= 120]
+    # highBP_df = summary_df[summary_df['SYS_BP'] > 120]
+    # print(f'the participants with high BP are: {highBP_df["Participant"].unique()}')
+
+    # # Plot density
+    # sns.kdeplot(summary_df['Corrected Velocity'], label='Entire Dataset', fill=True)
+    # sns.kdeplot(normBP_df['Corrected Velocity'], label='normal', fill=True, alpha=0.5)
+    # sns.kdeplot(highBP_df['Corrected Velocity'], label='high BP', fill=True, alpha=0.5)
+    # plt.legend()
+    # plt.title('Density Plot of Entire Dataset vs. Subset')
+    # plt.show()
+
+    # # Plot density of old high BP vs young high BP vs old low BP vs young low BP
+    # old_highBP_df = old_df[old_df['SYS_BP'] > 120]
+    # young_highBP_df = young_df[young_df['SYS_BP'] > 120]
+    # old_normBP_df = old_df[old_df['SYS_BP'] <= 120]
+    # young_normBP_df = young_df[young_df['SYS_BP'] <= 120]
+
+    # # Plot density
+    # sns.kdeplot(summary_df['Corrected Velocity'], label='Entire Dataset', fill=True)
+    # sns.kdeplot(old_highBP_df['Corrected Velocity'], label='old high BP', fill=True, alpha=0.5)
+    # sns.kdeplot(young_highBP_df['Corrected Velocity'], label='young high BP', fill=True, alpha=0.5)
+    # sns.kdeplot(old_normBP_df['Corrected Velocity'], label='old normal BP', fill=True, alpha=0.5)
+    # sns.kdeplot(young_normBP_df['Corrected Velocity'], label='young normal BP', fill=True, alpha=0.5)
+    # plt.legend()
+    # plt.title('Density Plot of Entire Dataset vs. Subset')
+    # plt.show()
+
+    # # compare high BP old vs young
+    # # Plot density
+    # sns.kdeplot(summary_df['Corrected Velocity'], label='Entire Dataset', fill=True)
+    # sns.kdeplot(old_highBP_df['Corrected Velocity'], label='old high BP', fill=True, alpha=0.5)
+    # sns.kdeplot(young_highBP_df['Corrected Velocity'], label='young high BP', fill=True, alpha=0.5)
+    # plt.legend()
+    # plt.title('Density Plot of high BP participants')
+    # plt.show()
+
+    # # compare low BP old vs young
+    # # Plot density
+    # sns.kdeplot(summary_df['Corrected Velocity'], label='Entire Dataset', fill=True)
+    # sns.kdeplot(old_normBP_df['Corrected Velocity'], label='old normal BP', fill=True, alpha=0.5)
+    # sns.kdeplot(young_normBP_df['Corrected Velocity'], label='young normal BP', fill=True, alpha=0.5)
+    # plt.legend()
+    # plt.title('Density Plot of normal BP participants')
+    # plt.show()
+
+    # # Plot median velocity by participant
+    # median_velocity_per_participant = summary_df.groupby('Participant')['Corrected Velocity'].median().sort_values()
+    # sorted_participant_indices = {participant: index for index, participant in enumerate(median_velocity_per_participant.index)}
+    # plt.figure(figsize=(10, 6))
+    # plt.bar(sorted_participant_indices.values(), median_velocity_per_participant.values, width=0.5)
+    # plt.xlabel('Participant')
+    # plt.ylabel('Median Corrected Velocity')
+    # plt.title('Median Corrected Velocity for Each Participant')
+    # plt.xticks(list(sorted_participant_indices.values()), list(sorted_participant_indices.keys()), rotation=45)
+    # plt.show()
+        
+    
+
+
+    # plt.figure(figsize=(10, 6))
+    # sns.barplot(x = [x[0] for x in skewness], y = [x[1] for x in skewness])
+    # plt.title('Skewness by Participant')
+    # plt.xlabel('Participant')
+    # plt.ylabel('Skewness')
+    # plt.show()
+
+    # plt.figure(figsize=(10, 6))
+    # sns.barplot(x = [x[0] for x in kurtosis], y = [x[1] for x in kurtosis])
+    # plt.title('Kurtosis by Participant')
+    # plt.xlabel('Participant')
+    # plt.ylabel('Kurtosis')
+    # plt.show()
+
+        
+        
 
     
   
@@ -677,7 +794,7 @@ def main(verbose = False):
             curve_up = plot_and_calculate_area(data_up, plot = False, normalize = False)
             curve_down = plot_and_calculate_area(data_down, plot = False, normalize = False)
             hysterisis = curve_up + curve_down
-            print(f'Participant: {participant}, Capillary: {capillary}, Hysterisis: {hysterisis}')
+            # print(f'Participant: {participant}, Capillary: {capillary}, Hysterisis: {hysterisis}')
             
             # add hysterisis to the favorite_df
             favorite_df.loc[(favorite_df['Participant'] == participant) & (favorite_df['Capillary'] == capillary), 'Hysterisis'] = hysterisis
