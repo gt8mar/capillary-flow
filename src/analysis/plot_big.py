@@ -703,16 +703,17 @@ def main(verbose = False):
     # plt.title('Density Plot of normal BP participants')
     # plt.show()
 
-    # # Plot median velocity by participant
-    # median_velocity_per_participant = summary_df.groupby('Participant')['Corrected Velocity'].median().sort_values()
-    # sorted_participant_indices = {participant: index for index, participant in enumerate(median_velocity_per_participant.index)}
-    # plt.figure(figsize=(10, 6))
-    # plt.bar(sorted_participant_indices.values(), median_velocity_per_participant.values, width=0.5)
-    # plt.xlabel('Participant')
-    # plt.ylabel('Median Corrected Velocity')
-    # plt.title('Median Corrected Velocity for Each Participant')
-    # plt.xticks(list(sorted_participant_indices.values()), list(sorted_participant_indices.keys()), rotation=45)
-    # plt.show()
+    # Plot median velocity by participant
+    median_velocity_per_participant = summary_df.groupby('Participant')['Corrected Velocity'].median().sort_values()
+    sorted_participant_indices = {participant: index for index, participant in enumerate(median_velocity_per_participant.index)}
+    
+    plt.figure(figsize=(10, 6))
+    plt.bar(sorted_participant_indices.values(), median_velocity_per_participant.values, width=0.5)
+    plt.xlabel('Participant')
+    plt.ylabel('Median Corrected Velocity')
+    plt.title('Median Corrected Velocity for Each Participant')
+    plt.xticks(list(sorted_participant_indices.values()), list(sorted_participant_indices.keys()), rotation=45)
+    plt.show()
         
     
 
