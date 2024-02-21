@@ -610,6 +610,139 @@ def plot_and_calculate_area(df, method='trapezoidal', plot = False, normalize = 
             print(f"Calculated area under the curve using {method} rule: {area}")
     return area
 
+def plot_densities(summary_df):
+    # Subset data into old vs young
+    old_df = summary_df[summary_df['Age'] > 50]
+    young_df = summary_df[summary_df['Age'] <= 50]
+    # Plot density
+    sns.kdeplot(summary_df['Corrected Velocity'], label='Entire Dataset', fill=True)
+    sns.kdeplot(old_df['Corrected Velocity'], label='old', fill=True, alpha=0.5)
+    sns.kdeplot(young_df['Corrected Velocity'], label='young', fill=True, alpha=0.5)
+    plt.legend()
+    plt.title('Density Plot of Entire Dataset vs. Subset')
+    plt.show()
+
+    # Subset data into low BP vs high BP
+    normBP_df = summary_df[summary_df['SYS_BP'] <= 120]
+    highBP_df = summary_df[summary_df['SYS_BP'] > 120]
+    print(f'the participants with high BP are: {highBP_df["Participant"].unique()}')
+
+    # Plot density
+    sns.kdeplot(summary_df['Corrected Velocity'], label='Entire Dataset', fill=True)
+    sns.kdeplot(normBP_df['Corrected Velocity'], label='normal', fill=True, alpha=0.5)
+    sns.kdeplot(highBP_df['Corrected Velocity'], label='high BP', fill=True, alpha=0.5)
+    plt.legend()
+    plt.title('Density Plot of Entire Dataset vs. Subset')
+    plt.show()
+
+    # Plot density of old high BP vs young high BP vs old low BP vs young low BP
+    old_highBP_df = old_df[old_df['SYS_BP'] > 120]
+    young_highBP_df = young_df[young_df['SYS_BP'] > 120]
+    old_normBP_df = old_df[old_df['SYS_BP'] <= 120]
+    young_normBP_df = young_df[young_df['SYS_BP'] <= 120]
+
+    # Plot density
+    sns.kdeplot(summary_df['Corrected Velocity'], label='Entire Dataset', fill=True)
+    sns.kdeplot(old_highBP_df['Corrected Velocity'], label='old high BP', fill=True, alpha=0.5)
+    sns.kdeplot(young_highBP_df['Corrected Velocity'], label='young high BP', fill=True, alpha=0.5)
+    sns.kdeplot(old_normBP_df['Corrected Velocity'], label='old normal BP', fill=True, alpha=0.5)
+    sns.kdeplot(young_normBP_df['Corrected Velocity'], label='young normal BP', fill=True, alpha=0.5)
+    plt.legend()
+    plt.title('Density Plot of Entire Dataset vs. Subset')
+    plt.show()
+
+    # compare high BP old vs young
+    # Plot density
+    sns.kdeplot(summary_df['Corrected Velocity'], label='Entire Dataset', fill=True)
+    sns.kdeplot(old_highBP_df['Corrected Velocity'], label='old high BP', fill=True, alpha=0.5)
+    sns.kdeplot(young_highBP_df['Corrected Velocity'], label='young high BP', fill=True, alpha=0.5)
+    plt.legend()
+    plt.title('Density Plot of high BP participants')
+    plt.show()
+
+    # compare low BP old vs young
+    # Plot density
+    sns.kdeplot(summary_df['Corrected Velocity'], label='Entire Dataset', fill=True)
+    sns.kdeplot(old_normBP_df['Corrected Velocity'], label='old normal BP', fill=True, alpha=0.5)
+    sns.kdeplot(young_normBP_df['Corrected Velocity'], label='young normal BP', fill=True, alpha=0.5)
+    plt.legend()
+    plt.title('Density Plot of normal BP participants')
+    plt.show()
+    return 0
+
+def plot_densities_individual(summary_df, participant_df, participant):
+    # Plot density
+    sns.kdeplot(summary_df['Corrected Velocity'], label='Entire Dataset', fill=True)
+    sns.kdeplot(participant_df['Corrected Velocity'], label=participant, fill=True, alpha=0.5)
+    plt.legend()
+    plt.title('Density Plot of Entire Dataset vs. Subset')
+    plt.show()
+    return 0
+
+def quantile_analysis(data, subset, quantiles=[0.25, 0.5, 0.75]):
+    data_quantiles = np.quantile(data, quantiles)
+    subset_quantiles = np.quantile(subset, quantiles)
+    
+    print("Quantile Analysis:")
+    for q, dq, sq in zip(quantiles, data_quantiles, subset_quantiles):
+        print(f"{int(q*100)}th percentile - Entire Dataset: {dq}, Subset: {sq}")
+    return 0
+
+def plot_cdf(data, subset, labels=['Entire Dataset', 'Subset']):
+    # Calculate CDF for the entire dataset
+    data_sorted = np.sort(data)
+    p = 1. * np.arange(len(data)) / (len(data) - 1)
+    
+    # Calculate CDF for the subset
+    subset_sorted = np.sort(subset)
+    p_subset = 1. * np.arange(len(subset)) / (len(subset) - 1)
+    
+    # Plotting
+    plt.figure(figsize=(8, 5))
+    plt.plot(data_sorted, p, label=labels[0])
+    plt.plot(subset_sorted, p_subset, label=labels[1], linestyle='--')
+    plt.ylabel('CDF')
+    plt.xlabel('Value')
+    plt.title('CDF Comparison')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+    return 0
+
+def plot_boxplot(data, subset, labels=['Entire Dataset', 'Subset']):
+    # Combine data and subset into a single dataset for plotting
+    combined_data = np.concatenate([data, subset])
+    # Create a list of labels corresponding to the data and subset
+    combined_labels = np.concatenate([[labels[0]]*len(data), [labels[1]]*len(subset)])
+    
+    # Create a DataFrame for easier plotting with seaborn
+    import pandas as pd
+    df = pd.DataFrame({'Value': combined_data, 'Group': combined_labels})
+    
+    # Plotting
+    plt.figure(figsize=(8, 6))
+    sns.boxplot(x='Group', y='Value', data=df)
+    plt.title('Box Plot of Entire Dataset vs. Subset')
+    plt.show()
+    return 0
+
+def plot_violinplot(data, subset, labels=['Entire Dataset', 'Subset']):
+    # Combine data and subset into a single dataset for plotting
+    combined_data = np.concatenate([data, subset])
+    # Create a list of labels corresponding to the data and subset
+    combined_labels = np.concatenate([[labels[0]]*len(data), [labels[1]]*len(subset)])
+    
+    # Create a DataFrame for easier plotting with seaborn
+    import pandas as pd
+    df = pd.DataFrame({'Value': combined_data, 'Group': combined_labels})
+    
+    # Plotting
+    plt.figure(figsize=(8, 6))
+    sns.violinplot(x='Group', y='Value', data=df, inner='quartile')
+    plt.title('Violin Plot of Entire Dataset vs. Subset')
+    plt.show()
+    return 0
+
 def main(verbose = False):
     if platform.system() == 'Windows':
         if 'gt8mar' in os.getcwd():
@@ -628,6 +761,9 @@ def main(verbose = False):
     # plot_histograms(summary_df, 'SYS_BP')
     # # print(summary_df.head())
 
+    # plot_densities(summary_df)
+
+
     summary_metrics = calculate_metrics(summary_df['Corrected Velocity'])
     print(summary_metrics)
     skewness = []
@@ -645,75 +781,18 @@ def main(verbose = False):
         # plt.title('Density Plot of Entire Dataset vs. Subset')
         # plt.show()
     
-    # # Subset data into old vs young
-    # old_df = summary_df[summary_df['Age'] > 50]
-    # young_df = summary_df[summary_df['Age'] <= 50]
-    # # Plot density
-    # sns.kdeplot(summary_df['Corrected Velocity'], label='Entire Dataset', fill=True)
-    # sns.kdeplot(old_df['Corrected Velocity'], label='old', fill=True, alpha=0.5)
-    # sns.kdeplot(young_df['Corrected Velocity'], label='young', fill=True, alpha=0.5)
-    # plt.legend()
-    # plt.title('Density Plot of Entire Dataset vs. Subset')
-    # plt.show()
-
-    # # Subset data into low BP vs high BP
-    # normBP_df = summary_df[summary_df['SYS_BP'] <= 120]
-    # highBP_df = summary_df[summary_df['SYS_BP'] > 120]
-    # print(f'the participants with high BP are: {highBP_df["Participant"].unique()}')
-
-    # # Plot density
-    # sns.kdeplot(summary_df['Corrected Velocity'], label='Entire Dataset', fill=True)
-    # sns.kdeplot(normBP_df['Corrected Velocity'], label='normal', fill=True, alpha=0.5)
-    # sns.kdeplot(highBP_df['Corrected Velocity'], label='high BP', fill=True, alpha=0.5)
-    # plt.legend()
-    # plt.title('Density Plot of Entire Dataset vs. Subset')
-    # plt.show()
-
-    # # Plot density of old high BP vs young high BP vs old low BP vs young low BP
-    # old_highBP_df = old_df[old_df['SYS_BP'] > 120]
-    # young_highBP_df = young_df[young_df['SYS_BP'] > 120]
-    # old_normBP_df = old_df[old_df['SYS_BP'] <= 120]
-    # young_normBP_df = young_df[young_df['SYS_BP'] <= 120]
-
-    # # Plot density
-    # sns.kdeplot(summary_df['Corrected Velocity'], label='Entire Dataset', fill=True)
-    # sns.kdeplot(old_highBP_df['Corrected Velocity'], label='old high BP', fill=True, alpha=0.5)
-    # sns.kdeplot(young_highBP_df['Corrected Velocity'], label='young high BP', fill=True, alpha=0.5)
-    # sns.kdeplot(old_normBP_df['Corrected Velocity'], label='old normal BP', fill=True, alpha=0.5)
-    # sns.kdeplot(young_normBP_df['Corrected Velocity'], label='young normal BP', fill=True, alpha=0.5)
-    # plt.legend()
-    # plt.title('Density Plot of Entire Dataset vs. Subset')
-    # plt.show()
-
-    # # compare high BP old vs young
-    # # Plot density
-    # sns.kdeplot(summary_df['Corrected Velocity'], label='Entire Dataset', fill=True)
-    # sns.kdeplot(old_highBP_df['Corrected Velocity'], label='old high BP', fill=True, alpha=0.5)
-    # sns.kdeplot(young_highBP_df['Corrected Velocity'], label='young high BP', fill=True, alpha=0.5)
-    # plt.legend()
-    # plt.title('Density Plot of high BP participants')
-    # plt.show()
-
-    # # compare low BP old vs young
-    # # Plot density
-    # sns.kdeplot(summary_df['Corrected Velocity'], label='Entire Dataset', fill=True)
-    # sns.kdeplot(old_normBP_df['Corrected Velocity'], label='old normal BP', fill=True, alpha=0.5)
-    # sns.kdeplot(young_normBP_df['Corrected Velocity'], label='young normal BP', fill=True, alpha=0.5)
-    # plt.legend()
-    # plt.title('Density Plot of normal BP participants')
-    # plt.show()
-
+    
     # Plot median velocity by participant
     median_velocity_per_participant = summary_df.groupby('Participant')['Corrected Velocity'].median().sort_values()
     sorted_participant_indices = {participant: index for index, participant in enumerate(median_velocity_per_participant.index)}
     
-    plt.figure(figsize=(10, 6))
-    plt.bar(sorted_participant_indices.values(), median_velocity_per_participant.values, width=0.5)
-    plt.xlabel('Participant')
-    plt.ylabel('Median Corrected Velocity')
-    plt.title('Median Corrected Velocity for Each Participant')
-    plt.xticks(list(sorted_participant_indices.values()), list(sorted_participant_indices.keys()), rotation=45)
-    plt.show()
+    # plt.figure(figsize=(10, 6))
+    # plt.bar(sorted_participant_indices.values(), median_velocity_per_participant.values, width=0.5)
+    # plt.xlabel('Participant')
+    # plt.ylabel('Median Corrected Velocity')
+    # plt.title('Median Corrected Velocity for Each Participant')
+    # plt.xticks(list(sorted_participant_indices.values()), list(sorted_participant_indices.keys()), rotation=45)
+    # plt.show()
         
     
 
@@ -757,6 +836,7 @@ def main(verbose = False):
     
     # plot_loc_histograms(favorite_df, 'Age')
     # plot_loc_histograms(favorite_df, 'SYS_BP')
+    # plot_densities(favorite_df)
 
     favorite_metrics = calculate_metrics(favorite_df['Corrected Velocity'])
 
@@ -765,7 +845,10 @@ def main(verbose = False):
         favorite_df_copy = favorite_df.copy()
         participant_df = favorite_df_copy[favorite_df_copy['Participant'] == participant]
         # plot_velocities(participant_df)
-    
+        # plot_densities_individual(summary_df, participant_df, participant)
+
+
+
         # Group the data by 'Capillary'
         grouped_df = participant_df.groupby('Capillary')
         # Get the unique capillary names
