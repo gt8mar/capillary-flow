@@ -688,7 +688,7 @@ def quantile_analysis(data, subset, quantiles=[0.25, 0.5, 0.75]):
         print(f"{int(q*100)}th percentile - Entire Dataset: {dq}, Subset: {sq}")
     return 0
 
-def plot_cdf(data, subset, labels=['Entire Dataset', 'Subset']):
+def plot_cdf(data, subset, subset2 = None, labels=['Entire Dataset', 'Subset'], title = 'CDF Comparison'):
     # Calculate CDF for the entire dataset
     data_sorted = np.sort(data)
     p = 1. * np.arange(len(data)) / (len(data) - 1)
@@ -696,17 +696,33 @@ def plot_cdf(data, subset, labels=['Entire Dataset', 'Subset']):
     # Calculate CDF for the subset
     subset_sorted = np.sort(subset)
     p_subset = 1. * np.arange(len(subset)) / (len(subset) - 1)
-    
-    # Plotting
-    plt.figure(figsize=(8, 5))
-    plt.plot(data_sorted, p, label=labels[0])
-    plt.plot(subset_sorted, p_subset, label=labels[1], linestyle='--')
-    plt.ylabel('CDF')
-    plt.xlabel('Value')
-    plt.title('CDF Comparison')
-    plt.legend()
-    plt.grid(True)
-    plt.show()
+
+    if subset2 is not None:
+        subset2_sorted = np.sort(subset2)
+        p_subset2 = 1. * np.arange(len(subset2)) / (len(subset2) - 1)
+        # Plotting
+        plt.figure(figsize=(8, 5))
+        plt.plot(data_sorted, p, label=labels[0])
+        plt.plot(subset_sorted, p_subset, label=labels[1], linestyle='--')
+        plt.plot(subset2_sorted, p_subset2, label=labels[2], linestyle='-.')
+        plt.ylabel('CDF')
+        plt.xlabel('Value')
+        plt.title(title)
+        plt.legend()
+        plt.grid(True)
+        plt.show()
+        return 0
+    else:
+        # Plotting
+        plt.figure(figsize=(8, 5))
+        plt.plot(data_sorted, p, label=labels[0])
+        plt.plot(subset_sorted, p_subset, label=labels[1], linestyle='--')
+        plt.ylabel('CDF')
+        plt.xlabel('Value')
+        plt.title('CDF Comparison')
+        plt.legend()
+        plt.grid(True)
+        plt.show()
     return 0
 
 def plot_boxplot(data, subset, labels=['Entire Dataset', 'Subset']):
@@ -762,6 +778,7 @@ def main(verbose = False):
     # # print(summary_df.head())
 
     # plot_densities(summary_df)
+    plot_cdf(summary_df['Corrected Velocity'], subset= summary_df[summary_df['Age'] > 50]['Corrected Velocity'], subset2= summary_df[summary_df['Age'] <= 50]['Corrected Velocity'], labels=['Entire Dataset', 'Old', 'Young'], title = 'CDF Comparison by Age')
 
 
     summary_metrics = calculate_metrics(summary_df['Corrected Velocity'])
