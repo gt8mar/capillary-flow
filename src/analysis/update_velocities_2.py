@@ -177,7 +177,10 @@ if __name__ == '__main__':
         else:
             velocities_folder = 'C:\\Users\\gt8ma\\capillary-flow\\results\\velocities\\velocities'
         for csv_file in os.listdir(velocities_folder):
-            if csv_file.endswith('Copy.csv'):
+            # for specific files
+            list_of_files = ['set01_part22_230530_loc01_velocity_data - Copy.csv', 'set01_part22_230530_loc02_velocity_data - Copy.csv', 'set01_part23_230530_loc01_velocity_data - Copy.csv', 'set01_part23_230530_loc02_velocity_data - Copy.csv']
+            if csv_file in list_of_files: # for specific files
+            # if csv_file.endswith('Copy.csv'):   # for entire folder
                 csv_file_path = os.path.join(velocities_folder, csv_file)
                 if big_df_count == 0:
                     big_df = update_velocities2(csv_file_path)

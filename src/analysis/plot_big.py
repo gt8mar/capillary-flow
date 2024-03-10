@@ -9,6 +9,7 @@ import seaborn as sns
 from scipy.integrate import simps, trapezoid
 from scipy.stats import skew, kurtosis, wilcoxon, mannwhitneyu
 import statsmodels.api as sm
+from src.tools.parse_filename import parse_filename
 
 def calculate_metrics(velocities):
     # Remove NaN values from the velocities
@@ -1100,6 +1101,17 @@ def collapse_df(df):
 
     # Combine age into the final DataFrame
     final_df = pd.merge(final_df, ages, left_on='Participant', right_index=True)
+    
+    # If there is an 'Area Score' column, add it to the final DataFrame
+    if 'Area Score' in df.columns:
+        area_scores = df.groupby('Participant')['Area Score'].mean().rename('Area Score')
+        final_df = pd.merge(final_df, area_scores, left_on='Participant', right_index=True)
+    
+    # If there is a 'Log Area Score' column, add it to the final DataFrame
+    if 'Log Area Score' in df.columns:
+        log_area_scores = df.groupby('Participant')['Log Area Score'].mean().rename('Log Area Score')
+        final_df = pd.merge(final_df, log_area_scores, left_on='Participant', right_index=True)
+    
     return final_df
 
 def plot_stats(df):
@@ -1133,7 +1145,7 @@ def plot_stats(df):
     plt.show()
     return 0
 
-def make_models(df, plot = False):
+def make_models(df, y = 'Median Velocity', plot = False):
     from sklearn.model_selection import train_test_split
     from sklearn.linear_model import LinearRegression
     from sklearn.ensemble import RandomForestRegressor
@@ -1142,7 +1154,10 @@ def make_models(df, plot = False):
 
     # Preparing the data
     X = df.drop(['Participant', 'Median Velocity', 'Median SYS_BP'], axis=1)  # Using pressures and age as features
-    y = df['Median Velocity']
+    if y == 'Median Velocity':
+        y = df['Median Velocity']
+    else:
+        y = df['Log Area Score']
 
     # Splitting the dataset into training and testing sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -1230,122 +1245,111 @@ def make_models(df, plot = False):
     # print(simplified_best_params, simplified_best_score)
     return mae_lr, rmse_lr, mae_rf, rmse_rf
 
+def make_log_df(df, plot = False):
+    # Log-transforming selected features and the target variable
+    df['log_Pressure_0.2'] = np.log1p(df['Pressure 0.2'])
+    df['log_Pressure_0.4'] = np.log1p(df['Pressure 0.4'])
+    df['log_Pressure_0.6'] = np.log1p(df['Pressure 0.6'])
+    df['log_Pressure_0.8'] = np.log1p(df['Pressure 0.8'])
+    df['log_Pressure_1.0'] = np.log1p(df['Pressure 1.0'])
+    df['log_Pressure_1.2'] = np.log1p(df['Pressure 1.2'])
+    df['log_Median_Velocity'] = np.log1p(df['Median Velocity'])
+
+    if plot:
+        # Plot log-transformed features vs Age
+        fig, axs = plt.subplots(1, 3, figsize=(18, 5))
+        sns.scatterplot(y='log_Pressure_0.2', x='Age', data=df, ax=axs[0])
+        axs[0].set_title('Log-transformed Pressure 0.2 vs. Age')
+        sns.scatterplot(y='log_Pressure_0.8', x='Age', data=df, ax=axs[1])
+        axs[1].set_title('Log-transformed Pressure 0.8 vs. Age')
+        sns.scatterplot(y='log_Pressure_1.2', x='Age', data=df, ax=axs[2])
+        axs[2].set_title('Log-transformed Pressure 1.2 vs. Age')
+        plt.tight_layout()
+        plt.show()
+
+        # Plot log-transformed features vs SYS_BP
+        fig, axs = plt.subplots(1, 3, figsize=(18, 5))
+        sns.scatterplot(y='log_Pressure_0.2', x='Median SYS_BP', data=df, ax=axs[0])
+        axs[0].set_title('Log-transformed Pressure 0.2 vs. Median SYS_BP')
+        sns.scatterplot(y='log_Pressure_0.8', x='Median SYS_BP', data=df, ax=axs[1])
+        axs[1].set_title('Log-transformed Pressure 0.8 vs. Median SYS_BP')
+        sns.scatterplot(y='log_Pressure_1.2', x='Median SYS_BP', data=df, ax=axs[2])
+        axs[2].set_title('Log-transformed Pressure 1.2 vs. Median SYS_BP')
+        plt.tight_layout()
+        plt.show()
+
+        # Plot log-transformed Median Velocity vs Age
+        plt.figure(figsize=(8, 5))
+        sns.scatterplot(y='log_Median_Velocity', x='Age', data=df)
+        plt.title('Log-transformed Median Velocity vs. Age')
+        plt.show()
+    return df
+
+
 def compare_log_and_linear(df, plot = False):
     from sklearn.model_selection import train_test_split
     from sklearn.linear_model import LinearRegression
     from sklearn.metrics import mean_squared_error, r2_score
+    from sklearn.ensemble import RandomForestRegressor
 
     # Assuming `df` is your DataFrame
+    df = make_log_df(df)
 
-    # Log-transforming selected features and the target variable
-    df['log_Pressure_0.2'] = np.log1p(df['Pressure 0.2'])
-    df['log_Pressure_0.8'] = np.log1p(df['Pressure 0.8'])
-    df['log_Pressure_1.2'] = np.log1p(df['Pressure 1.2'])
-    df['log_Median_Velocity'] = np.log1p(df['Median Velocity'])
-
-    # Plot log-transformed features vs Age
-    fig, axs = plt.subplots(1, 3, figsize=(18, 5))
-    sns.scatterplot(y='log_Pressure_0.2', x='Age', data=df, ax=axs[0])
-    axs[0].set_title('Log-transformed Pressure 0.2 vs. Age')
-    sns.scatterplot(y='log_Pressure_0.8', x='Age', data=df, ax=axs[1])
-    axs[1].set_title('Log-transformed Pressure 0.8 vs. Age')
-    sns.scatterplot(y='log_Pressure_1.2', x='Age', data=df, ax=axs[2])
-    axs[2].set_title('Log-transformed Pressure 1.2 vs. Age')
-    plt.tight_layout()
-    plt.show()
-
-    # Plot log-transformed features vs SYS_BP
-    fig, axs = plt.subplots(1, 3, figsize=(18, 5))
-    sns.scatterplot(y='log_Pressure_0.2', x='Median SYS_BP', data=df, ax=axs[0])
-    axs[0].set_title('Log-transformed Pressure 0.2 vs. Median SYS_BP')
-    sns.scatterplot(y='log_Pressure_0.8', x='Median SYS_BP', data=df, ax=axs[1])
-    axs[1].set_title('Log-transformed Pressure 0.8 vs. Median SYS_BP')
-    sns.scatterplot(y='log_Pressure_1.2', x='Median SYS_BP', data=df, ax=axs[2])
-    axs[2].set_title('Log-transformed Pressure 1.2 vs. Median SYS_BP')
-    plt.tight_layout()
-    plt.show()
-
-    # Plot log-transformed Median Velocity vs Age
-    plt.figure(figsize=(8, 5))
-    sns.scatterplot(y='log_Median_Velocity', x='Age', data=df)
-    plt.title('Log-transformed Median Velocity vs. Age')
-    plt.show()
-
-
-
-
-    # # Preparing datasets for the original and log-transformed data
-    # X_original = df[['Pressure 0.2']]  # Original features
-    # y_original = df['Median Velocity']  # Original target
-
-    # X_transformed = df[['log_Pressure_0.2']]  # Log-transformed features
-    # y_transformed = df['log_Median_Velocity']  # Log-transformed target
-
-    # # Splitting both datasets into training and testing sets
-    # X_train_orig, X_test_orig, y_train_orig, y_test_orig = train_test_split(X_original, y_original, test_size=0.2, random_state=42)
-    # X_train_trans, X_test_trans, y_train_trans, y_test_trans = train_test_split(X_transformed, y_transformed, test_size=0.2, random_state=42)
-
-    # # Initializing the model
-    # model = LinearRegression()
-
-    # # Training and predicting with original data
-    # model.fit(X_train_orig, y_train_orig)
-    # predictions_orig = model.predict(X_test_orig)
-
-    # # Training and predicting with log-transformed data
-    # model.fit(X_train_trans, y_train_trans)
-    # predictions_trans = model.predict(X_test_trans)
-
-    # # Evaluating the models
-    # mse_original = mean_squared_error(y_test_orig, predictions_orig)
-    # r2_original = r2_score(y_test_orig, predictions_orig)
-
-    # mse_transformed = mean_squared_error(np.expm1(y_test_trans), np.expm1(predictions_trans))  # Converting back from log scale for comparison
-    # r2_transformed = r2_score(np.expm1(y_test_trans), np.expm1(predictions_trans))
-
-    # print("Original Data - MSE: {:.4f}, R2: {:.4f}".format(mse_original, r2_original))
-    # print("Log-transformed Data - MSE: {:.4f}, R2: {:.4f}".format(mse_transformed, r2_transformed))
+    # Splitting both datasets into training and testing sets for all pressure columns
+    features_original = ['Pressure 0.2', 'Pressure 0.8', 'Pressure 1.2']  # Example original features
+    features_transformed = ['log_Pressure_0.2', 'log_Pressure_0.8', 'log_Pressure_1.2']  # Corresponding log-transformed features
     
-    # if plot:
-    #     # Actual vs. Predicted Plot for Original Data
-    #     plt.figure(figsize=(14, 6))
-
-    #     plt.subplot(1, 2, 1)
-    #     sns.scatterplot(x=y_test_orig, y=predictions_orig)
-    #     plt.plot([y_test_orig.min(), y_test_orig.max()], [y_test_orig.min(), y_test_orig.max()], 'k--', lw=2)
-    #     plt.title('Original Data: Actual vs. Predicted')
-    #     plt.xlabel('Actual')
-    #     plt.ylabel('Predicted')
-
-    #     # Actual vs. Predicted Plot for Log-transformed Data (converted back to original scale for comparison)
-    #     plt.subplot(1, 2, 2)
-    #     sns.scatterplot(x=np.expm1(y_test_trans), y=np.expm1(predictions_trans))
-    #     plt.plot([np.expm1(y_test_trans).min(), np.expm1(y_test_trans).max()], [np.expm1(y_test_trans).min(), np.expm1(y_test_trans).max()], 'k--', lw=2)
-    #     plt.title('Log-transformed Data: Actual vs. Predicted')
-    #     plt.xlabel('Actual')
-    #     plt.ylabel('Predicted')
-
-    #     plt.tight_layout()
-    #     plt.show()
-
-    #     # Residual Plot for Original Data
-    #     plt.figure(figsize=(14, 6))
-
-    #     plt.subplot(1, 2, 1)
-    #     sns.residplot(x=predictions_orig, y=y_test_orig, lowess=True, line_kws={'color': 'red', 'lw': 2})
-    #     plt.title('Original Data: Residuals')
-    #     plt.xlabel('Predicted')
-    #     plt.ylabel('Residuals')
-
-    #     # Residual Plot for Log-transformed Data
-    #     plt.subplot(1, 2, 2)
-    #     sns.residplot(x=np.expm1(predictions_trans), y=np.expm1(y_test_trans), lowess=True, line_kws={'color': 'red', 'lw': 2})
-    #     plt.title('Log-transformed Data: Residuals')
-    #     plt.xlabel('Predicted')
-    #     plt.ylabel('Residuals')
-
-    #     plt.tight_layout()
-    #     plt.show()
+    X_original = df[features_original]
+    y_original = df['Median Velocity']
+    
+    X_transformed = df[features_transformed]
+    y_transformed = df['log_Median_Velocity']
+    
+    X_train_orig, X_test_orig, y_train_orig, y_test_orig = train_test_split(X_original, y_original, test_size=0.2, random_state=42)
+    X_train_trans, X_test_trans, y_train_trans, y_test_trans = train_test_split(X_transformed, y_transformed, test_size=0.2, random_state=42)
+    
+    models = {
+        'Linear Regression': LinearRegression(),
+        'Random Forest': RandomForestRegressor(n_estimators=100, random_state=42)
+    }
+    
+    for name, model in models.items():
+        # Original data
+        model.fit(X_train_orig, y_train_orig)
+        predictions_orig = model.predict(X_test_orig)
+        
+        # Log-transformed data
+        model.fit(X_train_trans, y_train_trans)
+        predictions_trans = model.predict(X_test_trans)
+        
+        # Evaluation
+        mse_original = mean_squared_error(y_test_orig, predictions_orig)
+        r2_original = r2_score(y_test_orig, predictions_orig)
+        
+        mse_transformed = mean_squared_error(np.expm1(y_test_trans), np.expm1(predictions_trans))
+        r2_transformed = r2_score(np.expm1(y_test_trans), np.expm1(predictions_trans))
+        
+        print(f"{name} - Original Data - MSE: {mse_original:.4f}, R2: {r2_original:.4f}")
+        print(f"{name} - Log-transformed Data - MSE: {mse_transformed:.4f}, R2: {r2_transformed:.4f}")
+        
+        if plot:
+            # Actual vs. Predicted Plot
+            plt.figure(figsize=(14, 6))
+            plt.subplot(1, 2, 1)
+            sns.scatterplot(x=y_test_orig, y=predictions_orig).set(title=f'{name} - Original Data: Actual vs. Predicted')
+            plt.subplot(1, 2, 2)
+            sns.scatterplot(x=np.expm1(y_test_trans), y=np.expm1(predictions_trans)).set(title=f'{name} - Log-transformed Data: Actual vs. Predicted')
+            plt.show()
+            
+            # Residual Plot
+            plt.figure(figsize=(14, 6))
+            plt.subplot(1, 2, 1)
+            sns.residplot(x=predictions_orig, y=y_test_orig, lowess=True).set(title=f'{name} - Original Data: Residuals')
+            plt.subplot(1, 2, 2)
+            sns.residplot(x=np.expm1(predictions_trans), y=np.expm1(y_test_trans), lowess=True).set(title=f'{name} - Log-transformed Data: Residuals')
+            plt.show()
+    
+    return 0
 
 def run_regression(df):
     """
@@ -1358,9 +1362,10 @@ def run_regression(df):
         0 if successful
     """
     collapsed_df = collapse_df(df)
-    # plot_stats(collapsed_df)
+    collapsed_df = make_log_df(collapsed_df)
+    plot_stats(collapsed_df)
     # make_models(collapsed_df, plot=True)
-    compare_log_and_linear(collapsed_df, plot=True)
+    # compare_log_and_linear(collapsed_df, plot=True)
 
 
     # # Corrected aggregation method for 'SYS_BP'
@@ -1413,6 +1418,52 @@ def run_regression(df):
 
     return 0
 
+# def calculate_cdf_area(data, start=10, end=700):
+#     # Generate a linear space from the min to max velocity in the range of interest
+#     x = np.linspace(start, end, num=500)
+    
+#     # Calculate the CDF using the empirical data
+#     cdf = np.interp(x, np.sort(data), np.linspace(0, 1, len(data)))
+    
+#     # Calculate the area under the CDF curve using Simpson's rule
+#     area = simps(cdf, x)
+#     return area
+
+# def calculate_distance_score(data):
+#     # Calculate the CDF area for the entire dataset
+#     entire_dataset_area = calculate_cdf_area(data)
+
+#     # Calculate the CDF area for each participant and compute the distance score
+#     participant_scores = data.groupby('Participant')['Corrected Velocity'].apply(lambda x: entire_dataset_area - calculate_cdf_area(x))
+
+#     return participant_scores
+
+
+
+def calculate_cdf_area(data, start=10, end=700):
+    data = data['Corrected Velocity']
+    log_data = np.log1p(data)
+    data_sorted = np.sort(data)
+    log_data_sorted = np.sort(log_data)
+    p = 1. * np.arange(len(data)) / (len(data) - 1)
+    p_log = 1. * np.arange(len(log_data)) / (len(log_data) - 1)
+    
+    # Interpolate to find CDF values at start and end points if necessary
+    start_cdf = np.interp(start, data_sorted, p)
+    start_cdf_log = np.interp(np.log1p(start), log_data_sorted, p_log)
+    end_cdf = np.interp(end, data_sorted, p)
+    end_cdf_log = np.interp(np.log1p(end), log_data_sorted, p_log)
+    
+    # Calculate the area under the CDF curve using Simpson's rule within the range
+    x = np.linspace(start, end, num=500)  # More points for a smoother curve and more accurate integration
+    x_log = np.linspace(np.log1p(start), np.log1p(end), num=500)
+    cdf_values = np.interp(x, data_sorted, p)
+    cdf_values_log = np.interp(x_log, log_data_sorted, p_log)
+    area = simps(cdf_values, x)
+    area_log = simps(cdf_values_log, x_log)
+    
+    return area, area_log
+
 
 def main(verbose = False):
     if platform.system() == 'Windows':
@@ -1454,6 +1505,8 @@ def main(verbose = False):
     
     # create a subset of summary_df with no pressure values greater than 1.2
     summary_df_no_high_pressure = summary_df[summary_df['Pressure'] <= 1.2]
+    old_nhp = summary_df_no_high_pressure[summary_df_no_high_pressure['Age'] > 50]
+    young_nhp = summary_df_no_high_pressure[summary_df_no_high_pressure['Age'] <= 50]
     # plot_hist_pressure(summary_df_no_high_pressure, density=True)
 
     # plot_hist_specific_pressure(summary_df, 0.2, density=True, hist=False)
@@ -1466,7 +1519,6 @@ def main(verbose = False):
     # plot_cdf(summary_df['Corrected Velocity'], subsets= [summary_df[summary_df['SYS_BP'] > 120]['Corrected Velocity'], summary_df[summary_df['SYS_BP'] <= 120]['Corrected Velocity']], labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison by BP')
     # plot_cdf(summary_df_no_high_pressure['Corrected Velocity'], subsets= [summary_df_no_high_pressure[summary_df_no_high_pressure['SYS_BP'] > 120]['Corrected Velocity'], summary_df_no_high_pressure[summary_df_no_high_pressure['SYS_BP'] <= 120]['Corrected Velocity']], labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of velocities by BP nhp')
     # plot_cdf(summary_df['Corrected Velocity'], subsets= [summary_df[summary_df['Age'] > 50]['Corrected Velocity'], summary_df[summary_df['Age'] <= 50]['Corrected Velocity']], labels=['Entire Dataset', 'Old', 'Young'], title = 'CDF Comparison by Age')
-    
     
     # plot cdf for high bp old, high bp young, low bp old, low bp young
     highBP_old = summary_df[(summary_df['SYS_BP'] > 120) & (summary_df['Age'] > 50)]['Corrected Velocity']
@@ -1482,6 +1534,35 @@ def main(verbose = False):
     # plot_cdf(summary_df['Corrected Velocity'], subsets= [highBP_old, highBP_young, normBP_old, normBP_young], labels=['Entire Dataset', 'High BP Old', 'High BP Young', 'Normal BP Old', 'Normal BP Young'], title = 'CDF Comparison of velocities by Age and BP')
     # plot_cdf(summary_df_no_high_pressure['Corrected Velocity'], subsets= [highBP_old_nhp, highBP_young_nhp, normBP_old_nhp, normBP_young_nhp], labels=['Entire Dataset', 'High BP Old', 'High BP Young', 'Normal BP Old', 'Normal BP Young'], title = 'CDF Comparison of velocities by Age and BP')
     # plot_cdf_comp_pressure(summary_df)
+    area, area_log = calculate_cdf_area(summary_df_no_high_pressure)
+    print(area)
+    area_scores = []
+    for participant in summary_df_no_high_pressure['Participant'].unique():
+        participant_df = summary_df_no_high_pressure[summary_df_no_high_pressure['Participant'] == participant]
+        participant_area, participant_area_log = calculate_cdf_area(participant_df)
+        print(f'Participant {participant} has a CDF area of {participant_area:.2f} and a log CDF area of {participant_area_log:.2f}')
+        area_scores.append([participant, participant_area-area, participant_area_log-area_log])
+    # plot area scores
+    area_scores_df = pd.DataFrame(area_scores, columns=['Participant', 'Area Score', 'Log Area Score'])
+    area_scores_df = area_scores_df.sort_values(by='Area Score', ascending=False)
+    plt.figure(figsize=(10, 6))
+    plt.bar(area_scores_df['Participant'], area_scores_df['Log Area Score'], width=0.5)
+    plt.xlabel('Participant')
+    plt.ylabel('Area Score')
+    plt.title('Area Score for Each Participant')
+    plt.xticks(rotation=45)
+    plt.show()
+
+    # add area scores to summary_df_no_high_pressure
+    summary_df_no_high_pressure = summary_df_no_high_pressure.merge(area_scores_df, on='Participant', how='inner')
+
+
+
+
+
+
+
+
 
     # summary_metrics = calculate_metrics(summary_df['Corrected Velocity'])
     # print(summary_metrics)
@@ -1512,13 +1593,13 @@ def main(verbose = False):
     median_velocity_per_participant = summary_df_no_high_pressure.groupby('Participant')['Corrected Velocity'].median().sort_values()
     sorted_participant_indices = {participant: index for index, participant in enumerate(median_velocity_per_participant.index)}
     
-    plt.figure(figsize=(10, 6))
-    plt.bar(sorted_participant_indices.values(), median_velocity_per_participant.values, width=0.5)
-    plt.xlabel('Participant')
-    plt.ylabel('Median Corrected Velocity')
-    plt.title('Median Corrected Velocity for Each Participant')
-    plt.xticks(list(sorted_participant_indices.values()), list(sorted_participant_indices.keys()), rotation=45)
-    plt.show()
+    # plt.figure(figsize=(10, 6))
+    # plt.bar(sorted_participant_indices.values(), median_velocity_per_participant.values, width=0.5)
+    # plt.xlabel('Participant')
+    # plt.ylabel('Median Corrected Velocity')
+    # plt.title('Median Corrected Velocity for Each Participant')
+    # plt.xticks(list(sorted_participant_indices.values()), list(sorted_participant_indices.keys()), rotation=45)
+    # plt.show()
         
     run_regression(summary_df_no_high_pressure)
     
@@ -1579,7 +1660,8 @@ def main(verbose = False):
     for participant in favorite_df['Participant'].unique():
         favorite_df_copy = favorite_df.copy()
         participant_df = favorite_df_copy[favorite_df_copy['Participant'] == participant]
-        plot_velocities(participant_df, write = True)
+
+        # plot_velocities(participant_df, write = True)
         # plot_densities_individual(summary_df, participant_df, participant)
         # plot_densities_pressure_individual(summary_df, participant_df, participant)
 
