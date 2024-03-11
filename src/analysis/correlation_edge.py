@@ -7,14 +7,25 @@ from scipy.spatial.distance import cdist
 
 def find_closest_contour_points_on_column(contour, point):
     """
-    Find the closest contour points on the specified column.
+    Find the closest contour point to the specified point, prioritizing points on or within one column of the target column.
     """
-    column = point[1]
-    contour_columns = contour[:, 1]
-    column_diff = np.abs(contour_columns - column)
-    closest_point_idx = np.argmin(column_diff)
-    closest_point = contour[closest_point_idx]
-    print(f'closest point: {closest_point}')
+    target_row, target_column = point
+    # Filter points to those within one column of the target
+    close_columns_mask = np.abs(contour[:, 1] - target_column) <= 1
+    close_points = contour[close_columns_mask]
+    
+    if len(close_points) == 0:
+        # If no points are within one column, consider all points (fallback)
+        close_points = contour
+    
+    # Calculate Euclidean distances to the target point
+    distances = np.sqrt((close_points[:, 0] - target_row)**2 + (close_points[:, 1] - target_column)**2)
+    
+    # Find the index of the point with the minimum distance
+    min_distance_idx = np.argmin(distances)
+    closest_point = close_points[min_distance_idx]
+    
+    # print(f'closest point: {closest_point}')
     # Round the coordinates to the nearest integer
     return np.round(closest_point).astype(int)
 
@@ -52,8 +63,8 @@ def find_edge_points(mask, centerline_points):
     last_point = centerline_points[-1]
     closest_start = find_closest_contour_points_on_column(contour, first_point)
     closest_end = find_closest_contour_points_on_column(contour, last_point)
-    print(f'closest start: {closest_start}')
-    print(f'closest end: {closest_end}')
+    # print(f'closest start: {closest_start}')
+    # print(f'closest end: {closest_end}')
     # Split the contour into two parts
     contour1, contour2 = split_contour_at_points(contour, [closest_start, closest_end])
     
@@ -105,12 +116,12 @@ def main():
         # print(edge_points)
 
         # plot edge points and centerline points
-        for point in edge_points:
-            # plot using matplotlib
-            plt.plot(point[0][1], point[0][0], 'ro')
-            plt.plot(point[1][1], point[1][0], 'go')
-            plt.plot(point[2][1], point[2][0], 'bo')
-        plt.show()
+        # for point in edge_points:
+        #     # plot using matplotlib
+        #     plt.plot(point[0][1], point[0][0], 'ro')
+        #     plt.plot(point[1][1], point[1][0], 'go')
+        #     plt.plot(point[2][1], point[2][0], 'bo')
+        # plt.show()
         #     # plot first tuple: centerline point
         #     cv2.circle(mask, (int(point[0][1]), int(point[0][0])), 2, (0, 0, 100), -1)
         #     # plot second tuple: closest edge point
