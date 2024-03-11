@@ -5,23 +5,69 @@ import cv2
 from skimage.measure import find_contours
 from scipy.spatial.distance import cdist
 
-def find_edge_points(mask, centerline_points):
-    # Find contours of the mask, assuming the mask is binary
-    contours = find_contours(mask, 0.5)
-    contour_points = np.vstack(contours) # Combine all contour points
+def find_closest_contour_points_on_column(contour, point):
+    """
+    Find the closest contour points on the specified column.
+    """
+    column = point[1]
+    contour_columns = contour[:, 1]
+    column_diff = np.abs(contour_columns - column)
+    closest_point_idx = np.argmin(column_diff)
+    closest_point = contour[closest_point_idx]
+    print(f'closest point: {closest_point}')
+    # Round the coordinates to the nearest integer
+    return np.round(closest_point).astype(int)
+
+def split_contour_at_points(contour, split_points):
+    """
+    Split the contour into two parts at the closest points to the given split points, using a tolerance.
+    """
+    # Find indices of the closest points in the contour to the split points
+    indices = []
+    for point in split_points:
+        # Calculate the Euclidean distance from each contour point to the split point
+        distances = np.sqrt(((contour - point) ** 2).sum(axis=1))
+        closest_point_idx = np.argmin(distances)
+        indices.append(closest_point_idx)
     
-    # For each centerline point, find the closest two points on the mask edge
+    indices.sort()  # Ensure indices are in ascending order
+
+    # Split the contour into two parts. This logic assumes contour is a simple loop
+    # and might need adjustment for more complex shapes or multiple contours
+    if indices[0] < indices[1]:
+        contour1 = np.vstack([contour[:indices[0]+1], contour[indices[1]:]])
+        contour2 = contour[indices[0]:indices[1]+1]
+    else:  # Handle the case where indices might not be in expected order
+        contour1 = contour[indices[1]:indices[0]+1]
+        contour2 = np.vstack([contour[:indices[1]+1], contour[indices[0]:]])
+
+    return contour1, contour2
+
+def find_edge_points(mask, centerline_points):
+    contours = find_contours(mask, 0.5)
+    contour = max(contours, key=len)  # Assuming the longest contour
+    
+    # Use the columns of the first and last centerline points to find closest contour points vertically
+    first_point = centerline_points[0]
+    last_point = centerline_points[-1]
+    closest_start = find_closest_contour_points_on_column(contour, first_point)
+    closest_end = find_closest_contour_points_on_column(contour, last_point)
+    print(f'closest start: {closest_start}')
+    print(f'closest end: {closest_end}')
+    # Split the contour into two parts
+    contour1, contour2 = split_contour_at_points(contour, [closest_start, closest_end])
+    
+    # For each centerline point, find the closest points on each of the two contours
     edge_points = []
     for point in centerline_points:
-        distances = cdist([point], contour_points, 'euclidean')
-        sorted_distances_indices = np.argsort(distances[0])
-        closest_point_idx = sorted_distances_indices[0]
-        second_closest_point_idx = sorted_distances_indices[1]
+        distances1 = cdist([point], contour1, 'euclidean')
+        distances2 = cdist([point], contour2, 'euclidean')
+        closest_point_idx1 = np.argmin(distances1)
+        closest_point_idx2 = np.argmin(distances2)
+        edge_left = tuple(contour1[closest_point_idx1])
+        edge_right = tuple(contour2[closest_point_idx2])
         
-        edge1 = tuple(contour_points[closest_point_idx])
-        edge2 = tuple(contour_points[second_closest_point_idx])
-        
-        edge_points.append([tuple(point), edge1, edge2])
+        edge_points.append([tuple(point), edge_left, edge_right])
     
     return edge_points
 
