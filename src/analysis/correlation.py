@@ -210,16 +210,13 @@ def main(path, mask = False, verbose = False, plot = True, write = False, bin_bo
     plt.legend()
     plt.show()
 
-
-
-
     # print(edge_points)
 
     for point in edge_points:
         # plot using matplotlib
-        plt.plot(point[0][1], point[0][0], 'ro')
-        plt.plot(point[1][1], point[1][0], 'go')
-        plt.plot(point[2][1], point[2][0], 'bo')
+        plt.plot(point[0][1], point[0][0], 'o', color = 'tab:blue')
+        plt.plot(point[1][1], point[1][0], 'o', color = 'tab:orange')
+        plt.plot(point[2][1], point[2][0], 'o', color = 'tab:green')
     plt.show()
 
 
