@@ -99,6 +99,11 @@ def main():
         # load in centerline with same identifier
         centerline_name = video_identifier + "_centerline_" + capillary_id + ".csv"
         
+        # check if centerline exists
+        if not os.path.exists(os.path.join(centerline_path, centerline_name)):
+            print(f'centerline for {identifier} does not exist')
+            continue
+
         # load in centerline
         centerline = np.loadtxt(os.path.join(centerline_path, centerline_name), delimiter=",")
         # remove 3rd column
@@ -108,6 +113,7 @@ def main():
 
         # find edge points
         edge_points = find_edge_points(mask, centerline)
+        
         # # # save edge points
         # # edge_points_path = "C:\\Users\\gt8mar\\capillary-flow\\results\\edge_points\\individual_caps_original"
         # # for edge_point in edge_points_path:
@@ -121,19 +127,7 @@ def main():
         #     plt.plot(point[0][1], point[0][0], 'ro')
         #     plt.plot(point[1][1], point[1][0], 'go')
         #     plt.plot(point[2][1], point[2][0], 'bo')
-        # plt.show()
-        #     # plot first tuple: centerline point
-        #     cv2.circle(mask, (int(point[0][1]), int(point[0][0])), 2, (0, 0, 100), -1)
-        #     # plot second tuple: closest edge point
-        #     cv2.circle(mask, (int(point[1][1]), int(point[1][0])), 2, (0, 150, 0), -1)
-        #     # plot third tuple: second closest edge point
-        #     cv2.circle(mask, (int(point[2][1]), int(point[2][0])), 2, (225, 0, 0), -1)
-        # plt.imshow(mask)
-        # plt.show()
-            
-            
-
-
+        # plt.show()          
     return 0
 
 
