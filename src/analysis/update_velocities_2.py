@@ -187,7 +187,8 @@ if __name__ == '__main__':
                     big_df_count += 1
                 else:
                     big_df = pd.concat([big_df, update_velocities2(csv_file_path)])
-        big_df.to_csv(os.path.join(velocities_folder, 'big_df.csv'), index=False)
+        today_date = datetime.now().strftime("%Y%m%d")
+        big_df.to_csv(os.path.join(velocities_folder, f'big_df_{today_date}.csv'), index=False)
     else:
         velocities_folder = '/hpc/projects/capillary-flow/results/velocities'
         for csv_file in os.listdir(velocities_folder):
@@ -198,4 +199,5 @@ if __name__ == '__main__':
                     big_df_count += 1
                 else:
                     big_df = pd.concat([big_df, update_velocities2(csv_file_path)])
-        big_df.to_csv('/hpc/projects/capillary-flow/results/velocities/big_df.csv', index=False)
+        today_date = datetime.now().strftime("%Y%m%d")
+        big_df.to_csv(f'/hpc/projects/capillary-flow/results/velocities/big_df_{today_date}.csv', index=False)
