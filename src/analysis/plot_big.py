@@ -7,9 +7,112 @@ from matplotlib.patches import Patch
 from matplotlib.cm import ScalarMappable
 import seaborn as sns
 from scipy.integrate import simps, trapezoid
-from scipy.stats import skew, kurtosis, wilcoxon, mannwhitneyu
+from scipy.stats import skew, kurtosis, wilcoxon, mannwhitneyu, kstest, ks_2samp, ks_1samp, wasserstein_distance
+from scipy import stats
 import statsmodels.api as sm
 from src.tools.parse_filename import parse_filename
+from sklearn.utils import resample
+
+
+# Function to calculate mean, standard error, and 95% CI
+def calculate_stats(group):
+    mean = group['Corrected Velocity'].mean()
+    sem = stats.sem(group['Corrected Velocity'])
+    ci = 1.96 * sem
+    return pd.Series({'Mean Velocity': mean, 'Lower Bound': mean - ci, 'Upper Bound': mean + ci})
+
+def plot_CI(df, variable = 'Age', method='bootstrap', n_iterations=1000, ci_percentile=99.5):
+    """
+    Plot the mean and 95% CI for the variable of interest. 
+
+    Args:
+        df (DataFrame): the DataFrame to be plotted
+        variable (str): the variable of interest
+        method (str): the method for calculating the CI. Options are 'bootstrap' and 't-distribution'
+        n_iterations (int): the number of iterations for the bootstrap method
+        ci_percentile (int): the percentile for the CI
+    
+    Returns:
+        0 if successful
+    """
+    # df['Age Group'] = np.where(df['Age'] <= 50, '≤50', '>50')
+    df['Age Group'] = np.where(df['Age'] <= 50, '≤50', '>50')
+    df['SYS_BP Group'] = np.where(df['SYS_BP'] < 120, '<120', '≥120')
+                                     
+    # Group the data by the variable of interest and calculate the mean and 95% CI
+    if method == 'bootstrap':
+        if variable == 'Age':
+            # Group by Age Group and Pressure, then apply the calculate_median_ci function
+            median_stats_df = df.groupby(['Age Group', 'Pressure']).apply(calculate_median_ci, ci_percentile = ci_percentile).reset_index()
+        else:
+            # Group by SYS_BP Group and Pressure, then apply the calculate_median_ci function
+            median_stats_df = df.groupby(['SYS_BP Group', 'Pressure']).apply(calculate_median_ci, ci_percentile = ci_percentile).reset_index()
+    else:
+        if variable == 'Age':
+            # Group by Age Group and Pressure, then apply the calculate_stats function
+            stats_df = df.groupby(['Age Group', 'Pressure']).apply(calculate_stats).reset_index()
+        else:
+            # Group by SYS_BP Group and Pressure, then apply the calculate_stats function
+            stats_df = df.groupby(['SYS_BP Group', 'Pressure']).apply(calculate_stats).reset_index()
+        
+    # Plot the data
+    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+    if variable == 'Age':
+        enforce_colors = {'≤50': 'tab:green', '>50': 'tab:orange'}
+    else:
+        enforce_colors = {'<120': 'tab:green', '≥120': 'tab:orange'}
+
+    if method == 'bootstrap':
+        if variable == 'Age':
+            for label, group_df in median_stats_df.groupby('Age Group'):
+                ax.errorbar(group_df['Pressure'], group_df['Median Velocity'], 
+                            yerr=[group_df['Median Velocity'] - group_df['CI Lower Bound'], group_df['CI Upper Bound'] - group_df['Median Velocity']],
+                            label=f'Age Group {label}', fmt='-o', color = enforce_colors[label])
+            
+                ax.fill_between(group_df['Pressure'], group_df['CI Lower Bound'], group_df['CI Upper Bound'], alpha=0.2, color = enforce_colors[label])
+        else:
+            for label, group_df in median_stats_df.groupby('SYS_BP Group'):
+                ax.errorbar(group_df['Pressure'], group_df['Median Velocity'], 
+                            yerr=[group_df['Median Velocity'] - group_df['CI Lower Bound'], group_df['CI Upper Bound'] - group_df['Median Velocity']],
+                            label=f'SYS_BP Group {label}', fmt='-o', color = enforce_colors[label])
+            
+                ax.fill_between(group_df['Pressure'], group_df['CI Lower Bound'], group_df['CI Upper Bound'], alpha=0.2, color = enforce_colors[label])
+        ax.set_xlabel('Pressure')
+        ax.set_ylabel('Velocity (um/s)')
+        ax.set_title(f'Median Corrected Velocity vs. Pressure with {ci_percentile}% Confidence Interval')
+        ax.legend()
+
+    else:
+        if variable == 'Age':
+            for label, group_df in stats_df.groupby('Age Group'):
+                ax.errorbar(group_df['Pressure'], group_df['Mean Velocity'], 
+                            yerr=[group_df['Mean Velocity'] - group_df['Lower Bound'], group_df['Upper Bound'] - group_df['Mean Velocity']],
+                            label=f'Age Group {label}', fmt='-o', color = enforce_colors[label])
+                ax.fill_between(group_df['Pressure'], group_df['Lower Bound'], group_df['Upper Bound'], alpha=0.2, color = enforce_colors[label])
+        else:
+            for label, group_df in stats_df.groupby('SYS_BP Group'):
+                ax.errorbar(group_df['Pressure'], group_df['Mean Velocity'], 
+                            yerr=[group_df['Mean Velocity'] - group_df['Lower Bound'], group_df['Upper Bound'] - group_df['Mean Velocity']],
+                            label=f'SYS_BP Group {label}', fmt='-o', color = enforce_colors[label])
+                ax.fill_between(group_df['Pressure'], group_df['Lower Bound'], group_df['Upper Bound'], alpha=0.2, color = enforce_colors[label])
+        ax.set_xlabel('Pressure')
+        ax.set_ylabel('Velocity (um/s)')
+        ax.set_title(f'Corrected Velocity vs. Pressure with {ci_percentile}% Confidence Interval')
+        ax.legend()
+    plt.show()
+    return 0
+
+# Function to calculate median and bootstrap 95% CI
+def calculate_median_ci(group, n_iterations=1000, ci_percentile=95):
+    medians = []
+    for _ in range(n_iterations):
+        sample = resample(group['Corrected Velocity'])
+        medians.append(np.median(sample))
+    lower = np.percentile(medians, (100 - ci_percentile) / 2)
+    upper = np.percentile(medians, 100 - (100 - ci_percentile) / 2)
+    median = np.median(group['Corrected Velocity'])
+    return pd.Series({'Median Velocity': median, 'CI Lower Bound': lower, 'CI Upper Bound': upper})
+
 
 def calculate_metrics(velocities):
     # Remove NaN values from the velocities
@@ -27,6 +130,19 @@ def create_color_map(df, column, cmap='viridis'):
     unique_values = sorted(df[column].unique())
     colors = sns.color_palette(cmap, len(unique_values))  
     return dict(zip(unique_values, colors))
+
+def empirical_cdf_fn(data):
+    """Create a function to calculate the CDF for any value in the dataset."""
+    # Sort the data and calculate the CDF values
+    sorted_data = np.sort(data)
+    cdf_values = np.arange(1, len(data) + 1) / len(data)
+    
+    # Return a function that calculates the CDF for a given x
+    def cdf_function(x):
+        # If x is a single value, np.searchsorted will return a scalar; if x is an array, it will return an array
+        return np.interp(x, sorted_data, cdf_values, left=0, right=1)
+    
+    return cdf_function
 
 def compare_participants(df1, df2):
     """ 
@@ -479,8 +595,9 @@ def handle_dotted_evac(summary_df):
     return summary_df
 def merge_vel_size(verbose=False):
     size_df = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\results\\cap_diameters.csv')
-    velocity_df = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\big_df - Copy.csv')
-    velocity_df_old = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\big_df.csv')
+    # velocity_df = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\big_df - Copy.csv')
+    velocity_df = pd.read_excel('C:\\Users\\gt8mar\\capillary-flow\\results\\big_df.xlsx')
+    # velocity_df_old = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\big_df.csv')
     metadata_df = compile_metadata()
     print(metadata_df.head)
 
@@ -501,8 +618,8 @@ def merge_vel_size(verbose=False):
     # size_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\size_test.csv', index=False)
     # velocity_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\velocity_test.csv', index=False)
 
-    # remove part22 and part23 from different rows
-    different_rows = [row for row in different_rows if row[0] != 'part22' and row[0] != 'part23']
+    # # remove part22 and part23 from different rows
+    # different_rows = [row for row in different_rows if row[0] != 'part22' and row[0] != 'part23']
     print(different_rows)
     print(different_participants)
 
@@ -527,8 +644,20 @@ def merge_vel_size(verbose=False):
         check_inserted_rows(summary_df)
     
     # print any rows where area is NaN
+    print("the following rows have NaN in the 'Area' column: ")
     print(summary_df[summary_df['Area'].isna()][['Participant', 'Date', 'Location', 'Video', 'Capillary', 'Area', 'Corrected Velocity', 'Diameter']])
     
+    # make the 'Drop' column strings
+    summary_df['Drop'] = summary_df['Drop'].astype(str)
+
+    # remove row if 'drop' is in the Drop column
+    summary_df = summary_df[~summary_df['Drop'].str.contains('drop')]
+
+    # if there is a number in "Manual" column, replace "Corrected Velocity" with "Manual"
+    summary_df['Corrected Velocity'] = summary_df['Manual'].fillna(summary_df['Corrected Velocity'])
+    # if there is a number in "Manual Velocity" column, replace "Corrected Velocity" with "Manual Velocity"
+    summary_df['Corrected Velocity'] = summary_df['Manual Velocity'].fillna(summary_df['Corrected Velocity'])
+   
     # save summary_df to csv
     summary_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\summary_df_test.csv', index=False)
     return summary_df
@@ -1111,6 +1240,16 @@ def collapse_df(df):
     if 'Log Area Score' in df.columns:
         log_area_scores = df.groupby('Participant')['Log Area Score'].mean().rename('Log Area Score')
         final_df = pd.merge(final_df, log_area_scores, left_on='Participant', right_index=True)
+
+    # If there is a 'KS Statistic' column, add it to the final DataFrame
+    if 'KS Statistic' in df.columns:
+        ks_stats = df.groupby('Participant')['KS Statistic'].mean().rename('KS Statistic')
+        final_df = pd.merge(final_df, ks_stats, left_on='Participant', right_index=True)
+
+    # if there is a 'EMD Score' column, add it to the final DataFrame
+    if 'EMD Score' in df.columns:
+        emd_scores = df.groupby('Participant')['EMD Score'].mean().rename('EMD Score')
+        final_df = pd.merge(final_df, emd_scores, left_on='Participant', right_index=True)
     
     return final_df
 
@@ -1118,7 +1257,7 @@ def plot_stats(df):
     # Setting the style
     sns.set_theme(style="whitegrid")
 
-    # Plotting distributions of Median Velocity, Age, and Median SYS_BP
+    # Plotting distributions of Median Velocity, Age, and Median SYS_BP. 
     fig, ax = plt.subplots(1, 3, figsize=(18, 5))
 
     sns.histplot(df['Median Velocity'], kde=True, ax=ax[0], color='skyblue')
@@ -1134,7 +1273,7 @@ def plot_stats(df):
     plt.show()
 
     # Pair plot to visualize relationships between Median Velocity and other features
-    sns.pairplot(df[['Median Velocity', 'Pressure 0.2', 'Pressure 0.8', 'Pressure 1.2', 'Age', 'Median SYS_BP']])
+    sns.pairplot(df[['Median Velocity', 'Pressure 0.2', 'Pressure 0.8', 'Pressure 1.2', 'Age', 'Median SYS_BP', 'Area Score', 'Log Area Score', 'KS Statistic', 'EMD Score']])
     plt.show()
 
     # Correlation matrix
@@ -1438,6 +1577,66 @@ def run_regression(df):
 
 #     return participant_scores
 
+def empirical_cdf(data):
+    """Generates the empirical CDF for a dataset."""
+    sorted_data = np.sort(data)
+    cdf = np.arange(1, len(data) + 1) / len(data)
+    return sorted_data, cdf
+
+def plot_ks_statistic(sample, reference):
+    """Plots the empirical CDFs of a sample and a reference dataset, highlighting the KS statistic."""
+    # Compute empirical CDFs
+    sample_sorted, sample_cdf = empirical_cdf(sample)
+    reference_sorted, reference_cdf = empirical_cdf(reference)
+    
+    # Calculate KS statistic and the corresponding x-value
+    differences = np.abs(sample_cdf - np.interp(sample_sorted, reference_sorted, reference_cdf))
+    ks_statistic = np.max(differences)
+    ks_x = sample_sorted[np.argmax(differences)]
+    
+    # Plotting
+    plt.figure(figsize=(10, 6))
+    plt.plot(sample_sorted, sample_cdf, label='Sample CDF', linestyle='--', color='blue')
+    plt.plot(reference_sorted, reference_cdf, label='Reference CDF', color='green')
+    
+    # Highlight the KS statistic
+    plt.fill_betweenx([0, 1], ks_x, ks_x + ks_statistic, color='red', alpha=0.3, label=f'KS Statistic = {ks_statistic:.4f}')
+    
+    plt.title('Empirical CDFs and KS Statistic')
+    plt.xlabel('Value')
+    plt.ylabel('CDF')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+def kolmogorov_smirnov_test_per_part(entire_dataset, reference, plot = False):
+    # Create the empirical CDF function from the dataset
+    ecdf = empirical_cdf_fn(reference['Corrected Velocity'])
+
+    ks_vals = pd.DataFrame(columns=['Participant', 'KS Statistic', 'P-Value'])
+    # Perform the KS test comparing the sample to the empirical CDF
+    for participant in entire_dataset['Participant'].unique():
+        participant_velocities = entire_dataset[entire_dataset['Participant'] == participant]['Corrected Velocity']
+        # Perform the KS test comparing the sample to the empirical CDF
+        ks_statistic, p_value = kstest(participant_velocities, ecdf)
+        ks_vals = ks_vals.append({'Participant': participant, 'KS Statistic': ks_statistic, 'P-Value': p_value}, ignore_index=True)
+    if plot:
+        # plot the KS statistic and p-value for each participant on two different subplots
+        plt.figure(figsize=(10, 6))
+        plt.subplot(1, 2, 1)
+        plt.bar(ks_vals['Participant'], ks_vals['KS Statistic'], width=0.5)
+        plt.xlabel('Participant')
+        plt.ylabel('KS Statistic')
+        plt.title('KS Statistic for Each Participant')
+        plt.xticks(rotation=45)
+        plt.subplot(1, 2, 2)
+        plt.bar(ks_vals['Participant'], ks_vals['P-Value'], width=0.5)
+        plt.xlabel('Participant')
+        plt.ylabel('P-Value')
+        plt.title('P-Value for Each Participant')
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        plt.show()
 
 
 def calculate_cdf_area(data, start=10, end=700):
@@ -1463,6 +1662,34 @@ def calculate_cdf_area(data, start=10, end=700):
     area_log = simps(cdf_values_log, x_log)
     
     return area, area_log
+
+def calculate_area_score(data, start=10, end=700, plot = False):
+    area, area_log = calculate_cdf_area(data, start, end)
+    print(area)
+    area_scores = []
+    for participant in data['Participant'].unique():
+        participant_df = data[data['Participant'] == participant]
+        participant_area, participant_area_log = calculate_cdf_area(participant_df)
+        print(f'Participant {participant} has a CDF area of {participant_area:.2f} and a log CDF area of {participant_area_log:.2f}')
+        area_scores.append([participant, participant_area-area, participant_area_log-area_log])
+    # plot area scores
+    area_scores_df = pd.DataFrame(area_scores, columns=['Participant', 'Area Score', 'Log Area Score'])
+    area_scores_df = area_scores_df.sort_values(by='Area Score', ascending=False)
+    plt.figure(figsize=(10, 6))
+    plt.bar(area_scores_df['Participant'], area_scores_df['Log Area Score'], width=0.5)
+    plt.xlabel('Participant')
+    plt.ylabel('Area Score')
+    plt.title('Area Score for Each Participant')
+    plt.xticks(rotation=45)
+    if plot:
+        plt.show()
+    else:
+        plt.close()
+    return area_scores_df
+
+    
+
+
 
 
 def main(verbose = False):
@@ -1508,6 +1735,7 @@ def main(verbose = False):
     old_nhp = summary_df_no_high_pressure[summary_df_no_high_pressure['Age'] > 50]
     young_nhp = summary_df_no_high_pressure[summary_df_no_high_pressure['Age'] <= 50]
     # plot_hist_pressure(summary_df_no_high_pressure, density=True)
+    # plot_densities(summary_df_no_high_pressure)
 
     # plot_hist_specific_pressure(summary_df, 0.2, density=True, hist=False)
     # plot_hist_specific_pressure(summary_df, 0.8, density=True, hist=False)
@@ -1534,30 +1762,11 @@ def main(verbose = False):
     # plot_cdf(summary_df['Corrected Velocity'], subsets= [highBP_old, highBP_young, normBP_old, normBP_young], labels=['Entire Dataset', 'High BP Old', 'High BP Young', 'Normal BP Old', 'Normal BP Young'], title = 'CDF Comparison of velocities by Age and BP')
     # plot_cdf(summary_df_no_high_pressure['Corrected Velocity'], subsets= [highBP_old_nhp, highBP_young_nhp, normBP_old_nhp, normBP_young_nhp], labels=['Entire Dataset', 'High BP Old', 'High BP Young', 'Normal BP Old', 'Normal BP Young'], title = 'CDF Comparison of velocities by Age and BP')
     # plot_cdf_comp_pressure(summary_df)
-    area, area_log = calculate_cdf_area(summary_df_no_high_pressure)
-    print(area)
-    area_scores = []
-    for participant in summary_df_no_high_pressure['Participant'].unique():
-        participant_df = summary_df_no_high_pressure[summary_df_no_high_pressure['Participant'] == participant]
-        participant_area, participant_area_log = calculate_cdf_area(participant_df)
-        print(f'Participant {participant} has a CDF area of {participant_area:.2f} and a log CDF area of {participant_area_log:.2f}')
-        area_scores.append([participant, participant_area-area, participant_area_log-area_log])
-    # plot area scores
-    area_scores_df = pd.DataFrame(area_scores, columns=['Participant', 'Area Score', 'Log Area Score'])
-    area_scores_df = area_scores_df.sort_values(by='Area Score', ascending=False)
-    plt.figure(figsize=(10, 6))
-    plt.bar(area_scores_df['Participant'], area_scores_df['Log Area Score'], width=0.5)
-    plt.xlabel('Participant')
-    plt.ylabel('Area Score')
-    plt.title('Area Score for Each Participant')
-    plt.xticks(rotation=45)
-    plt.show()
 
+    
+    area_scores_df = calculate_area_score(summary_df_no_high_pressure, plot=False)
     # add area scores to summary_df_no_high_pressure
     summary_df_no_high_pressure = summary_df_no_high_pressure.merge(area_scores_df, on='Participant', how='inner')
-
-
-
 
 
 
@@ -1569,12 +1778,18 @@ def main(verbose = False):
     
     skewness = []
     kurtosis = []
+    ecdf_fn = empirical_cdf_fn(summary_df['Corrected Velocity'])
+    ks_statistic_df = pd.DataFrame(columns=['Participant', 'KS Statistic', 'KS P-Value', 'EMD Score'])
     for participant in summary_df['Participant'].unique():
         participant_df = summary_df[summary_df['Participant'] == participant]
         participant_df_nhp = summary_df_no_high_pressure[summary_df_no_high_pressure['Participant'] == participant]
         participant_metrics = calculate_metrics(participant_df['Corrected Velocity'])
         skewness.append([participant,participant_metrics['skewness']])
         kurtosis.append([participant,participant_metrics['kurtosis']])
+        ks_statistic, p_value = kstest(participant_df['Corrected Velocity'], ecdf_fn)
+        emd_score = wasserstein_distance(participant_df['Corrected Velocity'], summary_df['Corrected Velocity'])
+        ks_statistic_df = pd.concat([ks_statistic_df, pd.DataFrame({'Participant': [participant], 'KS Statistic': [ks_statistic], 'KS P-Value': [p_value], 'EMD Score': [emd_score]})])
+        # plot_ks_statistic(participant_df['Corrected Velocity'], summary_df['Corrected Velocity'])
     
         # # Plot density
         # sns.kdeplot(summary_df['Corrected Velocity'], label='Entire Dataset', fill=True)
@@ -1589,6 +1804,9 @@ def main(verbose = False):
         # plot_cdf_comp_pressure(participant_df)
         # plot_cdf_comp_pressure(participant_df_nhp)    
     
+    # merge ks statistic df with summary df
+    summary_df_no_high_pressure = summary_df_no_high_pressure.merge(ks_statistic_df, on='Participant', how='inner')
+
     # Plot median velocity by participant
     median_velocity_per_participant = summary_df_no_high_pressure.groupby('Participant')['Corrected Velocity'].median().sort_values()
     sorted_participant_indices = {participant: index for index, participant in enumerate(median_velocity_per_participant.index)}
@@ -1603,8 +1821,7 @@ def main(verbose = False):
         
     run_regression(summary_df_no_high_pressure)
     
-
-        
+    # plot_CI(summary_df_no_high_pressure)        
         
 
     
@@ -1626,7 +1843,7 @@ def main(verbose = False):
     # print(favorite_df.columns)
 
     # remove part22 and part23
-    favorite_df = favorite_df[~favorite_df['Participant'].isin(['part22', 'part23'])]
+    # favorite_df = favorite_df[~favorite_df['Participant'].isin(['part22', 'part23'])]
     
     # plot_histograms(favorite_df, 'Age')
     # plot_histograms(favorite_df, 'SYS_BP')
@@ -1646,7 +1863,8 @@ def main(verbose = False):
     normBP_old_fav_nhp = favorite_df_no_high_pressure[(favorite_df_no_high_pressure['SYS_BP'] <= 120) & (favorite_df_no_high_pressure['Age'] > 50)]['Corrected Velocity']
     normBP_young_fav_nhp = favorite_df_no_high_pressure[(favorite_df_no_high_pressure['SYS_BP'] <= 120) & (favorite_df_no_high_pressure['Age'] <= 50)]['Corrected Velocity']
 
-    # # plot_cdf(favorite_df_no_high_pressure['Corrected Velocity'], subsets= [highBP_old_fav, highBP_young_fav, normBP_old_fav, normBP_young_fav], labels=['Entire Dataset', 'High BP Old', 'High BP Young', 'Normal BP Old', 'Normal BP Young'], title = 'CDF Comparison by Age and BP')
+    # plot_cdf(favorite_df_no_high_pressure['Corrected Velocity'], subsets= [highBP_old_fav, highBP_young_fav, normBP_old_fav, normBP_young_fav], labels=['Entire Dataset', 'High BP Old', 'High BP Young', 'Normal BP Old', 'Normal BP Young'], title = 'CDF Comparison by Age and BP')
+    # plot_cdf(favorite_df_no_high_pressure['Corrected Velocity'], subsets= [highBP_old_fav_nhp, highBP_young_fav_nhp, normBP_old_fav_nhp, normBP_young_fav_nhp], labels=['Entire Dataset', 'High BP Old', 'High BP Young', 'Normal BP Old', 'Normal BP Young'], title = 'CDF Comparison by Age and BP nhp')
     # plot_hist_specific_pressure(favorite_df, 0.2, density=True, hist=False)
     # plot_hist_specific_pressure(favorite_df, 0.8, density=True, hist=False)
     # plot_hist_specific_pressure(favorite_df, 1.2, density=True, hist=False)
@@ -1655,6 +1873,10 @@ def main(verbose = False):
     # plot_hist_comp_pressure(summary_df_no_high_pressure, density=True, hist=False)
 
     favorite_metrics = calculate_metrics(favorite_df['Corrected Velocity'])
+
+    fav_area_scores_df = calculate_area_score(favorite_df_no_high_pressure, plot = False)
+    favorite_df_no_high_pressure = favorite_df_no_high_pressure.merge(fav_area_scores_df, on='Participant', how='inner')
+
 
     # plot velocities for each participant:
     for participant in favorite_df['Participant'].unique():
@@ -1720,6 +1942,9 @@ def main(verbose = False):
     return 0
     
 if __name__ == '__main__':
+    # to run the analysis code:
     main()
+    # to make the summary_df_test file:
+    # merge_vel_size(verbose=True)
 
     
