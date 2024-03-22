@@ -742,65 +742,93 @@ def plot_and_calculate_area(df, method='trapezoidal', plot = False, normalize = 
             print(f"Calculated area under the curve using {method} rule: {area}")
     return area
 
-def plot_densities(df):
+def calc_average_pdf(df):
+    pdfs = []
+    for participant in df['Participant'].unique():
+        # probability density function for each participant
+        pdf_participant = df[df['Participant'] == participant]['Corrected Velocity'].value_counts(normalize=True).sort_index()
+        pdfs.append(pdf_participant)
+    # average pdf
+    average_pdf = pd.concat(pdfs, axis=1).mean(axis=1)
+    return average_pdf
+
+def plot_densities(df, normalize = True):
     # Subset data into old vs young
     old_df = df[df['Age'] > 50]
     young_df = df[df['Age'] <= 50]
-    # Plot density
-    sns.kdeplot(df['Corrected Velocity'], label='Entire Dataset', fill=True)
-    sns.kdeplot(old_df['Corrected Velocity'], label='old', fill=True, alpha=0.5)
-    sns.kdeplot(young_df['Corrected Velocity'], label='young', fill=True, alpha=0.5)
-    plt.legend()
-    plt.title('Density Plot of Entire Dataset vs. Subset')
-    plt.show()
 
-    # Subset data into low BP vs high BP
-    normBP_df = df[df['SYS_BP'] <= 120]
-    highBP_df = df[df['SYS_BP'] > 120]
-    print(f'the participants with high BP are: {highBP_df["Participant"].unique()}')
+    if normalize:
+        # insert function here like the one in plot_cdf
+        average_pdf = calc_average_pdf(df)
+        old_pdf = calc_average_pdf(old_df)
+        young_pdf = calc_average_pdf(young_df)
 
-    # Plot density
-    sns.kdeplot(df['Corrected Velocity'], label='Entire Dataset', fill=True)
-    sns.kdeplot(highBP_df['Corrected Velocity'], label='high BP', fill=True, alpha=0.5)
-    sns.kdeplot(normBP_df['Corrected Velocity'], label='normal', fill=True, alpha=0.5)
-    plt.legend()
-    plt.title('Density Plot of Entire Dataset vs. Subset')
-    plt.show()
+        # Plot density
+        sns.kdeplot(average_pdf, label='Entire Dataset', fill=True)
+        sns.kdeplot(old_pdf, label='old', fill=True, alpha=0.5)
+        sns.kdeplot(young_pdf, label='young', fill=True, alpha=0.5)
+        plt.legend()
+        plt.title('Normalized Density Plot of Entire Dataset vs. Subset')
+        plt.show()
+        return 0
 
-    # Plot density of old high BP vs young high BP vs old low BP vs young low BP
-    old_highBP_df = old_df[old_df['SYS_BP'] > 120]
-    young_highBP_df = young_df[young_df['SYS_BP'] > 120]
-    old_normBP_df = old_df[old_df['SYS_BP'] <= 120]
-    young_normBP_df = young_df[young_df['SYS_BP'] <= 120]
+    else: 
 
-    # Plot density
-    sns.kdeplot(df['Corrected Velocity'], label='Entire Dataset', fill=True)
-    sns.kdeplot(old_highBP_df['Corrected Velocity'], label='old high BP', fill=True, alpha=0.5)
-    sns.kdeplot(young_highBP_df['Corrected Velocity'], label='young high BP', fill=True, alpha=0.5)
-    sns.kdeplot(old_normBP_df['Corrected Velocity'], label='old normal BP', fill=True, alpha=0.5)
-    sns.kdeplot(young_normBP_df['Corrected Velocity'], label='young normal BP', fill=True, alpha=0.5)
-    plt.legend()
-    plt.title('Density Plot of Entire Dataset vs. Subset')
-    plt.show()
+        # Plot density
+        sns.kdeplot(df['Corrected Velocity'], label='Entire Dataset', fill=True)
+        sns.kdeplot(old_df['Corrected Velocity'], label='old', fill=True, alpha=0.5)
+        sns.kdeplot(young_df['Corrected Velocity'], label='young', fill=True, alpha=0.5)
+        plt.legend()
+        plt.title('Density Plot of Entire Dataset vs. Subset')
+        plt.show()
 
-    # compare high BP old vs young
-    # Plot density
-    sns.kdeplot(df['Corrected Velocity'], label='Entire Dataset', fill=True)
-    sns.kdeplot(old_highBP_df['Corrected Velocity'], label='old high BP', fill=True, alpha=0.5)
-    sns.kdeplot(young_highBP_df['Corrected Velocity'], label='young high BP', fill=True, alpha=0.5)
-    plt.legend()
-    plt.title('Density Plot of high BP participants')
-    plt.show()
+        # Subset data into low BP vs high BP
+        normBP_df = df[df['SYS_BP'] <= 120]
+        highBP_df = df[df['SYS_BP'] > 120]
+        print(f'the participants with high BP are: {highBP_df["Participant"].unique()}')
 
-    # compare low BP old vs young
-    # Plot density
-    sns.kdeplot(df['Corrected Velocity'], label='Entire Dataset', fill=True)
-    sns.kdeplot(old_normBP_df['Corrected Velocity'], label='old normal BP', fill=True, alpha=0.5)
-    sns.kdeplot(young_normBP_df['Corrected Velocity'], label='young normal BP', fill=True, alpha=0.5)
-    plt.legend()
-    plt.title('Density Plot of normal BP participants')
-    plt.show()
-    return 0
+        # Plot density
+        sns.kdeplot(df['Corrected Velocity'], label='Entire Dataset', fill=True)
+        sns.kdeplot(highBP_df['Corrected Velocity'], label='high BP', fill=True, alpha=0.5)
+        sns.kdeplot(normBP_df['Corrected Velocity'], label='normal', fill=True, alpha=0.5)
+        plt.legend()
+        plt.title('Density Plot of Entire Dataset vs. Subset')
+        plt.show()
+
+        # Plot density of old high BP vs young high BP vs old low BP vs young low BP
+        old_highBP_df = old_df[old_df['SYS_BP'] > 120]
+        young_highBP_df = young_df[young_df['SYS_BP'] > 120]
+        old_normBP_df = old_df[old_df['SYS_BP'] <= 120]
+        young_normBP_df = young_df[young_df['SYS_BP'] <= 120]
+
+        # Plot density
+        sns.kdeplot(df['Corrected Velocity'], label='Entire Dataset', fill=True)
+        sns.kdeplot(old_highBP_df['Corrected Velocity'], label='old high BP', fill=True, alpha=0.5)
+        sns.kdeplot(young_highBP_df['Corrected Velocity'], label='young high BP', fill=True, alpha=0.5)
+        sns.kdeplot(old_normBP_df['Corrected Velocity'], label='old normal BP', fill=True, alpha=0.5)
+        sns.kdeplot(young_normBP_df['Corrected Velocity'], label='young normal BP', fill=True, alpha=0.5)
+        plt.legend()
+        plt.title('Density Plot of Entire Dataset vs. Subset')
+        plt.show()
+
+        # compare high BP old vs young
+        # Plot density
+        sns.kdeplot(df['Corrected Velocity'], label='Entire Dataset', fill=True)
+        sns.kdeplot(old_highBP_df['Corrected Velocity'], label='old high BP', fill=True, alpha=0.5)
+        sns.kdeplot(young_highBP_df['Corrected Velocity'], label='young high BP', fill=True, alpha=0.5)
+        plt.legend()
+        plt.title('Density Plot of high BP participants')
+        plt.show()
+
+        # compare low BP old vs young
+        # Plot density
+        sns.kdeplot(df['Corrected Velocity'], label='Entire Dataset', fill=True)
+        sns.kdeplot(old_normBP_df['Corrected Velocity'], label='old normal BP', fill=True, alpha=0.5)
+        sns.kdeplot(young_normBP_df['Corrected Velocity'], label='young normal BP', fill=True, alpha=0.5)
+        plt.legend()
+        plt.title('Density Plot of normal BP participants')
+        plt.show()
+        return 0
 
 def plot_densities_pressure(summary_df):
         # Subset data into old vs young
@@ -1111,7 +1139,18 @@ def quantile_analysis(data, subset, quantiles=[0.25, 0.5, 0.75]):
         print(f"{int(q*100)}th percentile - Entire Dataset: {dq}, Subset: {sq}")
     return 0
 
-def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title = 'CDF Comparison', write = False):
+def calc_norm_cdfs(data):
+    cdfs = []
+    for participant in data:
+        participant_sorted = np.sort(participant)
+        p_participant = 1. * np.arange(len(participant)) / (len(participant) - 1)
+        cdf = np.vstack([participant_sorted, p_participant])
+        cdfs.append(cdf)
+    cdfs = np.array(cdfs)
+    cdfs = np.mean(cdfs, axis=0)
+    return cdfs
+
+def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title = 'CDF Comparison', write = False, normalize = True):
     """
     Plots the CDF of the entire dataset and the inputtedc subsets.
 
@@ -1125,23 +1164,18 @@ def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title = 'CDF Co
     Returns:
         0 if successful
     """
-    # Calculate CDF for the entire dataset
-    data_sorted = np.sort(data)
-    p = 1. * np.arange(len(data)) / (len(data) - 1)
-    
-    # value is the column of the dataframe that we are interested in
-    value = 'Velocity (um/s)' if 'Pressure' not in title else 'Pressure (psi)'
-    
-    if len(subsets) == 1:
-        # Calculate CDF for the subset
-        subset_sorted = np.sort(subsets[0])
-        p_subset = 1. * np.arange(len(subsets[0])) / (len(subsets[0]) - 1)
+    if normalize:
+        # Calculate each individual CDF
+        cdfs_total = calc_norm_cdfs(data)
+        cdfs_subsets = [calc_norm_cdfs(subset) for subset in subsets]
+
         # Plotting
         plt.figure(figsize=(8, 5))
-        plt.plot(data_sorted, p, label=labels[0])
-        plt.plot(subset_sorted, p_subset, label=labels[1], linestyle='--')
+        plt.plot(cdfs_total[0], cdfs_total[1], label=labels[0])
+        for cdf, label in zip(cdfs_subsets, labels[1:]):
+            plt.plot(cdf[0], cdf[1], label=label, linestyle='--')
         plt.ylabel('CDF')
-        plt.xlabel(value)
+        plt.xlabel('Velocity (um/s)')
         plt.title(title)
         plt.legend()
         plt.grid(True)
@@ -1152,32 +1186,62 @@ def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title = 'CDF Co
             plt.close()
         else:
             plt.show()
-    elif len(subsets) == 0:
-        return 1
+        return 0
+
     else:
-        plt.figure(figsize=(8, 5))
-        plt.plot(data_sorted, p, label=labels[0])
-        labels = labels[1:]
-        for subset, label in zip(subsets, labels):
+        # Calculate CDF for the entire dataset
+        data_sorted = np.sort(data)
+        p = 1. * np.arange(len(data)) / (len(data) - 1)
+        
+        # value is the column of the dataframe that we are interested in
+        value = 'Velocity (um/s)' if 'Pressure' not in title else 'Pressure (psi)'
+        
+        if len(subsets) == 1:
             # Calculate CDF for the subset
-            subset_sorted = np.sort(subset)
-            p_subset = 1. * np.arange(len(subset)) / (len(subset) - 1)
+            subset_sorted = np.sort(subsets[0])
+            p_subset = 1. * np.arange(len(subsets[0])) / (len(subsets[0]) - 1)
             # Plotting
-            plt.plot(subset_sorted, p_subset, label=label, linestyle='--')
-        plt.ylabel('CDF')
-        plt.xlabel(value)
-        plt.title(title)
-        plt.legend()
-        plt.grid(True)
-        if write:
-            filename = title.replace(' ', '_')
-            filename += '.png'
-            filename = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\results', filename)
-            plt.savefig(filename, dpi=300)
-            plt.close()
+            plt.figure(figsize=(8, 5))
+            plt.plot(data_sorted, p, label=labels[0])
+            plt.plot(subset_sorted, p_subset, label=labels[1], linestyle='--')
+            plt.ylabel('CDF')
+            plt.xlabel(value)
+            plt.title(title)
+            plt.legend()
+            plt.grid(True)
+            if write:
+                filename = title.replace(' ', '_')
+                filename += '.png'
+                plt.savefig(filename, dpi=300)
+                plt.close()
+            else:
+                plt.show()
+        elif len(subsets) == 0:
+            return 1
         else:
-            plt.show()        
-    return 0
+            plt.figure(figsize=(8, 5))
+            plt.plot(data_sorted, p, label=labels[0])
+            labels = labels[1:]
+            for subset, label in zip(subsets, labels):
+                # Calculate CDF for the subset
+                subset_sorted = np.sort(subset)
+                p_subset = 1. * np.arange(len(subset)) / (len(subset) - 1)
+                # Plotting
+                plt.plot(subset_sorted, p_subset, label=label, linestyle='--')
+            plt.ylabel('CDF')
+            plt.xlabel(value)
+            plt.title(title)
+            plt.legend()
+            plt.grid(True)
+            if write:
+                filename = title.replace(' ', '_')
+                filename += '.png'
+                filename = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\results', filename)
+                plt.savefig(filename, dpi=300)
+                plt.close()
+            else:
+                plt.show()        
+        return 0
 
 def plot_boxplot(data, subset, labels=['Entire Dataset', 'Subset']):
     # Combine data and subset into a single dataset for plotting
@@ -1284,22 +1348,40 @@ def plot_stats(df):
     plt.show()
     return 0
 
-def make_models(df, y = 'Median Velocity', plot = False):
+def make_models(df, variable = 'Median Velocity', log = False, plot = False):
     from sklearn.model_selection import train_test_split
     from sklearn.linear_model import LinearRegression
     from sklearn.ensemble import RandomForestRegressor
     from sklearn.metrics import mean_absolute_error, mean_squared_error
     from sklearn.model_selection import RandomizedSearchCV
 
-    # Preparing the data
-    X = df.drop(['Participant', 'Median Velocity', 'Median SYS_BP'], axis=1)  # Using pressures and age as features
-    if y == 'Median Velocity':
-        y = df['Median Velocity']
+    # preparing the data
+    if log:
+        X = df.drop(['Participant', 'Median Velocity', 'Area Score', 'Log Area Score', 'EMD Score', 'KS Statistic',                      
+                     'Pressure 0.2', 'Pressure 0.4', 'Pressure 0.6', 'Pressure 0.8', 'Pressure 1.0', 'Pressure 1.2'], axis=1)  # Using log pressures, age, and sys_bp as features
+    else: 
+        X = df.drop(['Participant', 'Log Median Velocity', 'Area Score', 'Log Area Score', 'EMD Score', 'KS Statistic',
+                     'Log Pressure 0.2', 'Log Pressure 0.4', 'Log Pressure 0.6', 'Log Pressure 0.8', 'Log Pressure 1.0', 'Log Pressure 1.2'], axis=1)  # Using pressures, age, and sys_bp as features
+    
+    if variable == 'Median Velocity':
+        Y = df['Median Velocity']
+        X.drop(['Median Velocity'], axis=1, inplace=True)
+    elif variable == 'Log Median Velocity':
+        Y = df['Log Median Velocity']
+        X.drop(['Log Median Velocity'], axis=1, inplace=True)
+    elif variable == 'Log Area Score':
+        Y = df['Log Area Score']
+    elif variable == 'Area Score':
+        Y = df['Area Score']
     else:
-        y = df['Log Area Score']
+        Y = df['Median Velocity']
+        X.drop(['Log Median Velocity', 'Median Velocity'], axis=1, inplace=True)
+
+
+    print(X.columns, Y.name)
 
     # Splitting the dataset into training and testing sets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
 
     # Initializing models
     linear_reg = LinearRegression()
@@ -1324,14 +1406,15 @@ def make_models(df, y = 'Median Velocity', plot = False):
     mae_rf = mean_absolute_error(y_test, y_pred_rf)
     rmse_rf = mean_squared_error(y_test, y_pred_rf, squared=False)
 
-    print(mae_lr, rmse_lr, mae_rf, rmse_rf)
+    print(f'Linear Regression MAE: {mae_lr}, RMSE: {rmse_lr}')
+    print(f'Random Forest MAE: {mae_rf}, RMSE: {rmse_rf}')
 
     if plot:
         fig, axs = plt.subplots(2, 2, figsize=(14, 10))
 
         # Actual vs. Predicted for Linear Regression
         axs[0, 0].scatter(y_test, y_pred_lr, color='blue', alpha=0.5)
-        axs[0, 0].plot([y.min(), y.max()], [y.min(), y.max()], 'k--', lw=2)
+        axs[0, 0].plot([Y.min(), Y.max()], [Y.min(), Y.max()], 'k--', lw=2)
         axs[0, 0].set_title('Linear Regression: Actual vs. Predicted')
         axs[0, 0].set_xlabel('Actual')
         axs[0, 0].set_ylabel('Predicted')
@@ -1346,7 +1429,7 @@ def make_models(df, y = 'Median Velocity', plot = False):
 
         # Actual vs. Predicted for Random Forest
         axs[0, 1].scatter(y_test, y_pred_rf, color='green', alpha=0.5)
-        axs[0, 1].plot([y.min(), y.max()], [y.min(), y.max()], 'k--', lw=2)
+        axs[0, 1].plot([Y.min(), Y.max()], [Y.min(), Y.max()], 'k--', lw=2)
         axs[0, 1].set_title('Random Forest: Actual vs. Predicted')
         axs[0, 1].set_xlabel('Actual')
         axs[0, 1].set_ylabel('Predicted')
@@ -1386,13 +1469,13 @@ def make_models(df, y = 'Median Velocity', plot = False):
 
 def make_log_df(df, plot = False):
     # Log-transforming selected features and the target variable
-    df['log_Pressure_0.2'] = np.log1p(df['Pressure 0.2'])
-    df['log_Pressure_0.4'] = np.log1p(df['Pressure 0.4'])
-    df['log_Pressure_0.6'] = np.log1p(df['Pressure 0.6'])
-    df['log_Pressure_0.8'] = np.log1p(df['Pressure 0.8'])
-    df['log_Pressure_1.0'] = np.log1p(df['Pressure 1.0'])
-    df['log_Pressure_1.2'] = np.log1p(df['Pressure 1.2'])
-    df['log_Median_Velocity'] = np.log1p(df['Median Velocity'])
+    df['Log Pressure 0.2'] = np.log1p(df['Pressure 0.2'])
+    df['Log Pressure 0.4'] = np.log1p(df['Pressure 0.4'])
+    df['Log Pressure 0.6'] = np.log1p(df['Pressure 0.6'])
+    df['Log Pressure 0.8'] = np.log1p(df['Pressure 0.8'])
+    df['Log Pressure 1.0'] = np.log1p(df['Pressure 1.0'])
+    df['Log Pressure 1.2'] = np.log1p(df['Pressure 1.2'])
+    df['Log Median Velocity'] = np.log1p(df['Median Velocity'])
 
     if plot:
         # Plot log-transformed features vs Age
@@ -1425,7 +1508,7 @@ def make_log_df(df, plot = False):
     return df
 
 
-def compare_log_and_linear(df, plot = False):
+def compare_log_and_linear(df, variable = 'Median Velocity', plot = False):
     from sklearn.model_selection import train_test_split
     from sklearn.linear_model import LinearRegression
     from sklearn.metrics import mean_squared_error, r2_score
@@ -1439,10 +1522,16 @@ def compare_log_and_linear(df, plot = False):
     features_transformed = ['log_Pressure_0.2', 'log_Pressure_0.8', 'log_Pressure_1.2']  # Corresponding log-transformed features
     
     X_original = df[features_original]
-    y_original = df['Median Velocity']
-    
     X_transformed = df[features_transformed]
-    y_transformed = df['log_Median_Velocity']
+    if variable == 'Median Velocity':
+        y_original = df['Median Velocity']
+        y_transformed = df['log_Median_Velocity']
+    elif variable == 'Area Score':
+        y_original = df['Area Score']
+        y_transformed = df['Log Area Score']
+    else:
+        y_original = df['Age']
+        y_transformed = df['Age']
     
     X_train_orig, X_test_orig, y_train_orig, y_test_orig = train_test_split(X_original, y_original, test_size=0.2, random_state=42)
     X_train_trans, X_test_trans, y_train_trans, y_test_trans = train_test_split(X_transformed, y_transformed, test_size=0.2, random_state=42)
@@ -1475,22 +1564,22 @@ def compare_log_and_linear(df, plot = False):
             # Actual vs. Predicted Plot
             plt.figure(figsize=(14, 6))
             plt.subplot(1, 2, 1)
-            sns.scatterplot(x=y_test_orig, y=predictions_orig).set(title=f'{name} - Original Data: Actual vs. Predicted')
+            sns.scatterplot(x=y_test_orig, y=predictions_orig).set(title=f'{name} - Original Data: Actual vs. Predicted variable {variable}')
             plt.subplot(1, 2, 2)
-            sns.scatterplot(x=np.expm1(y_test_trans), y=np.expm1(predictions_trans)).set(title=f'{name} - Log-transformed Data: Actual vs. Predicted')
+            sns.scatterplot(x=np.expm1(y_test_trans), y=np.expm1(predictions_trans)).set(title=f'{name} - Log-transformed Data: Actual vs. Predicted variable {variable}')
             plt.show()
             
             # Residual Plot
             plt.figure(figsize=(14, 6))
             plt.subplot(1, 2, 1)
-            sns.residplot(x=predictions_orig, y=y_test_orig, lowess=True).set(title=f'{name} - Original Data: Residuals')
+            sns.residplot(x=predictions_orig, y=y_test_orig, lowess=True).set(title=f'{name} - Original Data: Residuals variable {variable}')
             plt.subplot(1, 2, 2)
-            sns.residplot(x=np.expm1(predictions_trans), y=np.expm1(y_test_trans), lowess=True).set(title=f'{name} - Log-transformed Data: Residuals')
+            sns.residplot(x=np.expm1(predictions_trans), y=np.expm1(y_test_trans), lowess=True).set(title=f'{name} - Log-transformed Data: Residuals variable {variable}')
             plt.show()
     
     return 0
 
-def run_regression(df):
+def run_regression(df, plot = False):
     """
     Runs a linear regression analysis on the inputted DataFrame and plots results.
 
@@ -1502,9 +1591,13 @@ def run_regression(df):
     """
     collapsed_df = collapse_df(df)
     collapsed_df = make_log_df(collapsed_df)
-    plot_stats(collapsed_df)
-    # make_models(collapsed_df, plot=True)
-    # compare_log_and_linear(collapsed_df, plot=True)
+    if plot:
+        plot_stats(collapsed_df)
+
+    make_models(collapsed_df, variable = 'Area Score', log = False, plot=False)
+    make_models(collapsed_df, variable = 'Log Area Score', log = True, plot=False)
+    make_models(collapsed_df, variable = 'Median Velocity', log = False, plot=False)
+    # compare_log_and_linear(collapsed_df, "Area Score", plot=False)
 
 
     # # Corrected aggregation method for 'SYS_BP'
@@ -1553,6 +1646,7 @@ def run_regression(df):
 
     # plt.tight_layout()
     # plt.show()
+    
     
 
     return 0
@@ -1613,13 +1707,13 @@ def kolmogorov_smirnov_test_per_part(entire_dataset, reference, plot = False):
     # Create the empirical CDF function from the dataset
     ecdf = empirical_cdf_fn(reference['Corrected Velocity'])
 
-    ks_vals = pd.DataFrame(columns=['Participant', 'KS Statistic', 'P-Value'])
+    ks_vals = pd.DataFrame(columns=['Participant', 'KS Statistic', 'KS P-Value'])
     # Perform the KS test comparing the sample to the empirical CDF
     for participant in entire_dataset['Participant'].unique():
         participant_velocities = entire_dataset[entire_dataset['Participant'] == participant]['Corrected Velocity']
         # Perform the KS test comparing the sample to the empirical CDF
         ks_statistic, p_value = kstest(participant_velocities, ecdf)
-        ks_vals = ks_vals.append({'Participant': participant, 'KS Statistic': ks_statistic, 'P-Value': p_value}, ignore_index=True)
+        ks_vals = ks_vals.append({'Participant': participant, 'KS Statistic': ks_statistic, 'KS P-Value': p_value}, ignore_index=True)
     if plot:
         # plot the KS statistic and p-value for each participant on two different subplots
         plt.figure(figsize=(10, 6))
@@ -1630,7 +1724,7 @@ def kolmogorov_smirnov_test_per_part(entire_dataset, reference, plot = False):
         plt.title('KS Statistic for Each Participant')
         plt.xticks(rotation=45)
         plt.subplot(1, 2, 2)
-        plt.bar(ks_vals['Participant'], ks_vals['P-Value'], width=0.5)
+        plt.bar(ks_vals['Participant'], ks_vals['KS P-Value'], width=0.5)
         plt.xlabel('Participant')
         plt.ylabel('P-Value')
         plt.title('P-Value for Each Participant')
@@ -1663,23 +1757,31 @@ def calculate_cdf_area(data, start=10, end=700):
     
     return area, area_log
 
-def calculate_area_score(data, start=10, end=700, plot = False):
+def calculate_area_score(data, start=10, end=700, plot = False, verbose = False, log = False):
     area, area_log = calculate_cdf_area(data, start, end)
-    print(area)
+    if verbose:
+        print(f'Area: {area:.2f}, Log Area: {area_log:.2f}')
     area_scores = []
     for participant in data['Participant'].unique():
         participant_df = data[data['Participant'] == participant]
         participant_area, participant_area_log = calculate_cdf_area(participant_df)
-        print(f'Participant {participant} has a CDF area of {participant_area:.2f} and a log CDF area of {participant_area_log:.2f}')
+        if verbose:
+            print(f'Participant {participant} has a CDF area of {participant_area:.2f} and a log CDF area of {participant_area_log:.2f}')
         area_scores.append([participant, participant_area-area, participant_area_log-area_log])
     # plot area scores
     area_scores_df = pd.DataFrame(area_scores, columns=['Participant', 'Area Score', 'Log Area Score'])
-    area_scores_df = area_scores_df.sort_values(by='Area Score', ascending=False)
     plt.figure(figsize=(10, 6))
-    plt.bar(area_scores_df['Participant'], area_scores_df['Log Area Score'], width=0.5)
-    plt.xlabel('Participant')
-    plt.ylabel('Area Score')
-    plt.title('Area Score for Each Participant')
+    if log:
+        area_scores_df = area_scores_df.sort_values(by='Log Area Score', ascending=False)
+        plt.bar(area_scores_df['Participant'], area_scores_df['Log Area Score'], width=0.5)
+        plt.ylabel('Log Area Score')
+        plt.title('Log Area Score for Each Participant')
+    else:
+        area_scores_df = area_scores_df.sort_values(by='Area Score', ascending=False)
+        plt.bar(area_scores_df['Participant'], area_scores_df['Area Score'], width=0.5)
+        plt.ylabel('Area Score')
+        plt.title('Area Score for Each Participant')
+    plt.xlabel(f'Participant')
     plt.xticks(rotation=45)
     if plot:
         plt.show()
@@ -1734,6 +1836,7 @@ def main(verbose = False):
     summary_df_no_high_pressure = summary_df[summary_df['Pressure'] <= 1.2]
     old_nhp = summary_df_no_high_pressure[summary_df_no_high_pressure['Age'] > 50]
     young_nhp = summary_df_no_high_pressure[summary_df_no_high_pressure['Age'] <= 50]
+
     # plot_hist_pressure(summary_df_no_high_pressure, density=True)
     # plot_densities(summary_df_no_high_pressure)
 
@@ -1764,9 +1867,17 @@ def main(verbose = False):
     # plot_cdf_comp_pressure(summary_df)
 
     
-    area_scores_df = calculate_area_score(summary_df_no_high_pressure, plot=False)
+    area_scores_df = calculate_area_score(summary_df_no_high_pressure, log = True, plot=False)
     # add area scores to summary_df_no_high_pressure
     summary_df_no_high_pressure = summary_df_no_high_pressure.merge(area_scores_df, on='Participant', how='inner')
+
+    # # plot area score vs age scatter
+    # plt.figure(figsize=(10, 6))
+    # plt.scatter(summary_df_no_high_pressure['Age'], summary_df_no_high_pressure['Log Area Score'])
+    # plt.xlabel('Age')
+    # plt.ylabel('Log Area Score')
+    # plt.title('Log Area Score vs. Age')
+    # plt.show()
 
 
 
@@ -1899,7 +2010,7 @@ def main(verbose = False):
 
         # Plot each capillary's data in separate subplots
         for i, capillary in enumerate(capillaries):
-            print(f'Participant: {participant}, Capillary: {capillary}')
+            # print(f'Participant: {participant}, Capillary: {capillary}')
             capillary_data = grouped_df.get_group(capillary)
             capillary_data = capillary_data.copy()
             # decreases = capillary_data['Pressure'].diff() < 0
