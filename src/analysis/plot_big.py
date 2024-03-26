@@ -12,19 +12,13 @@ from scipy import stats
 import statsmodels.api as sm
 from src.tools.parse_filename import parse_filename
 from sklearn.utils import resample
-from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, confusion_matrix
+from sklearn.linear_model import LogisticRegression, LinearRegression, LassoCV
+from sklearn.model_selection import train_test_split, cross_val_predict, cross_val_score
+from sklearn.metrics import accuracy_score, confusion_matrix, make_scorer
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
-from sklearn.linear_model import LassoCV
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import make_pipeline
-from sklearn.model_selection import cross_val_score
-from sklearn.metrics import roc_auc_score, roc_curve
-from sklearn.metrics import r2_score, mean_squared_error
+from sklearn.metrics import accuracy_score, roc_auc_score, auc, confusion_matrix, roc_curve, recall_score, precision_score, f1_score, r2_score, mean_squared_error, precision_recall_curve
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, confusion_matrix, precision_recall_curve, auc, f1_score
 
 
 
@@ -1166,7 +1160,7 @@ def calc_norm_cdfs(data):
     cdfs = np.mean(cdfs, axis=0)
     return cdfs
 
-def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title = 'CDF Comparison', write = False, normalize = True):
+def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title = 'CDF Comparison', write = False, normalize = False):
     """
     Plots the CDF of the entire dataset and the inputtedc subsets.
 
@@ -1601,47 +1595,26 @@ def compare_log_and_linear(df, variable = 'Median Velocity', plot = False):
     
     return 0
 
-def perform_logistic_regression_and_evaluate(dataframe, features, target, cv_folds=5):
-    X = dataframe[features]
-    y = dataframe[target]
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    model = make_pipeline(StandardScaler(), LogisticRegression())
-    model.fit(X_train, y_train)
-    y_pred_proba = model.predict_proba(X_test)[:, 1]
-
-    # Calculate precision, recall, and thresholds
-    precision, recall, thresholds = precision_recall_curve(y_test, y_pred_proba)
-    f1_scores = 2*recall*precision / (recall + precision)
+def age_bin_accuracy(y_true, y_pred, threshold=50):
+    """
+    Custom accuracy scorer that categorizes predicted and true ages into bins based on a threshold.
     
-    # Find the optimal threshold
-    optimal_idx = np.argmax(f1_scores)
-    optimal_threshold = thresholds[optimal_idx]
-    print(f"Optimal threshold: {optimal_threshold}")
-
-    # Adjusted prediction based on the new threshold
-    y_pred_adjusted = (y_pred_proba >= optimal_threshold).astype(int)
-
-    # Print adjusted metrics
-    print(f"Adjusted Accuracy: {accuracy_score(y_test, y_pred_adjusted)}")
-    print(f"Adjusted Confusion Matrix:\n{confusion_matrix(y_test, y_pred_adjusted)}")
+    Parameters:
+    - y_true: array-like of true ages.
+    - y_pred: array-like of predicted ages.
+    - threshold: age threshold for categorizing into bins (default is 50).
     
-    # Plotting
-    plt.plot(thresholds, precision[:-1], label='Precision')
-    plt.plot(thresholds, recall[:-1], label='Recall')
-    plt.plot(thresholds, f1_scores[:-1], label='F1 Score')
-    plt.xlabel('Threshold')
-    plt.ylabel('Score')
-    plt.title('Precision, Recall, and F1 Score vs. Threshold')
-    plt.legend()
-    plt.show()
+    Returns:
+    - Accuracy of the bin categorization.
+    """
+    # Convert ages to binary categories (0: young, 1: old)
+    y_true_bin = (y_true >= threshold).astype(int)
+    y_pred_bin = (y_pred >= threshold).astype(int)
+    
+    # Calculate accuracy
+    return accuracy_score(y_true_bin, y_pred_bin)
 
-    # Cross-validation
-    accuracy_scores = cross_val_score(model, X, y, cv=cv_folds, scoring='accuracy')
-    print(f"Average accuracy with {cv_folds}-fold cross-validation: {np.mean(accuracy_scores)}")
-
-    return model
-
-def perform_logistic_regression(dataframe, features, target, cv_folds=5):
+def perform_logistic_regression(dataframe, features, target, cv_folds=5, score_func='banana'):
     """
     Fits a logistic regression model and evaluates its performance.
 
@@ -1661,7 +1634,7 @@ def perform_logistic_regression(dataframe, features, target, cv_folds=5):
 
 
     # Splitting the dataset into training and testing sets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, random_state=42)
 
     # Creating and fitting the logistic regression model within a pipeline
     model = make_pipeline(StandardScaler(), LogisticRegression())
@@ -1669,15 +1642,104 @@ def perform_logistic_regression(dataframe, features, target, cv_folds=5):
 
     # Making predictions and evaluating the model
     y_pred = model.predict(X_test)
-    print(f"Accuracy: {accuracy_score(y_test, y_pred)}")
-    print(f"Confusion Matrix:\n{confusion_matrix(y_test, y_pred)}")
+    # print(f"Accuracy: {accuracy_score(y_test, y_pred)}")
+    # print(f"Confusion Matrix:\n{confusion_matrix(y_test, y_pred)}")
+    print('This is for perform logistic regression')
+    print(f'y_pred: {y_pred}')
+    print(f'y_test: {y_test}')
 
     # Now add cross-validation
-    accuracy_scores = cross_val_score(model, X, y, cv=cv_folds, scoring='accuracy')
+    if score_func is None:
+        score_func = 'accuracy'
+    else:
+        custom_accuracy_scorer = make_scorer(age_bin_accuracy, greater_is_better=True)
+        score_func = custom_accuracy_scorer
+    accuracy_scores = cross_val_score(model, X, y, cv=cv_folds, scoring=score_func)
     average_accuracy = np.mean(accuracy_scores)
     print(f"Average accuracy with {cv_folds}-fold cross-validation: {average_accuracy}")
+    print(features)
 
+    # calculate Recall, Precision, F1
+    y_test_bool = y_test >= 50
+    y_pred_bool = y_pred >= 50
+    # turn True and False into 1 and 0
+    y_test_bool = y_test_bool.astype(int)
+    y_pred_bool = y_pred_bool.astype(int)
+    print(f'y_test_bool: {y_test_bool}')
+    print(f'y_pred_bool: {y_pred_bool}')
+
+    # Calculate Precision, Recall, F1
+    precision = precision_score(y_test_bool, y_pred_bool, average='binary')
+    recall = recall_score(y_test_bool, y_pred_bool, average='binary')
+    f1 = f1_score(y_test_bool, y_pred_bool, average='binary')
+
+    print(f'Precision: {precision}')
+    print(f'Recall: {recall}')
+    print(f'F1: {f1}')
+    
+    print('End of perform logistic regression')
     return model
+
+def predict_age_with_linear_regression(dataframe, features):
+    """
+    Fits a linear regression model to predict age.
+
+    Args:
+    - dataframe: The pandas DataFrame containing the data.
+    - features: List of column names to use as features.
+
+    Returns:
+    - age_predictions: Predicted ages for the test set.
+    """
+    X = dataframe[features]
+    y = dataframe['Age']  # Assuming 'Age' is the column with age values
+
+    # Splitting the dataset into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, random_state=42)
+
+    # Creating and fitting the linear regression model within a pipeline
+    model = make_pipeline(StandardScaler(), LinearRegression())
+    age_predictions_CV = cross_val_predict(model, X, y, cv=5)
+    model.fit(X_train, y_train)
+
+    # Making predictions on the test set
+    age_predictions = model.predict(X_test)
+    age_buckets = np.where(age_predictions >= 50, 1, 0)
+    age_buckets_CV = np.where(age_predictions_CV >= 50, 1, 0)
+
+    # You could then evaluate the classification using actual age buckets in y_test
+    y_test_buckets = np.where(y_test >= 50, 1, 0)
+    y_test_buckets_CV = np.where(y >= 50, 1, 0)
+    precision = precision_score(y_test_buckets, age_buckets)
+    recall = recall_score(y_test_buckets, age_buckets)
+    f1 = f1_score(y_test_buckets, age_buckets)
+
+    # plot confusion matrix
+    plot_confusion_matrix(y_test_buckets, age_buckets, features = features, threshold=.5, class_names=['Young', 'Old'])
+    print(f"Accuracy: {accuracy_score(y_test_buckets, age_buckets)}")
+
+    print(f"Precision: {precision:.4f}")
+    print(f"Recall: {recall:.4f}")
+    print(f"F1 Score: {f1:.4f}")
+
+    precision_CV = precision_score(y_test_buckets_CV, age_buckets_CV)
+    recall_CV = recall_score(y_test_buckets_CV, age_buckets_CV)
+    f1_CV = f1_score(y_test_buckets_CV, age_buckets_CV)
+
+    print(f"Precision CV: {precision_CV:.4f}")
+    print(f"Recall CV: {recall_CV:.4f}")
+    print(f"F1 Score CV: {f1_CV:.4f}")
+
+    # plot confusion matrix
+    plot_confusion_matrix(y_test_buckets_CV, age_buckets_CV, features = features, threshold=.5, class_names=['Young CV', 'Old CV'])
+    print(f"Accuracy CV: {accuracy_score(y_test_buckets_CV, age_buckets_CV)}")
+
+    print('End of predict age with linear regression')
+
+    
+    return age_predictions, y_test
+
+
 
 def perform_lasso_regression(dataframe, features, target):
     """
@@ -1695,7 +1757,7 @@ def perform_lasso_regression(dataframe, features, target):
     y = dataframe[target]
 
     # Creating and fitting the Lasso model within a pipeline
-    model = make_pipeline(StandardScaler(), LassoCV(cv=5, max_iter=10000))
+    model = make_pipeline(StandardScaler(), LassoCV(cv=5, max_iter=5000))
     model.fit(X, y)
 
     # Accessing the Lasso model directly to get the coefficients
@@ -1703,8 +1765,11 @@ def perform_lasso_regression(dataframe, features, target):
     coefficients = pd.Series(lasso.coef_, index=features)
 
     # Printing the coefficients
+    print('Lasso Regression Model:')
     print("Feature coefficients:")
     print(coefficients)
+
+    print('End of perform lasso regression')
 
     return model
 
@@ -1713,7 +1778,7 @@ def perform_lasso_regression_and_evaluate(dataframe, features, target):
     y = dataframe[target]
 
     # Splitting the dataset into training and testing sets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, random_state=42)
 
     # Creating and fitting the Lasso model within a pipeline
     model = make_pipeline(StandardScaler(), LassoCV(cv=5))
@@ -1722,9 +1787,24 @@ def perform_lasso_regression_and_evaluate(dataframe, features, target):
     # Predicting on the test set
     y_pred = model.predict(X_test)
 
+    print(f'This is for perform lasso regression and evaluate')
+
+    print(f'y_pred: {y_pred} lasso')
+    print(f'y_test: {y_test} lasso')
+
     # Evaluation for regression
     print("R-squared:", r2_score(y_test, y_pred))
     print("MSE:", mean_squared_error(y_test, y_pred))
+
+    # Check number correctly classified: 50 year threshold
+    y_pred = y_pred >= 50
+    y_test = y_test >= 50
+
+    print(confusion_matrix(y_test, y_pred))
+    print(accuracy_score(y_test, y_pred))
+
+    print('End of perform lasso regression and evaluate')
+
 
     return model
 
@@ -1784,7 +1864,7 @@ def calculate_auc(y_true, y_scores, features = None, plot=False):
         plt.xlabel('False Positive Rate')
         plt.ylabel('True Positive Rate')
         if features:
-            plt.title(f'Receiver Operating Characteristic (ROC) for {features}')
+            plt.title(f'Receiver Operating Characteristic (ROC) for \n{features}')
         else:
             plt.title('Receiver Operating Characteristic (ROC)')
         plt.legend(loc="lower right")
@@ -1822,6 +1902,45 @@ def plot_confusion_matrix(y_true, y_scores, features = None, threshold=0.5, clas
         plt.title('Confusion Matrix')
     plt.show()
 
+def make_roc_curve_one_var(df, feature, target='Age', flip = False):
+    if target != 'Age':
+        raise ValueError('Please choose target for this function (only Age is supported)')
+    age_threshold = 50
+    if flip:
+        # Categorize 'old' (0) and 'young' (1) based on age threshold
+        df['Age Category'] = (df['Age'] < age_threshold).astype(int)
+    else:
+        # Categorize 'old' (1) and 'young' (0) based on age threshold
+        df['Age Category'] = (df['Age'] >= age_threshold).astype(int)
+
+    # Assuming a simple linear relationship for illustration
+    # Adjust 'LogArea Score' threshold for classification
+    # Normally, you'd use a model or some logic here
+    thresholds = np.linspace(df[feature].min(), df[feature].max(), 50)
+    tprs = []
+    fprs = []
+
+    for threshold in thresholds:
+        df['Predicted'] = (df[feature] >= threshold).astype(int)
+        fpr, tpr, _ = roc_curve(df['Age Category'], df['Predicted'])
+        tprs.append(tpr[1])
+        fprs.append(fpr[1])
+
+    # Plot ROC Curve
+    plt.figure(figsize=(8, 6))
+    plt.plot(fprs, tprs, marker='o', linestyle='-', color='blue')
+    plt.plot([0, 1], [0, 1], color='grey', linestyle='--')
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('ROC Curve for Age Classification using ' + feature)
+
+    # Calculate AUC
+    roc_auc = auc(fprs, tprs)
+
+    # Print AUC on the plot
+    plt.text(0.6, 0.2, f'AUC: {roc_auc:.2f}', fontsize=12, bbox=dict(facecolor='white', alpha=0.5))
+
+    plt.show()
 
 def run_regression(df, plot = False):
     """
@@ -1847,55 +1966,61 @@ def run_regression(df, plot = False):
                                     'Median SYS_BP']
     # make lasso features all features not including the target Age
     lasso_features = collapsed_df.columns.tolist()
+    # lasso_features = ['Age', 'Participant', 'Log Area Score', 'Pressure 0.2', 'Pressure 1.2', 'Median SYS_BP']
     lasso_features.remove('Participant')
     lasso_features.remove('Age')
     target = 'Age'
 
-    # Make models
-    logistic_model = perform_logistic_regression(collapsed_df, logistic_regression_features, target)
+    # # Make models
+    # logistic_model = perform_logistic_regression(collapsed_df, logistic_regression_features, target)
     lasso_model = perform_lasso_regression(collapsed_df, lasso_features, target)
     print(lasso_model)
     lasso_model_eval = perform_lasso_regression_and_evaluate(collapsed_df, lasso_features, target)
     print(lasso_model_eval)
 
-    # Calculate AUC with age threshold of 50
+    # # Calculate AUC with age threshold of 50
     y_true = (collapsed_df['Age'] > 50).astype(int)
     y_scores = lasso_model_eval.predict(collapsed_df[lasso_features])
     auc = calculate_auc(y_true, y_scores, plot=True)
 
-    # plot confusion matrix for lasso model
+    # # plot confusion matrix for lasso model
     plot_confusion_matrix(y_true, y_scores, threshold=50, class_names=['Under 50', 'Over 50'])   
 
     # -------------------------------------------------------------------------------------------------------
 
     # compare_log_and_linear(collapsed_df, "Area Score", plot=False)
-    logistic_features2 = ['Log Area Score', 'Pressure 0.2', 'Pressure 1.2', 
+    logistic_features2 = ['Log Area Score', 'Pressure 1.2', 
                                     'Median SYS_BP']
 
     # Make models
+    predict_age_with_linear_regression(collapsed_df, logistic_features2)
     logistic_model2 = perform_logistic_regression(collapsed_df, logistic_features2, target)
     # logistic_model_eval2 = perform_logistic_regression_and_evaluate(collapsed_df, logistic_features2, target)
 
-    # Calculate AUC with age threshold of 50
-    y_true = (collapsed_df['Age'] > 50).astype(int)
-    y_scores = logistic_model2.predict(collapsed_df[logistic_features2])
-    auc = calculate_auc(y_true, y_scores, features = logistic_features2, plot=True)
+    # make_roc_curve_one_var(collapsed_df, 'Log Area Score', target='Age', flip = True)
+    # make_roc_curve_one_var(collapsed_df, 'Area Score', target='Age', flip = True)
+    # make_roc_curve_one_var(collapsed_df, 'Log Pressure 1.2', target='Age', flip = False)
 
-    # plot confusion matrix for logistic model
-    plot_confusion_matrix(y_true, y_scores, threshold=50, features = logistic_features2, class_names=['Under 50', 'Over 50'])
+    # # Calculate AUC with age threshold of 50
+    # y_true = (collapsed_df['Age'] > 50).astype(int)
+    # y_scores = logistic_model2.predict(collapsed_df[logistic_features2])
+    # auc = calculate_auc(y_true, y_scores, features = logistic_features2, plot=True)
 
-    # plot ROC curve for logistic model
-    fpr, tpr, thresholds = roc_curve(y_true, y_scores)
-    plt.figure()
-    plt.plot(fpr, tpr, label='ROC curve (area = %0.2f)' % auc)
-    plt.plot([0, 1], [0, 1], 'k--')  # random predictions curve
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('Receiver Operating Characteristic (ROC) for Logistic Regression')
-    plt.legend(loc="lower right")
-    plt.show()
+    # # plot confusion matrix for logistic model
+    # plot_confusion_matrix(y_true, y_scores, threshold=50, features = logistic_features2, class_names=['Under 50', 'Over 50'])
+
+    # # plot ROC curve for logistic model
+    # fpr, tpr, thresholds = roc_curve(y_true, y_scores)
+    # plt.figure()
+    # plt.plot(fpr, tpr, label='ROC curve (area = %0.2f)' % auc)
+    # plt.plot([0, 1], [0, 1], 'k--')  # random predictions curve
+    # plt.xlim([0.0, 1.0])
+    # plt.ylim([0.0, 1.05])
+    # plt.xlabel('False Positive Rate')
+    # plt.ylabel('True Positive Rate')
+    # plt.title('Receiver Operating Characteristic (ROC) for Logistic Regression')
+    # plt.legend(loc="lower right")
+    # plt.show()
 
     
 
@@ -2238,19 +2363,38 @@ def main(verbose = False):
     normBP_old_fav_nhp = favorite_df_no_high_pressure[(favorite_df_no_high_pressure['SYS_BP'] <= 120) & (favorite_df_no_high_pressure['Age'] > 50)]['Corrected Velocity']
     normBP_young_fav_nhp = favorite_df_no_high_pressure[(favorite_df_no_high_pressure['SYS_BP'] <= 120) & (favorite_df_no_high_pressure['Age'] <= 50)]['Corrected Velocity']
 
-    # plot_cdf(favorite_df_no_high_pressure['Corrected Velocity'], subsets= [highBP_old_fav, highBP_young_fav, normBP_old_fav, normBP_young_fav], labels=['Entire Dataset', 'High BP Old', 'High BP Young', 'Normal BP Old', 'Normal BP Young'], title = 'CDF Comparison by Age and BP')
     # plot_cdf(favorite_df_no_high_pressure['Corrected Velocity'], subsets= [highBP_old_fav_nhp, highBP_young_fav_nhp, normBP_old_fav_nhp, normBP_young_fav_nhp], labels=['Entire Dataset', 'High BP Old', 'High BP Young', 'Normal BP Old', 'Normal BP Young'], title = 'CDF Comparison by Age and BP nhp')
-    # plot_hist_specific_pressure(favorite_df, 0.2, density=True, hist=False)
-    # plot_hist_specific_pressure(favorite_df, 0.8, density=True, hist=False)
-    # plot_hist_specific_pressure(favorite_df, 1.2, density=True, hist=False)
-    # plot_cdf_comp_pressure(favorite_df)
+    # plot_hist_specific_pressure(favorite_df_no_high_pressure, 0.2, density=True, hist=False)
+    # plot_hist_specific_pressure(favorite_df_no_high_pressure, 0.8, density=True, hist=False)
+    # plot_hist_specific_pressure(favorite_df_no_high_pressure, 1.2, density=True, hist=False)
+    # plot_cdf_comp_pressure(favorite_df_no_high_pressure)
 
     # plot_hist_comp_pressure(summary_df_no_high_pressure, density=True, hist=False)
 
-    favorite_metrics = calculate_metrics(favorite_df['Corrected Velocity'])
+    favorite_metrics = calculate_metrics(favorite_df_no_high_pressure['Corrected Velocity'])
 
     fav_area_scores_df = calculate_area_score(favorite_df_no_high_pressure, plot = False)
     favorite_df_no_high_pressure = favorite_df_no_high_pressure.merge(fav_area_scores_df, on='Participant', how='inner')
+
+    ecdf_fn = empirical_cdf_fn(favorite_df_no_high_pressure['Corrected Velocity'])
+    ks_statistic_df = pd.DataFrame(columns=['Participant', 'KS Statistic', 'KS P-Value', 'EMD Score'])
+    for participant in favorite_df_no_high_pressure['Participant'].unique():
+        participant_df = favorite_df_no_high_pressure[favorite_df_no_high_pressure['Participant'] == participant]
+        participant_df_nhp = favorite_df_no_high_pressure[favorite_df_no_high_pressure['Participant'] == participant]
+        participant_metrics = calculate_metrics(participant_df['Corrected Velocity'])
+        skewness.append([participant,participant_metrics['skewness']])
+        kurtosis.append([participant,participant_metrics['kurtosis']])
+        ks_statistic, p_value = kstest(participant_df['Corrected Velocity'], ecdf_fn)
+        emd_score = wasserstein_distance(participant_df['Corrected Velocity'], favorite_df_no_high_pressure['Corrected Velocity'])
+        ks_statistic_df = pd.concat([ks_statistic_df, pd.DataFrame({'Participant': [participant], 'KS Statistic': [ks_statistic], 'KS P-Value': [p_value], 'EMD Score': [emd_score]})])
+        # plot_ks_statistic(participant_df['Corrected Velocity'], favorite_df_no_high_pressure['Corrected Velocity'])
+ 
+    
+    # merge ks statistic df with summary df
+    favorite_df_no_high_pressure = favorite_df_no_high_pressure.merge(ks_statistic_df, on='Participant', how='inner')
+
+
+    # run_regression(favorite_df_no_high_pressure, plot = False)
 
 
     # plot velocities for each participant:
@@ -2261,6 +2405,10 @@ def main(verbose = False):
         # plot_velocities(participant_df, write = True)
         # plot_densities_individual(summary_df, participant_df, participant)
         # plot_densities_pressure_individual(summary_df, participant_df, participant)
+        # plot_cdf(favorite_df_no_high_pressure['Corrected Velocity'], 
+        #          subsets=[favorite_df_no_high_pressure[favorite_df_no_high_pressure['Participant'] == participant]['Corrected Velocity']],
+        #          labels=['Entire Dataset', participant], title=f'CDF Comparison of velocities for {participant}', 
+        #          normalize = False)
 
 
 
