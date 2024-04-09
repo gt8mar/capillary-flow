@@ -154,6 +154,40 @@ def empirical_cdf_fn(data):
     
     return cdf_function
 
+def plot_box_whisker_pressure(df, variable='Age', log_scale=False):
+    """
+    Plot box and whisker plots for the variable of interest grouped by Age or SYS_BP at each pressure level.
+
+    Args:
+        df (DataFrame): the DataFrame to be plotted
+        variable (str): the variable of interest to group by, 'Age' or 'SYS_BP'
+    
+    Returns:
+        0 if successful
+    """
+    # Set up the grouping based on the variable of interest
+    if variable == 'Age':
+        df['Group'] = np.where(df['Age'] <= 50, '≤50', '>50')
+        hue = 'Group'
+    else:
+        df['Group'] = np.where(df['SYS_BP'] < 120, '<120', '≥120')
+        hue = 'Group'
+
+    # Plotting
+    plt.figure(figsize=(10, 6))
+    box_plot = sns.boxplot(x='Pressure', y='Corrected Velocity', hue=hue, data=df, showfliers=False)
+    plt.title(f'Box and Whisker Plot of Velocity by Pressure and {variable} Group')
+    plt.xlabel('Pressure')
+    plt.ylabel('Velocity (um/s)')
+    plt.legend(title=f'{variable} Group')
+
+    # Set y-axis to logarithmic scale if specified
+    if log_scale:
+        box_plot.set_yscale('log')
+
+    plt.show()
+    return 0
+
 def compare_participants(df1, df2):
     """ 
     Compare the participants in two DataFrames and return a list of participants that are in one DataFrame 
@@ -1287,6 +1321,55 @@ def plot_violinplot(data, subset, labels=['Entire Dataset', 'Subset']):
     plt.show()
     return 0
 
+def plot_box_and_whisker(df_entire_data, df_subset1, df_subset2, column, variable = 'Age', log_scale = False):
+    # Extract the column of interest from each dataframe
+    data_entire = df_entire_data[column].rename('Entire Dataset')
+    if variable == 'Age':
+        data_subset1 = df_subset1[column].rename('Old')
+        data_subset2 = df_subset2[column].rename('Young')
+    else:
+        data_subset1 = df_subset1[column].rename('High BP')
+        data_subset2 = df_subset2[column].rename('Normal BP')
+    
+
+    # Combine the data into a single dataframe for plotting
+    combined_data = pd.concat([data_entire, data_subset1, data_subset2], axis=1)
+    
+    
+    # Plot the box and whisker plot
+    plt.figure(figsize=(10, 6))
+    sns.boxplot(data=combined_data, showfliers=False)
+    if log_scale:
+        plt.yscale('log')
+    if variable == 'Age':
+        plt.title('Comparison of Velocities by Age Group')
+    else:
+        plt.title('Comparison of Velocities by Blood Pressure Group')
+    plt.ylabel('Velocity (um/s)')
+    plt.show()
+    return 0
+
+def plot_violin(df_entire_data, df_subset1, df_subset2, column, log_scale = False):
+    # Extract the column of interest and create a category column
+    data_entire = df_entire_data.assign(Category='Entire Dataset')[[column, 'Category']]
+    data_subset1 = df_subset1.assign(Category='Old')[[column, 'Category']]
+    data_subset2 = df_subset2.assign(Category='Young')[[column, 'Category']]
+
+    # Combine the data into a single dataframe for plotting
+    combined_data = pd.concat([data_entire, data_subset1, data_subset2])
+
+    if log_scale:
+        # Apply logarithmic transformation to the data
+        combined_data[column] = combined_data[column].apply(lambda x: np.log(x) if x > 0 else None)
+
+    # Plot the violin plot
+    plt.figure(figsize=(10, 6))
+    sns.violinplot(x='Category', y=column, data=combined_data)
+    plt.title('Comparison of Log Velocities by Age Group' if log_scale else 'Comparison of Velocities by Age Group')
+    plt.ylabel('Log Velocity' if log_scale else 'Velocity (um/s)')
+    plt.show()
+    return 0
+
 def collapse_df(df):
     # Calculate median velocity for specific pressures and overall median velocity
     pressure_medians = df.groupby(['Participant', 'Pressure'])['Corrected Velocity'].median().unstack()
@@ -1522,6 +1605,42 @@ def make_log_df(df, plot = False):
         plt.title('Log-transformed Median Velocity vs. Age')
         plt.show()
     return df
+
+def calculate_video_median_velocity(df):
+    # Make a copy of the DataFrame to avoid modifying the original one
+    df_copy = df.copy()
+
+    # Group by 'participant' and 'video', then calculate the median of 'Corrected Velocity'
+    video_median_velocity = df_copy.groupby(['Participant', 'Video'])['Corrected Velocity'].median().reset_index(name='Video Median Velocity')
+
+    # Merge the median values back to the original DataFrame copy
+    merged_df = pd.merge(df_copy, video_median_velocity, on=['Participant', 'Video'], how='left')
+
+    # Drop duplicates to get a collapsed DataFrame with unique participant-video pairs
+    collapsed_df = merged_df.drop_duplicates(subset=['Participant', 'Video'])
+
+    return collapsed_df
+
+def plot_median_velocity_of_videos(df):
+    # Ensure the DataFrame is sorted by participant and then by video to get the correct order
+    sorted_df = df.sort_values(by=['Participant', 'Location', 'Video'])
+
+    # Set the plotting style for better readability
+    plt.style.use('seaborn-darkgrid')
+
+    # Create a line plot for each participant, ordered by video number but plotted against Pressure
+    for participant, group in sorted_df.groupby('Participant'):
+        for location, location_group in group.groupby('Location'):
+            # Sort the group by Pressure to get the x-axis values, but trace the line by video order
+            group_sorted_by_video = location_group.sort_values(by='Video')
+            plt.plot(group_sorted_by_video['Pressure'], group_sorted_by_video['Video Median Velocity'], marker='o', label=f'Participant {participant}')
+
+            plt.xlabel('Pressure')
+            plt.ylabel('Video Median Velocity')
+            plt.title(f'Video Median Velocity by Pressure for Participant {participant} at Location {location}')
+            plt.legend()
+            plt.show()
+    return 0
 
 
 def compare_log_and_linear(df, variable = 'Median Velocity', plot = False):
@@ -1803,6 +1922,20 @@ def perform_lasso_regression_and_evaluate(dataframe, features, target):
     print(confusion_matrix(y_test, y_pred))
     print(accuracy_score(y_test, y_pred))
 
+    # # select features which are not zero: 
+    # lasso = model.named_steps['lassocv']
+    # print(lasso.coef_.shape)
+    # print(np.asarray(features).shape)
+    # coefficients = pd.DataFrame(features, lasso.coef_, columns=['Feature', 'Coefficient'])
+    # print("Banana:")
+    # print(coefficients) 
+    # for coefficient in coefficients:
+    #     print(coefficient)
+    #     print('asdf;lkjasdfl;jkasdf;klj')
+    # # the second column of coefficients is the value of the coefficients
+    brute_force_features = f"Lasso of ['Pressure 0.2', 'Pressure 1.2', 'Median SYS_BP', 'Log Pressure 0.4']"
+    plot_confusion_matrix(y_test, y_pred, features = brute_force_features, threshold=.5, class_names=['Young Lasso', 'Old Lasso'])
+
     print('End of perform lasso regression and evaluate')
 
 
@@ -1897,7 +2030,7 @@ def plot_confusion_matrix(y_true, y_scores, features = None, threshold=0.5, clas
     plt.xlabel('Predicted')
     # add list of features to the title
     if features:
-        plt.title(f'Confusion Matrix for {features}')
+        plt.title(f'Confusion Matrix for \n{features}')
     else:
         plt.title('Confusion Matrix')
     plt.show()
@@ -1969,6 +2102,8 @@ def run_regression(df, plot = False):
     # lasso_features = ['Age', 'Participant', 'Log Area Score', 'Pressure 0.2', 'Pressure 1.2', 'Median SYS_BP']
     lasso_features.remove('Participant')
     lasso_features.remove('Age')
+    # remove_features = ['Log Pressure 0.2', 'Log Pressure 0.4', 'Log Pressure 0.6', 'Log Pressure 0.8', 'Log Pressure 1.0', 'Log Pressure 1.2']
+    # lasso_features = [feature for feature in lasso_features if feature not in remove_features]
     target = 'Age'
 
     # # Make models
@@ -1978,13 +2113,13 @@ def run_regression(df, plot = False):
     lasso_model_eval = perform_lasso_regression_and_evaluate(collapsed_df, lasso_features, target)
     print(lasso_model_eval)
 
-    # # Calculate AUC with age threshold of 50
-    y_true = (collapsed_df['Age'] > 50).astype(int)
-    y_scores = lasso_model_eval.predict(collapsed_df[lasso_features])
-    auc = calculate_auc(y_true, y_scores, plot=True)
+    # # # Calculate AUC with age threshold of 50
+    # y_true = (collapsed_df['Age'] > 50).astype(int)
+    # y_scores = lasso_model_eval.predict(collapsed_df[lasso_features])
+    # auc = calculate_auc(y_true, y_scores, plot=True)
 
-    # # plot confusion matrix for lasso model
-    plot_confusion_matrix(y_true, y_scores, threshold=50, class_names=['Under 50', 'Over 50'])   
+    # # # plot confusion matrix for lasso model
+    # plot_confusion_matrix(y_true, y_scores, threshold=50, class_names=['Under 50', 'Over 50'])   
 
     # -------------------------------------------------------------------------------------------------------
 
@@ -2213,7 +2348,12 @@ def main(verbose = False):
     summary_df_no_high_pressure = summary_df[summary_df['Pressure'] <= 1.2]
     old_nhp = summary_df_no_high_pressure[summary_df_no_high_pressure['Age'] > 50]
     young_nhp = summary_df_no_high_pressure[summary_df_no_high_pressure['Age'] <= 50]
+    normbp_nhp = summary_df_no_high_pressure[summary_df_no_high_pressure['SYS_BP'] <= 120]
+    highbp_nhp = summary_df_no_high_pressure[summary_df_no_high_pressure['SYS_BP'] > 120]
 
+    # plot_box_and_whisker(summary_df_no_high_pressure, old_nhp, young_nhp, column = 'Corrected Velocity', variable = 'Age', log_scale=True)
+    # plot_box_and_whisker(summary_df_no_high_pressure, highbp_nhp, normbp_nhp, column = 'Corrected Velocity', variable='SYS_BP', log_scale=True)
+    # plot_violin(summary_df_no_high_pressure, old_nhp, young_nhp, 'Corrected Velocity', True)
     # plot_hist_pressure(summary_df_no_high_pressure, density=True)
     # plot_densities(summary_df_no_high_pressure)
 
@@ -2244,6 +2384,29 @@ def main(verbose = False):
     area_scores_df = calculate_area_score(summary_df_no_high_pressure, log = True, plot=False)
     # add area scores to summary_df_no_high_pressure
     summary_df_no_high_pressure = summary_df_no_high_pressure.merge(area_scores_df, on='Participant', how='inner')
+
+    summary_df_nhp_video_medians = calculate_video_median_velocity(summary_df_no_high_pressure)
+    old_nhp_video_medians = summary_df_nhp_video_medians[summary_df_nhp_video_medians['Age'] > 50]
+    young_nhp_video_medians = summary_df_nhp_video_medians[summary_df_nhp_video_medians['Age'] <= 50]
+    normbp_nhp_video_medians = summary_df_nhp_video_medians[summary_df_nhp_video_medians['SYS_BP'] <= 120]
+    highbp_nhp_video_medians = summary_df_nhp_video_medians[summary_df_nhp_video_medians['SYS_BP'] > 120]
+
+    # plot_box_and_whisker(summary_df_nhp_video_medians, old_nhp_video_medians, young_nhp_video_medians, column = 'Video Median Velocity', variable = 'Age', log_scale=True)
+    # plot_box_and_whisker(summary_df_nhp_video_medians, highbp_nhp_video_medians, normbp_nhp_video_medians, column = 'Video Median Velocity', variable='SYS_BP', log_scale=True)
+    # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets= [old_nhp_video_medians['Video Median Velocity'], young_nhp_video_medians['Video Median Velocity']], labels=['Entire Dataset', 'Old', 'Young'], title = 'CDF Comparison of Video Median Velocities by Age')
+    # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets= [highbp_nhp_video_medians['Video Median Velocity'], normbp_nhp_video_medians['Video Median Velocity']], labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Video Median Velocities by BP nhp')
+
+    # plot_median_velocity_of_videos(summary_df_nhp_video_medians)
+    # make a copy of summary_df_nhp_video_medians where we replace 'Velocity' with 'Video Median Velocity'
+    summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians.copy()
+    # remove the 'Corrected Velocity' column
+    summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.drop(columns=['Corrected Velocity'])
+    # print(f'the length of summary_df_nhp_video_medians_copy is {len(summary_df_nhp_video_medians_copy)}')
+    # print(f'the length of summary_df_no_high_pressure is {len(summary_df_no_high_pressure)}')
+    summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.rename(columns={'Video Median Velocity': 'Corrected Velocity'})
+    # plot_box_whisker_pressure(summary_df_nhp_video_medians_copy, variable='Age', log_scale=False)
+    # plot_CI(summary_df_nhp_video_medians_copy)
+
 
     # # plot area score vs age scatter
     # plt.figure(figsize=(10, 6))
@@ -2302,10 +2465,14 @@ def main(verbose = False):
     male_subset = summary_df_no_high_pressure[summary_df_no_high_pressure['Sex']=='M']
     female_subset = summary_df_no_high_pressure[summary_df_no_high_pressure['Sex']=='F']
 
+    
+
     # plot_cdf(summary_df_no_high_pressure['Corrected Velocity'], 
     #          subsets=[male_subset['Corrected Velocity'], female_subset['Corrected Velocity']],
     #             labels=['Entire Dataset', 'Male', 'Female'], title='CDF Comparison of velocities by Sex', 
     #             normalize = False)
+
+
                                   
     # Plot median velocity by participant
     median_velocity_per_participant = summary_df_no_high_pressure.groupby('Participant')['Corrected Velocity'].median().sort_values()
@@ -2319,7 +2486,7 @@ def main(verbose = False):
     # plt.xticks(list(sorted_participant_indices.values()), list(sorted_participant_indices.keys()), rotation=45)
     # plt.show()
         
-    run_regression(summary_df_no_high_pressure)
+    # run_regression(summary_df_no_high_pressure)
     
     # plot_CI(summary_df_no_high_pressure)        
         
@@ -2353,6 +2520,17 @@ def main(verbose = False):
     # plot_densities(favorite_df)
 
     favorite_df_no_high_pressure = favorite_df[favorite_df['Pressure'] <= 1.2]
+    print(f'The length of favorite_df_no_high_pressure is {len(favorite_df_no_high_pressure)}')
+    # plot_CI(favorite_df_no_high_pressure, variable = 'Age', ci_percentile=95)
+    # plot_CI(favorite_df_no_high_pressure, variable = 'Age', method = 'mean', ci_percentile=95)
+    # plot_CI(favorite_df_no_high_pressure, variable = 'SYS_BP', ci_percentile=95)
+    # plot_CI(favorite_df_no_high_pressure, variable = 'SYS_BP', method = 'mean', ci_percentile=95)
+
+    # plot_box_whisker_pressure(favorite_df_no_high_pressure, 'Age', log_scale=True)
+    # plot_box_whisker_pressure(favorite_df_no_high_pressure, 'SYS_BP', log_scale=True)
+    # plot_box_whisker_pressure(favorite_df_no_high_pressure, 'Age', log_scale=False)
+    # plot_box_whisker_pressure(favorite_df_no_high_pressure, 'SYS_BP', log_scale=False)
+
     # plot_hist_pressure(favorite_df_no_high_pressure, density=True)
     # plot_densities(favorite_df_no_high_pressure)
     # plot_cdf(favorite_df_no_high_pressure['Corrected Velocity'], subsets= [favorite_df_no_high_pressure[favorite_df_no_high_pressure['Age'] > 50]['Corrected Velocity'], favorite_df_no_high_pressure[favorite_df_no_high_pressure['Age'] <= 50]['Corrected Velocity']], labels=['Entire Dataset', 'Old', 'Young'], title = 'CDF Comparison by Age')
@@ -2398,11 +2576,24 @@ def main(verbose = False):
 
 
     # plot velocities for each participant:
-    for participant in favorite_df['Participant'].unique():
-        favorite_df_copy = favorite_df.copy()
+    for participant in favorite_df_no_high_pressure['Participant'].unique():
+        favorite_df_copy = favorite_df_no_high_pressure.copy()
         participant_df = favorite_df_copy[favorite_df_copy['Participant'] == participant]
+        # Sort the data by 'Video':
+        participant_df = participant_df.sort_values(by='Video')
 
-        # plot_velocities(participant_df, write = True)
+        # iterate through videos in order and see if the video following the current video has the same pressure. Print the participant, capillary, location, video, pressure, and corrected velocity for each video that has the same pressure as the following video.
+        for i in range(len(participant_df)-1):
+            if (participant_df.iloc[i]['Pressure'] == participant_df.iloc[i+1]['Pressure']) and (participant_df.iloc[i]['Pressure'] != 0.2):
+                # print(participant_df.iloc[i][['Participant', 'Capillary', 'Location', 'Video', 'Pressure', 'Corrected Velocity']]) # TODO: average out or drop videos
+                pass
+        # print(participant_df[['Participant', 'Capillary', 'Location', 'Video', 'Pressure', 'Corrected Velocity']])
+
+        
+        # Select columns to print:
+
+
+        # plot_velocities(participant_df, write = False)
         # plot_densities_individual(summary_df, participant_df, participant)
         # plot_densities_pressure_individual(summary_df, participant_df, participant)
         # plot_cdf(favorite_df_no_high_pressure['Corrected Velocity'], 
