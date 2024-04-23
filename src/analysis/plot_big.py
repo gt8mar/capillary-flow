@@ -2132,8 +2132,8 @@ def run_regression(df, plot = False):
     logistic_model2 = perform_logistic_regression(collapsed_df, logistic_features2, target)
     # logistic_model_eval2 = perform_logistic_regression_and_evaluate(collapsed_df, logistic_features2, target)
 
-    # make_roc_curve_one_var(collapsed_df, 'Log Area Score', target='Age', flip = True)
-    # make_roc_curve_one_var(collapsed_df, 'Area Score', target='Age', flip = True)
+    make_roc_curve_one_var(collapsed_df, 'Log Area Score', target='Age', flip = True)
+    make_roc_curve_one_var(collapsed_df, 'Area Score', target='Age', flip = True)
     # make_roc_curve_one_var(collapsed_df, 'Log Pressure 1.2', target='Age', flip = False)
 
     # # Calculate AUC with age threshold of 50
@@ -2405,8 +2405,14 @@ def main(verbose = False):
     # print(f'the length of summary_df_no_high_pressure is {len(summary_df_no_high_pressure)}')
     summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.rename(columns={'Video Median Velocity': 'Corrected Velocity'})
     # plot_box_whisker_pressure(summary_df_nhp_video_medians_copy, variable='Age', log_scale=False)
-    # plot_CI(summary_df_nhp_video_medians_copy)
+    # plot_CI(summary_df_nhp_video_medians_copy, ci_percentile=95)
 
+    medians_area_scores_df = calculate_area_score(summary_df_nhp_video_medians_copy, log = True, plot=False)
+    # add area scores to summary_df_nhp_video_medians_copy
+    summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.merge(medians_area_scores_df, on='Participant', how='inner')
+    # print columns of summary_df_nhp_video_medians_copy
+    print(summary_df_nhp_video_medians_copy.columns)
+    
 
     # # plot area score vs age scatter
     # plt.figure(figsize=(10, 6))
@@ -2448,7 +2454,7 @@ def main(verbose = False):
 
         # # Plot CDF
         # plot_cdf(summary_df['Corrected Velocity'], subsets= [participant_df['Corrected Velocity']], labels=['Entire Dataset', participant], title = f'CDF Comparison of velocities for {participant}')
-        # plot_cdf(summary_df_no_high_pressure['Corrected Velocity'], subsets= [participant_df_nhp['Corrected Velocity']], labels=['Entire Dataset', participant], title = f'CDF Comparison of velocities for {participant} nhp', write=True)
+        plot_cdf(summary_df_no_high_pressure['Corrected Velocity'], subsets= [participant_df_nhp['Corrected Velocity']], labels=['Entire Dataset', participant], title = f'CDF Comparison of velocities for {participant} nhp', write=True)
         # plot_cdf_comp_pressure(participant_df)
         # plot_cdf_comp_pressure(participant_df_nhp)    
     
@@ -2478,6 +2484,7 @@ def main(verbose = False):
     median_velocity_per_participant = summary_df_no_high_pressure.groupby('Participant')['Corrected Velocity'].median().sort_values()
     sorted_participant_indices = {participant: index for index, participant in enumerate(median_velocity_per_participant.index)}
     
+
     # plt.figure(figsize=(10, 6))
     # plt.bar(sorted_participant_indices.values(), median_velocity_per_participant.values, width=0.5)
     # plt.xlabel('Participant')
@@ -2487,6 +2494,9 @@ def main(verbose = False):
     # plt.show()
         
     # run_regression(summary_df_no_high_pressure)
+
+    summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.rename(columns={'Area Score_y': 'Area Score', 'Log Area Score_y': 'Log Area Score'})
+    run_regression(summary_df_nhp_video_medians_copy)
     
     # plot_CI(summary_df_no_high_pressure)        
         
@@ -2536,6 +2546,33 @@ def main(verbose = False):
     # plot_cdf(favorite_df_no_high_pressure['Corrected Velocity'], subsets= [favorite_df_no_high_pressure[favorite_df_no_high_pressure['Age'] > 50]['Corrected Velocity'], favorite_df_no_high_pressure[favorite_df_no_high_pressure['Age'] <= 50]['Corrected Velocity']], labels=['Entire Dataset', 'Old', 'Young'], title = 'CDF Comparison by Age')
     # plot_cdf(favorite_df_no_high_pressure['Corrected Velocity'], subsets= [favorite_df_no_high_pressure[favorite_df_no_high_pressure['SYS_BP'] > 120]['Corrected Velocity'], favorite_df_no_high_pressure[favorite_df_no_high_pressure['SYS_BP'] <= 120]['Corrected Velocity']], labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison by BP')
 
+
+    old_fav_nhp = favorite_df_no_high_pressure[(favorite_df_no_high_pressure['Age'] > 50)]['Corrected Velocity']
+    young_fav_nhp = favorite_df_no_high_pressure[(favorite_df_no_high_pressure['Age'] <= 50)]['Corrected Velocity']
+
+    area_scores_fav_df = calculate_area_score(favorite_df_no_high_pressure, plot = False, log = True)
+    favorite_df_no_high_pressure = favorite_df_no_high_pressure.merge(area_scores_fav_df, on='Participant', how='inner')
+
+    # # plot area score vs age scatter
+    # plt.figure(figsize=(10, 6))
+    # plt.scatter(favorite_df_no_high_pressure['Age'], favorite_df_no_high_pressure['Area Score'])
+    # plt.xlabel('Age')
+    # plt.ylabel('Area Score')
+    # plt.title('Area Score vs. Age')
+    # plt.show()
+
+    # # plot area score vs age scatter for medians
+    # plt.figure(figsize=(10, 6))
+    # plt.scatter(summary_df_nhp_video_medians_copy['Age'], summary_df_nhp_video_medians_copy['Area Score_x'])
+    # plt.scatter(summary_df_nhp_video_medians_copy['Age'], summary_df_nhp_video_medians_copy['Area Score_y'])
+    # plt.scatter(favorite_df_no_high_pressure['Age'], favorite_df_no_high_pressure['Area Score'])
+    # plt.xlabel('Age')
+    # plt.ylabel('Area Score')
+    # plt.title('Area Score vs. Age')
+    # plt.legend(['Corrected Velocity', 'Video Median Velocity', 'Favorite Capillaries'])
+    # plt.show()
+
+
     highBP_old_fav_nhp = favorite_df_no_high_pressure[(favorite_df_no_high_pressure['SYS_BP'] > 120) & (favorite_df_no_high_pressure['Age'] > 50)]['Corrected Velocity']
     highBP_young_fav_nhp = favorite_df_no_high_pressure[(favorite_df_no_high_pressure['SYS_BP'] > 120) & (favorite_df_no_high_pressure['Age'] <= 50)]['Corrected Velocity']
     normBP_old_fav_nhp = favorite_df_no_high_pressure[(favorite_df_no_high_pressure['SYS_BP'] <= 120) & (favorite_df_no_high_pressure['Age'] > 50)]['Corrected Velocity']
@@ -2571,8 +2608,10 @@ def main(verbose = False):
     # merge ks statistic df with summary df
     favorite_df_no_high_pressure = favorite_df_no_high_pressure.merge(ks_statistic_df, on='Participant', how='inner')
 
-
-    # run_regression(favorite_df_no_high_pressure, plot = False)
+    # rename Area Score columns to omit _x
+    favorite_df_no_high_pressure = favorite_df_no_high_pressure.rename(columns={'Area Score_x': 'Area Score', 'Log Area Score_x': 'Log Area Score'})
+    # run_regression(favorite_df_no_high_pressure, plot = True)
+    
 
 
     # plot velocities for each participant:

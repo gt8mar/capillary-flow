@@ -11,9 +11,9 @@ from src.tools.parse_filename import parse_filename
 
 def main():
     if platform.system() == 'Windows':
-        seg_path = 'C:\\Users\\gt8mar\\capillary-flow\\results\\segmented\\hasty\\231101'
+        seg_path = 'C:\\Users\\gt8mar\\capillary-flow\\results\\segmented\\hasty\\240410'
     else:
-        seg_path = '/hpc/projects/capillary-flow/results/segmented/hasty/231101'
+        seg_path = '/hpc/projects/capillary-flow/results/segmented/hasty/240410'
 
     # get all files in the directory
     files = os.listdir(seg_path)

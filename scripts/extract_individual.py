@@ -1,3 +1,12 @@
+"""
+Filename: extract_individual.py
+---------------------------------
+This file contains a script that extracts individual capillary images 
+from the segmented images of participants.
+
+By: Marcus Forst
+"""
+
 import os, platform
 import shutil
 from src.tools.find_earliest_date_dir import find_earliest_date_dir
@@ -19,7 +28,8 @@ else:
     os.makedirs(result_directory, exist_ok=True)
 
 # Loop through the file tree
-for participant in os.listdir(base_directory):
+participant_list = ['part28', 'part29', 'part30', 'part31']
+for participant in participant_list: #os.listdir(base_directory):
     participant_path = os.path.join(base_directory, participant)
     date = find_earliest_date_dir(participant_path)
     date_path = os.path.join(participant_path, date)

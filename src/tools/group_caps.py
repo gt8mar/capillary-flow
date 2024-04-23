@@ -134,7 +134,7 @@ def save_untranslated(registered_folder_fp):
 
             cv2.imwrite(os.path.join(orig_fp, cap), crop_img)
             
-def main(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12\\230428\\loc03"):
+def main(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
     """
     Groups capillaries from different videos and saves individual caps with names based on
     this grouping.
