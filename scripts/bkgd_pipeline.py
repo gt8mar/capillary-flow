@@ -50,14 +50,18 @@ def main():
     
     locations = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', participant, date))
     for location in locations:
-        ticks = time.time()
-        video_folders = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', 
-                                               participant, date, location, "vids"))
-        for video in video_folders:
-            path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, location, "vids", video)
-            write_background_file.main(path, color = True)
-            print(f'video {video}')
-            print(str(ticks-time.time()))
+        # Omit locScan, locTemp, and locEx from this analysis
+        if location == 'locScan' or location == 'locTemp' or location == 'locEx':
+            continue
+        else:
+            ticks = time.time()
+            video_folders = os.listdir(os.path.join('/hpc/projects/capillary-flow/data', 
+                                                participant, date, location, "vids"))
+            for video in video_folders:
+                path =  os.path.join('/hpc/projects/capillary-flow/data', participant, date, location, "vids", video)
+                write_background_file.main(path, color = True)
+                print(f'video {video}')
+                print(str(ticks-time.time()))
 
     print(f'finished {participant} from the {date}')
     print(str(ticks_total-time.time()))    
