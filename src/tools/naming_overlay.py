@@ -1,3 +1,12 @@
+"""
+Filename: naming_overlay.py
+----------------------------
+This module contains a function that creates overlay images by combining frames with segmented caps.
+
+By: Gabriela Rincon
+Updated by: Marcus Forst
+"""
+
 import time
 import os
 import re
@@ -8,9 +17,18 @@ from skimage.color import rgb2gray
 import platform
 import pandas as pd
 
-PAD_VALUE = 250
+PAD_VALUE = 250  # Padding value to ensure images are large enough
 
 def get_label_position(input_array):
+    """
+    Calculate the position for a label based on non-zero elements in the array.
+
+    Args:
+        input_array (np.ndarray): The input array to process.
+
+    Returns:
+        tuple: Coordinates (x, y) for the label position.
+    """
     # Find the indices of non-zero elements in the array
     non_zero_indices = np.argwhere(input_array != 0)
     
@@ -37,6 +55,12 @@ def get_label_position(input_array):
     return x_coord, y_coord
 
 def rename_files(directory_path):
+    """
+    Rename files in a directory to ensure they have two-digit video numbers.
+
+    Args:
+        directory_path (str): The path to the directory containing the files.
+    """
     # Get a list of files in the directory
     file_list = os.listdir(directory_path)
 
@@ -58,16 +82,33 @@ def rename_files(directory_path):
             os.rename(old_path, new_path)
 
 def extract_file_info(filename):
-    set_part_date = filename[:20] #with trailing underscore
+    """
+    Extract date, location, and video information from a filename.
+
+    Args:
+        filename (str): The filename to extract information from.
+
+    Returns:
+        tuple: Extracted date, location, and video information.
+    """
+    set_part_date = filename[:20]  # with trailing underscore
     lmatch = re.search(r'loc(\d{2})', filename)
-    location = "" if lmatch == None else "loc" + lmatch.group(1) + "_"
+    location = "" if lmatch is None else "loc" + lmatch.group(1) + "_"
     vmatch = re.search(r'vid(\d{2})', filename)
-    vid = "" if vmatch == None else "vid" + vmatch.group(1) + "_"
+    vid = "" if vmatch is None else "vid" + vmatch.group(1) + "_"
     return set_part_date, location, vid
 
 def make_overlays(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12\\230428\\loc03"):
+    """
+    Create overlay images by combining frames with segmented caps.
+
+    Args:
+        path (str): The path to the directory containing the data.
+    """
+    # Set file paths
     reg_moco_fp = os.path.join(path, "segmented", "hasty", "moco_registered")
 
+    # Read resize values from CSV file
     resize_csv = os.path.join(path, "segmented", "hasty", "resize_vals.csv")
     resize_df = pd.read_csv(resize_csv, header=None)
     minx = int(resize_df.iloc[0, 0])
@@ -75,6 +116,7 @@ def make_overlays(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12
     miny = int(resize_df.iloc[0, 2])
     maxy = int(resize_df.iloc[0, 3])
 
+    # Define predefined colors for elements
     predefined_colors = [
         (255, 0, 0),    # Red
         (0, 255, 0),    # Lime
@@ -94,7 +136,11 @@ def make_overlays(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12
     ]
     element_colors = {}
     colored_elements = []
+
+    # Rename files in the directory
     rename_files(reg_moco_fp)
+
+    # Process each frame in the registered motion correction folder
     for frame in os.listdir(reg_moco_fp):
         vmatch = re.search(r'vid(\d{2})', frame)
         vidnum = vmatch.group(1)
@@ -102,13 +148,13 @@ def make_overlays(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12
         frame_img = cv2.cvtColor(frame_img, cv2.COLOR_BGR2BGRA)
         frame_img[:, :, 3] = 255
         
-        #get all caps in vid
+        # Get all caps in vid
         for cap in os.listdir(os.path.join(path, "segmented", "hasty", "individual_caps_translated")):
             if "vid" + vidnum in cap: 
                 cmatch = re.search(r'cap_(\d{2})', cap)
                 capnum = "cap_" + cmatch.group(1)
 
-                #match to previous color if used, else pop from predefined colors
+                # Match to previous color if used, else pop from predefined colors
                 if capnum in element_colors:
                     color = element_colors[capnum]
                 else:
@@ -122,15 +168,15 @@ def make_overlays(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12
                 cap_img = cv2.imread(os.path.join(path, "segmented", "hasty", "individual_caps_translated", cap))
                 cap_img = rgb2gray(cap_img)
 
-                #pad cap to match frame
+                # Pad cap to match frame
                 cap_img = np.pad(cap_img, ((PAD_VALUE, PAD_VALUE), (PAD_VALUE, PAD_VALUE)))
 
-                #translate cap
-                if miny==0 and minx==0:
+                # Translate cap
+                if miny == 0 and minx == 0:
                     resized_cap = cap_img[maxy:, maxx:]
-                elif miny==0:
+                elif miny == 0:
                     resized_cap = cap_img[maxy:, maxx:minx]
-                elif minx==0:
+                elif minx == 0:
                     resized_cap = cap_img[maxy:miny, maxx:]
                 else:
                     resized_cap = cap_img[maxy:miny, maxx:minx]
@@ -138,12 +184,12 @@ def make_overlays(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12
                 if np.argwhere(resized_cap != 0).size == 0:
                     continue
 
-                #get label coordinates
+                # Get label coordinates
                 xcoord, ycoord = get_label_position(resized_cap)
 
                 height, width = len(resized_cap), len(resized_cap[0])
                 
-                #make overlay
+                # Make overlay
                 overlay = np.zeros_like(frame_img)
                 for y in range(height):
                     for x in range(width):
@@ -153,13 +199,13 @@ def make_overlays(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12
                 overlay = overlay.astype(np.uint8)
                 overlayed = cv2.addWeighted(frame_img, 1, overlay, 1, 0)
 
-                #add label
+                # Add label
                 c2match = re.search(r'cap_(.{3})', cap)
                 capnuma = "cap_" + c2match.group(1)
-                cv2.putText(overlayed, capnuma, (xcoord, ycoord), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 0), 3, cv2.LINE_AA) #black outline
-                cv2.putText(overlayed, capnuma, (xcoord, ycoord), cv2.FONT_HERSHEY_PLAIN, 2, (225, 225, 225), 2, cv2.LINE_AA) #white text
+                cv2.putText(overlayed, capnuma, (xcoord, ycoord), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 0), 3, cv2.LINE_AA)  # Black outline
+                cv2.putText(overlayed, capnuma, (xcoord, ycoord), cv2.FONT_HERSHEY_PLAIN, 2, (225, 225, 225), 2, cv2.LINE_AA)  # White text
 
-                #save to location folder
+                # Save to location folder
                 set_part_date, location, vid = extract_file_info(cap)
                 filename = set_part_date + location + vid + "overlay.png"
                 frame_img = overlayed
@@ -167,7 +213,7 @@ def make_overlays(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12
                 os.makedirs(overlay_folder, exist_ok=True)
                 cv2.imwrite(os.path.join(overlay_folder, filename), overlayed)
 
-                #save to results
+                # Save to results
                 if platform.system() != 'Windows':
                     overlays_fp = '/hpc/projects/capillary-flow/results/size/overlays'
                     os.makedirs(overlays_fp, exist_ok=True)
@@ -175,6 +221,7 @@ def make_overlays(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12
 
 
 if __name__ == "__main__":
+    # Measure the runtime of the script
     ticks = time.time()
     make_overlays()
     print("--------------------")
