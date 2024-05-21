@@ -13,6 +13,6 @@ cd /hpc/projects/capillary-flow/scripts
 module load anaconda
 conda activate capillary-flow
 echo "size: participant $SLURM_ARRAY_TASK_ID"
-srun python pipeline_size.py ${SLURM_ARRAY_TASK_ID}
+python pipeline_size.py ${SLURM_ARRAY_TASK_ID}
 echo "completed size part$SLURM_ARRAY_TASK_ID"
 exit
