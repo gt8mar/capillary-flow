@@ -330,6 +330,6 @@ def main(path, verbose = True, write = True, plot=False):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(path='E:\\frawg\\Wake Sleep Pairs\\gabby_analysis', verbose = True, write = True, plot = False)
+    main(path='E:\\frawg\\gabbyanalysis', verbose = True, write = True, plot = False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))

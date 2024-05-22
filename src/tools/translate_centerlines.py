@@ -80,7 +80,7 @@ def rename_caps(coords_fp, individual_caps_fp, participant, date, location):
     names = []
     renamed_folder_fp = os.path.join(os.path.split(coords_fp)[0], "renamed")
     os.makedirs(renamed_folder_fp, exist_ok=True)
-    for file in os.listdir(coords_fp):        
+    for file in os.listdir(coords_fp):  
         match = re.search(r'vid(\d{2})', file)
         vidnum = match.group(1)
         vids = [string for string in os.listdir(individual_caps_fp) if f"vid{vidnum}" in string]
@@ -179,7 +179,7 @@ def show_centerlines(projected_caps_fp, coords_fp, individual_caps_fp, registere
         cv2.imshow(str(file), cap_img)
         cv2.waitKey(0)  """
 
-def main(path="C:\\Users\\Luke\\Documents\\capillary-flow\\temp\\part19\\230503\\loc01"):
+def main(path="C:\\Users\\Luke\\Documents\\capillary-flow\\temp\\part12\\230428\\loc02"):
     coords_fp = os.path.join(path, "centerlines", "coords")
     segmented_folder = os.path.join(path, "segmented", "hasty")
 

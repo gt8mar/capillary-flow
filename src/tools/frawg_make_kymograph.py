@@ -215,7 +215,7 @@ def main(path, write = True, variable_radii = False, verbose = False, plot = Fal
     for video_key in centerline_dict.keys():
         number_of_capillaries = len(centerline_dict[video_key])
 
-        video_folder = os.path.join(os.path.dirname(path), 'pair_vids', video_key)
+        video_folder = os.path.join(path, 'vids', video_key)
 
         # Get images
         # Import images
@@ -277,7 +277,7 @@ def main(path, write = True, variable_radii = False, verbose = False, plot = Fal
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    path = 'E:\\frawg\\Wake Sleep Pairs\\gabby_analysis'
+    path = 'E:\\frawg\\gabbyanalysis'
     main(path, write=True, hasty=True, verbose=False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))

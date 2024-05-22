@@ -189,7 +189,6 @@ def get_plotinfo(caps_fp, centerlines_fp, metadata_fp):
 
     plotinfo = []
     for cap in caps_listdir_nobp:
-        print(cap)
         cap_img = cv2.imread(os.path.join(caps_fp, cap), cv2.IMREAD_GRAYSCALE)
 
         #get vidnum and capnum
