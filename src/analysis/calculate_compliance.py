@@ -89,10 +89,10 @@ def plot_compliances():
 
     plt.tight_layout()
     plt.legend()
-    plt.show()
+    #plt.show()
 
 def main():
-    #get_compliances()
+    get_compliances()
     plot_compliances()
 
 
