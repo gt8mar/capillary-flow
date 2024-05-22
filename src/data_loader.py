@@ -26,8 +26,8 @@ class CenterCrop256:
         return image
 
 class VelocityDataset(Dataset):
-    def __init__(self, csv_file, root_dir, transform=None):
-        self.labels_frame = pd.read_csv(csv_file)
+    def __init__(self, labels_frame, root_dir, transform=None):
+        self.labels_frame = labels_frame
         self.root_dir = root_dir
         self.transform = transform
 
@@ -60,6 +60,6 @@ transform = transforms.Compose([
 def create_datasets(csv_file, root_dir, test_size=0.2, random_state=42):
     labels_frame = pd.read_csv(csv_file)
     train_frame, test_frame = train_test_split(labels_frame, test_size=test_size, random_state=random_state)
-    train_dataset = VelocityDataset(csv_file=train_frame, root_dir=root_dir, transform=transform)
-    test_dataset = VelocityDataset(csv_file=test_frame, root_dir=root_dir, transform=transform)
+    train_dataset = VelocityDataset(labels_frame=train_frame, root_dir=root_dir, transform=transform)
+    test_dataset = VelocityDataset(labels_frame=test_frame, root_dir=root_dir, transform=transform)
     return train_dataset, test_dataset
