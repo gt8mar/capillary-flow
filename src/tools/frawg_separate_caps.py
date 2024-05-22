@@ -16,6 +16,6 @@ def main(path):
 
 if __name__ == "__main__":
     ticks = time.time()
-    main(path = 'E:\\frawg\\Wake Sleep Pairs\\gabby_analysis')
+    main(path = 'E:\\frawg\\gabbyanalysis')
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
