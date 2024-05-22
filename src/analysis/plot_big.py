@@ -10,6 +10,7 @@ from scipy.integrate import simps, trapezoid
 from scipy.stats import skew, kurtosis, wilcoxon, mannwhitneyu, kstest, ks_2samp, ks_1samp, wasserstein_distance
 from scipy import stats
 import statsmodels.api as sm
+from statsmodels.formula.api import ols
 from src.tools.parse_filename import parse_filename
 from sklearn.utils import resample
 from sklearn.linear_model import LogisticRegression, LinearRegression, LassoCV
@@ -2243,6 +2244,26 @@ def kolmogorov_smirnov_test_per_part(entire_dataset, reference, plot = False):
         plt.xticks(rotation=45)
         plt.tight_layout()
         plt.show()
+        return 0
+
+    # Assuming data_above_50 and data_below_50 are arrays containing all measurements
+def bootstrap_test(data1, data2, n_iterations=1000):
+    size = min(len(data1), len(data2))
+    p_values = []
+    
+    for i in range(n_iterations):
+        sample1 = np.random.choice(data1, size=size, replace=True)
+        sample2 = np.random.choice(data2, size=size, replace=True)
+        stat, p = mannwhitneyu(sample1, sample2)
+        p_values.append(p)
+    
+    plt.hist(p_values, bins=30, edgecolor='k', alpha=0.7)
+    plt.xlabel('p-value')
+    plt.ylabel('Frequency')
+    plt.title('Bootstrap p-value Distribution')
+    plt.show()
+
+    return np.mean(p_values)
 
 
 def calculate_cdf_area(data, start=10, end=700):
@@ -2301,6 +2322,178 @@ def calculate_area_score(data, start=10, end=700, plot = False, verbose = False,
         plt.close()
     return area_scores_df
 
+def plot_medians_pvals(summary_df_nhp_video_medians):
+    if 'Sex' not in summary_df_nhp_video_medians.columns:
+        raise ValueError("DataFrame must include 'Sex' column for ANOVA analysis.")
+
+    print('Summary df nhp video medians')
+    print(summary_df_nhp_video_medians.columns)
+    # Rename 'Video Median Velocity' column to avoid spaces
+    summary_df_nhp_video_medians = summary_df_nhp_video_medians.rename(columns={'Video Median Velocity': 'Video_Median_Velocity'})
+    # Calculate the median velocity per participant
+    medians_nhp_vidmed = summary_df_nhp_video_medians.groupby('Participant')['Video_Median_Velocity'].median().reset_index()
+
+    # Merge this back with the original data to get age and sex information
+    merged_data = pd.merge(medians_nhp_vidmed, summary_df_nhp_video_medians[['Participant', 'Age', 'Sex']], on='Participant', how='left')
+    merged_data = merged_data.drop_duplicates().reset_index(drop=True)
+
+    # Define age groups
+    merged_data['Age_Group'] = merged_data['Age'].apply(lambda x: 'Above 50' if x >= 50 else 'Below 50')
+
+    # Statistical test
+    above_50 = merged_data[merged_data['Age_Group'] == 'Above 50']['Video_Median_Velocity']
+    below_50 = merged_data[merged_data['Age_Group'] == 'Below 50']['Video_Median_Velocity']
+    stat, p_value = mannwhitneyu(above_50, below_50)
+
+    # Visualization
+    plt.figure(figsize=(10, 6))
+    sns.boxplot(x='Age_Group', y='Video_Median_Velocity', data=merged_data, palette="Set3", boxprops=dict(alpha=.3))
+    sns.swarmplot(x='Age_Group', y='Video_Median_Velocity', data=merged_data, color='black')
+    plt.title('Comparison of Median Blood Flow Velocities by Age Group')
+    plt.xlabel('Age Group')
+    plt.ylabel('Median Blood Flow Velocity')
+    plt.annotate(f'p-value = {p_value:.3f}', xy=(0.5, 0.95), xycoords='axes fraction', ha='center', va='top',
+                 fontsize=12, color='red')
+    plt.show()
+
+    # Print the p-value
+    print(f"The p-value for the comparison between groups is: {p_value}")
+
+    # Fit model for ANOVA including Sex
+    model = ols('Video_Median_Velocity ~ C(Age_Group) + C(Sex) + C(Age_Group):C(Sex)', data=merged_data).fit()
+
+    # ANOVA table
+    anova_results = sm.stats.anova_lm(model, typ=2)
+    print(anova_results)
+
+    return 0
+
+def plot_results_with_annotations(data):
+    plt.figure(figsize=(10, 6))
+    
+    # Creating a box plot
+    sns.boxplot(x='Age_Group', y='Video_Median_Velocity', hue='Sex', data=data, palette="Set2")
+
+    # Adding titles and labels
+    plt.title('Impact of Age Group and Sex on Video Median Velocity')
+    plt.xlabel('Age Group')
+    plt.ylabel('Median Video Velocity')
+
+    # Annotating with p-values
+    # Adjust the positions according to your plot structure
+    plt.text(0.5, 300, f'p = 2.23e-08', horizontalalignment='center', color='black', weight='semibold')
+    plt.text(0.5, 280, f'Age*BP p = 0.00087', horizontalalignment='center', color='red', weight='semibold')
+    plt.text(0.5, 260, f'Sex*BP p = 0.00051', horizontalalignment='center', color='blue', weight='semibold')
+
+    plt.legend(title='Sex')
+    plt.show()
+
+
+# def analyze_velocity_influence(summary_df):
+#     if 'Sex' not in summary_df.columns or 'SYS_BP' not in summary_df.columns:
+#         raise ValueError("DataFrame must include both 'Sex' and 'SYS_BP' columns for the analysis.")
+
+#     # Prepare your data: Ensure there are no missing values, etc.
+#     summary_df.dropna(subset=['Video Median Velocity', 'Age', 'Sex', 'SYS_BP'], inplace=True)
+
+#     # rename 'Video Median Velocity' column to avoid spaces
+#     summary_df = summary_df.rename(columns={'Video Median Velocity': 'Video_Median_Velocity'})
+
+#     # Define age groups
+#     summary_df['Age_Group'] = summary_df['Age'].apply(lambda x: 'Above 50' if x >= 50 else 'Below 50')
+
+#     # Fit the ANOVA model with SYS_BP included
+#     model = ols('Video_Median_Velocity ~ C(Age_Group) + C(Sex) + SYS_BP + C(Age_Group):C(Sex) + C(Age_Group):SYS_BP + C(Sex):SYS_BP', data=summary_df).fit()
+
+#     # Display ANOVA table
+#     anova_results = sm.stats.anova_lm(model, typ=2)
+#     print(anova_results)
+#     plot_results_with_annotations(summary_df)
+
+#     return model
+
+def perform_anova_analysis(df):
+    # Calculate the median velocity per participant
+    participant_medians = df.groupby('Participant').agg({
+        'Video Median Velocity': 'median',  # Assume your velocity column is named 'Video Median Velocity'
+        'Age': 'first',  # Assumes each participant's age is constant across rows
+        'Sex': 'first',  # Assumes sex is constant
+        'SYS_BP': 'median'  # Assumes systolic blood pressure is constant
+    }).reset_index()
+
+    # Rename the aggregated velocity for clarity
+    participant_medians.rename(columns={'Video Median Velocity': 'Participant_Median_Velocity'}, inplace=True)
+
+    # Fit model for ANOVA including SYS_BP
+    model = ols('Participant_Median_Velocity ~ C(Age) + C(Sex) + SYS_BP + C(Age):C(Sex) + C(Age):SYS_BP + C(Sex):SYS_BP', data=participant_medians).fit()
+
+    # ANOVA table
+    anova_results = sm.stats.anova_lm(model, typ=2)
+    print("ANOVA Results:")
+    print(anova_results)
+
+    # # Visualization
+    # plt.figure(figsize=(12, 8))
+    # sns.boxplot(x='Age', y='Participant_Median_Velocity', hue='Sex', data=participant_medians, palette='Set2')
+    # plt.title('Impact of Age and Sex on Median Participant Velocity')
+    # plt.xlabel('Age')
+    # plt.ylabel('Median Participant Velocity')
+    # plt.legend(title='Sex')
+    # plt.show()
+
+    # Assuming 'participant_medians' is the DataFrame prepared earlier with median velocities and demographic data
+    # Reclassify 'Age' into 'Above 50' and 'Below 50'
+    participant_medians['Age_Group'] = participant_medians['Age'].apply(lambda x: 'Above 50' if x >= 50 else 'Below 50')
+
+    # # Plotting
+    # plt.figure(figsize=(12, 8))
+    # sns.boxplot(x='Age_Group', y='Participant_Median_Velocity', hue='Sex', data=participant_medians, palette='Set2')
+    # plt.title('Impact of Age Group and Sex on Median Participant Velocity')
+    # plt.xlabel('Age Group')
+    # plt.ylabel('Median Participant Velocity')
+
+    # # Adding annotations for significant results, adjust these based on your specific p-values
+    # plt.text(0.5, participant_medians['Participant_Median_Velocity'].max() * 0.9, f'Age Group p = 0.000083', horizontalalignment='center', color='black', weight='semibold')
+    # plt.text(0.5, participant_medians['Participant_Median_Velocity'].max() * 0.85, f'Age*Sex p = 0.001886', horizontalalignment='center', color='red', weight='semibold')
+    # plt.text(0.5, participant_medians['Participant_Median_Velocity'].max() * 0.8, f'Age*BP p = 0.002298', horizontalalignment='center', color='blue', weight='semibold')
+
+    # plt.legend(title='Sex')
+    # plt.show()
+
+    # Assuming 'participant_medians' is your DataFrame with median velocities and other demographic data
+    # Adjust the age column to create two groups: Above 50 and Below 50
+    participant_medians['Age_Group'] = participant_medians['Age'].apply(lambda x: 'Above 50' if x >= 50 else 'Below 50')
+
+    # print the two group medians
+    # Calculate the two group medians
+    above_50_median = participant_medians.loc[participant_medians['Age_Group'] == 'Above 50', 'Participant_Median_Velocity'].median()
+    below_50_median = participant_medians.loc[participant_medians['Age_Group'] == 'Below 50', 'Participant_Median_Velocity'].median()
+
+    # Print the two group medians
+    print("Median Velocity for Age Group Above 50:", above_50_median)
+    print("Median Velocity for Age Group Below 50:", below_50_median)
+    print("Difference in Medians:", above_50_median - below_50_median)
+    print("Percentage Increase:", ((above_50_median - below_50_median) / below_50_median) * 100)
+
+    # Plotting
+    plt.figure(figsize=(10, 6))
+    boxplot = sns.boxplot(x='Age_Group', y='Participant_Median_Velocity', data=participant_medians, palette='Set3')
+    # sns.stripplot(x='Age_Group', y='Participant_Median_Velocity', data=participant_medians, color='black', jitter=0.1, size=5, alpha=0.6)
+    sns.swarmplot(x='Age_Group', y='Participant_Median_Velocity', data=participant_medians, color='black', size=5, alpha=0.7)
+
+    plt.title('Impact of Age Group on Median Participant Velocity')
+    plt.xlabel('Age Group')
+    plt.ylabel('Median Participant Velocity')
+
+    # Annotate with p-value, assuming you already have it calculated or from previous analysis (p = 0.000083 in your case)
+    # Adding a star (*) to indicate statistical significance
+    p_value = 0.000083
+    significance = "*" if p_value < 0.05 else "ns"  # ns stands for not significant
+    plt.text(0.5, participant_medians['Participant_Median_Velocity'].max() * 0.95, f'p = {p_value:.5f} {significance}', horizontalalignment='center', color='black', weight='semibold')
+
+    plt.show()
+
+    return model
     
 
 
@@ -2351,6 +2544,15 @@ def main(verbose = False):
     normbp_nhp = summary_df_no_high_pressure[summary_df_no_high_pressure['SYS_BP'] <= 120]
     highbp_nhp = summary_df_no_high_pressure[summary_df_no_high_pressure['SYS_BP'] > 120]
 
+    # compute difference in median for old and young
+    old_median = old_nhp['Corrected Velocity'].median()
+    young_median = young_nhp['Corrected Velocity'].median()
+    print(f'Old Median: {old_median}, Young Median: {young_median}')
+
+    # # compute p value for difference in median for old and young
+    # stat, p = mannwhitneyu(old_nhp['Corrected Velocity'], young_nhp['Corrected Velocity'])      # could also use 'less' or 'greater'  , alternative='two-sided'
+    # print('Statistics=%.3f, p=%.5f' % (stat, p))
+
     # plot_box_and_whisker(summary_df_no_high_pressure, old_nhp, young_nhp, column = 'Corrected Velocity', variable = 'Age', log_scale=True)
     # plot_box_and_whisker(summary_df_no_high_pressure, highbp_nhp, normbp_nhp, column = 'Corrected Velocity', variable='SYS_BP', log_scale=True)
     # plot_violin(summary_df_no_high_pressure, old_nhp, young_nhp, 'Corrected Velocity', True)
@@ -2385,33 +2587,7 @@ def main(verbose = False):
     # add area scores to summary_df_no_high_pressure
     summary_df_no_high_pressure = summary_df_no_high_pressure.merge(area_scores_df, on='Participant', how='inner')
 
-    summary_df_nhp_video_medians = calculate_video_median_velocity(summary_df_no_high_pressure)
-    old_nhp_video_medians = summary_df_nhp_video_medians[summary_df_nhp_video_medians['Age'] > 50]
-    young_nhp_video_medians = summary_df_nhp_video_medians[summary_df_nhp_video_medians['Age'] <= 50]
-    normbp_nhp_video_medians = summary_df_nhp_video_medians[summary_df_nhp_video_medians['SYS_BP'] <= 120]
-    highbp_nhp_video_medians = summary_df_nhp_video_medians[summary_df_nhp_video_medians['SYS_BP'] > 120]
-
-    # plot_box_and_whisker(summary_df_nhp_video_medians, old_nhp_video_medians, young_nhp_video_medians, column = 'Video Median Velocity', variable = 'Age', log_scale=True)
-    # plot_box_and_whisker(summary_df_nhp_video_medians, highbp_nhp_video_medians, normbp_nhp_video_medians, column = 'Video Median Velocity', variable='SYS_BP', log_scale=True)
-    # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets= [old_nhp_video_medians['Video Median Velocity'], young_nhp_video_medians['Video Median Velocity']], labels=['Entire Dataset', 'Old', 'Young'], title = 'CDF Comparison of Video Median Velocities by Age')
-    # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets= [highbp_nhp_video_medians['Video Median Velocity'], normbp_nhp_video_medians['Video Median Velocity']], labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Video Median Velocities by BP nhp')
-
-    # plot_median_velocity_of_videos(summary_df_nhp_video_medians)
-    # make a copy of summary_df_nhp_video_medians where we replace 'Velocity' with 'Video Median Velocity'
-    summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians.copy()
-    # remove the 'Corrected Velocity' column
-    summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.drop(columns=['Corrected Velocity'])
-    # print(f'the length of summary_df_nhp_video_medians_copy is {len(summary_df_nhp_video_medians_copy)}')
-    # print(f'the length of summary_df_no_high_pressure is {len(summary_df_no_high_pressure)}')
-    summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.rename(columns={'Video Median Velocity': 'Corrected Velocity'})
-    # plot_box_whisker_pressure(summary_df_nhp_video_medians_copy, variable='Age', log_scale=False)
-    # plot_CI(summary_df_nhp_video_medians_copy, ci_percentile=95)
-
-    medians_area_scores_df = calculate_area_score(summary_df_nhp_video_medians_copy, log = True, plot=False)
-    # add area scores to summary_df_nhp_video_medians_copy
-    summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.merge(medians_area_scores_df, on='Participant', how='inner')
-    # print columns of summary_df_nhp_video_medians_copy
-    print(summary_df_nhp_video_medians_copy.columns)
+   
     
 
     # # plot area score vs age scatter
@@ -2471,7 +2647,35 @@ def main(verbose = False):
     male_subset = summary_df_no_high_pressure[summary_df_no_high_pressure['Sex']=='M']
     female_subset = summary_df_no_high_pressure[summary_df_no_high_pressure['Sex']=='F']
 
-    
+    summary_df_nhp_video_medians = calculate_video_median_velocity(summary_df_no_high_pressure)
+    old_nhp_video_medians = summary_df_nhp_video_medians[summary_df_nhp_video_medians['Age'] > 50]
+    young_nhp_video_medians = summary_df_nhp_video_medians[summary_df_nhp_video_medians['Age'] <= 50]
+    normbp_nhp_video_medians = summary_df_nhp_video_medians[summary_df_nhp_video_medians['SYS_BP'] <= 120]
+    highbp_nhp_video_medians = summary_df_nhp_video_medians[summary_df_nhp_video_medians['SYS_BP'] > 120]
+
+    # plot_medians_pvals(summary_df_nhp_video_medians)
+    # analyze_velocity_influence(summary_df_nhp_video_medians)
+    perform_anova_analysis(summary_df_nhp_video_medians)
+    # plot_box_and_whisker(summary_df_nhp_video_medians, highbp_nhp_video_medians, normbp_nhp_video_medians, column = 'Video Median Velocity', variable='SYS_BP', log_scale=True)
+    # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets= [old_nhp_video_medians['Video Median Velocity'], young_nhp_video_medians['Video Median Velocity']], labels=['Entire Dataset', 'Old', 'Young'], title = 'CDF Comparison of Video Median Velocities by Age')
+    # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets= [highbp_nhp_video_medians['Video Median Velocity'], normbp_nhp_video_medians['Video Median Velocity']], labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Video Median Velocities by BP nhp')
+
+    # plot_median_velocity_of_videos(summary_df_nhp_video_medians)
+    # make a copy of summary_df_nhp_video_medians where we replace 'Velocity' with 'Video Median Velocity'
+    summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians.copy()
+    # remove the 'Corrected Velocity' column
+    summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.drop(columns=['Corrected Velocity'])
+    # print(f'the length of summary_df_nhp_video_medians_copy is {len(summary_df_nhp_video_medians_copy)}')
+    # print(f'the length of summary_df_no_high_pressure is {len(summary_df_no_high_pressure)}')
+    summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.rename(columns={'Video Median Velocity': 'Corrected Velocity'})
+    # plot_box_whisker_pressure(summary_df_nhp_video_medians_copy, variable='Age', log_scale=False)
+    plot_CI(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='BP')
+
+    medians_area_scores_df = calculate_area_score(summary_df_nhp_video_medians_copy, log = True, plot=False)
+    # add area scores to summary_df_nhp_video_medians_copy
+    summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.merge(medians_area_scores_df, on='Participant', how='inner')
+    # print columns of summary_df_nhp_video_medians_copy
+    print(summary_df_nhp_video_medians_copy.columns)
 
     # plot_cdf(summary_df_no_high_pressure['Corrected Velocity'], 
     #          subsets=[male_subset['Corrected Velocity'], female_subset['Corrected Velocity']],
@@ -2496,7 +2700,7 @@ def main(verbose = False):
     # run_regression(summary_df_no_high_pressure)
 
     summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.rename(columns={'Area Score_y': 'Area Score', 'Log Area Score_y': 'Log Area Score'})
-    run_regression(summary_df_nhp_video_medians_copy)
+    # run_regression(summary_df_nhp_video_medians_copy)
     
     # plot_CI(summary_df_no_high_pressure)        
         
