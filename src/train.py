@@ -18,8 +18,8 @@ from data_loader import VelocityDataset, transform
 from model import VelocityNet
 from torch.utils.data import DataLoader
 
-csv_file = 'path_to_labels.csv'
-root_dir = '/hpc/projects/capillary-flow/results'
+csv_file = '/hpc/projects/capillary-flow/results/ML/240521_filename_df.csv'
+root_dir = '/hpc/projects/capillary-flow/results/ML/kymographs'
 
 # Load dataset with the new transform
 dataset = VelocityDataset(csv_file=csv_file, root_dir=root_dir, transform=transform)
