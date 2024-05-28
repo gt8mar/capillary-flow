@@ -15,12 +15,11 @@ import numpy as np
 """
 USER INSTRUCTIONS:
 
-1. Set the main_folder variable to the path of the folder containing the subfolders with the .tiff files.
-Example: main_folder = "/path/to/folder"
+1. Set the MAIN_FOLDER variable below to the path of the folder containing the subfolders with the .tiff files.
+Example: MAIN_FOLDER = "/path/to/folder"
 """
 
-
-
+MAIN_FOLDER = "/path/to/folder"
 
 def process_subfolder(subfolder_path, output_path):
     """
@@ -59,7 +58,7 @@ def main():
     Process all subfolders in the main folder and calculate the standard deviation image for each subfolder.
     """
     # Define the main folder and the output folder
-    main_folder = "/path/to/folder"
+    main_folder = MAIN_FOLDER
     output_folder = os.path.join(main_folder, "stdevs")
 
     # Create the output folder if it doesn't exist
