@@ -11,6 +11,17 @@ import os
 import cv2
 import numpy as np
 
+
+"""
+USER INSTRUCTIONS:
+
+1. Set the main_folder variable to the path of the folder containing the subfolders with the .tiff files.
+Example: main_folder = "/path/to/folder"
+"""
+
+
+
+
 def process_subfolder(subfolder_path, output_path):
     """
     Process a subfolder containing a series of .tiff files and calculate the standard deviation image.
@@ -33,6 +44,9 @@ def process_subfolder(subfolder_path, output_path):
 
     # Calculate the standard deviation for each pixel
     stdevs = np.std(frames_array, axis=0)
+
+    # Normalize the standard deviation values to the range [0, 255]
+    stdevs = cv2.normalize(stdevs, None, 0, 255, cv2.NORM_MINMAX)
 
     # Convert the standard deviation to uint8
     stdevs_uint8 = np.uint8(stdevs)
