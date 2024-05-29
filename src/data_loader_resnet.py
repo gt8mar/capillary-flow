@@ -1,9 +1,9 @@
 import os
 from PIL import Image
 import pandas as pd
-import torch
 from torch.utils.data import Dataset, DataLoader, random_split
 from torchvision import transforms
+import torch
 
 class CustomImageDataset(Dataset):
     def __init__(self, annotations_file, img_dir, transform=None):
@@ -16,25 +16,25 @@ class CustomImageDataset(Dataset):
 
     def __getitem__(self, idx):
         img_path = os.path.join(self.img_dir, self.img_labels.iloc[idx, 0])
-        image = Image.open(img_path).convert('RGB')
+        image = Image.open(img_path).convert('L')  # Convert image to grayscale
         label = self.img_labels.iloc[idx, 1]
         if self.transform:
             image = self.transform(image)
         return image, label
 
-# Define data augmentation transforms without rotations
+# Define data augmentation transforms without rotations and for grayscale images
 data_transforms = {
     'train': transforms.Compose([
         transforms.RandomResizedCrop(224),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        transforms.Normalize([0.5], [0.5])  # Adjust mean and std for single channel
     ]),
     'val': transforms.Compose([
         transforms.Resize(256),
         transforms.CenterCrop(224),
         transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        transforms.Normalize([0.5], [0.5])  # Adjust mean and std for single channel
     ]),
 }
 
