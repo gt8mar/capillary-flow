@@ -11,11 +11,13 @@ import shutil
 from PIL import Image
 
 def copy_large_images(source_folder):
+    
     # Create the target folder based on the source folder name
-    target_folder = f"big_{os.path.basename(source_folder)}"
+    parent_directory = os.path.dirname(source_folder)
+    target_folder = f"{parent_directory}/big_{os.path.basename(source_folder)}"
     if not os.path.exists(target_folder):
         os.makedirs(target_folder)
-    
+        
     # Iterate through all files in the source folder
     for filename in os.listdir(source_folder):
         file_path = os.path.join(source_folder, filename)
