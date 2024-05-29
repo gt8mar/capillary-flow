@@ -22,8 +22,8 @@ np.random.seed(42)
 torch.manual_seed(42)
 
 # Update these paths to your actual files and directories
-csv_file = '/hpc/projects/capillary-flow/results/ML/240521_filename_df.csv'
-root_dir = '/hpc/projects/capillary-flow/results/ML/kymographs'
+csv_file = '/hpc/projects/capillary-flow/results/ML/big_240521_filename_df.csv'
+root_dir = '/hpc/projects/capillary-flow/results/ML/big_kymographs'
 
 # Create train and test datasets
 train_dataset, test_dataset = create_datasets(csv_file, root_dir)
