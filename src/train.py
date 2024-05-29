@@ -51,6 +51,7 @@ for epoch in range(10):
     for i, data in enumerate(train_loader, 0):
         try:
             inputs, velocities = data
+            inputs, velocities = inputs.to(torch.float32), velocities.to(torch.float32)
             outputs = model(inputs)
             loss = criterion(outputs, velocities.view(-1, 1))
 
@@ -73,6 +74,7 @@ for epoch in range(10):
     with torch.no_grad():
         for data in test_loader:
             inputs, velocities = data
+            inputs, velocities = inputs.to(torch.float32), velocities.to(torch.float32)
             outputs = model(inputs)
             loss = criterion(outputs, velocities.view(-1, 1))
             test_loss += loss.item()
