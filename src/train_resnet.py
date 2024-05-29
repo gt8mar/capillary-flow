@@ -2,14 +2,15 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torchvision import models
-from data_loader import get_dataloaders
+from data_loader_resnet import get_dataloaders
 import os
 
 # Update these paths to your actual files and directories
-data_dir = 'path_to_data'
+annotations_file = '/hpc/projects/capillary-flow/results/ML/big_240521_filename_df.csv'
+data_dir = '/hpc/projects/capillary-flow/results/ML/big_kymographs'
 
-# Get data loaders
-dataloaders, dataset_sizes, class_names = get_dataloaders(data_dir, batch_size=32)
+# Get data loaders with train-test split
+dataloaders, dataset_sizes, class_names = get_dataloaders(data_dir, annotations_file, batch_size=32)
 
 # Use a pre-trained model and fine-tune it
 model_ft = models.resnet18(pretrained=True)

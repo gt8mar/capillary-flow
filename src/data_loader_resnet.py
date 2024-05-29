@@ -1,7 +1,8 @@
 import os
 from PIL import Image
 import pandas as pd
-from torch.utils.data import Dataset, DataLoader
+import torch
+from torch.utils.data import Dataset, DataLoader, random_split
 from torchvision import transforms
 
 class CustomImageDataset(Dataset):
@@ -37,11 +38,26 @@ data_transforms = {
     ]),
 }
 
-def get_dataloaders(data_dir, batch_size=32):
-    image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x), data_transforms[x])
-                      for x in ['train', 'val']}
-    dataloaders = {x: DataLoader(image_datasets[x], batch_size=batch_size, shuffle=True, num_workers=4)
-                   for x in ['train', 'val']}
-    dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
-    class_names = image_datasets['train'].classes
+def get_dataloaders(data_dir, annotations_file, batch_size=32, test_size=0.2, random_state=42):
+    # Create the full dataset
+    dataset = CustomImageDataset(annotations_file=annotations_file, img_dir=data_dir, transform=data_transforms['train'])
+    
+    # Split the dataset into training and validation sets
+    train_size = int((1 - test_size) * len(dataset))
+    val_size = len(dataset) - train_size
+    train_dataset, val_dataset = random_split(dataset, [train_size, val_size], generator=torch.Generator().manual_seed(random_state))
+
+    # Apply validation transforms
+    val_dataset.dataset.transform = data_transforms['val']
+
+    # Create data loaders
+    dataloaders = {
+        'train': DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4),
+        'val': DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
+    }
+    dataset_sizes = {
+        'train': train_size,
+        'val': val_size
+    }
+    class_names = dataset.dataset.img_labels.iloc[:, 1].unique()
     return dataloaders, dataset_sizes, class_names
