@@ -2669,7 +2669,7 @@ def main(verbose = False):
     # print(f'the length of summary_df_no_high_pressure is {len(summary_df_no_high_pressure)}')
     summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.rename(columns={'Video Median Velocity': 'Corrected Velocity'})
     # plot_box_whisker_pressure(summary_df_nhp_video_medians_copy, variable='Age', log_scale=False)
-    plot_CI(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='BP')
+    # plot_CI(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='BP')
 
     medians_area_scores_df = calculate_area_score(summary_df_nhp_video_medians_copy, log = True, plot=False)
     # add area scores to summary_df_nhp_video_medians_copy
