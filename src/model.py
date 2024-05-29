@@ -20,8 +20,8 @@ class VelocityNet(nn.Module):
         self.conv2 = nn.Conv2d(32, 64, 3, padding=1)
         # Third convolutional layer: input channels = 64, output channels = 128, kernel size = 3x3, padding = 1
         self.conv3 = nn.Conv2d(64, 128, 3, padding=1)
-        # Fully connected layer: input size = 128 * 16 * 16, output size = 512
-        self.fc1 = nn.Linear(128 * 16 * 16, 512)
+        # Fully connected layer: input size = 128 * 32 * 32, output size = 512
+        self.fc1 = nn.Linear(128 * 32 * 32, 512)
         # Output layer: input size = 512, output size = 1 (regression output)
         self.fc2 = nn.Linear(512, 1)
 
@@ -33,10 +33,9 @@ class VelocityNet(nn.Module):
         # Apply the third convolutional layer followed by ReLU activation and max pooling
         x = self.pool(F.relu(self.conv3(x)))
         # Flatten the tensor from 4D to 2D for the fully connected layers
-        x = x.view(-1, 128 * 16 * 16)
+        x = x.view(x.size(0), -1)  # Ensure the batch size is the first dimension
         # Apply the first fully connected layer followed by ReLU activation
         x = F.relu(self.fc1(x))
         # Apply the output layer
         x = self.fc2(x)
         return x
-
