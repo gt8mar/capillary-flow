@@ -113,6 +113,75 @@ def plot_CI(df, variable = 'Age', method='bootstrap', n_iterations=1000, ci_perc
     plt.show()
     return 0
 
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+def calculate_overlap(ci1, ci2):
+    lower1, upper1 = ci1
+    lower2, upper2 = ci2
+    intersection_lower = max(lower1, lower2)
+    intersection_upper = min(upper1, upper2)
+    if intersection_upper > intersection_lower:
+        intersection_length = intersection_upper - intersection_lower
+        smaller_interval_length = min(upper1 - lower1, upper2 - lower2)
+        return intersection_length / smaller_interval_length
+    return 0
+
+def plot_CI_overlaps(df, variable='Age', method='bootstrap', n_iterations=1000, ci_percentile=99.5):
+    # Define groups based on variable
+    if variable == 'Age':
+        df['Group'] = np.where(df['Age'] <= 50, '≤50', '>50')
+    else:
+        df['Group'] = np.where(df['SYS_BP'] < 120, '<120', '≥120')
+
+    group_cis = {}
+    
+    # Bootstrap method for confidence intervals
+    for group, group_df in df.groupby('Group'):
+        group_cis[group] = []
+        for pressure, pressure_group in group_df.groupby('Pressure'):
+            bootstrap_samples = [
+                pressure_group['Corrected Velocity'].sample(n=len(pressure_group), replace=True).median()
+                for _ in range(n_iterations)
+            ]
+            ci_lower = np.percentile(bootstrap_samples, (100 - ci_percentile) / 2)
+            ci_upper = np.percentile(bootstrap_samples, ci_percentile + (100 - ci_percentile) / 2)
+            group_cis[group].append((pressure, ci_lower, ci_upper))
+
+    # Plotting setup
+    fig, ax = plt.subplots(figsize=(10, 6))
+    colors = {'≤50': 'tab:green', '>50': 'tab:orange', '<120': 'tab:blue', '≥120': 'tab:red'}
+
+    # Plot each group
+    for group, cis in group_cis.items():
+        pressures = [x[0] for x in cis]
+        medians = [np.median([x[1], x[2]]) for x in cis]
+        errors = [(m-c[1], c[2]-m) for m, c in zip(medians, cis)]
+        ax.errorbar(pressures, medians, yerr=np.transpose(errors), fmt='-o', label=f'Group {group}', color=colors[group])
+    
+    # Calculate overlaps and store/print them
+    overlaps = {}
+    groups = list(group_cis.keys())
+    for i in range(len(groups)):
+        for j in range(i + 1, len(groups)):
+            overlaps[(groups[i], groups[j])] = [
+                calculate_overlap(group_cis[groups[i]][k][1:], group_cis[groups[j]][k][1:])
+                for k in range(len(group_cis[groups[i]]))
+            ]
+
+    ax.set_xlabel('Pressure')
+    ax.set_ylabel('Velocity (um/s)')
+    ax.set_title(f'Median Corrected Velocity vs. Pressure with {ci_percentile}% Confidence Interval')
+    ax.legend()
+
+    plt.show()
+
+    # Optionally print or return the overlaps
+    print(overlaps)
+    return overlaps
+
+
 # Function to calculate median and bootstrap 95% CI
 def calculate_median_ci(group, n_iterations=1000, ci_percentile=95):
     medians = []
