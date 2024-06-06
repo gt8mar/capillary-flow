@@ -17,6 +17,8 @@ USER INSTRUCTIONS:
 
 1. Set the MAIN_FOLDER variable below to the path of the folder containing the subfolders with the .tiff files.
 Example: MAIN_FOLDER = "/path/to/folder"
+
+This folder should either be "Left" or "Right" and contain subfolders with the .tiff files.
 """
 
 MAIN_FOLDER = "/path/to/folder"
@@ -62,16 +64,17 @@ def process_subfolder(subfolder_path, output_path):
     # Save the standard deviation image in .tiff format
     cv2.imwrite(output_path, stdevs_uint8)
 
-def main():
+def main(main_folder = MAIN_FOLDER):
     """
     Process all subfolders in the main folder and calculate the standard deviation image for each subfolder.
     """
     # Define the main folder and the output folder
-    main_folder = MAIN_FOLDER
     output_folder = os.path.join(main_folder, "stdevs")
+    results_folder = '/hpc/projects/capillary-flow/frog/results/stdevs'
 
     # Create the output folder if it doesn't exist
     os.makedirs(output_folder, exist_ok=True)
+    os.makedirs(results_folder, exist_ok=True)
 
     # Loop through each subfolder in the main folder
     for subfolder in os.listdir(main_folder):
