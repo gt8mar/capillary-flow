@@ -42,7 +42,7 @@ class VelocityDataset(Dataset):
         if image.size[0] < 256 or image.size[1] < 256:
             raise ValueError(f"Image {img_name} is smaller than 256x256 and will be excluded.")
         
-        velocity = self.labels_frame.iloc[idx, 1]
+        velocity = self.labels_frame.iloc[idx, 1].astype(np.float32)
 
         if self.transform:
             image = self.transform(image)

@@ -22,22 +22,22 @@ np.random.seed(42)
 torch.manual_seed(42)
 
 # Update these paths to your actual files and directories
-csv_file = '/hpc/projects/capillary-flow/results/ML/240521_filename_df.csv'
-root_dir = '/hpc/projects/capillary-flow/results/ML/kymographs'
+csv_file = '/hpc/projects/capillary-flow/results/ML/big_240521_filename_df.csv'
+root_dir = '/hpc/projects/capillary-flow/results/ML/big_kymographs'
 
 # Create train and test datasets
 train_dataset, test_dataset = create_datasets(csv_file, root_dir)
 
 # Create data loaders
-train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
+train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
 
 # Initialize the model
 model = VelocityNet()
 
 # Define loss and optimizer
 criterion = torch.nn.MSELoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+optimizer = optim.Adam(model.parameters(), lr=0.0001)
 
 # Prepare everything with the accelerator
 model, optimizer, train_loader, test_loader = accelerator.prepare(
@@ -45,12 +45,13 @@ model, optimizer, train_loader, test_loader = accelerator.prepare(
 )
 
 # Training loop
-for epoch in range(10):
+for epoch in range(50):
     model.train()
     running_loss = 0.0
     for i, data in enumerate(train_loader, 0):
         try:
             inputs, velocities = data
+            inputs, velocities = inputs.to(torch.float32), velocities.to(torch.float32)
             outputs = model(inputs)
             loss = criterion(outputs, velocities.view(-1, 1))
 
@@ -73,6 +74,7 @@ for epoch in range(10):
     with torch.no_grad():
         for data in test_loader:
             inputs, velocities = data
+            inputs, velocities = inputs.to(torch.float32), velocities.to(torch.float32)
             outputs = model(inputs)
             loss = criterion(outputs, velocities.view(-1, 1))
             test_loss += loss.item()

@@ -49,29 +49,36 @@ def plot_CI(df, variable = 'Age', method='bootstrap', n_iterations=1000, ci_perc
     # df['Age Group'] = np.where(df['Age'] <= 50, '≤50', '>50')
     df['Age Group'] = np.where(df['Age'] <= 50, '≤50', '>50')
     df['SYS_BP Group'] = np.where(df['SYS_BP'] < 120, '<120', '≥120')
+    df['Sex Group'] = np.where(df['Sex'] == 'M', 'M', 'F')
                                      
     # Group the data by the variable of interest and calculate the mean and 95% CI
     if method == 'bootstrap':
         if variable == 'Age':
             # Group by Age Group and Pressure, then apply the calculate_median_ci function
             median_stats_df = df.groupby(['Age Group', 'Pressure']).apply(calculate_median_ci, ci_percentile = ci_percentile).reset_index()
-        else:
+        elif variable == 'SYS_BP':
             # Group by SYS_BP Group and Pressure, then apply the calculate_median_ci function
             median_stats_df = df.groupby(['SYS_BP Group', 'Pressure']).apply(calculate_median_ci, ci_percentile = ci_percentile).reset_index()
+        elif variable == 'Sex':
+            median_stats_df = df.groupby(['Sex Group', 'Pressure']).apply(calculate_median_ci, ci_percentile = ci_percentile).reset_index()
     else:
         if variable == 'Age':
             # Group by Age Group and Pressure, then apply the calculate_stats function
             stats_df = df.groupby(['Age Group', 'Pressure']).apply(calculate_stats).reset_index()
-        else:
+        elif variable == 'SYS_BP':
             # Group by SYS_BP Group and Pressure, then apply the calculate_stats function
             stats_df = df.groupby(['SYS_BP Group', 'Pressure']).apply(calculate_stats).reset_index()
+        elif variable == 'Sex':
+            stats_df = df.groupby(['Sex Group', 'Pressure']).apply(calculate_stats).reset_index()
         
     # Plot the data
     fig, ax = plt.subplots(1, 1, figsize=(10, 6))
     if variable == 'Age':
         enforce_colors = {'≤50': 'tab:green', '>50': 'tab:orange'}
-    else:
-        enforce_colors = {'<120': 'tab:green', '≥120': 'tab:orange'}
+    elif variable == 'SYS_BP':
+        enforce_colors = {'<120': 'tab:blue', '≥120': 'tab:red'}
+    elif variable == 'Sex':
+        enforce_colors = {'M': 'tab:purple', 'F': 'tab:pink'}
 
     if method == 'bootstrap':
         if variable == 'Age':
@@ -81,12 +88,18 @@ def plot_CI(df, variable = 'Age', method='bootstrap', n_iterations=1000, ci_perc
                             label=f'Age Group {label}', fmt='-o', color = enforce_colors[label])
             
                 ax.fill_between(group_df['Pressure'], group_df['CI Lower Bound'], group_df['CI Upper Bound'], alpha=0.2, color = enforce_colors[label])
-        else:
+        elif variable == 'SYS_BP':
             for label, group_df in median_stats_df.groupby('SYS_BP Group'):
                 ax.errorbar(group_df['Pressure'], group_df['Median Velocity'], 
                             yerr=[group_df['Median Velocity'] - group_df['CI Lower Bound'], group_df['CI Upper Bound'] - group_df['Median Velocity']],
                             label=f'SYS_BP Group {label}', fmt='-o', color = enforce_colors[label])
             
+                ax.fill_between(group_df['Pressure'], group_df['CI Lower Bound'], group_df['CI Upper Bound'], alpha=0.2, color = enforce_colors[label])
+        elif variable == 'Sex':
+            for label, group_df in median_stats_df.groupby('Sex Group'):
+                ax.errorbar(group_df['Pressure'], group_df['Median Velocity'], 
+                            yerr=[group_df['Median Velocity'] - group_df['CI Lower Bound'], group_df['CI Upper Bound'] - group_df['Median Velocity']],
+                            label=f'Sex Group {label}', fmt='-o', color = enforce_colors[label])
                 ax.fill_between(group_df['Pressure'], group_df['CI Lower Bound'], group_df['CI Upper Bound'], alpha=0.2, color = enforce_colors[label])
         ax.set_xlabel('Pressure')
         ax.set_ylabel('Velocity (um/s)')
@@ -100,18 +113,95 @@ def plot_CI(df, variable = 'Age', method='bootstrap', n_iterations=1000, ci_perc
                             yerr=[group_df['Mean Velocity'] - group_df['Lower Bound'], group_df['Upper Bound'] - group_df['Mean Velocity']],
                             label=f'Age Group {label}', fmt='-o', color = enforce_colors[label])
                 ax.fill_between(group_df['Pressure'], group_df['Lower Bound'], group_df['Upper Bound'], alpha=0.2, color = enforce_colors[label])
-        else:
+        elif variable == 'SYS_BP':
             for label, group_df in stats_df.groupby('SYS_BP Group'):
                 ax.errorbar(group_df['Pressure'], group_df['Mean Velocity'], 
                             yerr=[group_df['Mean Velocity'] - group_df['Lower Bound'], group_df['Upper Bound'] - group_df['Mean Velocity']],
                             label=f'SYS_BP Group {label}', fmt='-o', color = enforce_colors[label])
                 ax.fill_between(group_df['Pressure'], group_df['Lower Bound'], group_df['Upper Bound'], alpha=0.2, color = enforce_colors[label])
+        elif variable == 'Sex':
+            for label, group_df in stats_df.groupby('Sex Group'):
+                ax.errorbar(group_df['Pressure'], group_df['Mean Velocity'], 
+                            yerr=[group_df['Mean Velocity'] - group_df['Lower Bound'], group_df['Upper Bound'] - group_df['Mean Velocity']],
+                            label = f'Sex Group {label}', fmt='-o', color = enforce_colors[label])
+                ax.fill_between(group_df['Pressure'], group_df['Lower Bound'], group_df['Upper Bound'], alpha=0.2, color = enforce_colors[label])
+        else:
+            raise ValueError('Variable not recognized')
         ax.set_xlabel('Pressure')
         ax.set_ylabel('Velocity (um/s)')
         ax.set_title(f'Corrected Velocity vs. Pressure with {ci_percentile}% Confidence Interval')
         ax.legend()
     plt.show()
     return 0
+
+def calculate_overlap(ci1, ci2):
+    lower1, upper1 = ci1
+    lower2, upper2 = ci2
+    intersection_lower = max(lower1, lower2)
+    intersection_upper = min(upper1, upper2)
+    if intersection_upper > intersection_lower:
+        intersection_length = intersection_upper - intersection_lower
+        smaller_interval_length = min(upper1 - lower1, upper2 - lower2)
+        return intersection_length / smaller_interval_length
+    return 0
+
+def plot_CI_overlaps(df, variable='Age', method='bootstrap', n_iterations=1000, ci_percentile=99.5):
+    # Define groups based on variable
+    if variable == 'Age':
+        df['Group'] = np.where(df['Age'] <= 50, '≤50', '>50')
+    elif variable == 'SYS_BP':
+        df['Group'] = np.where(df['SYS_BP'] < 120, '<120', '≥120')
+    elif variable == 'Sex':
+        df['Group'] = np.where(df['Sex'] == 'M', 'M', 'F')
+    else:
+        raise ValueError('Variable not recognized')
+    
+    group_cis = {}
+    
+    # Bootstrap method for confidence intervals
+    for group, group_df in df.groupby('Group'):
+        group_cis[group] = []
+        for pressure, pressure_group in group_df.groupby('Pressure'):
+            bootstrap_samples = [
+                pressure_group['Corrected Velocity'].sample(n=len(pressure_group), replace=True).median()
+                for _ in range(n_iterations)
+            ]
+            ci_lower = np.percentile(bootstrap_samples, (100 - ci_percentile) / 2)
+            ci_upper = np.percentile(bootstrap_samples, ci_percentile + (100 - ci_percentile) / 2)
+            group_cis[group].append((pressure, ci_lower, ci_upper))
+
+    # Plotting setup
+    fig, ax = plt.subplots(figsize=(10, 6))
+    colors = {'≤50': 'tab:green', '>50': 'tab:orange', '<120': 'tab:blue', '≥120': 'tab:red', 'M': 'tab:purple', 'F': 'tab:pink'}
+
+    # Plot each group
+    for group, cis in group_cis.items():
+        pressures = [x[0] for x in cis]
+        medians = [np.median([x[1], x[2]]) for x in cis]
+        errors = [(m-c[1], c[2]-m) for m, c in zip(medians, cis)]
+        ax.errorbar(pressures, medians, yerr=np.transpose(errors), fmt='-o', label=f'Group {group}', color=colors[group])
+    
+    # Calculate overlaps and store/print them
+    overlaps = {}
+    groups = list(group_cis.keys())
+    for i in range(len(groups)):
+        for j in range(i + 1, len(groups)):
+            overlaps[(groups[i], groups[j])] = [
+                calculate_overlap(group_cis[groups[i]][k][1:], group_cis[groups[j]][k][1:])
+                for k in range(len(group_cis[groups[i]]))
+            ]
+
+    ax.set_xlabel('Pressure')
+    ax.set_ylabel('Velocity (um/s)')
+    ax.set_title(f'Median Corrected Velocity vs. Pressure with {ci_percentile}% Confidence Interval')
+    ax.legend()
+
+    plt.show()
+
+    # Optionally print or return the overlaps
+    print(overlaps)
+    return overlaps
+
 
 # Function to calculate median and bootstrap 95% CI
 def calculate_median_ci(group, n_iterations=1000, ci_percentile=95):
@@ -2412,7 +2502,7 @@ def plot_results_with_annotations(data):
 
 #     return model
 
-def perform_anova_analysis(df):
+def perform_anova_analysis(df, variable ='Age', plot = True):
     # Calculate the median velocity per participant
     participant_medians = df.groupby('Participant').agg({
         'Video Median Velocity': 'median',  # Assume your velocity column is named 'Video Median Velocity'
@@ -2463,11 +2553,17 @@ def perform_anova_analysis(df):
     # Assuming 'participant_medians' is your DataFrame with median velocities and other demographic data
     # Adjust the age column to create two groups: Above 50 and Below 50
     participant_medians['Age_Group'] = participant_medians['Age'].apply(lambda x: 'Above 50' if x >= 50 else 'Below 50')
+    participant_medians['SYS_BP_Group'] = np.where(participant_medians['SYS_BP'] < 120, '<120', '≥120')
+    participant_medians['Sex_Group'] = np.where(participant_medians['Sex'] == 'M', 'M', 'F')
 
     # print the two group medians
     # Calculate the two group medians
     above_50_median = participant_medians.loc[participant_medians['Age_Group'] == 'Above 50', 'Participant_Median_Velocity'].median()
     below_50_median = participant_medians.loc[participant_medians['Age_Group'] == 'Below 50', 'Participant_Median_Velocity'].median()
+    above_120_median = participant_medians.loc[participant_medians['SYS_BP_Group'] == '≥120', 'Participant_Median_Velocity'].median()
+    below_120_median = participant_medians.loc[participant_medians['SYS_BP_Group'] == '<120', 'Participant_Median_Velocity'].median()
+    male_median = participant_medians.loc[participant_medians['Sex_Group'] == 'M', 'Participant_Median_Velocity'].median()
+    female_median = participant_medians.loc[participant_medians['Sex_Group'] == 'F', 'Participant_Median_Velocity'].median()
 
     # Print the two group medians
     print("Median Velocity for Age Group Above 50:", above_50_median)
@@ -2475,23 +2571,42 @@ def perform_anova_analysis(df):
     print("Difference in Medians:", above_50_median - below_50_median)
     print("Percentage Increase:", ((above_50_median - below_50_median) / below_50_median) * 100)
 
-    # Plotting
-    plt.figure(figsize=(10, 6))
-    boxplot = sns.boxplot(x='Age_Group', y='Participant_Median_Velocity', data=participant_medians, palette='Set3')
-    # sns.stripplot(x='Age_Group', y='Participant_Median_Velocity', data=participant_medians, color='black', jitter=0.1, size=5, alpha=0.6)
-    sns.swarmplot(x='Age_Group', y='Participant_Median_Velocity', data=participant_medians, color='black', size=5, alpha=0.7)
 
-    plt.title('Impact of Age Group on Median Participant Velocity')
-    plt.xlabel('Age Group')
-    plt.ylabel('Median Participant Velocity')
 
-    # Annotate with p-value, assuming you already have it calculated or from previous analysis (p = 0.000083 in your case)
-    # Adding a star (*) to indicate statistical significance
-    p_value = 0.000083
-    significance = "*" if p_value < 0.05 else "ns"  # ns stands for not significant
-    plt.text(0.5, participant_medians['Participant_Median_Velocity'].max() * 0.95, f'p = {p_value:.5f} {significance}', horizontalalignment='center', color='black', weight='semibold')
+    if plot:
+        # Plotting
+        plt.figure(figsize=(10, 6))
+        if variable == 'Age':
+            boxplot = sns.boxplot(x='Age_Group', y='Participant_Median_Velocity', data=participant_medians, palette='Set3')
+            # sns.stripplot(x='Age_Group', y='Participant_Median_Velocity', data=participant_medians, color='black', jitter=0.1, size=5, alpha=0.6)
+            sns.swarmplot(x='Age_Group', y='Participant_Median_Velocity', data=participant_medians, color='black', size=5, alpha=0.7)
 
-    plt.show()
+            plt.title('Impact of Age Group on Median Participant Velocity')
+            plt.xlabel('Age Group')
+        elif variable == 'SYS_BP':
+            boxplot = sns.boxplot(x='SYS_BP_Group', y='Participant_Median_Velocity', data=participant_medians, palette='Set1')
+            # sns.stripplot(x='SYS_BP', y='Participant_Median_Velocity', data=participant_medians, color='black', jitter=0.1, size=5, alpha=0.6)
+            sns.swarmplot(x='SYS_BP_Group', y='Participant_Median_Velocity', data=participant_medians, color='black', size=5, alpha=0.7)
+
+            plt.title('Impact of Systolic Blood Pressure on Median Participant Velocity')
+            plt.xlabel('Systolic Blood Pressure')
+        elif variable == 'Sex':
+            boxplot = sns.boxplot(x='Sex_Group', y='Participant_Median_Velocity', data=participant_medians, palette='Set2')
+            # sns.stripplot(x='SYS_BP', y='Participant_Median_Velocity', data=participant_medians, color='black', jitter=0.1, size=5, alpha=0.6)
+            sns.swarmplot(x='Sex_Group', y='Participant_Median_Velocity', data=participant_medians, color='black', size=5, alpha=0.7)
+
+            plt.title('Impact of Biological Sex on Median Participant Velocity')
+            plt.xlabel('Sex')
+        plt.ylabel('Median Participant Velocity')
+
+        # Annotate with p-value, assuming you already have it calculated or from previous analysis (p = 0.000083 in your case)
+        # Adding a star (*) to indicate statistical significance
+        if variable == 'Age':
+            p_value = 0.000083
+            significance = "*" if p_value < 0.05 else "ns"  # ns stands for not significant
+            plt.text(0.5, participant_medians['Participant_Median_Velocity'].max() * 0.95, f'p = {p_value:.5f} {significance}', horizontalalignment='center', color='black', weight='semibold')
+
+        plt.show()
 
     return model
     
@@ -2669,7 +2784,10 @@ def main(verbose = False):
     # print(f'the length of summary_df_no_high_pressure is {len(summary_df_no_high_pressure)}')
     summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.rename(columns={'Video Median Velocity': 'Corrected Velocity'})
     # plot_box_whisker_pressure(summary_df_nhp_video_medians_copy, variable='Age', log_scale=False)
-    # plot_CI(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='BP')
+    # plot_CI_overlaps(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='BP')
+    # plot_CI_overlaps(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='Age')
+    # plot_CI_overlaps(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='Sex')
+    plot_CI(summary_df_nhp_video_medians_copy, variable = 'Sex', ci_percentile=95)
 
     medians_area_scores_df = calculate_area_score(summary_df_nhp_video_medians_copy, log = True, plot=False)
     # add area scores to summary_df_nhp_video_medians_copy
