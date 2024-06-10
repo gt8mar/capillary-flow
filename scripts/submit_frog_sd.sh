@@ -4,7 +4,6 @@
 #SBATCH --time=5-00:00:00
 #SBATCH --mem=250G
 #SBATCH --partition=cpu
-#SBATCH --cpus=1
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --output=output_frog_sd_%A.out
