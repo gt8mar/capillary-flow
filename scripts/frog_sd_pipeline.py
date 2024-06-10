@@ -72,10 +72,12 @@ def main(test=False):
                     if folder2.startswith('Frog'):
                         for folder3 in os.listdir(os.path.join('/hpc/projects/capillary-flow/frog', folder, folder2)):
                             if folder3.startswith('Left'):
-                                left_folder = os.path.join('/hpc/projects/capillary-flow/frog', folder, folder2, folder3)    
+                                left_folder = os.path.join('/hpc/projects/capillary-flow/frog', folder, folder2, folder3) 
+                                print(left_folder)   
                                 frog_sd.main(left_folder)
                             elif folder3.startswith('Right'):
                                 right_folder = os.path.join('/hpc/projects/capillary-flow/frog', folder, folder2, folder3)
+                                print(right_folder)
                                 frog_sd.main(right_folder)
                             else:
                                 continue                    
@@ -98,7 +100,7 @@ if __name__ == "__main__":
     print("-------------------------------------")
     ticks_first = time.time()
     ticks = time.time()
-    main(test=True)  
+    main(test=False)  
 
     print("-------------------------------------")
     print("Total Pipeline Runtime: " + str(time.time() - ticks_first))
