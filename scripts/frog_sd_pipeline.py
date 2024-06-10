@@ -25,7 +25,7 @@ def list_only_folders(path):
     """
     return [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
 
-def main():
+def main(test=False):
     """
     Finds centerlines for segmented capillaries and makes kymographs.
 
@@ -39,33 +39,53 @@ def main():
         centerline files
         kymograph files
     """
+    testing_folder = 'C:\\Users\\ejerison\\capillary-flow\\tests\\24-4-19_WkSl'
 
     # # Participant number is passed as an argument
     # i = sys.argv[1]
     # print(f"begin kymo_pipeline for participant {i}")
     ticks_total = time.time()
 
+    if test:
+        # Testing
+        for folder2 in os.listdir(testing_folder):
+            if folder2.startswith('Frog'):
+                for folder3 in os.listdir(os.path.join(testing_folder, folder2)):
+                    if folder3.startswith('Left'):
+                        left_folder = os.path.join(testing_folder, folder2, folder3)    
+                        print(left_folder)
+                        frog_sd.main(left_folder)
+                    elif folder3.startswith('Right'):
+                        right_folder = os.path.join(testing_folder, folder2, folder3)
+                        # frog_sd.main(os.path.join(right_folder, folder2, folder3))
+                        print(folder3)
+                    else:
+                        continue
+            else:
+                continue
     # Load the date and video numbers
-    
-    for folder in os.listdir('/hpc/projects/capillary-flow/frog'):
-        # check if folder is a folder and if it starts with '24'
-        if os.path.isdir(os.path.join('/hpc/projects/capillary-flow/frog', folder)) and folder.startswith('24'):
-            for folder2 in os.listdir(os.path.join('/hpc/projects/capillary-flow/frog', folder)):
-                if folder2.startswith('Frog'):
-                    for folder3 in os.listdir(os.path.join('/hpc/projects/capillary-flow/frog', folder, folder2)):
-                        if folder3.startswith('Left'):
-                            frog_sd.main(os.path.join('/hpc/projects/capillary-flow/frog', folder, folder2, folder3))
-                        elif folder3.startswith('Right'):
-                            frog_sd.main(os.path.join('/hpc/projects/capillary-flow/frog', folder, folder2, folder3))
-                        else:
-                            continue                    
-                else:
-                    continue
-    
-        else:
-            continue
-            
-    return 0
+    else:
+        for folder in os.listdir('/hpc/projects/capillary-flow/frog'):
+            # check if folder is a folder and if it starts with '24'
+            if os.path.isdir(os.path.join('/hpc/projects/capillary-flow/frog', folder)) and folder.startswith('24'):
+                for folder2 in os.listdir(os.path.join('/hpc/projects/capillary-flow/frog', folder)):
+                    if folder2.startswith('Frog'):
+                        for folder3 in os.listdir(os.path.join('/hpc/projects/capillary-flow/frog', folder, folder2)):
+                            if folder3.startswith('Left'):
+                                left_folder = os.path.join('/hpc/projects/capillary-flow/frog', folder, folder2, folder3)    
+                                frog_sd.main(left_folder)
+                            elif folder3.startswith('Right'):
+                                right_folder = os.path.join('/hpc/projects/capillary-flow/frog', folder, folder2, folder3)
+                                frog_sd.main(right_folder)
+                            else:
+                                continue                    
+                    else:
+                        continue
+        
+            else:
+                continue
+                
+        return 0
 
 
 """
@@ -78,7 +98,7 @@ if __name__ == "__main__":
     print("-------------------------------------")
     ticks_first = time.time()
     ticks = time.time()
-    main()  
+    main(test=True)  
 
     print("-------------------------------------")
     print("Total Pipeline Runtime: " + str(time.time() - ticks_first))
