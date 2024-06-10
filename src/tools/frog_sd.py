@@ -32,13 +32,14 @@ XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 """
 
-def process_subfolder(subfolder_path, output_path):
+def process_subfolder(subfolder_path, output_path, results_path):
     """
     Process a subfolder containing a series of .tiff files and calculate the standard deviation image.
 
     Args:
         subfolder_path (str): The path to the subfolder containing the .tiff files.
         output_path (str): The path to save the standard deviation image.
+        results_path (str): The path to save the standard deviation image in the results folder.
 
     Returns:
         0 if successful
@@ -78,6 +79,7 @@ def process_subfolder(subfolder_path, output_path):
 
     # Save the standard deviation image in .tiff format
     cv2.imwrite(output_path, stdevs_uint8)
+    cv2.imwrite(results_path, stdevs_uint8)
 
     return 0
 
@@ -117,9 +119,9 @@ def main(main_folder = MAIN_FOLDER):
             if os.path.isdir(subfolder_path):
                 # Define the output path for the standard deviation image
                 output_path = os.path.join(output_folder, f"SD_{subfolder}.tiff")
-                
+                results_path = os.path.join(results_folder, f"SD_{subfolder}.tiff")
                 # Process the subfolder
-                process_subfolder(subfolder_path, output_path)
+                process_subfolder(subfolder_path, output_path, results_path)
         else:
             print(f"Skipping subfolder: {subfolder}")
     print("Processing complete!")
