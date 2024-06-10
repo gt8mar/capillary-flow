@@ -99,7 +99,7 @@ def load_metadata():
         split_bp(first_row)
         
 
-def split_bp(first_row):
+def split_bp(first):
     print(first_row["BP"])
     BP = first_row["BP"]
     SplitBP = BP.split('/')

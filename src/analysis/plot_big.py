@@ -2610,7 +2610,51 @@ def perform_anova_analysis(df, variable ='Age', plot = True):
 
     return model
     
+def summarize_set01(filepath='C:\\Users\\gt8mar\\capillary-flow\\metadata\\merged\\merged_metadata.csv'):
+    # Load the Excel file
+    df = pd.read_csv(filepath)
 
+    # Split the 'BP' column into 'SYS_BP' and 'DIA_BP'
+    df[['SYS_BP', 'DIA_BP']] = df['BP'].str.split('/', expand=True).astype(float)
+
+    # Filter rows for 'set01'
+    set01_df = df[df['SET'] == 'set01']
+
+    # Calculate necessary statistics
+    results = {
+        'Group': ['All', 'Below fifty', 'Fifty and above'],
+        'Average Age': [],
+        'Std Age': [],
+        'Average SYS_BP': [],
+        'Std SYS_BP': [],
+        'Average DIA_BP': [],
+        'Std DIA_BP': [],
+        'Average Pulse': [],
+        'Std Pulse': [],
+        'Male Count': [],
+        'Female Count': []
+    }
+
+    # Define age groups
+    all_ages = set01_df
+    below_fifty = set01_df[set01_df['Age'] < 50]
+    fifty_and_above = set01_df[set01_df['Age'] >= 50]
+
+    for group in [all_ages, below_fifty, fifty_and_above]:
+        results['Average Age'].append(group['Age'].mean())
+        results['Std Age'].append(group['Age'].std())
+        results['Average SYS_BP'].append(group['SYS_BP'].mean())
+        results['Std SYS_BP'].append(group['SYS_BP'].std())
+        results['Average DIA_BP'].append(group['DIA_BP'].mean())
+        results['Std DIA_BP'].append(group['DIA_BP'].std())
+        results['Average Pulse'].append(group['Pulse'].mean())
+        results['Std Pulse'].append(group['Pulse'].std())
+        results['Male Count'].append(group[group['Sex'] == 'M'].shape[0])
+        results['Female Count'].append(group[group['Sex'] == 'F'].shape[0])
+
+    # Create a DataFrame from the results dictionary
+    table_fig = pd.DataFrame(results)
+    return table_fig
 
 
 
@@ -2768,9 +2812,14 @@ def main(verbose = False):
     normbp_nhp_video_medians = summary_df_nhp_video_medians[summary_df_nhp_video_medians['SYS_BP'] <= 120]
     highbp_nhp_video_medians = summary_df_nhp_video_medians[summary_df_nhp_video_medians['SYS_BP'] > 120]
 
+    # remove part21, part22, part24
+    # summary_df_nhp_video_medians = summary_df_nhp_video_medians[~summary_df_nhp_video_medians['Participant'].isin(['part21', 'part22', 'part24'])]
+
     # plot_medians_pvals(summary_df_nhp_video_medians)
     # analyze_velocity_influence(summary_df_nhp_video_medians)
-    perform_anova_analysis(summary_df_nhp_video_medians)
+    # perform_anova_analysis(summary_df_nhp_video_medians)
+    table_fig = summarize_set01()
+    print(table_fig)
     # plot_box_and_whisker(summary_df_nhp_video_medians, highbp_nhp_video_medians, normbp_nhp_video_medians, column = 'Video Median Velocity', variable='SYS_BP', log_scale=True)
     # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets= [old_nhp_video_medians['Video Median Velocity'], young_nhp_video_medians['Video Median Velocity']], labels=['Entire Dataset', 'Old', 'Young'], title = 'CDF Comparison of Video Median Velocities by Age')
     # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets= [highbp_nhp_video_medians['Video Median Velocity'], normbp_nhp_video_medians['Video Median Velocity']], labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Video Median Velocities by BP nhp')
@@ -2784,10 +2833,12 @@ def main(verbose = False):
     # print(f'the length of summary_df_no_high_pressure is {len(summary_df_no_high_pressure)}')
     summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.rename(columns={'Video Median Velocity': 'Corrected Velocity'})
     # plot_box_whisker_pressure(summary_df_nhp_video_medians_copy, variable='Age', log_scale=False)
-    # plot_CI_overlaps(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='BP')
+    # plot_CI_overlaps(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='SYS_BP')
     # plot_CI_overlaps(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='Age')
     # plot_CI_overlaps(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='Sex')
-    plot_CI(summary_df_nhp_video_medians_copy, variable = 'Sex', ci_percentile=95)
+    # plot_CI(summary_df_nhp_video_medians_copy, variable = 'Sex', ci_percentile=95)
+    # plot_CI(summary_df_nhp_video_medians_copy, variable = 'Age', ci_percentile=95)
+    # plot_CI(summary_df_nhp_video_medians_copy, variable = 'SYS_BP', ci_percentile=95)
 
     medians_area_scores_df = calculate_area_score(summary_df_nhp_video_medians_copy, log = True, plot=False)
     # add area scores to summary_df_nhp_video_medians_copy
