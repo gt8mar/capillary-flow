@@ -8,6 +8,7 @@ By: Juliette Levy
 import os
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
 import time
 from src.tools.get_images import get_images
 from src.tools.load_image_array import load_image_array
@@ -19,28 +20,39 @@ from src.tools.load_image_array import load_image_array
 
 # def main(method = "hist"):
 
-def main(input_folder, output_folder):
+def main(input_folder, output_folder, saturated_percentage=0.37):
     #making input and output folders
-    input_folder = "C:\\Users\\gt8mar\\capillary-flow\\data\\part35\\240517\\loc01\\vids\\vid01\\moco" 
-    output_folder = "C:\\Users\\gt8mar\\capillary-flow\\data\\part35\\240517\\loc01\\vids\\vid01\\moco-contrasted"
+    # input_folder = "C:\\Users\\gt8mar\\capillary-flow\\data\\part35\\240517\\loc01\\vids\\vid01\\moco" 
+    # output_folder = "C:\\Users\\gt8mar\\capillary-flow\\data\\part35\\240517\\loc01\\vids\\vid01\\moco-contrasted"
     os.makedirs(output_folder, exist_ok= True) #dont crash if the folder is already there!!
 
     #grabbing files
-    filenames = get_images(filenames, input_folder) #puts each file from input folder into a numerical list
+    filenames = get_images(input_folder) #puts each file from input folder into a numerical list
     first_filename = filenames[0] #getting first image
     loaded_images = load_image_array(filenames, input_folder) #
-    first_image = loaded_images[0]
+    first_image = loaded_images[0].astype(np.uint8) #converts the first image to 8 bit unsigned integer
+    histogram = cv2.calcHist([first_image], [0], None, [256], [0, 256]).flatten()
+    total_pixels = first_image.size
+
     first_fame_contrast = cv2.equalizeHist(first_image)
-    min_, max_ = calculate_contrast_limits(first_image, first_image.dtype)
-    processed_image = apply_contrast(image, min_, max_)
+    lower_cutoff, upper_cutoff = calculate_histogram_cutoffs(histogram, total_pixels, saturated_percentage)
+    processed_image = apply_contrast(first_image, lower_cutoff, upper_cutoff)
 
-    # Concatenate images horizontally
-    concatenated_image = np.hstack((first_fame_contrast, processed_image))
+     # Plotting the images side by side using matplotlib
+    fig, ax = plt.subplots(1, 3, figsize=(15, 5))  # Adjusted to have three subplots
+    ax[0].imshow(first_image, cmap='gray')
+    ax[0].title.set_text('Original Image')
+    ax[0].axis('off')  # Turn off axis
 
-    # Display the concatenated image
-    cv2.imshow('Side by Side Images', concatenated_image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    ax[1].imshow(first_fame_contrast, cmap='gray')
+    ax[1].title.set_text('Histogram Equalized')
+    ax[1].axis('off')  # Turn off axis
+
+    ax[2].imshow(processed_image, cmap='gray')
+    ax[2].title.set_text('Contrast Stretched')
+    ax[2].axis('off')  # Turn off axis
+
+    plt.show()
 
     for i in range(len(loaded_images)):
         filename = filenames[i] #the [i] tracks which iteration of the filename you are on - remembers which filename you are on
@@ -97,69 +109,35 @@ def main(input_folder, output_folder):
 Helpful functions
 -----------------
 """
-def calculate_contrast_limits(image, image_type):
-    """Calculate the histogram-based contrast limits of an image.
+def calculate_histogram_cutoffs(histogram, total_pixels, saturated_percentage):
+    """ Calculate the cutoffs for histogram stretching based on saturation percentage. """
+    saturated_pixels = total_pixels * (saturated_percentage / 100.0) / 2
+    lower_sum = 0
+    upper_sum = 0
+    lower_cutoff = 0
+    upper_cutoff = len(histogram) - 1
 
-    Args:
-        image (ndarray): The image array in grayscale.
-        image_type (dtype): The data type of the image (e.g., np.uint8).
+    # Calculate lower cutoff
+    for i in range(len(histogram)):
+        lower_sum += histogram[i]
+        if lower_sum > saturated_pixels:
+            lower_cutoff = i
+            break
 
-    Returns:
-        tuple: A tuple containing the minimum and maximum values for contrast adjustment.
+    # Calculate upper cutoff
+    for i in reversed(range(len(histogram))):
+        upper_sum += histogram[i]
+        if upper_sum > saturated_pixels:
+            upper_cutoff = i
+            break
 
-    Raises:
-        NotImplementedError: If the image type is not supported.
-    """
-    # Set the histogram parameters based on the image data type
-    if image_type == np.uint8:
-        hist_min = 0
-        hist_max = 256
-    elif image_type in (np.uint16, np.int32):
-        hist_min = np.min(image)
-        hist_max = np.max(image)
-    else:
-        raise NotImplementedError(f"Not implemented for dtype {image_type}")
+    return lower_cutoff, upper_cutoff
 
-    # Compute histogram
-    histogram, bin_edges = np.histogram(image, bins=256, range=(hist_min, hist_max))
-    bin_size = (hist_max - hist_min) / 256
-
-    # Calculate the thresholds
-    pixel_count = image.size
-    limit = pixel_count / 10
-    auto_threshold = max(5000, pixel_count / 1000)
-    threshold = int(pixel_count / auto_threshold)
-
-    # Find the minimum bin with count above the threshold
-    hmin = next((i for i, count in enumerate(histogram) if count > threshold and count > limit), 0)
-
-    # Find the maximum bin with count above the threshold
-    hmax = next((i for i in reversed(range(256)) if histogram[i] > threshold and histogram[i] > limit), 255)
-
-    # Convert histogram bins to actual pixel values
-    min_ = hist_min + hmin * bin_size
-    max_ = hist_min + hmax * bin_size
-
-    # Handle edge cases where no valid range is found
-    if hmax <= hmin:
-        min_ = hist_min
-        max_ = hist_max
-
-    return min_, max_
-
-def apply_contrast(image, min_, max_):
-    """Apply contrast stretching to an image using specified min and max values.
-
-    Args:
-        image (ndarray): The original image array.
-        min_ (float): The minimum pixel value for contrast stretching.
-        max_ (float): The maximum pixel value for contrast stretching.
-
-    Returns:
-        ndarray: The contrast-stretched image.
-    """
-    return np.clip((image - min_) / (max_ - min_) * 255, 0, 255).astype(np.uint8)
-
+def apply_contrast(image, lower_cutoff, upper_cutoff, hist_size=256):
+    """ Apply contrast adjustment based on the computed histogram cutoffs. """
+    lut = np.arange(hist_size, dtype=np.uint8)
+    lut = np.clip((lut - lower_cutoff) * ((hist_size - 1) / (upper_cutoff - lower_cutoff)), 0, hist_size - 1)
+    return cv2.LUT(image, lut)
 
 # """
 # -----------------------------------------------------------------------------
@@ -167,8 +145,10 @@ def apply_contrast(image, min_, max_):
 # This provided line is required at the end of a Python file
 # to call the main() function.
 if __name__ == "__main__":
-    input_folder = "C:\\Users\\gt8mar\\capillary-flow\\data\\part35\\240517\\loc01\\vids\\vid01\\mocso" 
-    output_folder = "C:\\Users\\gt8mar\\capillary-flow\\data\\part35\\240517\\loc01\\vids\\vid01\\moco-contrasted"
+    # input_folder = "C:\\Users\\gt8mar\\capillary-flow\\data\\part35\\240517\\loc01\\vids\\vid01\\moco" 
+    # output_folder = "C:\\Users\\gt8mar\\capillary-flow\\data\\part35\\240517\\loc01\\vids\\vid01\\moco-contrasted"
+    input_folder = "E:\\Marcus\\data\\part35\\240517\\loc01\\vids\\vid01\\moco" 
+    output_folder = "E:\\Marcus\\data\part35\\240517\\loc01\\vids\\vid01\\moco-contrasted"
     ticks = time.time()
     main(input_folder, output_folder)
     print("--------------------")
