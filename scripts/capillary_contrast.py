@@ -20,7 +20,7 @@ from src.tools.load_image_array import load_image_array
 
 # def main(method = "hist"):
 
-def main(input_folder, output_folder, saturated_percentage=0.37):
+def main(input_folder, output_folder, saturated_percentage=.85):  # the default is 0.35 or 0.35% saturation
     #making input and output folders
     # input_folder = "C:\\Users\\gt8mar\\capillary-flow\\data\\part35\\240517\\loc01\\vids\\vid01\\moco" 
     # output_folder = "C:\\Users\\gt8mar\\capillary-flow\\data\\part35\\240517\\loc01\\vids\\vid01\\moco-contrasted"
@@ -38,17 +38,21 @@ def main(input_folder, output_folder, saturated_percentage=0.37):
     lower_cutoff, upper_cutoff = calculate_histogram_cutoffs(histogram, total_pixels, saturated_percentage)
     processed_image = apply_contrast(first_image, lower_cutoff, upper_cutoff)
 
+    # # plot processed image
+    # plt.imshow(processed_image, cmap='viridis')
+    # plt.show()
+
      # Plotting the images side by side using matplotlib
     fig, ax = plt.subplots(1, 3, figsize=(15, 5))  # Adjusted to have three subplots
-    ax[0].imshow(first_image, cmap='gray')
+    ax[0].imshow(first_image, cmap='viridis')
     ax[0].title.set_text('Original Image')
     ax[0].axis('off')  # Turn off axis
 
-    ax[1].imshow(first_fame_contrast, cmap='gray')
+    ax[1].imshow(first_fame_contrast, cmap='viridis')
     ax[1].title.set_text('Histogram Equalized')
     ax[1].axis('off')  # Turn off axis
 
-    ax[2].imshow(processed_image, cmap='gray')
+    ax[2].imshow(processed_image, cmap='viridis')
     ax[2].title.set_text('Contrast Stretched')
     ax[2].axis('off')  # Turn off axis
 
@@ -134,9 +138,18 @@ def calculate_histogram_cutoffs(histogram, total_pixels, saturated_percentage):
     return lower_cutoff, upper_cutoff
 
 def apply_contrast(image, lower_cutoff, upper_cutoff, hist_size=256):
-    """ Apply contrast adjustment based on the computed histogram cutoffs. """
-    lut = np.arange(hist_size, dtype=np.uint8)
-    lut = np.clip((lut - lower_cutoff) * ((hist_size - 1) / (upper_cutoff - lower_cutoff)), 0, hist_size - 1)
+    """Apply contrast adjustment based on the computed histogram cutoffs."""
+    # Create the lookup table
+    lut = np.linspace(0, hist_size - 1, hist_size, dtype=np.uint8)  # linear LUT for all values
+
+    # Modify LUT to stretch the histogram between lower_cutoff and upper_cutoff
+    lut[:lower_cutoff] = 0  # Set all values below lower_cutoff to black
+    lut[upper_cutoff:] = 255  # Set all values above upper_cutoff to white
+    if upper_cutoff > lower_cutoff:
+        scale = 255 / (upper_cutoff - lower_cutoff)
+        lut[lower_cutoff:upper_cutoff] = scale * (np.arange(lower_cutoff, upper_cutoff) - lower_cutoff)
+
+    # Apply the LUT
     return cv2.LUT(image, lut)
 
 # """
