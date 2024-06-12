@@ -31,7 +31,16 @@ def main(input_folder, output_folder):
     loaded_images = load_image_array(filenames, input_folder) #
     first_image = loaded_images[0]
     first_fame_contrast = cv2.equalizeHist(first_image)
+    min_, max_ = calculate_contrast_limits(first_image, first_image.dtype)
+    processed_image = apply_contrast(image, min_, max_)
 
+    # Concatenate images horizontally
+    concatenated_image = np.hstack((first_fame_contrast, processed_image))
+
+    # Display the concatenated image
+    cv2.imshow('Side by Side Images', concatenated_image)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
     for i in range(len(loaded_images)):
         filename = filenames[i] #the [i] tracks which iteration of the filename you are on - remembers which filename you are on
@@ -41,13 +50,11 @@ def main(input_folder, output_folder):
         # if not filename.lower().endswith(('.tif')):
         #     continue
 
-        #make path for each image file to the input/output folder
-        input_path = os.path.join(input_folder, filename)
-        output_path = os.path.join(output_folder, 'processed_' + filename)
-        first_fame_contrast = cv2.equalizeHist(image)
+        # #make path for each image file to the input/output folder
+        # input_path = os.path.join(input_folder, filename)
+        # output_path = os.path.join(output_folder, 'processed_' + filename)
+        # first_fame_contrast = cv2.equalizeHist(image)
         
-        # min_, max_ = calculate_contrast_limits(first_image, first_image.dtype)
-        # processed_image = apply_contrast(image, min_, max_)
 
 
 
@@ -160,7 +167,9 @@ def apply_contrast(image, min_, max_):
 # This provided line is required at the end of a Python file
 # to call the main() function.
 if __name__ == "__main__":
+    input_folder = "C:\\Users\\gt8mar\\capillary-flow\\data\\part35\\240517\\loc01\\vids\\vid01\\mocso" 
+    output_folder = "C:\\Users\\gt8mar\\capillary-flow\\data\\part35\\240517\\loc01\\vids\\vid01\\moco-contrasted"
     ticks = time.time()
-    main()
+    main(input_folder, output_folder)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
