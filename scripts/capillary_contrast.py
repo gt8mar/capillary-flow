@@ -31,12 +31,8 @@ def main(input_folder, output_folder, saturated_percentage=.85, plot = False):  
     first_filename = filenames[0] #getting first image
     loaded_images = load_image_array(filenames, input_folder) #
     first_image = loaded_images[0].astype(np.uint8) #converts the first image to 8 bit unsigned integer
-    histogram = cv2.calcHist([first_image], [0], None, [256], [0, 256]).flatten()
-    total_pixels = first_image.size
-
     first_fame_contrast = cv2.equalizeHist(first_image)
-    lower_cutoff, upper_cutoff = calculate_histogram_cutoffs(histogram, total_pixels, saturated_percentage)
-    processed_image = apply_contrast(first_image, lower_cutoff, upper_cutoff)
+    processed_image = imagej_contrast(first_image, saturated_percentage)    
 
     if plot:
         # # plot processed image
@@ -114,6 +110,13 @@ def main(input_folder, output_folder, saturated_percentage=.85, plot = False):  
 Helpful functions
 -----------------
 """
+def imagej_contrast(image, saturated_percentage=0.35):
+    histogram = cv2.calcHist([image], [0], None, [256], [0, 256]).flatten()
+    total_pixels = image.size
+    lower_cutoff, upper_cutoff = calculate_histogram_cutoffs(histogram, total_pixels, saturated_percentage)
+    processed_image = apply_contrast(image, lower_cutoff, upper_cutoff)
+    return processed_image
+
 def calculate_histogram_cutoffs(histogram, total_pixels, saturated_percentage):
     """ Calculate the cutoffs for histogram stretching based on saturation percentage. """
     saturated_pixels = total_pixels * (saturated_percentage / 100.0) / 2
@@ -161,8 +164,8 @@ def apply_contrast(image, lower_cutoff, upper_cutoff, hist_size=256):
 if __name__ == "__main__":
     # input_folder = "C:\\Users\\gt8mar\\capillary-flow\\data\\part35\\240517\\loc01\\vids\\vid01\\moco" 
     # output_folder = "C:\\Users\\gt8mar\\capillary-flow\\data\\part35\\240517\\loc01\\vids\\vid01\\moco-contrasted"
-    input_folder = "E:\\Marcus\\data\\part35\\240517\\loc01\\vids\\vid01\\moco" 
-    output_folder = "E:\\Marcus\\data\part35\\240517\\loc01\\vids\\vid01\\moco-contrasted"
+    input_folder = "E:\\Marcus\\data\\part35\\240517\\loc01\\vids\\vid02\\moco" 
+    output_folder = "E:\\Marcus\\data\part35\\240517\\loc01\\vids\\vid02\\moco-contrasted"
     ticks = time.time()
     main(input_folder, output_folder)
     print("--------------------")
