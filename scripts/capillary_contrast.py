@@ -20,7 +20,7 @@ from src.tools.load_image_array import load_image_array
 
 # def main(method = "hist"):
 
-def main(input_folder, output_folder, saturated_percentage=.85):  # the default is 0.35 or 0.35% saturation
+def main(input_folder, output_folder, saturated_percentage=.85, plot = False):  # the default is 0.35 or 0.35% saturation
     #making input and output folders
     # input_folder = "C:\\Users\\gt8mar\\capillary-flow\\data\\part35\\240517\\loc01\\vids\\vid01\\moco" 
     # output_folder = "C:\\Users\\gt8mar\\capillary-flow\\data\\part35\\240517\\loc01\\vids\\vid01\\moco-contrasted"
@@ -38,25 +38,26 @@ def main(input_folder, output_folder, saturated_percentage=.85):  # the default 
     lower_cutoff, upper_cutoff = calculate_histogram_cutoffs(histogram, total_pixels, saturated_percentage)
     processed_image = apply_contrast(first_image, lower_cutoff, upper_cutoff)
 
-    # # plot processed image
-    # plt.imshow(processed_image, cmap='viridis')
-    # plt.show()
+    if plot:
+        # # plot processed image
+        # plt.imshow(processed_image, cmap='viridis')
+        # plt.show()
 
-     # Plotting the images side by side using matplotlib
-    fig, ax = plt.subplots(1, 3, figsize=(15, 5))  # Adjusted to have three subplots
-    ax[0].imshow(first_image, cmap='viridis')
-    ax[0].title.set_text('Original Image')
-    ax[0].axis('off')  # Turn off axis
+        # Plotting the images side by side using matplotlib
+        fig, ax = plt.subplots(1, 3, figsize=(15, 5))  # Adjusted to have three subplots
+        ax[0].imshow(first_image, cmap='viridis')
+        ax[0].title.set_text('Original Image')
+        ax[0].axis('off')  # Turn off axis
 
-    ax[1].imshow(first_fame_contrast, cmap='viridis')
-    ax[1].title.set_text('Histogram Equalized')
-    ax[1].axis('off')  # Turn off axis
+        ax[1].imshow(first_fame_contrast, cmap='viridis')
+        ax[1].title.set_text('Histogram Equalized')
+        ax[1].axis('off')  # Turn off axis
 
-    ax[2].imshow(processed_image, cmap='viridis')
-    ax[2].title.set_text('Contrast Stretched')
-    ax[2].axis('off')  # Turn off axis
+        ax[2].imshow(processed_image, cmap='viridis')
+        ax[2].title.set_text('Contrast Stretched')
+        ax[2].axis('off')  # Turn off axis
 
-    plt.show()
+        plt.show()
 
     for i in range(len(loaded_images)):
         filename = filenames[i] #the [i] tracks which iteration of the filename you are on - remembers which filename you are on
