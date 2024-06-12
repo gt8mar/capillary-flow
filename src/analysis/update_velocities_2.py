@@ -172,6 +172,8 @@ if __name__ == '__main__':
     big_df = None
     # Usage example
     if platform.system() == 'Windows':
+        if 'Luke' in os.getcwd():
+            velocities_folder = 'C:\\Users\\Luke\\Documents\\vscode\\capillary-flow\\results\\velocities'
         if 'gt8mar' in os.getcwd():
             velocities_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities'
         else:
