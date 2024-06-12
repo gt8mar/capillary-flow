@@ -74,6 +74,11 @@ def process_subfolder(subfolder_path, output_path, results_path):
     # Normalize the standard deviation values to the range [0, 255]
     stdevs = cv2.normalize(stdevs, None, 0, 255, cv2.NORM_MINMAX)
 
+    # Contrast enhancement
+    stdevs = cv2.equalizeHist(stdevs)
+    # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    # stdevs = clahe.apply(stdevs)
+
     # Convert the standard deviation to uint8
     stdevs_uint8 = np.uint8(stdevs)
 
