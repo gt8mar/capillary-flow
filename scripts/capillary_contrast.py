@@ -7,7 +7,7 @@ By: Juliette Levy
 
 import os
 import cv2
-import numpy
+import numpy as np
 import time
 from src.tools.get_images import get_images
 from src.tools.load_image_array import load_image_array
