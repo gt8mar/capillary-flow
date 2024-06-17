@@ -20,7 +20,7 @@ from src.tools.load_image_array import load_image_array
 
 # def main(method = "hist"):
 
-def main(input_folder, output_folder, saturated_percentage=.85, plot = False):  # the default is 0.35 or 0.35% saturation
+def capillary_contrast(input_folder, output_folder, saturated_percentage=.85, plot = False):  # the default is 0.35 or 0.35% saturation
     #making input and output folders
     # input_folder = "C:\\Users\\gt8mar\\capillary-flow\\data\\part35\\240517\\loc01\\vids\\vid01\\moco" 
     # output_folder = "C:\\Users\\gt8mar\\capillary-flow\\data\\part35\\240517\\loc01\\vids\\vid01\\moco-contrasted"
@@ -185,6 +185,6 @@ if __name__ == "__main__":
     output_folder = "D:\\Marcus\\data\part35\\240517\\loc01\\vids\\vid03\\moco-contrasted"
     ticks = time.time()
     # print(os.listdir(input_folder))
-    main(input_folder, output_folder)
+    capillary_contrast(input_folder, output_folder)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
