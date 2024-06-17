@@ -21,7 +21,7 @@ Example: MAIN_FOLDER = "/path/to/folder"
 This folder should either be "Left" or "Right" and contain subfolders with the .tiff files.
 """
 
-MAIN_FOLDER = "/path/to/folder"
+MAIN_FOLDER = "/hpc/projects/capillary-flow/frog/second_pass/"
 
 
 """
@@ -45,7 +45,7 @@ def process_subfolder(subfolder_path, output_path, results_path):
         0 if successful
     """
     # List all .tiff files in the subfolder
-    frame_files = [os.path.join(subfolder_path, f) for f in os.listdir(subfolder_path) if f.endswith('.tiff')]
+    frame_files = [os.path.join(subfolder_path, f) for f in os.listdir(subfolder_path) if (f.endswith('.tiff') or f.endswith('.tif'))]
 
     # Check if there are no .tiff files in the subfolder
     if not frame_files:
@@ -74,17 +74,18 @@ def process_subfolder(subfolder_path, output_path, results_path):
     # Normalize the standard deviation values to the range [0, 255]
     stdevs = cv2.normalize(stdevs, None, 0, 255, cv2.NORM_MINMAX)
 
-    # Contrast enhancement
-    stdevs = cv2.equalizeHist(stdevs)
-    # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-    # stdevs = clahe.apply(stdevs)
-
     # Convert the standard deviation to uint8
     stdevs_uint8 = np.uint8(stdevs)
 
+    # Contrast enhancement
+    stdevs_contrasted = cv2.equalizeHist(stdevs_uint8)
+    # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    # stdevs = clahe.apply(stdevs)
+
+
     # Save the standard deviation image in .tiff format
-    cv2.imwrite(output_path, stdevs_uint8)
-    cv2.imwrite(results_path, stdevs_uint8)
+    cv2.imwrite(output_path, stdevs_contrasted)
+    cv2.imwrite(results_path, stdevs_contrasted)
 
     return 0
 
