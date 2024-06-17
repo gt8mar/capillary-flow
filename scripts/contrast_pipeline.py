@@ -63,6 +63,7 @@ def main(input_folder, output_folder):
                 moco_folder = os.path.join(video_path, "moco")
                 moco_contrasted_folder = os.path.join(video_path, "moco-contrasted")
                 capillary_contrast(moco_folder, moco_contrasted_folder, saturated_percentage=.85, plot = False)
+                write_background_file.main(video_path, color=True)
                 print(f'video {video}')
                 print(str(ticks-time.time()))
 
