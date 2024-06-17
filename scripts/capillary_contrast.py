@@ -28,11 +28,20 @@ def main(input_folder, output_folder, saturated_percentage=.85, plot = False):  
 
     #grabbing files
     filenames = get_images(input_folder) #puts each file from input folder into a numerical list
+    
+    print(filenames)
     first_filename = filenames[0] #getting first image
-    loaded_images = load_image_array(filenames, input_folder) #
+    print(first_filename)
+    loaded_images = load_image_array(filenames, input_folder) 
     first_image = loaded_images[0].astype(np.uint8) #converts the first image to 8 bit unsigned integer
-    first_fame_contrast = cv2.equalizeHist(first_image)
-    processed_image = imagej_contrast(first_image, saturated_percentage)    
+    histogram = cv2.calcHist([first_image], [0], None, [256], [0, 256]).flatten() #moved these lines into main
+    total_pixels = image.size
+    lower_cutoff, upper_cutoff = calculate_histogram_cutoffs(histogram, total_pixels, saturated_percentage)
+    first_frame_contrast = apply_contrast(first_image, lower_cutoff, upper_cutoff)
+
+
+    # first_fame_contrast = cv2.equalizeHist(first_image)
+    # processed_image = imagej_contrast(first_image, saturated_percentage)    
 
     if plot:
         # # plot processed image
@@ -40,24 +49,33 @@ def main(input_folder, output_folder, saturated_percentage=.85, plot = False):  
         # plt.show()
 
         # Plotting the images side by side using matplotlib
-        fig, ax = plt.subplots(1, 3, figsize=(15, 5))  # Adjusted to have three subplots
+        fig, ax = plt.subplots(1, 2, figsize=(10, 5))  # Adjusted to have three subplots
         ax[0].imshow(first_image, cmap='viridis')
         ax[0].title.set_text('Original Image')
         ax[0].axis('off')  # Turn off axis
 
-        ax[1].imshow(first_fame_contrast, cmap='viridis')
+        ax[1].imshow(first_frame_contrast, cmap='viridis')
         ax[1].title.set_text('Histogram Equalized')
         ax[1].axis('off')  # Turn off axis
 
-        ax[2].imshow(processed_image, cmap='viridis')
-        ax[2].title.set_text('Contrast Stretched')
-        ax[2].axis('off')  # Turn off axis
+        # ax[2].imshow(processed_image, cmap='viridis')
+        # ax[2].title.set_text('Contrast Stretched')
+        # ax[2].axis('off')  # Turn off axis
 
         plt.show()
 
     for i in range(len(loaded_images)):
-        filename = filenames[i] #the [i] tracks which iteration of the filename you are on - remembers which filename you are on
-        image = loaded_images[i] #does the same for the image
+        image = loaded_images[i].astype(np.uint8) #converts the first image to 8 bit unsigned integer
+        processed_image = apply_contrast(image, lower_cutoff, upper_cutoff)    
+        output_path = os.path.join(output_folder, 'processed_' + filenames[i])
+        cv2.imwrite(output_path, processed_image)
+
+    print(f"Processed {len(loaded_images)} images using cutoffs: lower={lower_cutoff}, upper={upper_cutoff}")
+
+
+        # filename = filenames[i] #the [i] tracks which iteration of the filename you are on - remembers which filename you are on
+        # image = loaded_images[i] #does the same for the image
+
 
         # #makes sure the file is a video
         # if not filename.lower().endswith(('.tif')):
@@ -164,9 +182,10 @@ def apply_contrast(image, lower_cutoff, upper_cutoff, hist_size=256):
 if __name__ == "__main__":
     # input_folder = "C:\\Users\\gt8mar\\capillary-flow\\data\\part35\\240517\\loc01\\vids\\vid01\\moco" 
     # output_folder = "C:\\Users\\gt8mar\\capillary-flow\\data\\part35\\240517\\loc01\\vids\\vid01\\moco-contrasted"
-    input_folder = "E:\\Marcus\\data\\part35\\240517\\loc01\\vids\\vid02\\moco" 
-    output_folder = "E:\\Marcus\\data\part35\\240517\\loc01\\vids\\vid02\\moco-contrasted"
+    input_folder = "D:\\Marcus\\data\\part35\\240517\\loc01\\vids\\vid03\\moco" 
+    output_folder = "D:\\Marcus\\data\part35\\240517\\loc01\\vids\\vid03\\moco-contrasted"
     ticks = time.time()
+    # print(os.listdir(input_folder))
     main(input_folder, output_folder)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
