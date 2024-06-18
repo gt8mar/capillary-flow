@@ -44,7 +44,9 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
     """  
     print(path)
     # check to see if 'mocoslice' folder exists
-    if os.path.exists(os.path.join(path, 'mocoslice')):
+    if os.path.exists(os.path.join(path, 'moco-contrasted')):
+        input_folder = (os.path.join(path, 'moco-contrasted'))
+    elif os.path.exists(os.path.join(path, 'mocoslice')):
         input_folder = os.path.join(path, 'mocoslice')
     elif os.path.exists(os.path.join(path, 'mocosplit')):
         input_folder = os.path.join(path, 'mocosplit')
@@ -54,11 +56,15 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
     location = os.path.basename(location_folder)
     os.makedirs(os.path.join(location_folder, 'backgrounds'), exist_ok=True)
     output_folder = os.path.join(location_folder, 'backgrounds')
+    os.makedirs(os.path.join(location_folder, 'stdevs'), exist_ok=True)
+    output_folder_stdev = os.path.join(location_folder, 'stdevs')
 
     if platform.system() != 'Windows':
         results_folder = '/hpc/projects/capillary-flow/results/backgrounds'  # I want to save all the backgrounds to the same folder for easy transfer to hasty.ai
+        results_folder_stdev = '/hpc/projects/capillary-flow/results/stdevs'
     else:
         results_folder = 'C:\\Users\\Luke\\Documents\\capillary-flow\\backgrounds'
+        # results_folder_stdev = '/hpc/projects/capillary-flow/results/stdevs'
     participant, date, location, video, file_prefix = parse_path(path, video_path=True)
     print(f'participant is {participant}, date is {date}, location is {location}, video is {video}, file_prefix is {file_prefix}')
 
@@ -116,6 +122,21 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
         background = np.median(image_files, axis=0).astype('uint8') # median instead of mean
     else:
         raise ValueError("Invalid operation entered, please enter either 'median' or 'mean'.")
+    
+    # Calculate the standard deviation for each pixel
+    stdevs = np.std(image_files, axis=0)
+
+    # Normalize the standard deviation values to the range [0, 255]
+    stdevs = cv2.normalize(stdevs, None, 0, 255, cv2.NORM_MINMAX)
+
+    # Convert the standard deviation to uint8
+    stdevs_uint8 = np.uint8(stdevs)
+
+    # Contrast enhancement
+    stdevs_contrasted = cv2.equalizeHist(stdevs_uint8)
+    # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    # stdevs = clahe.apply(stdevs)
+
 
     # # Enhance contrast
     # background = cv2.equalizeHist(background)
@@ -138,9 +159,13 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
 
     # Add background file
     bkgd_name = f'{file_prefix}_{video}_background.tiff'
+    stdev_name = f'{file_prefix}_{video}_stdev.tiff'
     print(f'background name is {bkgd_name}')
     cv2.imwrite(os.path.join(output_folder, bkgd_name), background)
     cv2.imwrite(os.path.join(results_folder, bkgd_name), background)
+    cv2.imwrite(os.path.join(output_folder_stdev, stdev_name), stdevs_contrasted)
+    cv2.imwrite(os.path.join(results_folder_stdev, stdev_name), stdevs_contrasted)
+
     
     return 0
 
