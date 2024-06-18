@@ -27,7 +27,7 @@ def list_only_folders(path):
     """
     return [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
 
-def main(input_folder, output_folder):
+def main():
     """
     Write background file, corresponding video, segment capillaries, and calculate flow rates.
 
