@@ -94,11 +94,32 @@ def main(filename):
         filename (str): Path to the data file to load.
     """
     data = load_data(filename)
+    
+    # print(data.keys())
+    # print(data['maskIm'].shape)
+    # plt.imshow(data['maskIm'])
+    # plt.show()
+
+    # print(data['windowArray'].shape)
+    # video_array = data['windowArray'].reshape(388, 220, 30)
+    # # for i in range(30):
+    # #     plt.imshow(video_array[:, :, i])
+    # #     plt.show()
+    # # transpose the array from 388, 220, 30 to 220, 388, 30
+    # video_array = np.transpose(video_array, (1, 0, 2))
+    # # for i in range(30):
+    # #     plt.imshow(video_array[:, :, i])
+    # #     plt.show()
+    
+    # # now video_array and maskIm have the same shape and orientation. 
+    
+
+
     maskIm = data['maskIm']
     fps = data['fps'][0, 0]
     pixel_diam_mm = data['pixel_diam_mm'][0, 0]
     windowArray = data['windowArray']
-    maskIm[:] = 1  # Set entire mask to 1
+    maskIm[:] = 1  # Set entire mask to 1     totally unclear why this is done
 
     # Parameters
     v_max_mms = 4.5  # mm/sec
@@ -111,24 +132,31 @@ def main(filename):
     (dr_fwd, dc_fwd, dr_bak, dc_bak, fwd_zvals, bak_zvals, min_zvals,
      fwd_array, bak_array, stdIm_inv_z) = initialize_arrays(numPix_loop)
 
-    # Pre-compute arrays
-    fwd_array = windowArray[:, 2:][loopPix]
-    bak_array = windowArray[:, :-2][loopPix]
+    print("windowArray shape:", windowArray.shape)
+    print("Sliced windowArray shape:", windowArray[:, 2:].shape)
+    print("loopPix:", loopPix)
+    # reshape loopPix to a list of tuples
+    loopPix = list(zip(loopPix[0], loopPix[1]))
+    print("loopPix:", loopPix)
 
-    # Process each pixel
-    for pp_i in range(numPix_loop):
-        pp = loopPix[0][pp_i], loopPix[1][pp_i]
-        this_sig = windowArray[pp][:, 1:-1]
-        fwd_im_inv_z, bak_im_inv_z = compute_inverse_rms_differences(this_sig, fwd_array, bak_array, numPix_loop)
-        fwd_val, bak_val, (fwd_r, fwd_c), (bak_r, bak_c) = update_displacements(fwd_im_inv_z, bak_im_inv_z, stdIm_inv_z, loopPix, windowArray.shape[1])
-        # Update Z-values and displacements (further code as required)
+    # # Pre-compute arrays
+    # fwd_array = windowArray[:, 2:][loopPix]
+    # bak_array = windowArray[:, :-2][loopPix]
 
-    # Display velocity map
-    plt.figure()
-    plt.imshow(fwd_array)  # Example placeholder
-    plt.colorbar()
-    plt.title('Velocity (mm/s)')
-    plt.show()
+    # # Process each pixel
+    # for pp_i in range(numPix_loop):
+    #     pp = loopPix[0][pp_i], loopPix[1][pp_i]
+    #     this_sig = windowArray[pp][:, 1:-1]
+    #     fwd_im_inv_z, bak_im_inv_z = compute_inverse_rms_differences(this_sig, fwd_array, bak_array, numPix_loop)
+    #     fwd_val, bak_val, (fwd_r, fwd_c), (bak_r, bak_c) = update_displacements(fwd_im_inv_z, bak_im_inv_z, stdIm_inv_z, loopPix, windowArray.shape[1])
+    #     # Update Z-values and displacements (further code as required)
+
+    # # Display velocity map
+    # plt.figure()
+    # plt.imshow(fwd_array)  # Example placeholder
+    # plt.colorbar()
+    # plt.title('Velocity (mm/s)')
+    # plt.show()
 
 if __name__ == "__main__":
-    main('demo_data.mat')
+    main('C:\\Users\\gt8mar\\capillary-flow\\tests\\demo_data.mat')
