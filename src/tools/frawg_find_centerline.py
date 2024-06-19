@@ -26,8 +26,8 @@ import warnings
 import pandas as pd
 from scipy.ndimage import convolve
 
-BRANCH_THRESH = 40
-MIN_CAP_LEN = 50
+BRANCH_THRESH = 0
+MIN_CAP_LEN = 2
 
 def find_junctions(skel):
     """Finds pixels with exactly three neighbors."""
@@ -232,14 +232,14 @@ def main(path, verbose = True, write = True, plot=False):
     # Ignore FilFinder warnings
     warnings.filterwarnings("ignore", category=UserWarning, module="fil_finder.filament")
     
-    segmented_folder = os.path.join(path, "segmented")
-    individual_caps_folder = os.path.join(path, "individual_caps")
-    os.makedirs(os.path.join(path, 'centerlines', 'coords'), exist_ok=True)
-    output_folder = os.path.join(path, 'centerlines')
+    segmented_folder = os.path.join(path, "E:\\frog\\24-2-14 WkSl\\Frog4\\Right\\segmented")
+    individual_caps_folder = os.path.join(path, "E:\\frog\\24-2-14 WkSl\\Frog4\\Right\\individual_caps")
+    os.makedirs(os.path.join(path, 'E:\\frog\\24-2-14 WkSl\\Frog4\\Right\\centerlines', 'coords'), exist_ok=True)
+    output_folder = os.path.join(path, 'E:\\frog\\24-2-14 WkSl\\Frog4\\Right\\centerlines')
     
     for file in os.listdir(segmented_folder):
         if file.endswith(".png"):
-            filename = file[4:-4]
+            filename = file[3:-4]
          
             # Read in the mask
             segmented = cv2.imread(os.path.join(segmented_folder, file), cv2.IMREAD_GRAYSCALE)
@@ -309,14 +309,15 @@ def main(path, verbose = True, write = True, plot=False):
 
                         if write:
                             # Save centerline and radii information
-                            for i in range(len(skeleton_coords)):
+                            for i in range(len(skeleton_coords)): 
+
                                 np.savetxt(os.path.join(output_folder, "coords", filename + f'_centerline_coords_{str(capnum).zfill(2)}.csv'), 
                                         skeleton_data[i], delimiter=',', fmt = "%s")
                                 if platform.system() == 'Windows':
                                     pass
                                 else:
-                                    os.makedirs('/hpc/projects/capillary-flow/results/centerlines', exist_ok=True)
-                                    np.savetxt(os.path.join('/hpc/projects/capillary-flow/results/centerlines', filename + f'_centerline_coords_{str(capnum).zfill(2)}.csv'), 
+                                    os.makedirs('/hpc/projects/capillary-flow/frog/results/centerlines', exist_ok=True)
+                                    np.savetxt(os.path.join('/hpc/projects/capillary-flow/frog/results/centerlines', filename + f'_centerline_coords_{str(capnum).zfill(2)}.csv'), 
                                                 skeleton_data[i], delimiter=',', fmt = "%s")
                                 
     return 0
@@ -330,6 +331,6 @@ def main(path, verbose = True, write = True, plot=False):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(path='E:\\frawg\\gabbyanalysis', verbose = True, write = True, plot = False)
+    main(path='E:\\frog\\24-2-14 WkSl\\Frog4\\Right', verbose = True, write = True, plot = False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
