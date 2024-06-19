@@ -62,8 +62,11 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
     if platform.system() != 'Windows':
         results_folder = '/hpc/projects/capillary-flow/results/backgrounds'  # I want to save all the backgrounds to the same folder for easy transfer to hasty.ai
         results_folder_stdev = '/hpc/projects/capillary-flow/results/stdevs'
+        os.makedirs(results_folder_stdev, exist_ok=True)
+        os.makedirs(results_folder, exist_ok=True)
     else:
-        results_folder = 'C:\\Users\\Luke\\Documents\\capillary-flow\\backgrounds'
+        # results_folder = 'C:\\Users\\Luke\\Documents\\capillary-flow\\backgrounds'
+        results_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\backgrounds'
         # results_folder_stdev = '/hpc/projects/capillary-flow/results/stdevs'
     participant, date, location, video, file_prefix = parse_path(path, video_path=True)
     print(f'participant is {participant}, date is {date}, location is {location}, video is {video}, file_prefix is {file_prefix}')
@@ -177,10 +180,12 @@ def main(path = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\loc01
 if __name__ == "__main__":
     ticks = time.time()
     # path = 'D:\\Marcus\\backup\\data\\part25\\230601\\loc02\\vids\\vid27'
-    short_path = 'D:\\Marcus\\backup\\data\\part24\\230601\\loc03\\vids'
-    vids = ['vid' + str(i) for i in range(38, 49)]
-    for vid in vids:
-        long_path = os.path.join(short_path, vid)
-        main(path=long_path, method="mean", make_video=False, color=False, verbose=False)
+    # short_path = 'D:\\Marcus\\backup\\data\\part24\\230601\\loc03\\vids'
+    short_path = 'F:\\Marcus\\data\\2022\\test_220513\\part00\\220513\\loc01\\vids\\vid01'
+    # vids = ['vid' + str(i) for i in range(38, 49)]
+    # for vid in vids:
+    #     long_path = os.path.join(short_path, vid)
+    #     main(path=long_path, method="mean", make_video=False, color=False, verbose=False)
+    main(path=short_path, method="median", make_video=False, color=False, verbose=False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
