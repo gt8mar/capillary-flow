@@ -75,7 +75,6 @@ def make_skeletons(binary_image, plot = False):
     endpoints = np.asarray(np.nonzero(find_endpoints(fil.skeleton))).shape[1]
     print(f'Number of junctions is {junctions}')
     print(f'Number of endpoints is {endpoints}')
-    print('-----------------------------------------------')
     if junctions == 0 and endpoints == 0:
         # Note: it's unclear if it is necessary to cut the loop. I think it makes sense for kymographs but it could work without.
         print('This is a loop')
@@ -231,6 +230,8 @@ def main(path, verbose = True, write = True, plot=False):
     
     # Ignore FilFinder warnings
     warnings.filterwarnings("ignore", category=UserWarning, module="fil_finder.filament")
+
+    # TODO make this better
     
     segmented_folder = os.path.join(path, "E:\\frog\\24-2-14 WkSl\\Frog4\\Right\\segmented")
     individual_caps_folder = os.path.join(path, "E:\\frog\\24-2-14 WkSl\\Frog4\\Right\\individual_caps")
@@ -258,7 +259,7 @@ def main(path, verbose = True, write = True, plot=False):
             flattened_radii = []
             skeleton_data = []
             for cap in contours:
-                capnum = cap.split('_')[1][:-4]
+                capnum = cap.strip(".png")[-2:]
                 # check to see if contours is zero
                 if contours[cap].shape[0] == 0:
                     pass
@@ -266,6 +267,7 @@ def main(path, verbose = True, write = True, plot=False):
                     pass
                 else:
                     # make skeleton
+                    print("------------------------------------------")
                     print(f"Making skeleton for capillary {capnum}")
                     skeleton, skeleton_longpath, radii = make_skeletons(contours[cap], plot=False)     # Skeletons come out in the shape of the image
                     if plot:
@@ -287,6 +289,7 @@ def main(path, verbose = True, write = True, plot=False):
                     # omit small capillaries
                     print(f"Capillary {capnum} has {skeleton_nums.shape[1]} points")
                     if skeleton_nums.shape[1] <= MIN_CAP_LEN:
+                        print('min')
                         pass
                     else:
                         # Sort skeleton points in order of continuous points
