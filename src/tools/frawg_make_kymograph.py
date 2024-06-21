@@ -203,7 +203,8 @@ def main(path, write = True, variable_radii = False, verbose = False, plot = Fal
     # make dictionary of centerline files with same video number
     for centerline_file in os.listdir(os.path.join(centerline_folder, 'coords')):
         if centerline_file.endswith(".csv"):
-            video = centerline_file.split('_')[0] 
+            date = centerline_file.split('_')[0]
+            video = centerline_file.split('_')[1]
             
             # check if video is in dictionary, if not add it
             if video not in centerline_dict.keys():
@@ -213,9 +214,11 @@ def main(path, write = True, variable_radii = False, verbose = False, plot = Fal
     
     # loop through videos
     for video_key in centerline_dict.keys():
+        print(video_key)
         number_of_capillaries = len(centerline_dict[video_key])
 
-        video_folder = os.path.join(path, 'vids', video_key)
+        video_name = date + ' ' + video_key
+        video_folder = os.path.join(path, 'vids', video_name)
 
         # Get images
         # Import images
@@ -232,8 +235,9 @@ def main(path, write = True, variable_radii = False, verbose = False, plot = Fal
         # loop through capillaries
         for file in centerline_dict[video_key]:
             # participant, date, location, video_parsed, file_prefix = parse_filename(file)
+            print(file)
 
-            capillary_number = file.split('_')[3][:-4]
+            capillary_number = file.split('_')[4][:-4]
 
             print(f'Processing {video_key} capillary {capillary_number}')            
 
@@ -277,7 +281,7 @@ def main(path, write = True, variable_radii = False, verbose = False, plot = Fal
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    path = 'E:\\frawg\\gabbyanalysis'
+    path = 'E:\\frog\\24-2-14 WkSl\\Frog4\\Right'
     main(path, write=True, hasty=True, verbose=False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
