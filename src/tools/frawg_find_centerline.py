@@ -230,13 +230,11 @@ def main(path, verbose = True, write = True, plot=False):
     
     # Ignore FilFinder warnings
     warnings.filterwarnings("ignore", category=UserWarning, module="fil_finder.filament")
-
-    # TODO make this better
     
-    segmented_folder = os.path.join(path, "E:\\frog\\24-2-14 WkSl\\Frog4\\Right\\segmented")
-    individual_caps_folder = os.path.join(path, "E:\\frog\\24-2-14 WkSl\\Frog4\\Right\\individual_caps")
-    os.makedirs(os.path.join(path, 'E:\\frog\\24-2-14 WkSl\\Frog4\\Right\\centerlines', 'coords'), exist_ok=True)
-    output_folder = os.path.join(path, 'E:\\frog\\24-2-14 WkSl\\Frog4\\Right\\centerlines')
+    segmented_folder = os.path.join(path, 'segmented')
+    individual_caps_folder = os.path.join(path, 'individual_caps_renamed')
+    os.makedirs(os.path.join(path, 'centerlines', 'coords'), exist_ok=True)
+    output_folder = os.path.join(path, 'centerlines')
     
     for file in os.listdir(segmented_folder):
         if file.endswith(".png"):
@@ -259,7 +257,7 @@ def main(path, verbose = True, write = True, plot=False):
             flattened_radii = []
             skeleton_data = []
             for cap in contours:
-                capnum = cap.strip(".png")[-2:]
+                capnum = cap.strip(".png")[-1:]
                 # check to see if contours is zero
                 if contours[cap].shape[0] == 0:
                     pass
@@ -289,7 +287,6 @@ def main(path, verbose = True, write = True, plot=False):
                     # omit small capillaries
                     print(f"Capillary {capnum} has {skeleton_nums.shape[1]} points")
                     if skeleton_nums.shape[1] <= MIN_CAP_LEN:
-                        print('min')
                         pass
                     else:
                         # Sort skeleton points in order of continuous points
@@ -314,7 +311,7 @@ def main(path, verbose = True, write = True, plot=False):
                             # Save centerline and radii information
                             for i in range(len(skeleton_coords)): 
 
-                                np.savetxt(os.path.join(output_folder, "coords", filename + f'_centerline_coords_{str(capnum).zfill(2)}.csv'), 
+                                np.savetxt(os.path.join(output_folder, "coords", filename + f'_centerline_coords_' + capnum + '.csv'), 
                                         skeleton_data[i], delimiter=',', fmt = "%s")
                                 if platform.system() == 'Windows':
                                     pass
