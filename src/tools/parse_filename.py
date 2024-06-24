@@ -30,6 +30,7 @@ def parse_filename(filename):
     participant = [item for item in filename_list if item.startswith('part')][0]
     date = [item for item in filename_list if (item.startswith('230') |
                                                item.startswith('231') |
+                                               item.startswith('220') |
                                                item.startswith('240') |
                                                item.startswith('241'))][0]
     video = [item for item in filename_list if item.startswith('vid')] [0]

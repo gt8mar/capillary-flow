@@ -31,6 +31,7 @@ def parse_path(path, video_path=False):
     date = [item for item in dir_names if (item.startswith('230') |
                                                item.startswith('231') |
                                                item.startswith('240') |
+                                               item.startswith('220') |
                                                item.startswith('241'))][0]   
     location = [item for item in dir_names if item.startswith('loc')][0]
     # remove bp from the video name
