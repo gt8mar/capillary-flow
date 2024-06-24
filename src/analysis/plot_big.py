@@ -1377,6 +1377,50 @@ def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title = 'CDF Co
             else:
                 plt.show()        
         return 0
+    
+def plot_individual_cdfs(data, title='CDF Comparison', write=False):
+    """
+    Plots the CDF for each individual in the data, colored by age.
+
+    Args:
+        data (DataFrame): The entire dataset with columns 'Participant', 'Age', and the data values.
+        title (str): The title of the plot.
+        write (bool): Whether to write the plot to a file.
+
+    Returns:
+        None
+    """
+    # Get unique participants
+    participants = data['Participant'].unique()
+
+    # Setup plot
+    plt.figure(figsize=(10, 6))
+
+    for participant in participants:
+        participant_data = data[data['Participant'] == participant]
+        participant_age = participant_data['Age'].iloc[0]
+        values = participant_data['Corrected Velocity']  # Assuming the column with data is named 'Value'
+        values_sorted = np.sort(values)
+        p = 1. * np.arange(len(values)) / (len(values) - 1)
+        linestyle = '--' if participant_age > 50 else '-'
+        color = plt.cm.viridis((participant_age - data['Age'].min()) / (data['Age'].max() - data['Age'].min()))
+        plt.plot(values_sorted, p, label=f'Participant {participant} (Age {participant_age})',
+                 linestyle=linestyle, color=color)
+
+    plt.ylabel('CDF')
+    plt.xlabel('Velocity (um/s)')  # Adjust the label to match the actual data
+    plt.title(title)
+    plt.legend()
+    plt.grid(True)
+
+    # Save or show plot
+    if write:
+        filename = title.replace(' ', '_') + '.png'
+        plt.savefig(filename, dpi=300)
+        plt.close()
+    else:
+        plt.show()
+    return 0
 
 def plot_boxplot(data, subset, labels=['Entire Dataset', 'Subset']):
     # Combine data and subset into a single dataset for plotting
@@ -1804,6 +1848,12 @@ def compare_log_and_linear(df, variable = 'Median Velocity', plot = False):
             plt.show()
     
     return 0
+
+def get_bad_apples(summary_df):
+    # Filter the dataframe where 'Correct', 'Zero', and 'Correct2' are all False
+    filtered_df = summary_df[(summary_df['Correct'] == 'f') & 
+                             (summary_df['Zero'] == 'f') ] # &       (summary_df['Correct2'] == 'f')
+    return filtered_df
 
 def age_bin_accuracy(y_true, y_pred, threshold=50):
     """
@@ -2565,11 +2615,25 @@ def perform_anova_analysis(df, variable ='Age', plot = True):
     male_median = participant_medians.loc[participant_medians['Sex_Group'] == 'M', 'Participant_Median_Velocity'].median()
     female_median = participant_medians.loc[participant_medians['Sex_Group'] == 'F', 'Participant_Median_Velocity'].median()
 
-    # Print the two group medians
-    print("Median Velocity for Age Group Above 50:", above_50_median)
-    print("Median Velocity for Age Group Below 50:", below_50_median)
-    print("Difference in Medians:", above_50_median - below_50_median)
-    print("Percentage Increase:", ((above_50_median - below_50_median) / below_50_median) * 100)
+    # Calculate standard deviations for different groups
+    above_50_std = participant_medians.loc[participant_medians['Age_Group'] == 'Above 50', 'Participant_Median_Velocity'].std()
+    below_50_std = participant_medians.loc[participant_medians['Age_Group'] == 'Below 50', 'Participant_Median_Velocity'].std()
+    above_120_std = participant_medians.loc[participant_medians['SYS_BP_Group'] == '≥120', 'Participant_Median_Velocity'].std()
+    below_120_std = participant_medians.loc[participant_medians['SYS_BP_Group'] == '<120', 'Participant_Median_Velocity'].std()
+    male_std = participant_medians.loc[participant_medians['Sex_Group'] == 'M', 'Participant_Median_Velocity'].std()
+    female_std = participant_medians.loc[participant_medians['Sex_Group'] == 'F', 'Participant_Median_Velocity'].std()
+
+    # Print the two group medians and standard deviations
+    print(f"Median Velocity for Age Group Above 50: {above_50_median:.2f} (Std: {above_50_std:.2f})")
+    print(f"Median Velocity for Age Group Below 50: {below_50_median:.2f} (Std: {below_50_std:.2f})")
+    print(f"Difference in Medians: {above_50_median - below_50_median:.2f}")
+    print(f"Percentage Increase: {((above_50_median - below_50_median) / below_50_median) * 100:.2f}%")
+
+    print(f"Median Velocity for SYS_BP Group ≥120: {above_120_median:.2f} (Std: {above_120_std:.2f})")
+    print(f"Median Velocity for SYS_BP Group <120: {below_120_median:.2f} (Std: {below_120_std:.2f})")
+
+    print(f"Median Velocity for Males: {male_median:.2f} (Std: {male_std:.2f})")
+    print(f"Median Velocity for Females: {female_median:.2f} (Std: {female_std:.2f})")
 
 
 
@@ -2789,7 +2853,7 @@ def main(verbose = False):
 
         # # Plot CDF
         # plot_cdf(summary_df['Corrected Velocity'], subsets= [participant_df['Corrected Velocity']], labels=['Entire Dataset', participant], title = f'CDF Comparison of velocities for {participant}')
-        plot_cdf(summary_df_no_high_pressure['Corrected Velocity'], subsets= [participant_df_nhp['Corrected Velocity']], labels=['Entire Dataset', participant], title = f'CDF Comparison of velocities for {participant} nhp', write=True)
+        # plot_cdf(summary_df_no_high_pressure['Corrected Velocity'], subsets= [participant_df_nhp['Corrected Velocity']], labels=['Entire Dataset', participant], title = f'CDF Comparison of velocities for {participant} nhp', write=False)
         # plot_cdf_comp_pressure(participant_df)
         # plot_cdf_comp_pressure(participant_df_nhp)    
     
@@ -2812,17 +2876,29 @@ def main(verbose = False):
     normbp_nhp_video_medians = summary_df_nhp_video_medians[summary_df_nhp_video_medians['SYS_BP'] <= 120]
     highbp_nhp_video_medians = summary_df_nhp_video_medians[summary_df_nhp_video_medians['SYS_BP'] > 120]
 
+    """
+    -------- This is where I am running stuff rn --------
+    """
     # remove part21, part22, part24
     # summary_df_nhp_video_medians = summary_df_nhp_video_medians[~summary_df_nhp_video_medians['Participant'].isin(['part21', 'part22', 'part24'])]
 
     # plot_medians_pvals(summary_df_nhp_video_medians)
     # analyze_velocity_influence(summary_df_nhp_video_medians)
     # perform_anova_analysis(summary_df_nhp_video_medians)
-    table_fig = summarize_set01()
-    print(table_fig)
+    # table_fig = summarize_set01()
+    # print(table_fig)
     # plot_box_and_whisker(summary_df_nhp_video_medians, highbp_nhp_video_medians, normbp_nhp_video_medians, column = 'Video Median Velocity', variable='SYS_BP', log_scale=True)
     # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets= [old_nhp_video_medians['Video Median Velocity'], young_nhp_video_medians['Video Median Velocity']], labels=['Entire Dataset', 'Old', 'Young'], title = 'CDF Comparison of Video Median Velocities by Age')
+    # plot_individual_cdfs(summary_df_nhp_video_medians)
     # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets= [highbp_nhp_video_medians['Video Median Velocity'], normbp_nhp_video_medians['Video Median Velocity']], labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Video Median Velocities by BP nhp')
+    # plot_cdf_comp_pressure(summary_df_nhp_video_medians)
+    
+    """
+    ------------------ back to mess ------------------
+    """
+    incorrect_vels = get_bad_apples(summary_df_no_high_pressure)
+    # save to csv
+    incorrect_vels.to_csv('C:\\Users\\gt8mar\\capillary-flow\\incorrect_vels.csv', index=False)
 
     # plot_median_velocity_of_videos(summary_df_nhp_video_medians)
     # make a copy of summary_df_nhp_video_medians where we replace 'Velocity' with 'Video Median Velocity'
