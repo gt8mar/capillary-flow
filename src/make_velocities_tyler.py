@@ -8,10 +8,8 @@ from skimage.transform import radon
 
 
 
-def remove_horizontal_banding(image_path, filter_size=100, rotation=0):
-    # Open the grayscale JPEG image and rotate it
+def remove_horizontal_banding(image_path, filter_size=10, rotation=0):
     img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-
 
     # Compute the average intensity along each row
     row_means = np.mean(img, axis=1)
@@ -168,7 +166,6 @@ def detect_streaks_and_plot_combined(image_path, filter_size=1):
     # Plot lines for each method
     plot_line(img, ax, steve_angle, 'red', 'Steve Method')
     plot_line(img, ax, normal_angle, 'blue', 'Normal Method')
-    plot_line(img, ax, radon_angle, 'green', 'Radon Transform')
     plot_line(img, ax, normal_angle*(-1), 'purple', 'normal flip')
 
     ax.legend(loc='upper right')
