@@ -15,6 +15,55 @@ from itertools import combinations
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+def contrast_enhance(image):
+    """Enhances the contrast of an image using Histogram Equalization.
+
+    Args:
+        image (numpy.ndarray): The grayscale image.
+
+    Returns:
+        numpy.ndarray: The contrast-enhanced image.
+    """
+    return cv2.equalizeHist(image)
+
+def flatten_image(image, target_size=(256, 256)):
+    """Flattens the image by resizing it to a target size.
+
+    Args:
+        image (numpy.ndarray): The grayscale image.
+        target_size (tuple): The target size (width, height).
+
+    Returns:
+        numpy.ndarray: The resized image.
+    """
+    return cv2.resize(image, target_size, interpolation=cv2.INTER_AREA)
+
+def segment_image(image):
+    """Segments the image using Otsu's thresholding.
+
+    Args:
+        image (numpy.ndarray): The grayscale image.
+
+    Returns:
+        numpy.ndarray: The segmented image.
+    """
+    _, segmented = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    return segmented
+
+def to_binary_mask(image):
+    """Converts the segmented image to a binary mask.
+
+    Args:
+        image (numpy.ndarray): The segmented image.
+
+    Returns:
+        numpy.ndarray: The binary mask.
+    """
+    binary_mask = image.copy()
+    binary_mask[binary_mask > 0] = 255
+    binary_mask[binary_mask == 0] = 0
+    return binary_mask
+
 def load_image(image_path):
     """Loads an image in grayscale.
 
@@ -87,6 +136,45 @@ def calculate_similarity_score(image1, image2, H):
     score = np.sum(overlap) / np.sum(image2)  # Similarity score based on overlap
     return score
 
+def filter_image(image_tuple, plot = False):
+    """
+    Filters the image to enhance edges and remove noise.
+    
+    Args:
+        image_tuple (tuple): Tuple containing the image name and the image.
+
+    Returns:
+        filtered_image_tuple ((string, numpy.ndarray)): The filtered image
+                and its name.
+    """
+    image = image_tuple[1]
+    image_name = image_tuple[0]
+    # Contrast Enhancement
+    enhanced_image = contrast_enhance(image)
+    if plot:
+        cv2.imshow('Contrast Enhanced', enhanced_image)
+        cv2.waitKey(0)
+
+    # # Flatten Image
+    # flattened_image = flatten_image(enhanced_image)
+    # cv2.imshow('Flattened', flattened_image)
+    # cv2.waitKey(0)
+
+    # # Segment Image
+    # segmented_image = segment_image(flattened_image)
+    # cv2.imshow('Segmented', segmented_image)
+    # cv2.waitKey(0)
+
+    # # Convert to Binary Mask
+    # binary_mask = to_binary_mask(segmented_image)
+    # cv2.imshow('Binary Mask', binary_mask)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+
+    return (image_name, enhanced_image)
+
+
+
 def process_images_in_folder(folder_path):
     """Processes all images in a folder, comparing each pair and calculating similarity scores.
 
@@ -107,7 +195,13 @@ def process_images_in_folder(folder_path):
     n = len(images)
     similarity_matrix = np.zeros((n, n))
     
-    for (i, (file1, img1)), (j, (file2, img2)) in combinations(enumerate(images), 2):
+    contrast_images = []
+    for image_tuple in images:
+        contrast_tuple = filter_image(image_tuple)
+        contrast_images.append(contrast_tuple)
+        
+
+    for (i, (file1, img1)), (j, (file2, img2)) in combinations(enumerate(contrast_images), 2):
         kp1, desc1 = extract_features(img1)
         kp2, desc2 = extract_features(img2)
         matches = match_features(desc1, desc2)
@@ -134,10 +228,22 @@ def plot_similarity_matrix(image_files, similarity_matrix):
     plt.ylabel('Image Files')
     plt.show()
 
-# Example usage
-folder_path = 'C:\\Users\\gt8ma\\capillary-flow\\tests\\stdevs_frogs'
-image_files, similarity_matrix = process_images_in_folder(folder_path)
+def main():
 
-# Display the similarity scores
-plot_similarity_matrix(image_files, similarity_matrix)
+    # Example usage
+    folder_path = 'C:\\Users\\gt8ma\\capillary-flow\\tests\\stdevs_frogs'
+    image_files, similarity_matrix = process_images_in_folder(folder_path)
 
+    # # IMAGES THAT SHOULD MATCH:
+    # matching = ["WkSIExaustedFrog5Lankle2",
+    #             "WkSIExhaustedFrog5Lankle3",
+    #             "WkSISleepingFrog5Lankle1C545",
+    #             "WkSISleepingFrog5Lankle2Cl600",
+    #             "WkSISleepingFrog5Lankle3",
+    #             "WkSIAlertFrog5Lankle1"]
+
+    # Display the similarity scores
+    plot_similarity_matrix(image_files, similarity_matrix)
+
+if __name__ == '__main__':
+    main()
