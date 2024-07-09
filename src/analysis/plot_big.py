@@ -20,9 +20,71 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
 from sklearn.metrics import accuracy_score, roc_auc_score, auc, confusion_matrix, roc_curve, recall_score, precision_score, f1_score, r2_score, mean_squared_error, precision_recall_curve
 from sklearn.ensemble import RandomForestClassifier
+import matplotlib as mpl
+from matplotlib.font_manager import FontProperties
+from matplotlib.colors import to_rgb, LinearSegmentedColormap
+import colorsys
+import matplotlib.patches as mpatches
 
 
 
+#For editable text. Except latex text is still shapes sadly
+mpl.rcParams['pdf.fonttype'] = 42
+mpl.rcParams['ps.fonttype'] = 42
+sns.set_style("whitegrid")
+font = {'size' : 6}
+lines = {'linewidth' : 0.5}
+fig = {'figsize' : (2.5, 1.5)}
+mpl.rc('font', **font)
+mpl.rc('lines', **lines)
+mpl.rc('figure', **fig)
+#Set style
+sns.set_theme(style="whitegrid", palette="pastel", color_codes=True)
+
+
+def to_rgb(hex_color):
+    """Converts a hex color to an RGB tuple."""
+    hex_color = hex_color.lstrip('#')
+    lv = len(hex_color)
+    return tuple(int(hex_color[i:i + lv // 3], 16) / 255.0 for i in range(0, lv, lv // 3))
+
+def create_monochromatic_palette(base_color, n_colors=5):
+    """Creates a monochromatic palette based on the given color."""
+    rgb = to_rgb(base_color)
+    h, l, s = colorsys.rgb_to_hls(*rgb)
+    
+    colors = []
+    # Increasing the spread for more distinct colors
+    lightness_increment = 0.4 / (n_colors - 1)  # Adjust the 0.4 value to increase or decrease contrast
+    for i in range(n_colors):
+        l_new = max(0, min(1, l + (i - n_colors / 2) * lightness_increment))
+        rgb_new = colorsys.hls_to_rgb(h, l_new, s)
+        colors.append(rgb_new)
+    # plot all the colors in the set:
+    # for color in colors:
+    #     plt.axhspan(0, 1, color=color)
+    #     plt.show()
+    return colors
+
+def adjust_saturation_of_colors(color_list, saturation_scale=10):
+    """Adjusts the saturation of a list of RGB colors."""
+    adjusted_colors = []
+    for color in color_list:
+        h, l, s = colorsys.rgb_to_hls(*color)
+        s_new = max(0, min(1, s + saturation_scale))
+        rgb_new = colorsys.hls_to_rgb(h, l, s_new)
+        adjusted_colors.append(rgb_new)
+    return adjusted_colors
+
+def adjust_brightness_of_colors(color_list, brightness_scale=0.1):
+    """Adjusts the brightness (lightness) of a list of RGB colors."""
+    adjusted_colors = []
+    for color in color_list:
+        h, l, s = colorsys.rgb_to_hls(*color)
+        l_new = max(0, min(1, l + brightness_scale))
+        rgb_new = colorsys.hls_to_rgb(h, l_new, s)
+        adjusted_colors.append(rgb_new)
+    return adjusted_colors
 
 
 # Function to calculate mean, standard error, and 95% CI
@@ -32,106 +94,104 @@ def calculate_stats(group):
     ci = 1.96 * sem
     return pd.Series({'Mean Velocity': mean, 'Lower Bound': mean - ci, 'Upper Bound': mean + ci})
 
-def plot_CI(df, variable = 'Age', method='bootstrap', n_iterations=1000, ci_percentile=99.5):
-    """
-    Plot the mean and 95% CI for the variable of interest. 
+def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000, ci_percentile=99.5, write = True):
+    """Plots the mean/median and CI for the variable of interest.
+
+    This function creates a plot comparing different groups based on the specified
+    variable, showing either mean or median values with confidence intervals.
 
     Args:
-        df (DataFrame): the DataFrame to be plotted
-        variable (str): the variable of interest
-        method (str): the method for calculating the CI. Options are 'bootstrap' and 't-distribution'
-        n_iterations (int): the number of iterations for the bootstrap method
-        ci_percentile (int): the percentile for the CI
-    
+        df (pd.DataFrame): The dataframe containing the data to be plotted.
+        variable (str, optional): The variable to group by. Options are 'Age', 'SYS_BP', or 'Sex'. Defaults to 'Age'.
+        method (str, optional): The method for calculating CI. Options are 'bootstrap' or 't-distribution'. Defaults to 'bootstrap'.
+        n_iterations (int, optional): The number of iterations for bootstrap method. Defaults to 1000.
+        ci_percentile (float, optional): The percentile for the confidence interval. Defaults to 99.5.
+
     Returns:
-        0 if successful
+        int: 0 if the plot was created successfully.
+
+    Raises:
+        ValueError: If an unsupported variable is specified.
+
+    Note:
+        This function assumes the existence of helper functions `calculate_median_ci` and `calculate_stats`.
+        It also requires the Source Sans 3 font to be installed and accessible.
     """
-    # df['Age Group'] = np.where(df['Age'] <= 50, '≤50', '>50')
-    df['Age Group'] = np.where(df['Age'] <= 50, '≤50', '>50')
-    df['SYS_BP Group'] = np.where(df['SYS_BP'] < 120, '<120', '≥120')
-    df['Sex Group'] = np.where(df['Sex'] == 'M', 'M', 'F')
-                                     
-    # Group the data by the variable of interest and calculate the mean and 95% CI
-    if method == 'bootstrap':
-        if variable == 'Age':
-            # Group by Age Group and Pressure, then apply the calculate_median_ci function
-            median_stats_df = df.groupby(['Age Group', 'Pressure']).apply(calculate_median_ci, ci_percentile = ci_percentile).reset_index()
-        elif variable == 'SYS_BP':
-            # Group by SYS_BP Group and Pressure, then apply the calculate_median_ci function
-            median_stats_df = df.groupby(['SYS_BP Group', 'Pressure']).apply(calculate_median_ci, ci_percentile = ci_percentile).reset_index()
-        elif variable == 'Sex':
-            median_stats_df = df.groupby(['Sex Group', 'Pressure']).apply(calculate_median_ci, ci_percentile = ci_percentile).reset_index()
-    else:
-        if variable == 'Age':
-            # Group by Age Group and Pressure, then apply the calculate_stats function
-            stats_df = df.groupby(['Age Group', 'Pressure']).apply(calculate_stats).reset_index()
-        elif variable == 'SYS_BP':
-            # Group by SYS_BP Group and Pressure, then apply the calculate_stats function
-            stats_df = df.groupby(['SYS_BP Group', 'Pressure']).apply(calculate_stats).reset_index()
-        elif variable == 'Sex':
-            stats_df = df.groupby(['Sex Group', 'Pressure']).apply(calculate_stats).reset_index()
-        
-    # Plot the data
-    fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+    # Set up style and font
+    sns.set_style("whitegrid")
+    source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 5, 'lines.linewidth': 0.5
+    })
+
+    # Set color palette based on variable
     if variable == 'Age':
-        enforce_colors = {'≤50': 'tab:green', '>50': 'tab:orange'}
+        base_color = '#1f77b4'##3FCA54''BDE4A7 #A1E5AB
     elif variable == 'SYS_BP':
-        enforce_colors = {'<120': 'tab:blue', '≥120': 'tab:red'}
+        base_color = '2ca02c'#80C6C3 #ff7f0e
     elif variable == 'Sex':
-        enforce_colors = {'M': 'tab:purple', 'F': 'tab:pink'}
-
-    if method == 'bootstrap':
-        if variable == 'Age':
-            for label, group_df in median_stats_df.groupby('Age Group'):
-                ax.errorbar(group_df['Pressure'], group_df['Median Velocity'], 
-                            yerr=[group_df['Median Velocity'] - group_df['CI Lower Bound'], group_df['CI Upper Bound'] - group_df['Median Velocity']],
-                            label=f'Age Group {label}', fmt='-o', color = enforce_colors[label])
-            
-                ax.fill_between(group_df['Pressure'], group_df['CI Lower Bound'], group_df['CI Upper Bound'], alpha=0.2, color = enforce_colors[label])
-        elif variable == 'SYS_BP':
-            for label, group_df in median_stats_df.groupby('SYS_BP Group'):
-                ax.errorbar(group_df['Pressure'], group_df['Median Velocity'], 
-                            yerr=[group_df['Median Velocity'] - group_df['CI Lower Bound'], group_df['CI Upper Bound'] - group_df['Median Velocity']],
-                            label=f'SYS_BP Group {label}', fmt='-o', color = enforce_colors[label])
-            
-                ax.fill_between(group_df['Pressure'], group_df['CI Lower Bound'], group_df['CI Upper Bound'], alpha=0.2, color = enforce_colors[label])
-        elif variable == 'Sex':
-            for label, group_df in median_stats_df.groupby('Sex Group'):
-                ax.errorbar(group_df['Pressure'], group_df['Median Velocity'], 
-                            yerr=[group_df['Median Velocity'] - group_df['CI Lower Bound'], group_df['CI Upper Bound'] - group_df['Median Velocity']],
-                            label=f'Sex Group {label}', fmt='-o', color = enforce_colors[label])
-                ax.fill_between(group_df['Pressure'], group_df['CI Lower Bound'], group_df['CI Upper Bound'], alpha=0.2, color = enforce_colors[label])
-        ax.set_xlabel('Pressure')
-        ax.set_ylabel('Velocity (um/s)')
-        ax.set_title(f'Median Corrected Velocity vs. Pressure with {ci_percentile}% Confidence Interval')
-        ax.legend()
-
+        base_color = '674F92'#947EB0#2ca02c#CAC0D89467bd
     else:
-        if variable == 'Age':
-            for label, group_df in stats_df.groupby('Age Group'):
-                ax.errorbar(group_df['Pressure'], group_df['Mean Velocity'], 
-                            yerr=[group_df['Mean Velocity'] - group_df['Lower Bound'], group_df['Upper Bound'] - group_df['Mean Velocity']],
-                            label=f'Age Group {label}', fmt='-o', color = enforce_colors[label])
-                ax.fill_between(group_df['Pressure'], group_df['Lower Bound'], group_df['Upper Bound'], alpha=0.2, color = enforce_colors[label])
-        elif variable == 'SYS_BP':
-            for label, group_df in stats_df.groupby('SYS_BP Group'):
-                ax.errorbar(group_df['Pressure'], group_df['Mean Velocity'], 
-                            yerr=[group_df['Mean Velocity'] - group_df['Lower Bound'], group_df['Upper Bound'] - group_df['Mean Velocity']],
-                            label=f'SYS_BP Group {label}', fmt='-o', color = enforce_colors[label])
-                ax.fill_between(group_df['Pressure'], group_df['Lower Bound'], group_df['Upper Bound'], alpha=0.2, color = enforce_colors[label])
-        elif variable == 'Sex':
-            for label, group_df in stats_df.groupby('Sex Group'):
-                ax.errorbar(group_df['Pressure'], group_df['Mean Velocity'], 
-                            yerr=[group_df['Mean Velocity'] - group_df['Lower Bound'], group_df['Upper Bound'] - group_df['Mean Velocity']],
-                            label = f'Sex Group {label}', fmt='-o', color = enforce_colors[label])
-                ax.fill_between(group_df['Pressure'], group_df['Lower Bound'], group_df['Upper Bound'], alpha=0.2, color = enforce_colors[label])
-        else:
-            raise ValueError('Variable not recognized')
-        ax.set_xlabel('Pressure')
-        ax.set_ylabel('Velocity (um/s)')
-        ax.set_title(f'Corrected Velocity vs. Pressure with {ci_percentile}% Confidence Interval')
-        ax.legend()
-    plt.show()
+        raise ValueError(f"Unsupported variable: {variable}")
+
+    palette = create_monochromatic_palette(base_color)
+    # palette = adjust_saturation_of_colors(palette, saturation_scale=1.3)
+    palette = adjust_brightness_of_colors(palette, brightness_scale=.2)
+    sns.set_palette(palette)
+
+    # Group data
+    group_col = f'{variable} Group'
+    df[group_col] = np.select([
+        df[variable] <= 50 if variable == 'Age' else df[variable] < 120 if variable == 'SYS_BP' else df[variable] == 'M',
+        df[variable] > 50 if variable == 'Age' else df[variable] >= 120 if variable == 'SYS_BP' else df[variable] == 'F'
+    ], ['≤50' if variable == 'Age' else '<120' if variable == 'SYS_BP' else 'M',
+        '>50' if variable == 'Age' else '≥120' if variable == 'SYS_BP' else 'F'])
+
+    # Calculate stats
+    stats_func = calculate_median_ci if method == 'bootstrap' else calculate_stats
+    stats_df = df.groupby([group_col, 'Pressure']).apply(stats_func, ci_percentile=ci_percentile).reset_index()
+
+    # Plot
+    fig, ax = plt.subplots(figsize=(2.4, 2.0))
+
+    for i, (label, group_df) in enumerate(stats_df.groupby(group_col)):
+        if i == 0:
+            i_color = 0
+            dot_color = 0
+        elif i == 1:
+            i_color = 3
+            dot_color = 2
+        elif i == 2:
+            i_color = 4
+            dot_color=3
+        y_col = 'Median Velocity' if method == 'bootstrap' else 'Mean Velocity'
+        lower_col = 'CI Lower Bound' if method == 'bootstrap' else 'Lower Bound'
+        upper_col = 'CI Upper Bound' if method == 'bootstrap' else 'Upper Bound'
+        
+        ax.errorbar(group_df['Pressure'], group_df[y_col], 
+                    yerr=[group_df[y_col] - group_df[lower_col], group_df[upper_col] - group_df[y_col]],
+                    label=f'{variable} Group {label}', fmt='-o',markersize=2, color=palette[dot_color])
+        ax.fill_between(group_df['Pressure'], group_df[lower_col], group_df[upper_col], alpha=0.4, color=palette[i_color])
+
+    legend_handles = [mpatches.Patch(color=palette[0], label=f'{variable} Group ≤50' if variable == 'Age' else '<120' if variable == 'SYS_BP' else 'M', alpha=0.6),
+                      mpatches.Patch(color=palette[3], label=f'{variable} Group >50' if variable == 'Age' else '≥120' if variable == 'SYS_BP' else 'F', alpha=0.6)]
+
+    ax.set_xlabel('Pressure (psi)', fontproperties=source_sans)
+    ax.set_ylabel('Velocity (um/s)', fontproperties=source_sans)
+    ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Corrected Velocity vs. Pressure with {ci_percentile}% CI', fontproperties=source_sans, fontsize=8)
+    ax.legend(handles = legend_handles, prop=source_sans)
+    ax.grid(True, linewidth=0.3)
+
+    plt.tight_layout()
+    if write:
+        plt.savefig(f'C:\\Users\\gt8mar\\capillary-flow\\results\\{variable}_CI.png')
+        plt.close()
+    else:
+        plt.show()
     return 0
 
 def calculate_overlap(ci1, ci2):
@@ -1285,9 +1345,18 @@ def calc_norm_cdfs(data):
     cdfs = np.mean(cdfs, axis=0)
     return cdfs
 
-def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title = 'CDF Comparison', write = False, normalize = False):
+def calculate_cdf(data, normalize=False):
+    if normalize:
+        return calc_norm_cdfs(data)
+    else:
+        sorted_data = np.sort(data)
+        p = np.linspace(0, 1, len(data))
+        return sorted_data, p
+    
+def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title='CDF Comparison', 
+             write=False, normalize=False, variable = 'Age'):
     """
-    Plots the CDF of the entire dataset and the inputtedc subsets.
+    Plots the CDF of the entire dataset and the inputted subsets.
 
     Args:
         data (array-like): The entire dataset
@@ -1295,88 +1364,84 @@ def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title = 'CDF Co
         labels (list of str): The labels for the entire dataset and the subsets
         title (str): The title of the plot
         write (bool): Whether to write the plot to a file
+        normalize (bool): Whether to normalize the CDF
     
     Returns:
-        0 if successful
+        0 if successful, 1 if no subsets provided
     """
-    if normalize:
-        # Calculate each individual CDF
-        cdfs_total = calc_norm_cdfs(data)
-        cdfs_subsets = [calc_norm_cdfs(subset) for subset in subsets]
+    # Set up style and font
+    sns.set_style("whitegrid")
+    source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 5, 'lines.linewidth': 0.5
+    })
 
-        # Plotting
-        plt.figure(figsize=(8, 5))
-        plt.plot(cdfs_total[0], cdfs_total[1], label=labels[0])
-        for cdf, label in zip(cdfs_subsets, labels[1:]):
-            plt.plot(cdf[0], cdf[1], label=label, linestyle='--')
-        plt.ylabel('CDF')
-        plt.xlabel('Velocity (um/s)')
-        plt.title(title)
-        plt.legend()
-        plt.grid(True)
-        if write:
-            filename = title.replace(' ', '_')
-            filename += '.png'
-            plt.savefig(filename, dpi=300)
-            plt.close()
-        else:
-            plt.show()
-        return 0
-
+    # Set color palette based on variable
+    if variable == 'Age':
+        base_color = '#1f77b4'##3FCA54''BDE4A7 #A1E5AB
+    elif variable == 'SYS_BP':
+        base_color = '2ca02c'#80C6C3 #ff7f0e
+    elif variable == 'Sex':
+        base_color = '674F92'#947EB0#2ca02c#CAC0D89467bd
     else:
-        # Calculate CDF for the entire dataset
-        data_sorted = np.sort(data)
-        p = 1. * np.arange(len(data)) / (len(data) - 1)
-        
-        # value is the column of the dataframe that we are interested in
-        value = 'Velocity (um/s)' if 'Pressure' not in title else 'Pressure (psi)'
-        
-        if len(subsets) == 1:
-            # Calculate CDF for the subset
-            subset_sorted = np.sort(subsets[0])
-            p_subset = 1. * np.arange(len(subsets[0])) / (len(subsets[0]) - 1)
-            # Plotting
-            plt.figure(figsize=(8, 5))
-            plt.plot(data_sorted, p, label=labels[0])
-            plt.plot(subset_sorted, p_subset, label=labels[1], linestyle='--')
-            plt.ylabel('CDF')
-            plt.xlabel(value)
-            plt.title(title)
-            plt.legend()
-            plt.grid(True)
-            if write:
-                filename = title.replace(' ', '_')
-                filename += '.png'
-                plt.savefig(filename, dpi=300)
-                plt.close()
-            else:
-                plt.show()
-        elif len(subsets) == 0:
-            return 1
-        else:
-            plt.figure(figsize=(8, 5))
-            plt.plot(data_sorted, p, label=labels[0])
-            labels = labels[1:]
-            for subset, label in zip(subsets, labels):
-                # Calculate CDF for the subset
-                subset_sorted = np.sort(subset)
-                p_subset = 1. * np.arange(len(subset)) / (len(subset) - 1)
-                # Plotting
-                plt.plot(subset_sorted, p_subset, label=label, linestyle='--')
-            plt.ylabel('CDF')
-            plt.xlabel(value)
-            plt.title(title)
-            plt.legend()
-            plt.grid(True)
-            if write:
-                filename = title.replace(' ', '_')
-                filename += '.png'
-                filename = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\results', filename)
-                plt.savefig(filename, dpi=300)
-                plt.close()
-            else:
-                plt.show()        
-        return 0
+        raise ValueError(f"Unsupported variable: {variable}")
+
+    palette = create_monochromatic_palette(base_color)
+    # palette = adjust_saturation_of_colors(palette, saturation_scale=1.3)
+    palette = adjust_brightness_of_colors(palette, brightness_scale=.2)
+    sns.set_palette(palette)
+
+    if not subsets:
+        return 1
+
+    fig, ax = plt.subplots(figsize=(2.4, 2.0))
+
+    # Plot main dataset
+    x, y = calculate_cdf(data, normalize)
+    ax.plot(x, y, label=labels[0])
+
+    # Plot subsets
+    for i in  range(len(subsets)):
+        if i == 0:
+            i_color = 0
+            dot_color = 0
+        elif i == 1:
+            i_color = 3
+            dot_color = 2
+        elif i == 2:
+            i_color = 4
+            dot_color=3
+        x, y = calculate_cdf(subsets[i], normalize)
+        ax.plot(x, y, label=labels[i+1], linestyle='--', color=palette[i_color])
+
+    ax.set_ylabel('CDF')
+    ax.set_xlabel('Velocity (um/s)' if 'Pressure' not in title else 'Pressure (psi)')
+    ax.set_title(title, fontsize=8)
+    
+    # Adjust legend
+    ax.legend(loc='lower right', bbox_to_anchor=(1, 0.2))
+    
+    ax.grid(True, linewidth=0.3)
+
+    # Adjust layout to prevent cutting off labels
+    plt.tight_layout()
+
+    if write:
+        save_plot(fig, title, dpi=300)
+    else:
+        plt.show()
+
+    return 0
+
+def save_plot(fig, title, dpi=300):
+    filename = f"{title.replace(' ', '_')}.png"
+    filepath = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\results', filename)
+    fig.savefig(filepath, dpi=dpi, bbox_inches='tight')
+    plt.close(fig)
     
 def plot_individual_cdfs(data, title='CDF Comparison', write=False):
     """
@@ -2565,7 +2630,7 @@ def perform_anova_analysis(df, variable ='Age', plot = True):
     participant_medians.rename(columns={'Video Median Velocity': 'Participant_Median_Velocity'}, inplace=True)
 
     # Fit model for ANOVA including SYS_BP
-    model = ols('Participant_Median_Velocity ~ C(Age) + C(Sex) + SYS_BP + C(Age):C(Sex) + C(Age):SYS_BP + C(Sex):SYS_BP', data=participant_medians).fit()
+    model = ols('Participant_Median_Velocity ~ Age + C(Sex) + SYS_BP + Age:C(Sex) + Age:SYS_BP + C(Sex):SYS_BP', data=participant_medians).fit()
 
     # ANOVA table
     anova_results = sm.stats.anova_lm(model, typ=2)
@@ -2880,18 +2945,20 @@ def main(verbose = False):
     -------- This is where I am running stuff rn --------
     """
     # remove part21, part22, part24
-    # summary_df_nhp_video_medians = summary_df_nhp_video_medians[~summary_df_nhp_video_medians['Participant'].isin(['part21', 'part22', 'part24'])]
+    summary_df_nhp_video_medians = summary_df_nhp_video_medians[~summary_df_nhp_video_medians['Participant'].isin(['part21', 'part22', 'part24'])]
 
     # plot_medians_pvals(summary_df_nhp_video_medians)
     # analyze_velocity_influence(summary_df_nhp_video_medians)
-    # perform_anova_analysis(summary_df_nhp_video_medians)
+    perform_anova_analysis(summary_df_nhp_video_medians)
     # table_fig = summarize_set01()
     # print(table_fig)
     # plot_box_and_whisker(summary_df_nhp_video_medians, highbp_nhp_video_medians, normbp_nhp_video_medians, column = 'Video Median Velocity', variable='SYS_BP', log_scale=True)
-    # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets= [old_nhp_video_medians['Video Median Velocity'], young_nhp_video_medians['Video Median Velocity']], labels=['Entire Dataset', 'Old', 'Young'], title = 'CDF Comparison of Video Median Velocities by Age')
+    plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets= [old_nhp_video_medians['Video Median Velocity'], young_nhp_video_medians['Video Median Velocity']], labels=['Entire Dataset', 'Old', 'Young'], title = 'CDF Comparison of Video Median Velocities by Age',
+             write =True, variable='Age')
     # plot_individual_cdfs(summary_df_nhp_video_medians)
-    # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets= [highbp_nhp_video_medians['Video Median Velocity'], normbp_nhp_video_medians['Video Median Velocity']], labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Video Median Velocities by BP nhp')
-    # plot_cdf_comp_pressure(summary_df_nhp_video_medians)
+    plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets= [highbp_nhp_video_medians['Video Median Velocity'], normbp_nhp_video_medians['Video Median Velocity']], labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Video Median Velocities by BP nhp',
+             write = True, variable='SYS_BP')
+    plot_cdf_comp_pressure(summary_df_nhp_video_medians)
     
     """
     ------------------ back to mess ------------------
@@ -2922,10 +2989,10 @@ def main(verbose = False):
     # print columns of summary_df_nhp_video_medians_copy
     print(summary_df_nhp_video_medians_copy.columns)
 
-    # plot_cdf(summary_df_no_high_pressure['Corrected Velocity'], 
-    #          subsets=[male_subset['Corrected Velocity'], female_subset['Corrected Velocity']],
-    #             labels=['Entire Dataset', 'Male', 'Female'], title='CDF Comparison of velocities by Sex', 
-    #             normalize = False)
+    plot_cdf(summary_df_no_high_pressure['Corrected Velocity'], 
+             subsets=[male_subset['Corrected Velocity'], female_subset['Corrected Velocity']],
+                labels=['Entire Dataset', 'Male', 'Female'], title='CDF Comparison of velocities by Sex', 
+                normalize = False, variable='Sex', write=True)
 
 
                                   
