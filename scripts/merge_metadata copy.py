@@ -36,6 +36,9 @@ def load_metadata():
         if filename == "part10_230516.xlsx":
             print("excluding part10_230516.xlsx")
             continue
+        elif filename.startswith("part24"):
+            print("excluding part24")
+            continue
         if filename.endswith('.xlsx'):
             metadata_path = os.path.join(METADATA_FOLDER_PATH, filename) # full path to metadata file, merges folder path with the filename
             first_row = load_first_row(metadata_path)
