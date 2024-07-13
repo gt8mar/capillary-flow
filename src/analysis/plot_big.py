@@ -28,18 +28,18 @@ import matplotlib.patches as mpatches
 
 
 
-#For editable text. Except latex text is still shapes sadly
-mpl.rcParams['pdf.fonttype'] = 42
-mpl.rcParams['ps.fonttype'] = 42
-sns.set_style("whitegrid")
-font = {'size' : 6}
-lines = {'linewidth' : 0.5}
-fig = {'figsize' : (2.5, 1.5)}
-mpl.rc('font', **font)
-mpl.rc('lines', **lines)
-mpl.rc('figure', **fig)
-#Set style
-sns.set_theme(style="whitegrid", palette="pastel", color_codes=True)
+# #For editable text. Except latex text is still shapes sadly
+# mpl.rcParams['pdf.fonttype'] = 42
+# mpl.rcParams['ps.fonttype'] = 42
+# sns.set_style("whitegrid")
+# font = {'size' : 6}
+# lines = {'linewidth' : 0.5}
+# fig = {'figsize' : (2.5, 1.5)}
+# mpl.rc('font', **font)
+# mpl.rc('lines', **lines)
+# mpl.rc('figure', **fig)
+# #Set style
+# sns.set_theme(style="whitegrid", palette="pastel", color_codes=True)
 
 
 def to_rgb(hex_color):
@@ -182,14 +182,13 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000, ci_percen
 
     ax.set_xlabel('Pressure (psi)', fontproperties=source_sans)
     ax.set_ylabel('Velocity (um/s)', fontproperties=source_sans)
-    ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Corrected Velocity vs. Pressure with {ci_percentile}% CI', fontproperties=source_sans, fontsize=8)
+    ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Velocity vs. Pressure with {ci_percentile}% CI', fontproperties=source_sans, fontsize=8)
     ax.legend(handles = legend_handles, prop=source_sans)
     ax.grid(True, linewidth=0.3)
 
     plt.tight_layout()
     if write:
-        plt.savefig(f'C:\\Users\\gt8mar\\capillary-flow\\results\\{variable}_CI.png')
-        plt.close()
+        plt.savefig(f'C:\\Users\\gt8mar\\capillary-flow\\results\\{variable}_CI.png', dpi = 600)
     else:
         plt.show()
     return 0
@@ -425,6 +424,83 @@ def plot_pressure_vs_diameter(df, hue = 'Age'):
     plt.ylabel('Velocity')
     plt.show()
     return 0
+def plot_velocity_vs_diameter(df, hue = 'Age'):
+    # Create a 2x3 subplot figure
+    fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+
+    # Iterate over each pressure level
+    for i, pressure in enumerate(df['Pressure'].unique()):
+        # Filter the data for the current pressure level
+        df_pressure = df[df['Pressure'] == pressure]
+        # make all velocities between 0 and 1 equal to 0
+        df_pressure['Corrected Velocity'] = df_pressure['Corrected Velocity'].apply(lambda x: 0 if x < 10 else x)
+        
+        # Select the subplot for the current pressure level
+        ax = axes[i // 3, i % 3]
+        
+        # Scatter plot for diameter vs velocity
+        sns.scatterplot(x='Diameter', y='Corrected Velocity', hue='Age', data=df_pressure, ax=ax)
+        # set x axis to 0-100
+        ax.set_xlim(10, 100)
+        # set y axis to log scale
+        ax.set_yscale('log')
+        ax.set_xscale('log')
+
+        
+        # Set the title and labels for the subplot
+        ax.set_title(f'Pressure: {pressure}')
+        ax.set_xlabel('Diameter')
+        ax.set_ylabel('Velocity')
+
+    # Adjust the spacing between subplots
+    plt.tight_layout()
+
+    # Show the plot
+    plt.show()
+
+def plot_velocity_vs_diameter2(df, pressure=0.2, hue = 'Age'):
+    # Create a 2x3 subplot figure
+    fig, axes = plt.subplots(2, 3, figsize=(15, 10))
+
+    # Define the age groups
+    age_groups = {
+        'Under 24': (0, 23),
+        '24-26': (24, 26),
+        '27-32': (27, 32),
+        '50-60': (50, 60),
+        '61-65': (61, 65),
+        'Over 66': (66, np.inf)
+    }
+
+    # Iterate over each age group
+    for i in range(6):
+        # Select the subplot for the current age group
+        ax = axes[i // 3, i % 3]
+        # Filter the data for the current age group
+        min_age, max_age = list(age_groups.values())[i]
+        df_age_group = df[(df['Age'] >= min_age) & (df['Age'] <= max_age) & (df['Pressure'] == pressure)]
+        # make all velocities between 0 and 1 equal to 0
+        df_age_group['Corrected Velocity'] = df_age_group['Corrected Velocity'].apply(lambda x: 10 if x < 10 else x)
+        
+        # Scatter plot for diameter vs velocity
+        sns.scatterplot(x='Diameter', y='Corrected Velocity', hue='Age', data=df_age_group, ax=ax)
+        # set x axis to 0-100
+        ax.set_xlim(10, 100)
+        # set y axis to log scale
+        ax.set_yscale('log')
+        ax.set_xscale('log')
+
+        # Set the title and labels for the subplot
+        ax.set_title(f'Age: {min_age}-{max_age}')
+        ax.set_xlabel('Diameter')
+        ax.set_ylabel('Velocity')
+
+    
+    # Adjust the spacing between subplots
+    plt.tight_layout()
+
+    # Show the plot
+    plt.show()
 
 def plot_loc_histograms(df, variable, metrics = False):
     if variable == 'Age':
@@ -676,7 +752,7 @@ def plot_velocities(participant_df, write=False):
 
     plt.tight_layout()
     if write:
-        plt.savefig(f'C:\\Users\\gt8mar\\capillary-flow\\results\\{participant}_fav_cap_v.png')
+        plt.savefig(f'C:\\Users\\gt8mar\\capillary-flow\\results\\{participant}_fav_cap_v.png', dpi = 600)
         plt.close()
     else:
         plt.show()
@@ -1296,7 +1372,7 @@ def plot_cdf_comp_pressure(df, title = 'CDF Plot for Different Pressures', write
     if write:
         filename = title.replace(' ', '_')
         filename += '.png'
-        plt.savefig(filename, dpi=300)
+        plt.savefig(filename, dpi=600)
         plt.close()
     else:
         plt.show()
@@ -1318,7 +1394,7 @@ def plot_cdf_comp_pressure(df, title = 'CDF Plot for Different Pressures', write
     if write:
         filename = title.replace(' ', '_') + '_age_group'
         filename += '.png'
-        plt.savefig(filename, dpi=300)
+        plt.savefig(filename, dpi=600)
         plt.close()
     else:
         plt.show()
@@ -1437,7 +1513,7 @@ def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title='CDF Comp
 
     return 0
 
-def save_plot(fig, title, dpi=300):
+def save_plot(fig, title, dpi=600):
     filename = f"{title.replace(' ', '_')}.png"
     filepath = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\results', filename)
     fig.savefig(filepath, dpi=dpi, bbox_inches='tight')
@@ -1481,7 +1557,7 @@ def plot_individual_cdfs(data, title='CDF Comparison', write=False):
     # Save or show plot
     if write:
         filename = title.replace(' ', '_') + '.png'
-        plt.savefig(filename, dpi=300)
+        plt.savefig(filename, dpi=600)
         plt.close()
     else:
         plt.show()
@@ -2945,27 +3021,32 @@ def main(verbose = False):
     -------- This is where I am running stuff rn --------
     """
     # remove part21, part22, part24
-    summary_df_nhp_video_medians = summary_df_nhp_video_medians[~summary_df_nhp_video_medians['Participant'].isin(['part21', 'part22', 'part24'])]
+    # summary_df_nhp_video_medians = summary_df_nhp_video_medians[~summary_df_nhp_video_medians['Participant'].isin(['part21', 'part22', 'part24'])]
 
     # plot_medians_pvals(summary_df_nhp_video_medians)
     # analyze_velocity_influence(summary_df_nhp_video_medians)
-    perform_anova_analysis(summary_df_nhp_video_medians)
+    # perform_anova_analysis(summary_df_nhp_video_medians)
     # table_fig = summarize_set01()
     # print(table_fig)
     # plot_box_and_whisker(summary_df_nhp_video_medians, highbp_nhp_video_medians, normbp_nhp_video_medians, column = 'Video Median Velocity', variable='SYS_BP', log_scale=True)
-    plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets= [old_nhp_video_medians['Video Median Velocity'], young_nhp_video_medians['Video Median Velocity']], labels=['Entire Dataset', 'Old', 'Young'], title = 'CDF Comparison of Video Median Velocities by Age',
-             write =True, variable='Age')
+    # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets= [old_nhp_video_medians['Video Median Velocity'], young_nhp_video_medians['Video Median Velocity']], labels=['Entire Dataset', 'Old', 'Young'], title = 'CDF Comparison of Video Median Velocities by Age',
+            #  write =True, variable='Age')
     # plot_individual_cdfs(summary_df_nhp_video_medians)
-    plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets= [highbp_nhp_video_medians['Video Median Velocity'], normbp_nhp_video_medians['Video Median Velocity']], labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Video Median Velocities by BP nhp',
-             write = True, variable='SYS_BP')
-    plot_cdf_comp_pressure(summary_df_nhp_video_medians)
-    
+    # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets= [highbp_nhp_video_medians['Video Median Velocity'], normbp_nhp_video_medians['Video Median Velocity']], labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Video Median Velocities by BP nhp',
+            #  write = True, variable='SYS_BP')
+    # plot_cdf_comp_pressure(summary_df_nhp_video_medians)
+
+    # make subset of age for participants under 25
+    under_25 = summary_df_no_high_pressure[summary_df_no_high_pressure['Age'] < 25]
+    # plot_velocity_vs_diameter(under_25, hue = 'Pressure')
+    plot_velocity_vs_diameter2(summary_df_no_high_pressure, hue = 'Age')
+
     """
     ------------------ back to mess ------------------
     """
-    incorrect_vels = get_bad_apples(summary_df_no_high_pressure)
+    # incorrect_vels = get_bad_apples(summary_df_no_high_pressure)
     # save to csv
-    incorrect_vels.to_csv('C:\\Users\\gt8mar\\capillary-flow\\incorrect_vels.csv', index=False)
+    # incorrect_vels.to_csv('C:\\Users\\gt8mar\\capillary-flow\\incorrect_vels.csv', index=False)
 
     # plot_median_velocity_of_videos(summary_df_nhp_video_medians)
     # make a copy of summary_df_nhp_video_medians where we replace 'Velocity' with 'Video Median Velocity'
@@ -2983,7 +3064,7 @@ def main(verbose = False):
     # plot_CI(summary_df_nhp_video_medians_copy, variable = 'Age', ci_percentile=95)
     # plot_CI(summary_df_nhp_video_medians_copy, variable = 'SYS_BP', ci_percentile=95)
 
-    medians_area_scores_df = calculate_area_score(summary_df_nhp_video_medians_copy, log = True, plot=False)
+    # medians_area_scores_df = calculate_area_score(summary_df_nhp_video_medians_copy, log = True, plot=False)
     # add area scores to summary_df_nhp_video_medians_copy
     summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.merge(medians_area_scores_df, on='Participant', how='inner')
     # print columns of summary_df_nhp_video_medians_copy
