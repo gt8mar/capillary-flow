@@ -20,13 +20,19 @@ from scipy.ndimage import gaussian_filter
 from scipy.ndimage import median_filter
 from sklearn.linear_model import Lasso
 
-FPS = 227.8 #169.3
-PIX_UM = 4.64
+FPS = 220
+PIX_UM = 0.8
 CANNY_THRESH_1 = 20
 CANNY_THRESH_2 = 50
 
 # TODO: Long term: zero speed capillaries handling
 # TODO: clean up results folder saving stuff
+
+def get_condition(filename):
+    start_index = filename.find('WkSl')
+    end_index = filename.find('Frog')
+    start_index += len('WkSl')
+    return filename[start_index:end_index].strip()
 
 def average_array(array):
     """
@@ -227,7 +233,7 @@ def find_slopes(image, filename, output_folder=None, method = 'ridge', verbose =
         plt.close()
     return weighted_average_slope
 
-def main(path, verbose = False, write = False, write_data = True,
+def main(path, fps, verbose = False, write = False, write_data = True,
          test = False):
     """
     This function takes in a path to a folder containing kymographs and outputs
@@ -253,20 +259,25 @@ def main(path, verbose = False, write = False, write_data = True,
     images = get_images(input_folder, "tiff")
 
     # Create a dataframe to store the results
-    df = pd.DataFrame(columns = ['Date', 'Video','Capillary', 'Velocity (um/s)'])
+    df = pd.DataFrame(columns = ['Date', 'Frog', 'Side', 'Condition', 'Capillary', 'Velocity (um/s)'])
+
+    date = path.split("\\")[-3]
+    frog = path.split("\\")[-2]
+    side = path.split("\\")[-1]
     missing_log = []
     for image in images:
-        date = image.split(" ")[0]
-        print(image)
-        video = image.split(" ")[1].split("_")[0]
+        #date = image.split(" ")[0]
+        #print(image)
+        video = image.split('_')[0]
+        condition = get_condition(image)
 
         kymo_raw = cv2.imread(os.path.join(input_folder, image), cv2.IMREAD_GRAYSCALE)
 
-        fps = FPS
+        #fps = FPS
         
         # Get the capillary name for the video
-        capillary_name = image[-7:-5]
-        filename = f'{date} {video}_{capillary_name}'
+        capillary_name = image[image.find('.tiff') - 1]
+        filename = f'{date}_{video}_{capillary_name}'
         kymo_blur = gaussian_filter(kymo_raw, sigma = 2)
         
         if write:
@@ -276,12 +287,12 @@ def main(path, verbose = False, write = False, write_data = True,
         # transform slope from pixels/frames into um/s:
         um_slope = np.absolute(weighted_average_slope) *fps/PIX_UM
         # add row to dataframe
-        new_data = pd.DataFrame([[date, video, capillary_name, um_slope]], columns = df.columns)
+        new_data = pd.DataFrame([[date, frog, side, condition, capillary_name, um_slope]], columns = df.columns)
         df = pd.concat([df, new_data], ignore_index=True)
 
     # Write the dataframe to a file
     if write_data:
-        df.to_csv(os.path.join(output_folder, f"{date} {video}_velocity_data.csv"), index=False)    
+        df.to_csv(os.path.join(output_folder, f"{date}_{frog}_{side}_velocity_data.csv"), index=False)    
         #df.to_csv(os.path.join(results_folder, f"{file_prefix}_velocity_data.csv"), index=False)    
 
     # print(df)
@@ -375,6 +386,34 @@ def main(path, verbose = False, write = False, write_data = True,
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(path = 'E:\\frawg\\gabbyanalysis', write = True, write_data=True, verbose= False, test = False)
+    umbrella_folder = 'J:\\frog\\data'
+    for date in os.listdir(umbrella_folder):
+        if not date.startswith('24'):
+            continue
+        if date == 'archive': # TO DELETE
+            continue
+        for frog in os.listdir(os.path.join(umbrella_folder, date)):
+            if frog.startswith('STD'):
+                continue
+            if not frog.startswith('Frog'):
+                continue   
+            for side in os.listdir(os.path.join(umbrella_folder, date, frog)):
+                if side.startswith('STD'):
+                    continue
+                if side == 'archive':
+                    continue
+                print('Processing: ' + date + ' ' + frog + ' ' + side)
+                path = os.path.join(umbrella_folder, date, frog, side)
+
+                if date in ['240213', '240214', '240229']:
+                    fps = 100
+                elif date == '240530':
+                    fps = 220
+                else:
+                    fps = 130
+
+
+                main(path, fps, write = True, write_data=True, verbose= False, test = False)
+    #main(path = 'E:\\frawg\\gabbyanalysis', write = True, write_data=True, verbose= False, test = False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
