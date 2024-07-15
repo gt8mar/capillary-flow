@@ -38,5 +38,6 @@ def main(method = "hist"):
 if __name__ == "__main__":
     ticks = time.time()
     main(method = 'hist')
+    main(method = 'hist')
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))

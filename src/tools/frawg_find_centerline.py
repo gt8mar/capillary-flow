@@ -331,6 +331,25 @@ def main(path, verbose = True, write = True, plot=False):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(path='E:\\frog\\24-2-14 WkSl\\Frog4\\Right', verbose = True, write = True, plot = False)
+    umbrella_folder = 'J:\\frog\\data'
+    for date in os.listdir(umbrella_folder):
+        if not date.startswith('24'):
+            continue
+        if date == 'archive':
+            continue
+        for frog in os.listdir(os.path.join(umbrella_folder, date)):
+            if frog.startswith('STD'):
+                continue
+            if not frog.startswith('Frog'):
+                continue
+            for side in os.listdir(os.path.join(umbrella_folder, date, frog)):
+                if side.startswith('STD'):
+                    continue
+                if side == 'archive':
+                    continue
+                print('Processing: ' + date + ' ' + frog + ' ' + side)
+                path = os.path.join(umbrella_folder, date, frog, side)
+                main(path)
+    #main(path='E:\\frog\\24-2-14 WkSl\\Frog4\\Right', verbose = True, write = True, plot = False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))

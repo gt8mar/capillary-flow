@@ -2,7 +2,7 @@ import time
 import os
 import numpy as np
 import cv2
-from naming_overlay import get_label_position
+from src.tools.naming_overlay_old import get_label_position
 import csv
 
 def rename_files(rename_map_fp, individual_caps_folder):
@@ -97,18 +97,25 @@ def main(path, rename = False):
 
 if __name__ == "__main__":
     ticks = time.time()
-    umbrella_folder = 'D:\\frog\\data'
+    umbrella_folder = 'J:\\frog\\data'
     for date in os.listdir(umbrella_folder):
         if not date.startswith('24'):
+            continue
+        if date == 'archive':
             continue
         for frog in os.listdir(os.path.join(umbrella_folder, date)):
             if frog.startswith('STD'):
                 continue
+            if not frog.startswith('Frog'):
+                continue
             for side in os.listdir(os.path.join(umbrella_folder, date, frog)):
                 if side.startswith('STD'):
                     continue
+                if side == 'archive':
+                    continue
+                print('Processing: ' + date + ' ' + frog + ' ' + side)
                 path = os.path.join(umbrella_folder, date, frog, side)
                 main(path)
-    # main(path = 'E:\\frog\\24-2-14 WkSl\\Frog4\\Right')
+    #main(path = 'D:\\frog\\data\\240530\\Frog5\\Right')
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
