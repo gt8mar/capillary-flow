@@ -14,6 +14,7 @@ import re
 import platform
 import pandas as pd
 import itertools
+import csv
 if platform.system() == 'Windows':
     from enumerate_capillaries2 import find_connected_components
 else:
@@ -73,6 +74,11 @@ def separate_caps(registered_folder_fp):
                                 break
 
 def save_untranslated(registered_folder_fp):
+    participant = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(registered_folder_fp))))))
+    date = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(registered_folder_fp)))))
+    location = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(registered_folder_fp))))
+    
+
     indi_caps_fp = os.path.join(os.path.dirname(registered_folder_fp), "individual_caps_translated")
     translations_csv = os.path.join(os.path.dirname(registered_folder_fp), "translations.csv")
     crops_csv = os.path.join(os.path.dirname(registered_folder_fp), "crop_values.csv")
@@ -100,19 +106,19 @@ def save_untranslated(registered_folder_fp):
     miny = abs(int(resize_row[2]))
     maxy = abs(int(resize_row[3]))
 
+    saved_files = []
+
     for i in range(len(grouped_by_vid)):
-        x, y = translated_rows[i] 
+        x, y = translated_rows[i]
         xint = int(float(x))
-        xint = xint
         yint = int(float(y))
-        yint = yint
 
         l, r, b, t = crop_rows[i]
         lint = int(l)
         rint = int(r)
         bint = int(b)
         tint = int(t)
-        
+
         for cap in grouped_by_vid[i]:
             img = cv2.imread(os.path.join(indi_caps_fp, cap), cv2.IMREAD_GRAYSCALE)
 
@@ -127,12 +133,33 @@ def save_untranslated(registered_folder_fp):
             xend = None if xend == 0 else xend
 
             untrans_img = img[ystart:yend, xstart:xend]
-            
+
             bint = None if bint == 0 else bint
             rint = None if rint == 0 else rint
             crop_img = untrans_img[tint:bint, lint:rint]
 
-            cv2.imwrite(os.path.join(orig_fp, cap), crop_img)
+            save_path = os.path.join(orig_fp, cap)
+            cv2.imwrite(save_path, crop_img)
+            saved_files.append(cap)
+
+    # Save the file names to a CSV file in folder
+    file_names_csv = os.path.join(orig_fp, participant + '_' + date + '_' + location + "_cap_names.csv")
+    with open(file_names_csv, 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(["File Name"])
+        for file_name in saved_files:
+            writer.writerow([file_name])
+
+    # Save the CSV file to results folder
+    if platform.system() != 'Windows':
+        results_fp = '/hpc/projects/capillary-flow/results/size/name_csvs'
+        os.makedirs(results_fp, exist_ok=True)
+        file_names_csv = os.path.join(results_fp, date + '_' + participant + '_' + location + "_cap_names.csv")
+        with open(file_names_csv, 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["File Name"])
+            for file_name in saved_files:
+                writer.writerow([file_name])
             
 def main(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
     """
