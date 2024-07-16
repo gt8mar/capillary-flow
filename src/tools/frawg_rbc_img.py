@@ -10,16 +10,16 @@ def main(path):
     os.makedirs(output_folder, exist_ok=True)
     for centerline in os.listdir(centerline_folder):
         print(centerline)
-        date = centerline.split(' ')[0]
-        video = centerline.split(' ')[1].split('_')[0]
-        capnum = centerline[-6:-4]
+        date = centerline.split('_')[0]
+        video = centerline.split('_')[1]
+        capnum = centerline.strip('.csv')[-1:]
 
-        video_folder = os.path.join(os.path.dirname(path), 'pair_vids')
+        video_folder = os.path.join(path, 'vids')
         for vid in os.listdir(video_folder):
             if date in vid and video in vid:
                 video_file = os.path.join(video_folder, vid)
                 break
-        print(video_file)
+        #print(video_file)
 
         centerline_file = os.path.join(centerline_folder, centerline)
         with open(centerline_file, 'r') as f:
@@ -47,7 +47,7 @@ def main(path):
                 frame = cv2.imread(os.path.join(video_file, frames[j]), cv2.IMREAD_GRAYSCALE)
                 frame2 = np.copy(frame)
                 for i in range(len(perp_coords)):
-                    frame2[perp_coords[i][0]][perp_coords[i][1]] = 255
+                    frame2[perp_coords[i][0]][perp_coords[i][1]] = 255 
                 """cv2.imshow('frame', frame2)
                 resized = cv2.resize(frame2, (864,648))
                 cv2.imshow('frame', resized)
@@ -55,15 +55,33 @@ def main(path):
                 for i in range(len(perp_coords)):
                     rbc_img[i][j] = frame[perp_coords[i][0]][perp_coords[i][1]]
                     rbc_img = rbc_img.astype(np.uint8)
-            cv2.imwrite(os.path.join(output_folder, date + ' ' + video + '_' + capnum + '_' + names.pop(0) + '.tiff'), rbc_img)
+            cv2.imwrite(os.path.join(output_folder, date + '_' + video + '_' + capnum + '_' + names.pop(0) + '.tiff'), rbc_img)
 
 
                 
         
         
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     ticks = time.time()
-    main(path = 'D:\\frawg\\Wake Sleep Pairs\\gabby_analysis')
+    umbrella_folder = 'J:\\frog\\data'
+    for date in os.listdir(umbrella_folder):
+        if not date.startswith('24'):
+            continue
+        if date == 'archive': 
+            continue
+        for frog in os.listdir(os.path.join(umbrella_folder, date)):
+            if frog.startswith('STD'):
+                continue
+            if not frog.startswith('Frog'):
+                continue   
+            for side in os.listdir(os.path.join(umbrella_folder, date, frog)):
+                if side.startswith('STD'):
+                    continue
+                if side == 'archive':
+                    continue
+                print('Processing: ' + date + ' ' + frog + ' ' + side)
+                path = os.path.join(umbrella_folder, date, frog, side)
+                main(path)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))    
