@@ -10,7 +10,7 @@ def rename(path):
     participant = os.path.basename(os.path.dirname(os.path.dirname(path)))
     date = os.path.basename(os.path.dirname(path))
     location = os.path.basename(path)
-    cap_names_csv = os.path.join(individual_caps_original_fp, participant + '_' + date + '_' + location + '_cap_names.csv')
+    cap_names_csv = os.path.join('/hpc/projects/capillary-flow/results/size/name_csvs', participant + '_' + date + '_' + location + '_cap_names.csv')
 
     df = pd.read_csv(cap_names_csv)
 
