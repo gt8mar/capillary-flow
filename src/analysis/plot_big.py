@@ -502,6 +502,9 @@ def plot_velocity_vs_diameter2(df, pressure=0.2, hue = 'Age'):
     # Show the plot
     plt.show()
 
+def calc_nu_star():
+    pass
+
 def plot_loc_histograms(df, variable, metrics = False):
     if variable == 'Age':
         point_variable = 'SYS_BP'
