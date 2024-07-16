@@ -154,7 +154,7 @@ def save_untranslated(registered_folder_fp):
     if platform.system() != 'Windows':
         results_fp = '/hpc/projects/capillary-flow/results/size/name_csvs'
         os.makedirs(results_fp, exist_ok=True)
-        file_names_csv = os.path.join(results_fp, date + '_' + participant + '_' + location + "_cap_names.csv")
+        file_names_csv = os.path.join(results_fp, participant + '_' + date + '_' + location + "_cap_names.csv")
         with open(file_names_csv, 'w', newline='') as csvfile:
             writer = csv.writer(csvfile)
             writer.writerow(["File Name"])
