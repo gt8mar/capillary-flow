@@ -15,8 +15,8 @@ class KymographClassifier:
         self.prepare_data()
         self.index = 0
         self.inverted_slope = False
-        self.high_velocities = [10, 500, 600, 750, 1000, 1500, 2000, 3000, 4000]  # Original velocities
-        self.additional_velocities = [10, 20, 35, 50, 75, 110, 160, 220, 300, 400]  # Additional velocities with Shift key
+        self.high_velocities = [0, 420, 500, 600, 750, 1000, 1500, 2000, 3000, 4000]  # Original velocities
+        self.additional_velocities = [0, 20, 35, 50, 75, 110, 160, 220, 290, 360]  # Additional velocities with Shift key
         self.original_velocity = None
         self.current_velocity_index = 0
         self.use_additional_velocities = False  # Toggle between high and additional velocities
@@ -78,32 +78,73 @@ class KymographClassifier:
         self.use_additional_velocities = not self.use_additional_velocities
         print("Using additional velocities" if self.use_additional_velocities else "Using high velocities")
         self.load_image()
-
-    def save_classification(self, classification):
-        if pd.isna(self.df.at[self.index, 'Initial_Classification']) or self.df.at[self.index, 'Initial_Classification'] == 'Correct':
-            self.df.at[self.index, 'Initial_Classification'] = classification
-        else:
-            self.df.at[self.index, 'Second_Classification'] = classification
+    
+    def first_classification(self, classification):
         if classification in ['Too Fast', 'Too Slow']:
-            velocities = self.additional_velocities if self.use_additional_velocities else self.high_velocities
-            self.df.at[self.index, 'Classified_Velocity'] = velocities[self.current_velocity_index - 1] if self.current_velocity_index != 0 else self.df.at[self.index, 'Velocity']
-        elif classification == 'Zero':
-            self.df.at[self.index, 'Classified_Velocity'] = 0
-        elif classification == 'Unsure':
-            self.df.at[self.index, 'Classified_Velocity'] = self.original_velocity
-        elif classification == 'Correct':
-            self.df.at[self.index, 'Classified_Velocity'] = self.original_velocity
-        self.update_output_csv()
+            self.df.at[self.index, 'Initial_Classification'] = classification
+            self.initial_classification_complete = True
+            self.current_velocity_index = 0
+            self.load_image()
+        else: 
+            messagebox.showinfo("Try again", "Please classify the original velocity")
 
+    def unsure_classification(self, classification):
+        self.df.at[self.index, 'Initial_Classification'] = 'Unsure'
+        self.df.at[self.index, 'Classified_Velocity'] = self.original_velocity
+        self.df.at[self.index, 'Second_Classification'] = 'Unsure'
+        self.update_output_csv()
+        self.index = self.find_next_unclassified()
+        self.initial_classification_complete = False
+        self.current_velocity_index = 0
+        if self.index is not None:
+            self.load_image()
+        else:
+            print("No more images to classify.")
+    
+    def zero_classification(self, classification):
+        self.df.at[self.index, 'Initial_Classification'] = 'Zero'
+        self.df.at[self.index, 'Classified_Velocity'] = 0
+        self.df.at[self.index, 'Second_Classification'] = 'Correct'
+        self.update_output_csv()
+        self.index = self.find_next_unclassified()
+        self.initial_classification_complete = False
+        self.current_velocity_index = 0
+        if self.index is not None:
+            self.load_image()
+        else:
+            print("No more images to classify.")
+            
+
+    # def save_classification(self, classification):
+    #     if pd.isna(self.df.at[self.index, 'Initial_Classification']) or self.df.at[self.index, 'Initial_Classification'] == 'Correct':
+    #         self.df.at[self.index, 'Initial_Classification'] = classification
+    #     else:
+    #         self.df.at[self.index, 'Second_Classification'] = classification
+    #     if classification in ['Too Fast', 'Too Slow']:
+    #         velocities = self.additional_velocities if self.use_additional_velocities else self.high_velocities
+    #         self.df.at[self.index, 'Classified_Velocity'] = velocities[self.current_velocity_index - 1] if self.current_velocity_index != 0 else self.df.at[self.index, 'Velocity']
+    #     elif classification == 'Zero':
+    #         self.df.at[self.index, 'Classified_Velocity'] = 0
+    #     elif classification == 'Unsure':
+    #         self.df.at[self.index, 'Classified_Velocity'] = self.original_velocity
+    #     elif classification == 'Correct':
+    #         self.df.at[self.index, 'Classified_Velocity'] = self.original_velocity
+    #     self.update_output_csv()
+
+        
     def correct_classification(self):
         if self.initial_classification_complete:
             self.df.at[self.index, 'Second_Classification'] = 'Correct'
-            self.save_classification(self.df.at[self.index, 'Initial_Classification'])
+            velocities = self.additional_velocities if self.use_additional_velocities else self.high_velocities
+            self.df.at[self.index, 'Classified_Velocity'] = velocities[self.current_velocity_index] if self.current_velocity_index != 0 else self.df.at[self.index, 'Velocity']
         else: 
             self.df.at[self.index, 'Initial_Classification'] = 'Correct'
-            self.save_classification('Correct')
+            self.df.at[self.index, 'Classified_Velocity'] = self.original_velocity
+            self.df.at[self.index, 'Second_Classification'] = 'Correct'
+        self.update_output_csv()
         self.index = self.find_next_unclassified()
         self.current_velocity_index = 0
+        self.initial_classification_complete = False
         if self.index is not None:
             self.load_image()
         else:
@@ -150,10 +191,10 @@ class KymographClassifier:
         self.root = tk.Tk()
         self.root.title("Kymograph Classification")
         self.root.bind('<c>', lambda event: self.correct_classification())
-        self.root.bind('<f>', lambda event: self.save_classification('Too Fast'))
-        self.root.bind('<s>', lambda event: self.save_classification('Too Slow'))
-        self.root.bind('<z>', lambda event: self.save_classification('Zero'))
-        self.root.bind('<u>', lambda event: self.save_classification('Unsure'))
+        self.root.bind('<f>', lambda event: self.first_classification('Too Fast'))
+        self.root.bind('<s>', lambda event: self.first_classification('Too Slow'))
+        self.root.bind('<z>', lambda event: self.zero_classification('Zero'))
+        self.root.bind('<u>', lambda event: self.unsure_classification('Unsure'))
         self.root.bind('<p>', lambda event: self.toggle_slope())
         self.root.bind('<b>', lambda event: self.previous_image())
         self.root.bind('<n>', lambda event: self.next_image())
@@ -161,6 +202,7 @@ class KymographClassifier:
         self.root.bind('<Shift_R>', self.toggle_velocity_set)
         for i in range(10):
             self.root.bind(str(i), self.set_velocity)
+            
         self.panel = tk.Label(self.root)
         self.panel.pack(fill="both", expand="yes")
         self.metadata_label = tk.Label(self.root, text="", wraplength=400)
