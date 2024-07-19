@@ -156,7 +156,7 @@ def make_overlays(path, rename = False):
         for cap in cap_dir:
             if "vid" + vidnum in cap: 
                 cmatch = re.search(r'cap_(\d{2})', cap)
-                capnum = "cap_" + cmatch.group(1)
+                capnum = "cap_" + cmatch.group(1) 
 
                 # Match to previous color if used, else pop from predefined colors
                 if capnum in element_colors:
