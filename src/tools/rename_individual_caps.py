@@ -36,7 +36,7 @@ def rename(path):
             shutil.copy(translated_path, os.path.join(renamed_translated_fp, file))
         else:
             # Copy the file into the new folder with the new name
-            new_filename = file[:-7] + str(row.iloc[1]) + '.png'
+            new_filename = file[:-7] + f"{int(row.iloc[1]):02d}" + 'a.png' 
             shutil.copy(original_path, os.path.join(renamed_original_fp, new_filename))
             shutil.copy(translated_path, os.path.join(renamed_translated_fp, new_filename))
 
