@@ -16,6 +16,7 @@ import os, platform
 import seaborn as sns
 import time
 from scipy.ndimage import gaussian_filter
+from scipy.ndimage import gaussian_filter1d
 from scipy.ndimage import median_filter
 from sklearn.linear_model import Lasso
 from src.tools.get_images import get_images
@@ -117,6 +118,145 @@ def plot_box_swarm(data, x_labels, y_axis_label,  plot_title, figure_name,
             else: plt.close()
         if verbose: plt.show()
     return 0
+def remove_horizontal_banding(image_path, filter_size=10):
+    image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    row_means = np.mean(image, axis=1)
+    smoothed_means = gaussian_filter1d(row_means, filter_size)
+    correction = np.tile(smoothed_means[:, np.newaxis], (1, image.shape[1]))
+    corrected_image = image - correction
+    corrected_image -= np.min(corrected_image)
+    corrected_image /= np.max(corrected_image)
+    corrected_image *= 255
+    return corrected_image.astype(np.uint8), image
+def find_slopes_hough(image, filename, min_angles=5, output_folder=None, plot = False, write = False,
+                        plot_title = "Kymograph", too_fast = False, too_slow = False):
+    """
+    This function takes in an image and finds edges using Canny edge detection
+    before applying the Hough Transform to find lines. It then calculates the
+    slope of each line and computes a weighted average slope. It plots the image
+    with the lines drawn on it and returns the slope.
+
+    Args:
+        image (numpy array): the image to be analyzed
+        filename (str): the filename of the image
+        min_angles (int): the minimum number of angles to find
+        output_folder (str): the folder to write images to
+        plot (bool): If True, show plots
+        write (bool): If True, write plots to file
+        plot_title (str): The title of the plot
+        too_fast (bool): If True, exclude slopes that are too fast
+        too_slow (bool): If True, exclude slopes that are too slow
+
+    Returns:
+        weighted_average_slope (float): the slope of the line
+
+    """
+    # Define a list of Canny thresholds to try
+    canny_thresholds = [(50, 150), (30, 100), (70, 200), (20, 80), (100, 250), (20, 50)]
+    slopes = []
+    lengths = []
+
+    for lower, upper in canny_thresholds:
+        # Apply edge detection
+        edges = cv2.Canny(image, lower, upper)
+        
+        # Apply Hough Transform
+        lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=50, minLineLength=30, maxLineGap=10)
+        
+        if lines is None:
+            continue
+
+        # Process the detected lines
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            angle = np.degrees(np.arctan2(y2 - y1, x2 - x1))
+            if angle < 0:
+                angle += 180
+            
+            # Convert angle to slope
+            slope = np.tan(np.radians(angle))
+
+            if 5 < angle < 175:  # Filter out near-horizontal and near-vertical lines
+                if too_slow and abs(slope) <= 0.75:
+                    continue
+                if too_fast and abs(slope) >= 8.0:
+                    continue
+
+                length = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+                slopes.append(slope)
+                lengths.append(length)
+
+        # If we have enough slopes, break the loop
+        if len(slopes) >= min_angles:
+            break
+
+    # Calculate the weighted average slope
+    if slopes:
+        weighted_average_slope = np.average(np.array(slopes, dtype=float), weights=np.array(lengths, dtype=float))
+        average_slope = np.mean(np.array(slopes, dtype=float))
+    else:
+        weighted_average_slope = 0
+        average_slope = 0
+
+    # Plotting
+    fig = plt.figure(figsize=(16, 4))
+    ax1 = plt.subplot2grid((2, 4), (0, 0), colspan=1, rowspan=2)
+    ax2 = plt.subplot2grid((2, 4), (0, 1), colspan=1, rowspan=2)
+    ax3 = plt.subplot2grid((1, 4), (0, 2), colspan=2, rowspan=1)
+
+    ax1.imshow(edges)
+    ax1.set_title("Canny Edge Detection")
+
+    # Draw lines on the original image
+    if weighted_average_slope == 0:
+        cv2.line(image, (int(image.shape[1]/2), 0), (int(image.shape[1]/2), image.shape[0]-1), (255,255,0), 2)
+    else:
+        cv2.line(image, (int(image.shape[1]/2), 0), (int((image.shape[0]-1)/average_slope) + int(image.shape[1]/2), image.shape[0]-1), (255,255,0), 2)
+        cv2.line(image, (int(image.shape[1]/2), 0), (int((image.shape[0]-1)/weighted_average_slope) + int(image.shape[1]/2), image.shape[0]-1), (0,255,0), 2)
+
+    ax2.imshow(image, cmap='gray')
+    ax2.set_title("Line Fitting")
+
+    ax3.hist(slopes, bins=100)
+    ax3.set_title("Slope Histogram")
+
+    filename = filename.replace(".tiff", "")
+    plot_title = f"{filename}\nWeighted Average Slope: {weighted_average_slope:.3f}"
+    plt.suptitle(plot_title)
+    plt.tight_layout()
+
+    if write:
+        # Determine the results folder
+        if platform.system() != 'Windows':
+            results_folder = '/hpc/projects/capillary-flow/results/velocities'
+        else:
+            if 'gt8mar' in os.getcwd():
+                base_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities'
+            else:
+                base_folder = 'C:\\Users\\gt8ma\\capillary-flow\\results\\velocities'
+            
+            if too_fast:
+                results_folder = os.path.join(base_folder, 'too_fast')
+                filename += "_toofast"
+            elif too_slow:
+                results_folder = os.path.join(base_folder, 'too_slow')
+                filename += "_tooslow"
+            else:
+                results_folder = base_folder
+
+        os.makedirs(results_folder, exist_ok=True)
+
+        # Save the plot
+        if output_folder is not None:
+            plt.savefig(os.path.join(output_folder, f"{filename}.png"), bbox_inches='tight', dpi=400)
+        plt.savefig(os.path.join(results_folder, f"{filename}.png"), bbox_inches='tight', dpi=400)
+
+    if plot:
+        plt.show()
+    else:
+        plt.close()
+
+    return weighted_average_slope
 def find_slopes(image, filename, output_folder=None, method = 'lasso', verbose = False, write = False, 
                 plot_title = "Kymograph", too_fast = False, too_slow = False):
     """
@@ -153,7 +293,7 @@ def find_slopes(image, filename, output_folder=None, method = 'lasso', verbose =
     # Find contours of the edges
     contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
-    # remove contours with less than 10 points
+    # remove contours with less than 20 points
     contours = [contour for contour in contours if len(contour) > 20]
 
     # Iterate through the contours
@@ -349,15 +489,22 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
         # Get the pressure for the video
         pressure = video_metadata['Pressure'].values[0]
         fps = video_metadata['FPS'].values[0]
+
+        # Fix image if it has horizontal banding
+        kymo_raw, __ = remove_horizontal_banding(os.path.join(input_folder, image), filter_size=10)
         
         # Get the capillary name for the video
         capillary_name = image.split(".")[0].split("_")[-1]
         kymo_blur = gaussian_filter(kymo_raw, sigma = 2)
         
         if write:
-            weighted_average_slope = find_slopes(kymo_blur, velocity_filename, output_folder, method = 'lasso', verbose = False, write=True)
+            # weighted_average_slope = find_slopes(kymo_blur, velocity_filename, output_folder, method = 'lasso', verbose = False, write=True)
+            weighted_average_slope = find_slopes_hough(kymo_blur, velocity_filename, min_angles=5, output_folder=output_folder, verbose=False, write=True,
+                        plot_title = "Kymograph", too_fast = False, too_slow = False)
         else:
-            weighted_average_slope = find_slopes(kymo_blur, velocity_filename, output_folder, method = 'lasso', verbose = verbose, write=False)
+            # weighted_average_slope = find_slopes(kymo_blur, velocity_filename, output_folder, method = 'lasso', verbose = verbose, write=False)
+            weighted_average_slope = find_slopes_hough(kymo_blur, velocity_filename,min_angles=5,  output_folder=output_folder, verbose=verbose, write=False,
+                        plot_title = "Kymograph", too_fast = False, too_slow = False)
         # transform slope from pixels/frames into um/s:
         um_slope = np.absolute(weighted_average_slope) *fps/PIX_UM
         # add row to dataframe

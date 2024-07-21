@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import cv2
 from skimage.transform import radon
+from sklearn.linear_model import Lasso
 
 
 
@@ -58,16 +59,24 @@ def radon_transform_angle(image):
     
     return np.degrees(radon_angle)
 
-def detect_streaks_and_plot(image_path, filter_size=1, min_angles = 5):
+def detect_streaks_and_plot(image_path, filter_size=1, min_angles = 5, blur = True):
     # Get both the corrected and original images
     corrected_image, original_image = remove_horizontal_banding(image_path, filter_size=filter_size)
 
     # Convert to numpy array if it's not already
-    img = np.array(corrected_image)
+    img_raw = np.array(corrected_image)
+    if blur:
+        img = ndimage.gaussian_filter(img_raw, sigma = 2)
+        # plt.imshow(img, cmap='gray')
+        # plt.show()
     # Define a list of Canny thresholds to try
-    canny_thresholds = [(50, 150), (30, 100), (70, 200), (20, 80), (100, 250)]
+    canny_thresholds = [(50, 150), (30, 100), (70, 200), (20, 80), (100, 250), (20, 50)]
+    angles = []
+    weights = []
 
     for lower, upper in canny_thresholds:
+        angles = []
+        weights = []
         # Apply edge detection
         edges = cv2.Canny(img, lower, upper)
         
@@ -78,8 +87,7 @@ def detect_streaks_and_plot(image_path, filter_size=1, min_angles = 5):
             continue
 
         # Process the detected lines
-        angles = []
-        weights = []
+        
         for line in lines:
             x1, y1, x2, y2 = line[0]
             angle = np.degrees(np.arctan2(y2 - y1, x2 - x1))
@@ -87,6 +95,76 @@ def detect_streaks_and_plot(image_path, filter_size=1, min_angles = 5):
                 angle += 180
             if 5 < angle < 175:  # Filter out near-horizontal and near-vertical lines
                 length = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+                angles.append(angle)
+                weights.append(length)
+            
+
+        # If we have enough angles, break the loop
+        if len(angles) >= min_angles:
+            break
+    print(angles)
+    # Calculate the weighted average angle
+    if angles:
+        avg_angle = np.average(angles, weights=weights)
+    else:
+        avg_angle = None
+
+    return avg_angle, original_image, img
+
+def find_slopes_angles(image_path, filter_size=1, min_angles=5, blur=True):
+    """
+    This function processes an image to detect streaks and calculate the weighted average angle
+    of detected lines using the Lasso regression method.
+    
+    Args:
+        image_path (str): Path to the image file.
+        filter_size (int): Size of the filter for removing horizontal banding.
+        min_angles (int): Minimum number of angles required to consider detection.
+        blur (bool): Whether to apply Gaussian blur to the image.
+
+    Returns:
+        avg_angle (float): Weighted average angle of detected lines.
+        original_image (ndarray): Original image.
+        img (ndarray): Processed image.
+    """
+    # Get both the corrected and original images
+    corrected_image, original_image = remove_horizontal_banding(image_path, filter_size=filter_size)
+
+    # Convert to numpy array if it's not already
+    img_raw = np.array(corrected_image)
+    img = ndimage.gaussian_filter(img_raw, sigma=2) if blur else img_raw
+
+    # Define a list of Canny thresholds to try
+    canny_thresholds = [(50, 150), (30, 100), (70, 200), (20, 80), (100, 250), (20, 50)]
+    angles = []
+    weights = []
+
+    for lower, upper in canny_thresholds:
+        # Apply edge detection
+        edges = cv2.Canny(img, lower, upper)
+        
+        # Find contours of the edges
+        contours, _ = cv2.findContours(edges, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+        contours = [contour for contour in contours if len(contour) > 20]
+
+        # Process the detected contours
+        for contour in contours:
+            # Extract the x and y coordinates of the contour points
+            x, y = contour[:, 0, 0], contour[:, 0, 1]
+            
+            # Fit a Lasso regression model to the contour
+            lasso = Lasso(alpha=0.1, tol=0.0001)
+            X = x.reshape(-1, 1)
+            lasso.fit(X, y)
+            
+            # Compute the start and end points of the line
+            start_x, end_x = 0, img.shape[1] - 1
+            start_y, end_y = lasso.predict([[start_x]]), lasso.predict([[end_x]])
+            slope = (end_y - start_y) / (end_x - start_x)
+            angle = np.degrees(np.arctan(slope))
+
+            if 5 < angle < 175:  # Filter out near-horizontal and near-vertical lines
+                length = np.sqrt((end_x - start_x)**2 + (end_y - start_y)**2)
                 angles.append(angle)
                 weights.append(length)
 
@@ -127,15 +205,22 @@ def find_best_angle(image, angle_range, angle_step, line_spacing):
 
 # Function to plot line
 def plot_line(img, ax, angle, color, label):
-    height, width = img.shape
-    center_x, center_y = width // 2, height // 2
-    length = max(width, height) // 2
-    radian_angle = np.radians(angle)
-    x1 = int(center_x - length * np.cos(radian_angle))
-    y1 = int(center_y - length * np.sin(radian_angle))
-    x2 = int(center_x + length * np.cos(radian_angle))
-    y2 = int(center_y + length * np.sin(radian_angle))
-    ax.plot([x1, x2], [y1, y2], color=color, linewidth=2, label=f"{label}: {angle:.2f}°")
+    if angle is None:
+        return
+    elif angle==0:
+        #plot horizontal line on middle row
+        ax.axhline(y=img.shape[0]//2, color=color, linewidth=2, label=f"{label}: {angle:.2f}°")
+    else:
+        height, width = img.shape
+        center_x, center_y = width // 2, height // 2
+        length = max(width, height) // 2
+        radian_angle = np.radians(angle)
+        x1 = int(center_x - length * np.cos(radian_angle))
+        y1 = int(center_y - length * np.sin(radian_angle))
+        x2 = int(center_x + length * np.cos(radian_angle))
+        y2 = int(center_y + length * np.sin(radian_angle))
+        ax.plot([x1, x2], [y1, y2], color=color, linewidth=2, label=f"{label}: {angle:.2f}°")
+    return 0
 
 def detect_streaks_and_plot_combined(image_path, filter_size=1):
     # Get both the corrected and original images
@@ -146,12 +231,16 @@ def detect_streaks_and_plot_combined(image_path, filter_size=1):
 
     # Normalize image to [0, 1] range
     img_norm = (img - np.min(img)) / (np.max(img) - np.min(img))
+    img_gaussian = ndimage.gaussian_filter(img_norm, sigma=2)
 
     # Steve method
-    steve_angle, _ = find_best_angle(img_norm, angle_range=(0, 180), angle_step=0.5, line_spacing=3)
+    steve_angle, _ = find_best_angle(img_gaussian, angle_range=(0, 180), angle_step=0.5, line_spacing=3)
 
     # Normal method
     normal_angle, _, _ = detect_streaks_and_plot(image_path, filter_size=filter_size)
+
+    # find slopes method
+    slopes_angle, _, _ = find_slopes_angles(image_path, filter_size=filter_size)
 
     # Radon transform method
     radon_angle = radon_transform_angle(img_norm)
@@ -166,13 +255,23 @@ def detect_streaks_and_plot_combined(image_path, filter_size=1):
     # Plot lines for each method
     plot_line(img, ax, steve_angle, 'red', 'Steve Method')
     plot_line(img, ax, normal_angle, 'blue', 'Normal Method')
-    plot_line(img, ax, normal_angle*(-1), 'purple', 'normal flip')
+    # plot_line(img, ax, normal_angle*(-1), 'purple', 'normal flip')
+    plot_line(img, ax, slopes_angle, 'green', 'Slopes Method')
 
     ax.legend(loc='upper right')
     ax.axis('off')
 
     plt.tight_layout()
     plt.show()
+
+    if steve_angle is None:
+        steve_angle = 0.101
+    if normal_angle is None:
+        normal_angle = 0.101
+    if radon_angle is None:
+        radon_angle = 0.101
+    if slopes_angle is None:
+        slopes_angle = 0.101
 
     return steve_angle, normal_angle, radon_angle, img
 
@@ -187,7 +286,7 @@ def display_image(img):
 
 if __name__ == "__main__":
     # Use the function
-    folder_path = 'C:\\Users\\Luke\\capillary-flow\\tests\\tricky_kymographs'
+    folder_path = 'C:\\Users\\ejerison\\capillary-flow\\tests\\tricky_kymographs'
     for filename in os.listdir(folder_path):
         if filename.endswith('.tiff'):
             # filename = 'set01_part09_230414_loc01_vid14_kymograph_03a.tiff'
