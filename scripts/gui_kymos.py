@@ -69,6 +69,9 @@ class KymographClassifier:
         self.panel.config(image=photo)
         self.panel.image = photo
         self.metadata_label.config(text=f"Index: {self.index}\nVelocity: {self.df.loc[self.index, 'Velocity']}\nInitial_Classification: {self.df.loc[self.index, 'Initial_Classification']}")
+        velocities = self.additional_velocities if self.use_additional_velocities else self.high_velocities
+        current_velocity = velocities[self.current_velocity_index] if self.current_velocity_index != 0 else um_slope
+        self.metadata_label.config(text=f"Index: {self.index}\nVelocity: {um_slope}\nCurrent Set Velocity: {current_velocity}\nInitial_Classification: {self.df.loc[self.index, 'Initial_Classification']}")
 
     def toggle_slope(self):
         self.inverted_slope = not self.inverted_slope
