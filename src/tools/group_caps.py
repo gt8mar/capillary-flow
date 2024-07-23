@@ -106,24 +106,29 @@ def save_untranslated(registered_folder_fp):
         A folder named 'individual_caps_original' with untranslated capillary images.
         CSV files with capillary names.
     """
+    # Extract participant, date, and location information from the folder structure
     participant = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(registered_folder_fp))))))
     date = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(registered_folder_fp)))))
     location = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(registered_folder_fp))))
-    
 
+    # Define file paths for individual caps, translations, crop values, and resize values
     indi_caps_fp = os.path.join(os.path.dirname(registered_folder_fp), "individual_caps_translated")
     translations_csv = os.path.join(os.path.dirname(registered_folder_fp), "translations.csv")
     crops_csv = os.path.join(os.path.dirname(registered_folder_fp), "crop_values.csv")
     resize_vals_csv = os.path.join(os.path.dirname(registered_folder_fp), "resize_vals.csv")
 
+    # Create a new folder for original individual caps
     orig_fp = os.path.join(os.path.dirname(registered_folder_fp), "individual_caps_original")
     os.makedirs(orig_fp, exist_ok=True)
 
+    # List and sort individual caps by video number
     indi_caps_listdir = os.listdir(indi_caps_fp)
     sorted_indi_caps = sorted(indi_caps_listdir, key=lambda x: int(re.search(r'vid(\d{2})', x).group(1)))
 
+    # Group individual caps by video number
     grouped_by_vid = group_by_vid(sorted_indi_caps)
 
+    # Read translations, resize values, and crop values from CSV files
     translated_df = pd.read_csv(translations_csv, header=None)
     translated_rows = translated_df.values.tolist()
 
@@ -133,6 +138,7 @@ def save_untranslated(registered_folder_fp):
     crops_df = pd.read_csv(crops_csv, header=None)
     crop_rows = crops_df.values.tolist()
 
+    # Extract minimum and maximum x and y values for resizing
     minx = abs(int(resize_row[0]))
     maxx = abs(int(resize_row[1]))
     miny = abs(int(resize_row[2]))
@@ -140,6 +146,7 @@ def save_untranslated(registered_folder_fp):
 
     saved_files = []
 
+    # Iterate through each group of caps by video number
     for i in range(len(grouped_by_vid)):
         x, y = translated_rows[i]
         xint = int(float(x))
@@ -151,30 +158,36 @@ def save_untranslated(registered_folder_fp):
         bint = int(b)
         tint = int(t)
 
+        # Iterate through each cap in the group
         for cap in grouped_by_vid[i]:
             img = cv2.imread(os.path.join(indi_caps_fp, cap), cv2.IMREAD_GRAYSCALE)
 
+            # Calculate crop boundaries based on translations and resize values
             ystart = maxy - yint
             yend = -(miny + yint)
             xstart = maxx - xint
             xend = -(minx + xint)
 
+            # Adjust boundaries to None if they are zero to keep the entire range
             ystart = None if ystart == 0 else ystart
             yend = None if yend == 0 else yend
             xstart = None if xstart == 0 else xstart
             xend = None if xend == 0 else xend
 
+            # Crop the image using the calculated boundaries
             untrans_img = img[ystart:yend, xstart:xend]
 
+            # Further crop the image based on crop values
             bint = None if bint == 0 else bint
             rint = None if rint == 0 else rint
             crop_img = untrans_img[tint:bint, lint:rint]
 
+            # Save the cropped image to the original folder
             save_path = os.path.join(orig_fp, cap)
             cv2.imwrite(save_path, crop_img)
             saved_files.append(cap)
 
-    # Save the file names to a CSV file in folder
+    # Save the list of saved file names to a CSV file
     file_names_csv = os.path.join(orig_fp, participant + '_' + date + '_' + location + "_cap_names.csv")
     with open(file_names_csv, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
@@ -182,7 +195,7 @@ def save_untranslated(registered_folder_fp):
         for file_name in saved_files:
             writer.writerow([file_name])
 
-    # Save the CSV file to results folder
+    # Save the CSV file to a results folder if not on Windows
     if platform.system() != 'Windows':
         results_fp = '/hpc/projects/capillary-flow/results/size/name_csvs'
         os.makedirs(results_fp, exist_ok=True)
