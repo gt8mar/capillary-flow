@@ -1,7 +1,8 @@
 """
 Filename: group_caps.py
 -------------------------------------------------------------
-This file 
+This file contains functions for grouping capillaries from different videos and saving them 
+individually with appropriate naming conventions. 
 by: Gabby Rincon & ChatGPT
 """
 
@@ -15,12 +16,23 @@ import platform
 import pandas as pd
 import itertools
 import csv
+
+# Import the appropriate module based on the operating system
 if platform.system() == 'Windows':
     from enumerate_capillaries2 import find_connected_components
 else:
     from src.tools.enumerate_capillaries2 import find_connected_components
 
 def group_by_vid(vidlist):
+    """
+    Groups files by video number found in the filename.
+
+    Args:
+        vidlist (list of str): List of filenames containing video numbers.
+
+    Returns:
+        list of lists: Grouped filenames by video number.
+    """
     grouped = {}
 
     for file in vidlist:
@@ -28,12 +40,22 @@ def group_by_vid(vidlist):
         vidnum = vmatch.group(1)
         if vidnum in grouped:
             grouped[vidnum].append(file)
-        else: grouped[vidnum] = [file]
+        else: 
+            grouped[vidnum] = [file]
 
     result = list(grouped.values())
     return result
 
 def separate_caps(registered_folder_fp):
+    """
+    Separates and saves individual capillary images from registered folder.
+
+    Args:
+        registered_folder_fp (str): File path to the registered folder.
+
+    Creates:
+        A folder named 'individual_caps_translated' with individual capillary images.
+    """
     new_folder_fp = os.path.join(os.path.dirname(registered_folder_fp), "individual_caps_translated")
     os.makedirs(new_folder_fp, exist_ok=True)
 
@@ -74,6 +96,16 @@ def separate_caps(registered_folder_fp):
                                 break
 
 def save_untranslated(registered_folder_fp):
+    """
+    Saves untranslated capillary images after cropping and resizing.
+
+    Args:
+        registered_folder_fp (str): File path to the registered folder.
+
+    Creates:
+        A folder named 'individual_caps_original' with untranslated capillary images.
+        CSV files with capillary names.
+    """
     participant = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(registered_folder_fp))))))
     date = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(registered_folder_fp)))))
     location = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(registered_folder_fp))))
@@ -171,7 +203,7 @@ def main(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
             This will be used to load in registered segmentation files. 
 
     Returns:
-        0, if run correctly
+        int: 0 if run correctly
         
     Saves:
         - Individual caps as separate images in the 'proj_caps' directory.
@@ -182,17 +214,17 @@ def main(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
     
     sorted_seg_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(registered_fp, x)) and x.endswith('.png'), os.listdir(registered_fp)))
 
-    #get max projection
+    # Get maximum projection of all frames
     rows, cols = cv2.imread(os.path.join(registered_fp, sorted_seg_listdir[0]), cv2.IMREAD_GRAYSCALE).shape
     maxproject = np.zeros((rows, cols))
     for image in sorted_seg_listdir:
         maxproject += cv2.imread(os.path.join(registered_fp, image), cv2.IMREAD_GRAYSCALE)
     maxproject = np.clip(maxproject, 0, 255)
     
-    #get array of images in which each image has 1 capillary (all frames projected on)
+    # Get array of images where each image has one capillary (all frames projected on)
     caps = find_connected_components(maxproject)
 
-    #save maxproj individual caps, named
+    # Save maximum projection individual caps, named
     caps_fp = os.path.join(os.path.dirname(registered_fp), "proj_caps")
     os.makedirs(caps_fp, exist_ok=True)
     for x in range(len(caps)):
@@ -200,10 +232,10 @@ def main(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
         cap_fp = os.path.join(caps_fp, filename)
         cv2.imwrite(str(cap_fp), caps[x])
 
-    #save individual caps, named
+    # Save individual caps, named
     separate_caps(registered_fp)
 
-    #save untranslated individual caps, named
+    # Save untranslated individual caps, named
     save_untranslated(registered_fp)
 
     return 0
