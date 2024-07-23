@@ -16,6 +16,7 @@ import shutil
 from skimage.color import rgb2gray
 from skimage import io
 import csv
+from src.tools.parse_path import parse_path
 
 # Import the appropriate module based on the operating system
 if platform.system() != 'Windows':
@@ -81,6 +82,7 @@ def align_segmented(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
     moco_vids_fp = []
     sorted_vids_listdir = sorted(filter(lambda x: os.path.exists(os.path.join(vid_folder_fp, x)), os.listdir(vid_folder_fp)))  # Sort numerically
     for vid in sorted_vids_listdir:
+        vid_path = os.path.join(vid_folder_fp, vid)
         if os.path.exists(os.path.join(vid_folder_fp, vid, "mocoslice")):
             moco_folder_fp = os.path.join(vid_folder_fp, vid, "mocoslice")
         elif os.path.exists(os.path.join(vid_folder_fp, vid, "mocosplit")):
@@ -93,10 +95,12 @@ def align_segmented(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
     # Set reference image
     reference_moco_fp = moco_vids_fp[0]
     reference_moco_img = cv2.imread(reference_moco_fp)
+    reference_moco_filename = f'{vid}_moco_0000.tif'
+
 
     # Save reference moco image with contrast adjustment
     contrast_reference_moco_img = cv2.equalizeHist(cv2.cvtColor(reference_moco_img, cv2.COLOR_BGR2GRAY))
-    cv2.imwrite(os.path.join(reg_moco_folder, os.path.basename(reference_moco_fp)), np.pad(contrast_reference_moco_img, ((PAD_VALUE, PAD_VALUE), (PAD_VALUE, PAD_VALUE))))
+    cv2.imwrite(os.path.join(reg_moco_folder, reference_moco_filename), np.pad(contrast_reference_moco_img, ((PAD_VALUE, PAD_VALUE), (PAD_VALUE, PAD_VALUE))))
 
     # Create folder to save registered segmented images
     reg_folder_path = os.path.join(segmented_folder_fp, "registered")
@@ -121,6 +125,7 @@ def align_segmented(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
             # Register vids
             input_moco_fp = moco_vids_fp[x]
             input_moco_img = cv2.imread(input_moco_fp)
+            input_moco_filename = f'{sorted_vids_listdir[x]}_moco_0000.tif'
             [dx, dy], registered_image = register_images(reference_moco_img, input_moco_img, prevdx, prevdy)
 
             dx = int(dx)
@@ -133,7 +138,7 @@ def align_segmented(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
             prevdy += dy
 
             # Save registered moco frame
-            cv2.imwrite(os.path.join(reg_moco_folder, os.path.basename(input_moco_fp)), registered_image)
+            cv2.imwrite(os.path.join(reg_moco_folder, input_moco_filename), registered_image)
 
     # Calculate the maximum size of segmented images
     minx = min(0, min(entry[0] for entry in translations))
