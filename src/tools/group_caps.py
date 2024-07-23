@@ -16,6 +16,7 @@ import platform
 import pandas as pd
 import itertools
 import csv
+from src.tools.parse_path import parse_path
 
 # Import the appropriate module based on the operating system
 if platform.system() == 'Windows':
@@ -106,19 +107,23 @@ def save_untranslated(registered_folder_fp):
         A folder named 'individual_caps_original' with untranslated capillary images.
         CSV files with capillary names.
     """
+    # # Extract participant, date, and location information from the folder structure
+    # participant = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(registered_folder_fp))))))
+    # date = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(registered_folder_fp)))))
+    # location = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(registered_folder_fp))))
+
     # Extract participant, date, and location information from the folder structure
-    participant = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(registered_folder_fp))))))
-    date = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(registered_folder_fp)))))
-    location = os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(registered_folder_fp))))
+    participant, date, location, __, __ = parse_path(registered_folder_fp)
+    segmented_hasty_folder = os.path.dirname(registered_folder_fp)
 
     # Define file paths for individual caps, translations, crop values, and resize values
-    indi_caps_fp = os.path.join(os.path.dirname(registered_folder_fp), "individual_caps_translated")
-    translations_csv = os.path.join(os.path.dirname(registered_folder_fp), "translations.csv")
-    crops_csv = os.path.join(os.path.dirname(registered_folder_fp), "crop_values.csv")
-    resize_vals_csv = os.path.join(os.path.dirname(registered_folder_fp), "resize_vals.csv")
+    indi_caps_fp = os.path.join(segmented_hasty_folder, "individual_caps_translated")
+    translations_csv = os.path.join(segmented_hasty_folder, "translations.csv")
+    crops_csv = os.path.join(segmented_hasty_folder, "crop_values.csv")
+    resize_vals_csv = os.path.join(segmented_hasty_folder, "resize_vals.csv")
 
     # Create a new folder for original individual caps
-    orig_fp = os.path.join(os.path.dirname(registered_folder_fp), "individual_caps_original")
+    orig_fp = os.path.join(segmented_hasty_folder, "individual_caps_original")
     os.makedirs(orig_fp, exist_ok=True)
 
     # List and sort individual caps by video number
