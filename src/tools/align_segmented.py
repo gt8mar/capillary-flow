@@ -17,6 +17,7 @@ from skimage.color import rgb2gray
 from skimage import io
 import csv
 from src.tools.parse_path import parse_path
+from src.tools.parse_filename import parse_filename
 
 # Import the appropriate module based on the operating system
 if platform.system() != 'Windows':
@@ -95,10 +96,11 @@ def align_segmented(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
 
     # Set reference image
     reference_moco_tuple = moco_vids_fp[0]
-    video = reference_moco_tuple[0]
+    first_video = reference_moco_tuple[0]
+    first_video_path = os.path.join(vid_folder_fp, first_video)
     reference_moco_fp = reference_moco_tuple[1]
     reference_moco_img = cv2.imread(reference_moco_fp)
-    reference_moco_filename = f'{video}_moco_0000.tif'
+    reference_moco_filename = f'{first_video}_moco_0000.tif'
 
 
     # Save reference moco image with contrast adjustment
@@ -115,7 +117,9 @@ def align_segmented(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
     sorted_seg_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(segmented_folder_fp, x)) and x.endswith(".png"), os.listdir(segmented_folder_fp)))  # Sort numerically
     first_seg_fp = os.path.join(segmented_folder_fp, sorted_seg_listdir[0])
     first_seg_img = cv2.imread(first_seg_fp)
-    first_seg_img, left, right, bottom, top = uncrop_segmented(os.path.join(os.path.split(os.path.split(moco_vids_fp[0])[0])[0]), first_seg_img)
+    
+    # Use the shifts from the Results.csv file to uncrop the first segmented image we will register to
+    first_seg_img, left, right, bottom, top = uncrop_segmented(first_video_path, first_seg_img)
 
     translations = []
     prevdx = 0
@@ -155,12 +159,14 @@ def align_segmented(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
 
     for x in range(0, len(sorted_seg_listdir)):
         if "vid" in sorted_vids_listdir[x]: 
+            participant, date, location, seg_video, __= parse_filename(sorted_seg_listdir[x])
+            seg_video_filepath = os.path.join(vid_folder_fp, seg_video)
             # Get image to segment
             input_seg_fp = os.path.join(segmented_folder_fp, sorted_seg_listdir[x])
             input_seg_img = cv2.imread(input_seg_fp)
 
-            # Make segmented image same size
-            input_seg_img, left, right, bottom, top = uncrop_segmented(os.path.join(os.path.split(os.path.split(moco_vids_fp[x])[0])[0]), input_seg_img)
+            # Make segmented image same size using Results.csv file from video folder
+            input_seg_img, left, right, bottom, top = uncrop_segmented(seg_video_filepath, input_seg_img)
             crops.append((left, right, bottom, top))
 
             # Transform segmented image
