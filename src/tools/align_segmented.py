@@ -31,7 +31,7 @@ def uncrop_segmented(path, input_seg_img):
     Uncrops a segmented image based on shifts from a CSV file.
 
     Args:
-        path (str): Path to the folder containing the 'Results.csv' file with shift data.
+        path (str): Path to the "video" folder containing the 'Results.csv' file with shift data.
         input_seg_img (numpy.ndarray): Input segmented image.
 
     Returns:
@@ -90,12 +90,15 @@ def align_segmented(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
         else:
             moco_folder_fp = os.path.join(vid_folder_fp, vid, "moco")
         sorted_moco_ld = sorted(filter(lambda x: os.path.exists(os.path.join(moco_folder_fp, x)), os.listdir(moco_folder_fp)))
-        moco_vids_fp.append(os.path.join(moco_folder_fp, sorted_moco_ld[0]))
+        # append the video name and the first moco image path. This fixes a bug with naming if the moco images are not named correctly
+        moco_vids_fp.append((vid, os.path.join(moco_folder_fp, sorted_moco_ld[0])))
 
     # Set reference image
-    reference_moco_fp = moco_vids_fp[0]
+    reference_moco_tuple = moco_vids_fp[0]
+    video = reference_moco_tuple[0]
+    reference_moco_fp = reference_moco_tuple[1]
     reference_moco_img = cv2.imread(reference_moco_fp)
-    reference_moco_filename = f'{vid}_moco_0000.tif'
+    reference_moco_filename = f'{video}_moco_0000.tif'
 
 
     # Save reference moco image with contrast adjustment
@@ -120,12 +123,14 @@ def align_segmented(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
     translations.append([prevdx, prevdy]) 
 
     # Process remaining frames
-    for x in range(1, len(sorted_seg_listdir)):
-        if "vid" in sorted_vids_listdir[x]: 
+    for i in range(1, len(sorted_seg_listdir)):
+        if "vid" in sorted_vids_listdir[i]: 
             # Register vids
-            input_moco_fp = moco_vids_fp[x]
+            input_moco_tuple = moco_vids_fp[i]
+            input_moco_fp = input_moco_tuple[1]
+            video = input_moco_tuple[0]
             input_moco_img = cv2.imread(input_moco_fp)
-            input_moco_filename = f'{sorted_vids_listdir[x]}_moco_0000.tif'
+            input_moco_filename = f'{video}_moco_0000.tif'
             [dx, dy], registered_image = register_images(reference_moco_img, input_moco_img, prevdx, prevdy)
 
             dx = int(dx)
