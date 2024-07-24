@@ -243,7 +243,7 @@ def main(path ='F:\\Marcus\\data\\hasty_seg\\230626\\part10\\230425\\loc01', # '
     
     # segmented folder
     if hasty:
-        segmented_folder = os.path.join(path, "segmented", "hasty", "individual_caps_original")
+        segmented_folder = os.path.join(path, "segmented", "hasty", "renamed_individual_caps_original")
     else:
         segmented_folder = os.path.join(path, "segmented")
     os.makedirs(os.path.join(path, 'centerlines', 'coords'), exist_ok=True)
