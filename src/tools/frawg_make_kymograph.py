@@ -214,10 +214,12 @@ def main(path, write = True, variable_radii = False, verbose = False, plot = Fal
     
     # loop through videos
     for video_key in centerline_dict.keys():
+        #if video_key in ['WkSlAlertFrog7Lankle2', 'WkSlExaustedFrog7Lankle2']: # TO DELETE
+            #continue
         print(video_key)
         number_of_capillaries = len(centerline_dict[video_key])
 
-        video_name = date + ' ' + video_key
+        video_name = date + '_' + video_key
         video_folder = os.path.join(path, 'vids', video_name)
 
         # Get images
@@ -281,8 +283,26 @@ def main(path, write = True, variable_radii = False, verbose = False, plot = Fal
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    path = 'E:\\frog\\24-2-14 WkSl\\Frog4\\Right'
-    main(path, write=True, hasty=True, verbose=False)
+    umbrella_folder = 'J:\\frog\\data'
+    for date in os.listdir(umbrella_folder):
+        if not date.startswith('24'):
+            continue
+        if date == 'archive' or date in ['240213', '240214', '240229', '240402', '240404', '240411', '240419']: # TO DELETE
+            continue
+        for frog in os.listdir(os.path.join(umbrella_folder, date)):
+            if frog.startswith('STD'):
+                continue
+            if not frog.startswith('Frog'):
+                continue   
+            for side in os.listdir(os.path.join(umbrella_folder, date, frog)):
+                if side.startswith('STD'):
+                    continue
+                if side == 'archive':
+                    continue
+                print('Processing: ' + date + ' ' + frog + ' ' + side)
+                path = os.path.join(umbrella_folder, date, frog, side)
+                main(path)
+    #main(path, write=True, hasty=True, verbose=False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
 

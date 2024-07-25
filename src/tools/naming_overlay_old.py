@@ -98,7 +98,7 @@ def extract_file_info(filename):
     vid = "" if vmatch is None else "vid" + vmatch.group(1) + "_"
     return set_part_date, location, vid
 
-def make_overlays(path, rename = False):
+def make_overlays(path="C:\\Users\\Luke\\Documents\\capillary-flow\\data\\part12\\230428\\loc03"):
     """
     Create overlay images by combining frames with segmented caps.
 
@@ -137,9 +137,8 @@ def make_overlays(path, rename = False):
     element_colors = {}
     colored_elements = []
 
-    """# Rename files in the directory
-    if rename:
-        rename_files(reg_moco_fp)"""
+    # Rename files in the directory
+    rename_files(reg_moco_fp)
 
     # Process each frame in the registered motion correction folder
     for frame in os.listdir(reg_moco_fp):
@@ -150,13 +149,10 @@ def make_overlays(path, rename = False):
         frame_img[:, :, 3] = 255
         
         # Get all caps in vid
-        cap_dir = os.listdir(os.path.join(path, "segmented", "hasty", "individual_caps_translated"))
-        if rename:
-            cap_dir = os.listdir(os.path.join(path, "segmented", "hasty", "renamed_individual_caps_translated"))
-        for cap in cap_dir:
+        for cap in os.listdir(os.path.join(path, "segmented", "hasty", "individual_caps_translated")):
             if "vid" + vidnum in cap: 
                 cmatch = re.search(r'cap_(\d{2})', cap)
-                capnum = "cap_" + cmatch.group(1) 
+                capnum = "cap_" + cmatch.group(1)
 
                 # Match to previous color if used, else pop from predefined colors
                 if capnum in element_colors:
@@ -170,8 +166,6 @@ def make_overlays(path, rename = False):
                 colored_elements.append((capnum, color))
 
                 cap_img = cv2.imread(os.path.join(path, "segmented", "hasty", "individual_caps_translated", cap))
-                if rename:
-                    cap_img = cv2.imread(os.path.join(path, "segmented", "hasty", "renamed_individual_caps_translated", cap))
                 cap_img = rgb2gray(cap_img)
 
                 # Pad cap to match frame
@@ -221,14 +215,9 @@ def make_overlays(path, rename = False):
 
                 # Save to results
                 if platform.system() != 'Windows':
-                    if rename:
-                        overlays_fp = '/hpc/projects/capillary-flow/results/size/renamed_overlays'
-                        os.makedirs(overlays_fp, exist_ok=True)
-                        cv2.imwrite(os.path.join(overlays_fp, filename), overlayed)
-                    else:
-                        overlays_fp = '/hpc/projects/capillary-flow/results/size/overlays'
-                        os.makedirs(overlays_fp, exist_ok=True)
-                        cv2.imwrite(os.path.join(overlays_fp, filename), overlayed)
+                    overlays_fp = '/hpc/projects/capillary-flow/results/size/overlays'
+                    os.makedirs(overlays_fp, exist_ok=True)
+                    cv2.imwrite(os.path.join(overlays_fp, filename), overlayed)
 
 
 if __name__ == "__main__":

@@ -10,9 +10,9 @@ import cv2
 import numpy
 import time
 
-FOLDER = "C:\\Users\\ejerison\\capillary-flow\\frog\\results\\stdevs"
-OUTPUT_PATH = "C:\\Users\\ejerison\\capillary-flow\\frog\\results\\stdevs-contrasted"
-OUTPUT_PATH_CLAHE = "C:\\Users\\ejerison\\capillary-flow\\frog\\results\\stdevs-contrasted-clahe"
+FOLDER = "E:\\frog\\results\\stdevs"
+OUTPUT_PATH = "E:\\frog\\results\\stdevs-contrasted"
+OUTPUT_PATH_CLAHE = "E:\\frog\\results\\stdevs-contrasted-clahe"
 os.makedirs(OUTPUT_PATH, exist_ok= True)
 os.makedirs(OUTPUT_PATH_CLAHE, exist_ok= True)
 
@@ -37,6 +37,7 @@ def main(method = "hist"):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    main(method = 'banana')
+    main(method = 'hist')
+    main(method = 'hist')
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))

@@ -28,18 +28,6 @@ def main(path):
 
 if __name__ == "__main__":
     ticks = time.time()
-    umbrella_folder = 'D:\\frog\\data'
-    for date in os.listdir(umbrella_folder):
-        if not date.startswith('24'):
-            continue
-        for frog in os.listdir(os.path.join(umbrella_folder, date)):
-            if frog.startswith('STD'):
-                continue
-            for side in os.listdir(os.path.join(umbrella_folder, date, frog)):
-                if side.startswith('STD'):
-                    continue
-                path = os.path.join(umbrella_folder, date, frog, side)
-                main(path)
-    # main(path = 'E:\\frog\\24-2-14 WkSl\\Frog4\\Right')
+    main(path = 'E:\\frog\\24-2-14 WkSl\\Frog4\\Right')
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
