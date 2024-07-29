@@ -15,8 +15,8 @@ class KymographClassifier:
         self.prepare_data()
         self.index = 0
         self.inverted_slope = False
-        self.high_velocities = [0, 420, 500, 600, 750, 1000, 1500, 2000, 3000, 4000]  # Original velocities
-        self.additional_velocities = [0, 20, 35, 50, 75, 110, 160, 220, 290, 360]  # Additional velocities with Shift key
+        self.high_velocities = [10, 420, 500, 600, 750, 1000, 1500, 2000, 3000, 4000]  # Original velocities
+        self.additional_velocities = [10, 20, 35, 50, 75, 110, 160, 220, 290, 360]  # Additional velocities with Shift key
         self.original_velocity = None
         self.current_velocity_index = 0
         self.use_additional_velocities = False  # Toggle between high and additional velocities
@@ -58,11 +58,14 @@ class KymographClassifier:
             self.original_velocity = um_slope
         else:
             velocities = self.additional_velocities if self.use_additional_velocities else self.high_velocities
-            average_slope = (velocities[self.current_velocity_index - 1] * 2.44) / fps
+            average_slope = (velocities[self.current_velocity_index] * 2.44) / fps
         if self.inverted_slope:
             average_slope = -average_slope
-        end_x = int((image.shape[0]-1) / average_slope) + int(image.shape[1] / 2)
-        cv2.line(image, (int(image.shape[1]/2), 0), (end_x, image.shape[0]-1), (255, 255, 0), 2)
+        if average_slope != 0:
+            end_x = int((image.shape[0]-1) / average_slope) + int(image.shape[1] / 2)
+            cv2.line(image, (int(image.shape[1]/2), 0), (end_x, image.shape[0]-1), (255, 255, 0), 2)
+        else:
+            cv2.line(image, (0, int(image.shape[0]/2)), (image.shape[1]-1, int(image.shape[0]/2)), (255, 255, 0), 2)
         img = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
         img = img.resize((500, 500), Image.Resampling.LANCZOS)
         photo = ImageTk.PhotoImage(img)
@@ -91,10 +94,10 @@ class KymographClassifier:
         else: 
             messagebox.showinfo("Try again", "Please classify the original velocity")
 
-    def unsure_classification(self, classification):
-        self.df.at[self.index, 'Initial_Classification'] = 'Unsure'
+    def unclear_classification(self, classification):
+        self.df.at[self.index, 'Initial_Classification'] = 'Unclear'
         self.df.at[self.index, 'Classified_Velocity'] = self.original_velocity
-        self.df.at[self.index, 'Second_Classification'] = 'Unsure'
+        self.df.at[self.index, 'Second_Classification'] = 'Unclear'
         self.update_output_csv()
         self.index = self.find_next_unclassified()
         self.initial_classification_complete = False
@@ -197,7 +200,7 @@ class KymographClassifier:
         self.root.bind('<f>', lambda event: self.first_classification('Too Fast'))
         self.root.bind('<s>', lambda event: self.first_classification('Too Slow'))
         self.root.bind('<z>', lambda event: self.zero_classification('Zero'))
-        self.root.bind('<u>', lambda event: self.unsure_classification('Unsure'))
+        self.root.bind('<u>', lambda event: self.unclear_classification('Unsure'))
         self.root.bind('<p>', lambda event: self.toggle_slope())
         self.root.bind('<b>', lambda event: self.previous_image())
         self.root.bind('<n>', lambda event: self.next_image())
@@ -246,7 +249,10 @@ class KymographClassifier:
     def find_next_unclassified(self, start_index=0):
         for idx in range(start_index, len(self.df)):
             if self.df.at[idx, 'Second_Classification'] != 'Correct':
-                return idx
+                if self.df.at[idx,'Second_Classification'] != 'Unclear':
+                    return idx
+                else:
+                    continue
         return None
 
     def find_previous_unclassified(self, start_index):
@@ -257,8 +263,8 @@ class KymographClassifier:
 
 if __name__ == "__main__":
     classifier = KymographClassifier(
-        'C:\\Users\\gt8mar\\capillary-flow\\results\\kymographs\\tricky_kymographs', 
-        'C:\\Users\\gt8mar\\capillary-flow\\metadata', 
-        'C:\\Users\\gt8mar\\capillary-flow\\tricky_kymos.csv',
-        'C:\\Users\\gt8mar\\capillary-flow\\classified_kymos.csv'
+        'C:\\Users\\gt8ma\\capillary-flow\\results\\kymographs\\tricky_kymographs', 
+        'C:\\Users\\gt8ma\\capillary-flow\\metadata', 
+        'C:\\Users\\gt8ma\\capillary-flow\\tricky_kymos.csv',
+        'C:\\Users\\gt8ma\\capillary-flow\\classified_kymos.csv'
     )

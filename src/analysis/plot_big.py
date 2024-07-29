@@ -113,6 +113,9 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
         method (str, optional): The method for calculating CI. Options are 'bootstrap' or 't-distribution'. Defaults to 'bootstrap'.
         n_iterations (int, optional): The number of iterations for bootstrap method. Defaults to 1000.
         ci_percentile (float, optional): The percentile for the confidence interval. Defaults to 99.5.
+        write (bool, optional): Whether to write the plot to a file. Defaults to True.
+        dimensionless (bool, optional): Whether to plot dimensionless velocity. Defaults to False.
+        video_median (bool, optional): Whether to use video medians. Defaults to False.
 
     Returns:
         int: 0 if the plot was created successfully.
@@ -3019,6 +3022,12 @@ def summarize_set01(filepath='C:\\Users\\gt8mar\\capillary-flow\\metadata\\merge
     table_fig = pd.DataFrame(results)
     return table_fig
 
+def extract_capillary(image_path):
+    image_path = image_path.replace('.tiff', '').replace('.png', '')
+    image_path_list  = image_path.split('_')
+    capillary_name = image_path_list[-1]
+    return capillary_name
+
 
 
 def main(verbose = False):
@@ -3031,9 +3040,22 @@ def main(verbose = False):
         path = '/hpc/projects/capillary-flow/results/summary_df_test.csv'
 
     summary_df = pd.read_csv(path)
+    classified_kymos_df = pd.read_csv('C:\\Users\\gt8ma\\capillary-flow\\classified_kymos.csv')
+    classified_kymos_df['Capillary'] = classified_kymos_df['Image_Path'].apply(extract_capillary)
+    
+    # Merge the dataframes on the common columns
+    summary_df = pd.merge(summary_df, classified_kymos_df[['Participant', 'Date', 'Location', 'Video', 'Capillary', 'Classified_Velocity']], 
+                         on=['Participant', 'Date', 'Location', 'Video', 'Capillary'], how='outer')
+    
+    # Save or display the resulting dataframe
+    # merged_df.to_csv('C:\\Users\\gt8ma\\capillary-flow\\merged_csv.csv', index=False)
+
+    # If there is a value in "Classified Velocity" overwrite the value in "Corrected Velocity" with that value:
+    summary_df['Corrected Velocity'] = np.where(summary_df['Classified_Velocity'].notnull(), summary_df['Classified_Velocity'], summary_df['Corrected Velocity'])
+    summary_df.to_csv('C:\\Users\\gt8ma\\capillary-flow\\merged_csv2.csv', index=False)
     summary_df = summary_df.drop(columns=['Capillary'])
     summary_df = summary_df.rename(columns={'Capillary_new': 'Capillary'})
-    
+
     
     old_subset = summary_df[summary_df['Age'] > 50]
     # drop nan values
@@ -3179,19 +3201,19 @@ def main(verbose = False):
     -------- This is where I am running stuff rn --------
     """
     # remove part21, part22, part24
-    # summary_df_nhp_video_medians = summary_df_nhp_video_medians[~summary_df_nhp_video_medians['Participant'].isin(['part21', 'part22', 'part24'])]
+    summary_df_nhp_video_medians = summary_df_nhp_video_medians[~summary_df_nhp_video_medians['Participant'].isin(['part21', 'part22', 'part24'])]
 
     # plot_medians_pvals(summary_df_nhp_video_medians)
     # analyze_velocity_influence(summary_df_nhp_video_medians)
-    # perform_anova_analysis(summary_df_nhp_video_medians)
+    perform_anova_analysis(summary_df_nhp_video_medians, plot = False)
     # table_fig = summarize_set01()
     # print(table_fig)
     # plot_box_and_whisker(summary_df_nhp_video_medians, highbp_nhp_video_medians, normbp_nhp_video_medians, column = 'Video Median Velocity', variable='SYS_BP', log_scale=True)
-    # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets= [old_nhp_video_medians['Video Median Velocity'], young_nhp_video_medians['Video Median Velocity']], labels=['Entire Dataset', 'Old', 'Young'], title = 'CDF Comparison of Video Median Velocities by Age',
-            #  write =True, variable='Age')
+    plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets= [old_nhp_video_medians['Video Median Velocity'], young_nhp_video_medians['Video Median Velocity']], labels=['Entire Dataset', 'Old', 'Young'], title = 'CDF Comparison of Video Median Velocities by Age',
+             write =True, variable='Age')
     # plot_individual_cdfs(summary_df_nhp_video_medians)
-    # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets= [highbp_nhp_video_medians['Video Median Velocity'], normbp_nhp_video_medians['Video Median Velocity']], labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Video Median Velocities by BP nhp',
-            #  write = True, variable='SYS_BP')
+    plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets= [highbp_nhp_video_medians['Video Median Velocity'], normbp_nhp_video_medians['Video Median Velocity']], labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Video Median Velocities by BP nhp',
+             write = True, variable='SYS_BP')
     plot_cdf(summary_df_no_high_pressure['Corrected Velocity'], 
              subsets=[male_subset['Corrected Velocity'], female_subset['Corrected Velocity']],
                 labels=['Entire Dataset', 'Male', 'Female'], title='CDF Comparison of velocities by Sex', 
@@ -3203,36 +3225,38 @@ def main(verbose = False):
     # under_25 = summary_df_no_high_pressure[summary_df_no_high_pressure['Age'] < 25]
     # plot_velocity_vs_diameter(under_25, hue = 'Pressure')
     # plot_velocity_vs_diameter2(summary_df_no_high_pressure, hue = 'Age')
-    summary_df_dimless = add_dimensionless_velocity(summary_df_no_high_pressure)
-    dimensionless_velocities = summary_df_dimless['Dimensionless Velocity']
-    # print number of nan values
-    print(f'Number of nan values in dimensionless velocities: {dimensionless_velocities.isna().sum()}')
-    # plot average viscocities for each participant
-    # replace 'Corrected Velocity' values with 'Dimensionless Velocity' in summary_df_dimless
-    # summary_df_dimless['Corrected Velocity'] = np.log(summary_df_dimless['Corrected Velocity']) /summary_df_dimless['Dimensionless Velocity']
-    plot_cdf(summary_df_dimless['Dimensionless Velocity'], subsets= [summary_df_dimless[summary_df_dimless['Age'] > 50]['Dimensionless Velocity'], summary_df_dimless[summary_df_dimless['Age'] <= 50]['Dimensionless Velocity']], labels=['Entire Dataset', 'Old', 'Young'], title = 'CDF Comparison of Dimensionless Velocities by Age', write=True, variable='Age')
-    plot_cdf(summary_df_dimless['Dimensionless Velocity'], subsets= [summary_df_dimless[summary_df_dimless['SYS_BP'] > 120]['Dimensionless Velocity'], summary_df_dimless[summary_df_dimless['SYS_BP'] <= 120]['Dimensionless Velocity']], labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Dimensionless Velocities by BP', write=True, variable='SYS_BP')
-    plot_cdf(summary_df_dimless['Dimensionless Velocity'], subsets= [summary_df_dimless[summary_df_dimless['Sex'] == 'M']['Dimensionless Velocity'], summary_df_dimless[summary_df_dimless['Sex'] == 'F']['Dimensionless Velocity']], labels=['Entire Dataset', 'Male', 'Female'], title = 'CDF Comparison of Dimensionless Velocities by Sex', write=True, variable = 'Sex')
-    plot_CI(summary_df_dimless, variable = 'Age', ci_percentile=95, dimensionless = True)
-    plot_CI(summary_df_dimless, variable = 'SYS_BP', ci_percentile=95, dimensionless=True)
-    plot_CI(summary_df_dimless, variable = 'Sex', ci_percentile=95, dimensionless=True)
+   
+    """ Below here is dimless stuff"""
+    # summary_df_dimless = add_dimensionless_velocity(summary_df_no_high_pressure)
+    # dimensionless_velocities = summary_df_dimless['Dimensionless Velocity']
+    # # print number of nan values
+    # print(f'Number of nan values in dimensionless velocities: {dimensionless_velocities.isna().sum()}')
+    # # plot average viscocities for each participant
+    # # replace 'Corrected Velocity' values with 'Dimensionless Velocity' in summary_df_dimless
+    # # summary_df_dimless['Corrected Velocity'] = np.log(summary_df_dimless['Corrected Velocity']) /summary_df_dimless['Dimensionless Velocity']
+    # plot_cdf(summary_df_dimless['Dimensionless Velocity'], subsets= [summary_df_dimless[summary_df_dimless['Age'] > 50]['Dimensionless Velocity'], summary_df_dimless[summary_df_dimless['Age'] <= 50]['Dimensionless Velocity']], labels=['Entire Dataset', 'Old', 'Young'], title = 'CDF Comparison of Dimensionless Velocities by Age', write=True, variable='Age')
+    # plot_cdf(summary_df_dimless['Dimensionless Velocity'], subsets= [summary_df_dimless[summary_df_dimless['SYS_BP'] > 120]['Dimensionless Velocity'], summary_df_dimless[summary_df_dimless['SYS_BP'] <= 120]['Dimensionless Velocity']], labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Dimensionless Velocities by BP', write=True, variable='SYS_BP')
+    # plot_cdf(summary_df_dimless['Dimensionless Velocity'], subsets= [summary_df_dimless[summary_df_dimless['Sex'] == 'M']['Dimensionless Velocity'], summary_df_dimless[summary_df_dimless['Sex'] == 'F']['Dimensionless Velocity']], labels=['Entire Dataset', 'Male', 'Female'], title = 'CDF Comparison of Dimensionless Velocities by Sex', write=True, variable = 'Sex')
+    # plot_CI(summary_df_dimless, variable = 'Age', ci_percentile=95, dimensionless = True)
+    # plot_CI(summary_df_dimless, variable = 'SYS_BP', ci_percentile=95, dimensionless=True)
+    # plot_CI(summary_df_dimless, variable = 'Sex', ci_percentile=95, dimensionless=True)
     
-    # make the same plots for medians:
-    summary_df_dimless_video_medians = calculate_video_median_velocity(summary_df_dimless, dimensionless=True)
-    old_nhp_video_medians_dimless = summary_df_dimless_video_medians[summary_df_dimless_video_medians['Age'] > 50]
-    young_nhp_video_medians_dimless = summary_df_dimless_video_medians[summary_df_dimless_video_medians['Age'] <= 50]
-    normbp_nhp_video_medians_dimless = summary_df_dimless_video_medians[summary_df_dimless_video_medians['SYS_BP'] <= 120]
-    highbp_nhp_video_medians_dimless = summary_df_dimless_video_medians[summary_df_dimless_video_medians['SYS_BP'] > 120]
-    plot_cdf(summary_df_dimless_video_medians['Video Median Dimensionless Velocity'], subsets= [old_nhp_video_medians_dimless['Video Median Dimensionless Velocity'], 
-                young_nhp_video_medians_dimless['Video Median Dimensionless Velocity']], labels=['Entire Dataset', 'Old', 'Young'], 
-                title = 'CDF Comparison of Video Median Dimensionless Velocities by Age', write =True, variable='Age')
-    plot_cdf(summary_df_dimless_video_medians['Video Median Dimensionless Velocity'], subsets= [highbp_nhp_video_medians_dimless['Video Median Dimensionless Velocity'], normbp_nhp_video_medians_dimless['Video Median Dimensionless Velocity']], labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Video Median Dimensionless Velocities by BP nhp',
-                write = True, variable='SYS_BP')
-    plot_cdf(summary_df_dimless_video_medians['Video Median Dimensionless Velocity'], subsets= [summary_df_dimless_video_medians[summary_df_dimless_video_medians['Sex'] == 'M']['Video Median Dimensionless Velocity'], summary_df_dimless_video_medians[summary_df_dimless_video_medians['Sex']=='F']['Video Median Dimensionless Velocity']], 
-             labels=['Entire Dataset', 'Men', 'Women'], title='CDF Comparison of Video Median Dimensionless Velocities by Sex', write=True , variable='Sex')
-    plot_CI(summary_df_dimless_video_medians, variable = 'Age', ci_percentile=95, dimensionless = True, video_median = True)
-    plot_CI(summary_df_dimless_video_medians, variable = 'SYS_BP', ci_percentile=95, dimensionless=True, video_median = True)
-    plot_CI(summary_df_dimless_video_medians, variable = 'Sex', ci_percentile=95, dimensionless=True, video_median = True)
+    # # make the same plots for medians:
+    # summary_df_dimless_video_medians = calculate_video_median_velocity(summary_df_dimless, dimensionless=True)
+    # old_nhp_video_medians_dimless = summary_df_dimless_video_medians[summary_df_dimless_video_medians['Age'] > 50]
+    # young_nhp_video_medians_dimless = summary_df_dimless_video_medians[summary_df_dimless_video_medians['Age'] <= 50]
+    # normbp_nhp_video_medians_dimless = summary_df_dimless_video_medians[summary_df_dimless_video_medians['SYS_BP'] <= 120]
+    # highbp_nhp_video_medians_dimless = summary_df_dimless_video_medians[summary_df_dimless_video_medians['SYS_BP'] > 120]
+    # plot_cdf(summary_df_dimless_video_medians['Video Median Dimensionless Velocity'], subsets= [old_nhp_video_medians_dimless['Video Median Dimensionless Velocity'], 
+    #             young_nhp_video_medians_dimless['Video Median Dimensionless Velocity']], labels=['Entire Dataset', 'Old', 'Young'], 
+    #             title = 'CDF Comparison of Video Median Dimensionless Velocities by Age', write =True, variable='Age')
+    # plot_cdf(summary_df_dimless_video_medians['Video Median Dimensionless Velocity'], subsets= [highbp_nhp_video_medians_dimless['Video Median Dimensionless Velocity'], normbp_nhp_video_medians_dimless['Video Median Dimensionless Velocity']], labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Video Median Dimensionless Velocities by BP nhp',
+    #             write = True, variable='SYS_BP')
+    # plot_cdf(summary_df_dimless_video_medians['Video Median Dimensionless Velocity'], subsets= [summary_df_dimless_video_medians[summary_df_dimless_video_medians['Sex'] == 'M']['Video Median Dimensionless Velocity'], summary_df_dimless_video_medians[summary_df_dimless_video_medians['Sex']=='F']['Video Median Dimensionless Velocity']], 
+    #          labels=['Entire Dataset', 'Men', 'Women'], title='CDF Comparison of Video Median Dimensionless Velocities by Sex', write=True , variable='Sex')
+    # plot_CI(summary_df_dimless_video_medians, variable = 'Age', ci_percentile=95, dimensionless = True, video_median = True)
+    # plot_CI(summary_df_dimless_video_medians, variable = 'SYS_BP', ci_percentile=95, dimensionless=True, video_median = True)
+    # plot_CI(summary_df_dimless_video_medians, variable = 'Sex', ci_percentile=95, dimensionless=True, video_median = True)
 
 
     """
@@ -3254,9 +3278,9 @@ def main(verbose = False):
     # plot_CI_overlaps(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='SYS_BP')
     # plot_CI_overlaps(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='Age')
     # plot_CI_overlaps(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='Sex')
-    # plot_CI(summary_df_nhp_video_medians_copy, variable = 'Sex', ci_percentile=95)
-    # plot_CI(summary_df_nhp_video_medians_copy, variable = 'Age', ci_percentile=95)
-    # plot_CI(summary_df_nhp_video_medians_copy, variable = 'SYS_BP', ci_percentile=95)
+    plot_CI(summary_df_nhp_video_medians_copy, variable = 'Sex', ci_percentile=95, write = True)
+    plot_CI(summary_df_nhp_video_medians_copy, variable = 'Age', ci_percentile=95, write = True)
+    plot_CI(summary_df_nhp_video_medians_copy, variable = 'SYS_BP', ci_percentile=95, write = True)
 
     medians_area_scores_df = calculate_area_score(summary_df_nhp_video_medians_copy, log = True, plot=False)
     # add area scores to summary_df_nhp_video_medians_copy
