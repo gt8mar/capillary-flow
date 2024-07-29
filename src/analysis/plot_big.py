@@ -101,11 +101,12 @@ def calculate_stats(group, dimensionless = False):
         return pd.Series({'Mean Velocity': mean, 'Lower Bound': mean - ci, 'Upper Bound': mean + ci})
 
 def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000, 
-            ci_percentile=99.5, write = True, dimensionless=False, video_median = False):
-    """Plots the mean/median and CI for the variable of interest.
+            ci_percentile=99.5, write=True, dimensionless=False, video_median=False):
+    """Plots the mean/median and CI for the variable of interest, with KS statistic.
 
     This function creates a plot comparing different groups based on the specified
-    variable, showing either mean or median values with confidence intervals.
+    variable, showing either mean or median values with confidence intervals and
+    calculating the two-way KS statistic between group distributions.
 
     Args:
         df (pd.DataFrame): The dataframe containing the data to be plotted.
@@ -129,7 +130,7 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
     """
     # Set up style and font
     sns.set_style("whitegrid")
-    source_sans = FontProperties(fname='C:\\Users\\gt8ma\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
     
     plt.rcParams.update({
         'pdf.fonttype': 42, 'ps.fonttype': 42,
@@ -152,6 +153,7 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
     # palette = adjust_saturation_of_colors(palette, saturation_scale=1.3)
     palette = adjust_brightness_of_colors(palette, brightness_scale=.2)
     sns.set_palette(palette)
+
     if video_median:
         # collapse the data for each participant and video to a single row by selecting just the first row for each participant and video combination
         df = df.groupby(['Participant', 'Video', 'Capillary']).first().reset_index()
@@ -174,16 +176,21 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
     # Plot
     fig, ax = plt.subplots(figsize=(2.4, 2.0))
 
+    ks_stats = []
+
     for i, (label, group_df) in enumerate(stats_df.groupby(group_col)):
         if i == 0:
             i_color = 0
             dot_color = 0
+            group_1 = group_df
         elif i == 1:
             i_color = 3
             dot_color = 2
+            group_2 = group_df
         elif i == 2:
             i_color = 4
-            dot_color=3
+            dot_color = 3
+        
         if dimensionless:
             y_col = 'Median Dimensionless Velocity' if method == 'bootstrap' else 'Mean Dimensionless Velocity'
         else:
@@ -193,8 +200,17 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
         
         ax.errorbar(group_df['Pressure'], group_df[y_col], 
                     yerr=[group_df[y_col] - group_df[lower_col], group_df[upper_col] - group_df[y_col]],
-                    label=f'{variable} Group {label}', fmt='-o',markersize=2, color=palette[dot_color])
+                    label=f'{variable} Group {label}', fmt='-o', markersize=2, color=palette[dot_color])
         ax.fill_between(group_df['Pressure'], group_df[lower_col], group_df[upper_col], alpha=0.4, color=palette[i_color])
+    
+    for pressure in stats_df['Pressure'].unique():
+        group_1_velocities = group_1[group_1['Pressure'] == pressure][y_col]
+        group_2_velocities = group_2[group_2['Pressure'] == pressure][y_col]
+        ks_stat, p_value = ks_2samp(group_1_velocities, group_2_velocities)
+        ks_stats.append({'Pressure': pressure, 'KS Statistic': ks_stat, 'p-value': p_value})
+
+    ks_df = pd.DataFrame(ks_stats)
+    print(ks_df)  # Or save it to a file if needed
 
     legend_handles = [mpatches.Patch(color=palette[0], label=f'{variable} Group ≤50' if variable == 'Age' else '<120' if variable == 'SYS_BP' else 'M', alpha=0.6),
                       mpatches.Patch(color=palette[3], label=f'{variable} Group >50' if variable == 'Age' else '≥120' if variable == 'SYS_BP' else 'F', alpha=0.6)]
@@ -206,15 +222,15 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
     else:
         ax.set_ylabel('Velocity (um/s)', fontproperties=source_sans)
         ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Velocity vs. Pressure with {ci_percentile}% CI', fontproperties=source_sans, fontsize=8)
-    ax.legend(handles = legend_handles, prop=source_sans)
+    ax.legend(handles=legend_handles, prop=source_sans)
     ax.grid(True, linewidth=0.3)
 
     plt.tight_layout()
     if write:
         if video_median:
-            plt.savefig(f'C:\\Users\\gt8ma\\capillary-flow\\results\\{variable}_videomedians_CI.png', dpi = 600)
+            plt.savefig(f'C:\\Users\\gt8mar\\capillary-flow\\results\\{variable}_videomedians_CI.png', dpi=600)
         else:
-            plt.savefig(f'C:\\Users\\gt8ma\\capillary-flow\\results\\{variable}_CI.png', dpi = 600)
+            plt.savefig(f'C:\\Users\\gt8mar\\capillary-flow\\results\\{variable}_CI.png', dpi=600)
     else:
         plt.show()
     return 0
@@ -908,7 +924,7 @@ def plot_velocities(participant_df, write=False):
 
     plt.tight_layout()
     if write:
-        plt.savefig(f'C:\\Users\\gt8ma\\capillary-flow\\results\\{participant}_fav_cap_v.png', dpi = 600)
+        plt.savefig(f'C:\\Users\\gt8mar\\capillary-flow\\results\\{participant}_fav_cap_v.png', dpi = 600)
         plt.close()
     else:
         plt.show()
@@ -1603,7 +1619,7 @@ def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title='CDF Comp
     """
     # Set up style and font
     sns.set_style("whitegrid")
-    source_sans = FontProperties(fname='C:\\Users\\gt8ma\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
     
     plt.rcParams.update({
         'pdf.fonttype': 42, 'ps.fonttype': 42,
@@ -1671,7 +1687,7 @@ def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title='CDF Comp
 
 def save_plot(fig, title, dpi=600):
     filename = f"{title.replace(' ', '_')}.png"
-    filepath = os.path.join('C:\\Users\\gt8ma\\capillary-flow\\results', filename)
+    filepath = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\results', filename)
     fig.savefig(filepath, dpi=dpi, bbox_inches='tight')
     plt.close(fig)
     
@@ -3040,7 +3056,7 @@ def main(verbose = False):
         path = '/hpc/projects/capillary-flow/results/summary_df_test.csv'
 
     summary_df = pd.read_csv(path)
-    classified_kymos_df = pd.read_csv('C:\\Users\\gt8ma\\capillary-flow\\classified_kymos.csv')
+    classified_kymos_df = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\classified_kymos.csv')
     classified_kymos_df['Capillary'] = classified_kymos_df['Image_Path'].apply(extract_capillary)
     
     # Merge the dataframes on the common columns
@@ -3052,7 +3068,7 @@ def main(verbose = False):
 
     # If there is a value in "Classified Velocity" overwrite the value in "Corrected Velocity" with that value:
     summary_df['Corrected Velocity'] = np.where(summary_df['Classified_Velocity'].notnull(), summary_df['Classified_Velocity'], summary_df['Corrected Velocity'])
-    summary_df.to_csv('C:\\Users\\gt8ma\\capillary-flow\\merged_csv2.csv', index=False)
+    summary_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\merged_csv2.csv', index=False)
     summary_df = summary_df.drop(columns=['Capillary'])
     summary_df = summary_df.rename(columns={'Capillary_new': 'Capillary'})
 
