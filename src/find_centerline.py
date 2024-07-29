@@ -361,7 +361,8 @@ def main(path ='F:\\Marcus\\data\\hasty_seg\\230626\\part10\\230425\\loc01', # '
 if __name__ == "__main__":
     ticks = time.time()
     test_path = 'F:\\Marcus\\data\\part12\\230428\\loc01'
+    test_path = 'F:\\Marcus\\data\\2022\\test_220513\\part00\\220513\\loc01'
     # main(path = '/hpc/projects/capillary-flow/data/part09/230414/loc01', verbose = False, write = True)
-    main(path = test_path, verbose = False, write = True, plot=False)
+    main(path = test_path, hasty=False, verbose = False, write = True, plot=False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
