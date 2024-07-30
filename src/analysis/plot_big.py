@@ -2555,9 +2555,9 @@ def calculate_auc_ci_delong(y_true, y_scores, alpha=0.95):
     ci_upper = auc + lower_upper_q * auc_std
     ci_lower = max(0, ci_lower)  # Ensure lower bound is not below 0
     ci_upper = min(1, ci_upper)  # Ensure upper bound is not above 1
-    return auc, ci_lower, ci_upper
+    return auc, auc_var, ci_lower, ci_upper
 
-def make_roc_curve_one_var(df, feature, target='Age', flip=False, n_bootstraps=1000, ci_percentile=95):
+def make_roc_curve_one_var(df, feature, target='Age', flip=False, plot = False, n_bootstraps=1000, ci_percentile=95):
     if target != 'Age':
         raise ValueError('Please choose target for this function (only Age is supported)')
     age_threshold = 50
@@ -2585,10 +2585,10 @@ def make_roc_curve_one_var(df, feature, target='Age', flip=False, n_bootstraps=1
     # Calculate AUC and confidence interval using DeLong's method
     y_true = df['Age Category'].values
     y_scores = df[feature].values
-    auc_score, ci_lower, ci_upper = calculate_auc_ci_delong(y_true, y_scores)
+    auc_score, auc_var, ci_lower, ci_upper = calculate_auc_ci_delong(y_true, y_scores)
 
     print(f'delong auc below')
-    print(f'AUC: {auc_score:.2f}, 95% CI: [{ci_lower:.2f}, {ci_upper:.2f}]')
+    print(f'AUC: {auc_score:.2f}, auc variance: {auc_var}, auc std: {np.sqrt(auc_var)}, 95% CI: [{ci_lower:.2f}, {ci_upper:.2f}]')
 
     
 
@@ -2633,8 +2633,10 @@ def make_roc_curve_one_var(df, feature, target='Age', flip=False, n_bootstraps=1
 
     # Print AUC and its confidence interval on the plot
     plt.text(0.6, 0.2, f'AUC: {roc_auc:.2f}\n95% CI: [{ci_lower:.2f}, {ci_upper:.2f}]', fontsize=12, bbox=dict(facecolor='white', alpha=0.5))
-
-    plt.show()
+    if plot:
+        plt.show()
+    else:
+        plt.close()
     return 0
 
 def run_regression(df, plot = False):
