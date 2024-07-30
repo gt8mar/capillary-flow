@@ -100,6 +100,9 @@ def calculate_stats(group, dimensionless = False):
         ci = 1.96 * sem
         return pd.Series({'Mean Velocity': mean, 'Lower Bound': mean - ci, 'Upper Bound': mean + ci})
 
+
+
+
 def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000, 
             ci_percentile=99.5, write=True, dimensionless=False, video_median=False):
     """Plots the mean/median and CI for the variable of interest, with KS statistic.
@@ -173,20 +176,39 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
     stats_func = calculate_median_ci if method == 'bootstrap' else calculate_stats
     stats_df = df.groupby([group_col, 'Pressure']).apply(stats_func, ci_percentile=ci_percentile, dimensionless=dimensionless).reset_index()
 
+    # Calculate KS statistic
+    # Group the DataFrame by the specified column
+    grouped = df.groupby(group_col)
+
+    # Iterate over each group to perform the KS test
+    ks_stats = []
+    for pressure in df['Pressure'].unique():
+        group_1 = grouped.get_group('≤50' if variable == 'Age' else '<120' if variable == 'SYS_BP' else 'M')
+        group_2 = grouped.get_group('>50' if variable == 'Age' else '≥120' if variable == 'SYS_BP' else 'F')
+        
+        group_1_velocities = group_1[group_1['Pressure'] == pressure]['Corrected Velocity']
+        group_2_velocities = group_2[group_2['Pressure'] == pressure]['Corrected Velocity']
+        
+        ks_stat, p_value = ks_2samp(group_1_velocities, group_2_velocities)
+        ks_stats.append({'Pressure': pressure, 'KS Statistic': ks_stat, 'p-value': p_value})
+
+    ks_df = pd.DataFrame(ks_stats)
+    print(variable)
+    print(ks_df)
+
     # Plot
     fig, ax = plt.subplots(figsize=(2.4, 2.0))
 
-    ks_stats = []
 
     for i, (label, group_df) in enumerate(stats_df.groupby(group_col)):
         if i == 0:
             i_color = 0
             dot_color = 0
-            group_1 = group_df
+            # group_1 = group_df
         elif i == 1:
             i_color = 3
             dot_color = 2
-            group_2 = group_df
+            # group_2 = group_df
         elif i == 2:
             i_color = 4
             dot_color = 3
@@ -203,14 +225,7 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
                     label=f'{variable} Group {label}', fmt='-o', markersize=2, color=palette[dot_color])
         ax.fill_between(group_df['Pressure'], group_df[lower_col], group_df[upper_col], alpha=0.4, color=palette[i_color])
     
-    for pressure in stats_df['Pressure'].unique():
-        group_1_velocities = group_1[group_1['Pressure'] == pressure][y_col]
-        group_2_velocities = group_2[group_2['Pressure'] == pressure][y_col]
-        ks_stat, p_value = ks_2samp(group_1_velocities, group_2_velocities)
-        ks_stats.append({'Pressure': pressure, 'KS Statistic': ks_stat, 'p-value': p_value})
-
-    ks_df = pd.DataFrame(ks_stats)
-    print(ks_df)  # Or save it to a file if needed
+        
 
     legend_handles = [mpatches.Patch(color=palette[0], label=f'{variable} Group ≤50' if variable == 'Age' else '<120' if variable == 'SYS_BP' else 'M', alpha=0.6),
                       mpatches.Patch(color=palette[3], label=f'{variable} Group >50' if variable == 'Age' else '≥120' if variable == 'SYS_BP' else 'F', alpha=0.6)]
@@ -2494,7 +2509,55 @@ def plot_confusion_matrix(y_true, y_scores, features = None, threshold=0.5, clas
         plt.title('Confusion Matrix')
     plt.show()
 
-def make_roc_curve_one_var(df, feature, target='Age', flip = False):
+def delong_roc_variance(ground_truth, predictions):
+    """
+    Computes ROC AUC variance for a single set of predictions and true binary labels.
+    
+    Args:
+    ground_truth (array-like): True binary labels.
+    predictions (array-like): Predicted scores.
+    
+    Returns:
+    tuple: (AUC, AUC variance)
+    """
+    
+    ground_truth = np.asarray(ground_truth)
+    predictions = np.asarray(predictions)
+    assert len(ground_truth) == len(predictions)
+    assert np.array_equal(np.unique(ground_truth), [0, 1])
+    
+    # Count positive and negative examples
+    n1 = np.sum(ground_truth)
+    n2 = len(ground_truth) - n1
+    
+    # Calculate AUC
+    fpr, tpr, thresholds = roc_curve(ground_truth, predictions)
+    auc = np.trapz(tpr, fpr)
+    
+    # DeLong covariance
+    tx = predictions[ground_truth == 1]
+    ty = predictions[ground_truth == 0]
+    tx = np.expand_dims(tx, axis=0)
+    ty = np.expand_dims(ty, axis=1)
+    
+    v10 = np.mean(np.less(tx, ty), axis=1) - auc
+    v01 = np.mean(np.greater(tx, ty), axis=0) - auc
+    
+    auc_variance = (np.var(v10) / n1 + np.var(v01) / n2)
+    
+    return auc, auc_variance
+
+def calculate_auc_ci_delong(y_true, y_scores, alpha=0.95):
+    auc, auc_var = delong_roc_variance(y_true, y_scores)
+    auc_std = np.sqrt(auc_var)
+    lower_upper_q = stats.norm.ppf(1 - (1 - alpha) / 2)
+    ci_lower = auc - lower_upper_q * auc_std
+    ci_upper = auc + lower_upper_q * auc_std
+    ci_lower = max(0, ci_lower)  # Ensure lower bound is not below 0
+    ci_upper = min(1, ci_upper)  # Ensure upper bound is not above 1
+    return auc, ci_lower, ci_upper
+
+def make_roc_curve_one_var(df, feature, target='Age', flip=False, n_bootstraps=1000, ci_percentile=95):
     if target != 'Age':
         raise ValueError('Please choose target for this function (only Age is supported)')
     age_threshold = 50
@@ -2505,9 +2568,7 @@ def make_roc_curve_one_var(df, feature, target='Age', flip = False):
         # Categorize 'old' (1) and 'young' (0) based on age threshold
         df['Age Category'] = (df['Age'] >= age_threshold).astype(int)
 
-    # Assuming a simple linear relationship for illustration
-    # Adjust 'LogArea Score' threshold for classification
-    # Normally, you'd use a model or some logic here
+    # Calculate ROC and AUC for the actual data
     thresholds = np.linspace(df[feature].min(), df[feature].max(), 50)
     tprs = []
     fprs = []
@@ -2518,21 +2579,63 @@ def make_roc_curve_one_var(df, feature, target='Age', flip = False):
         tprs.append(tpr[1])
         fprs.append(fpr[1])
 
-    # Plot ROC Curve
-    plt.figure(figsize=(8, 6))
-    plt.plot(fprs, tprs, marker='o', linestyle='-', color='blue')
-    plt.plot([0, 1], [0, 1], color='grey', linestyle='--')
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('ROC Curve for Age Classification using ' + feature)
-
-    # Calculate AUC
+    # Calculate the actual AUC
     roc_auc = auc(fprs, tprs)
 
-    # Print AUC on the plot
-    plt.text(0.6, 0.2, f'AUC: {roc_auc:.2f}', fontsize=12, bbox=dict(facecolor='white', alpha=0.5))
+    # Calculate AUC and confidence interval using DeLong's method
+    y_true = df['Age Category'].values
+    y_scores = df[feature].values
+    auc_score, ci_lower, ci_upper = calculate_auc_ci_delong(y_true, y_scores)
+
+    print(f'delong auc below')
+    print(f'AUC: {auc_score:.2f}, 95% CI: [{ci_lower:.2f}, {ci_upper:.2f}]')
+
+    
+
+    # Bootstrap to calculate AUC confidence interval
+    bootstrapped_aucs = []
+
+    rng = np.random.RandomState(42)
+    for _ in range(n_bootstraps):
+        # Resample with replacement
+        df_resampled = df.sample(n=len(df), replace=True, random_state=rng)
+        tprs_resampled = []
+        fprs_resampled = []
+
+        for threshold in thresholds:
+            df_resampled['Predicted'] = (df_resampled[feature] >= threshold).astype(int)
+            fpr, tpr, _ = roc_curve(df_resampled['Age Category'], df_resampled['Predicted'])
+            tprs_resampled.append(tpr[1])
+            fprs_resampled.append(fpr[1])
+
+        # Sort fprs and tprs before calculating AUC
+        fprs_resampled, tprs_resampled = zip(*sorted(zip(fprs_resampled, tprs_resampled)))
+        bootstrapped_auc = auc(fprs_resampled, tprs_resampled)
+        bootstrapped_aucs.append(bootstrapped_auc)
+
+    bootstrapped_aucs = np.array(bootstrapped_aucs)
+    auc_mean = np.mean(bootstrapped_aucs)
+    auc_std = np.std(bootstrapped_aucs)
+    ci_lower = np.percentile(bootstrapped_aucs, (100 - ci_percentile) / 2)
+    ci_upper = np.percentile(bootstrapped_aucs, 100 - (100 - ci_percentile) / 2)
+
+    print('bootstrapping auc below')
+    print(f'AUC: {roc_auc:.2f}, 95% CI: [{ci_lower:.2f}, {ci_upper:.2f}], auc_mean: {auc_mean:.2f}, auc_std: {auc_std:.2f}')
+
+    # Plot ROC Curve
+    plt.figure(figsize=(8, 6))
+    plt.plot(fprs, tprs, marker='o', linestyle='-', color='blue', label='ROC curve')
+    plt.plot([0, 1], [0, 1], color='grey', linestyle='--', label='Random guess')
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title(f'ROC Curve for Age Classification using {feature}')
+    plt.legend(loc='lower right')
+
+    # Print AUC and its confidence interval on the plot
+    plt.text(0.6, 0.2, f'AUC: {roc_auc:.2f}\n95% CI: [{ci_lower:.2f}, {ci_upper:.2f}]', fontsize=12, bbox=dict(facecolor='white', alpha=0.5))
 
     plt.show()
+    return 0
 
 def run_regression(df, plot = False):
     """
@@ -2544,6 +2647,7 @@ def run_regression(df, plot = False):
     Returns:
         0 if successful
     """
+    plt.close('all')
     collapsed_df = collapse_df(df)
     collapsed_df = make_log_df(collapsed_df)
     if plot:
@@ -2567,10 +2671,10 @@ def run_regression(df, plot = False):
 
     # # Make models
     # logistic_model = perform_logistic_regression(collapsed_df, logistic_regression_features, target)
-    lasso_model = perform_lasso_regression(collapsed_df, lasso_features, target)
-    print(lasso_model)
-    lasso_model_eval = perform_lasso_regression_and_evaluate(collapsed_df, lasso_features, target)
-    print(lasso_model_eval)
+    # # lasso_model = perform_lasso_regression(collapsed_df, lasso_features, target)
+    # print(lasso_model)
+    # lasso_model_eval = perform_lasso_regression_and_evaluate(collapsed_df, lasso_features, target)
+    # print(lasso_model_eval)
 
     # # # Calculate AUC with age threshold of 50
     # y_true = (collapsed_df['Age'] > 50).astype(int)
@@ -2591,9 +2695,11 @@ def run_regression(df, plot = False):
     logistic_model2 = perform_logistic_regression(collapsed_df, logistic_features2, target)
     # logistic_model_eval2 = perform_logistic_regression_and_evaluate(collapsed_df, logistic_features2, target)
 
+    plt.close('all')
     make_roc_curve_one_var(collapsed_df, 'Log Area Score', target='Age', flip = True)
     make_roc_curve_one_var(collapsed_df, 'Area Score', target='Age', flip = True)
-    # make_roc_curve_one_var(collapsed_df, 'Log Pressure 1.2', target='Age', flip = False)
+    make_roc_curve_one_var(collapsed_df, 'Log Pressure 1.2', target='Age', flip = False)
+    make_roc_curve_one_var(collapsed_df, 'Pressure 1.2', target='Age', flip = False)
 
     # # Calculate AUC with age threshold of 50
     # y_true = (collapsed_df['Age'] > 50).astype(int)
@@ -3323,7 +3429,7 @@ def main(verbose = False):
     # run_regression(summary_df_no_high_pressure)
 
     summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.rename(columns={'Area Score_y': 'Area Score', 'Log Area Score_y': 'Log Area Score'})
-    # run_regression(summary_df_nhp_video_medians_copy)
+    run_regression(summary_df_nhp_video_medians_copy)
     
     # plot_CI(summary_df_no_high_pressure)        
         
