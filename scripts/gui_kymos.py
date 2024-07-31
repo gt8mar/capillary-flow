@@ -263,8 +263,8 @@ class KymographClassifier:
 
 if __name__ == "__main__":
     classifier = KymographClassifier(
-        'C:\\Users\\gt8ma\\capillary-flow\\results\\kymographs\\tricky_kymographs', 
-        'C:\\Users\\gt8ma\\capillary-flow\\metadata', 
-        'C:\\Users\\gt8ma\\capillary-flow\\tricky_kymos.csv',
-        'C:\\Users\\gt8ma\\capillary-flow\\classified_kymos.csv'
+        'C:\\Users\\gt8mar\\capillary-flow\\results\\kymographs\\tricky_kymographs', 
+        'C:\\Users\\gt8mar\\capillary-flow\\metadata', 
+        'C:\\Users\\gt8mar\\capillary-flow\\tricky_kymos.csv',
+        'C:\\Users\\gt8mar\\capillary-flow\\classified_kymos.csv'
     )
