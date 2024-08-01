@@ -64,15 +64,26 @@ def calculate_focus_measure(image,method='LAPE'):
     return focus_measure
 def extract_metadata(path, video):
     print(video)
+    print(path)
+    # remove leading and trailing whitespaces
+    video = video.strip(' ')
     """input path: string; outputs pressure: string, frame rate: integer"""
     metadata = pd.read_excel(path)
-    pressure = metadata.loc[(metadata['Video'] == video )| 
-                            (metadata["Video"]== video + 'bp')| 
-                            (metadata['Video']== video +'scan')]['Pressure'].values[0]
-    frame_rate = metadata.loc[(metadata['Video'] == video )| 
-                            (metadata["Video"]== video + 'bp')| 
-                            (metadata['Video']== video +'scan')]['FPS'].values[0]
-    
+    # Check if the video is in the metadata
+    if not metadata['Video'].str.contains(video).any():
+        print(f'Video {video} not found in metadata file')
+        return None, None
+    else:
+        # Check if the pressure is in the metadata
+        pressure_thing = metadata.loc[(metadata['Video'] == video )| 
+                                (metadata["Video"]== video + 'bp')| 
+                                (metadata['Video']== video +'scan')]['Pressure']
+        print(pressure_thing)
+        pressure = pressure_thing.values[0]
+        print(pressure)
+        frame_rate = metadata.loc[(metadata['Video'] == video )| 
+                                (metadata["Video"]== video + 'bp')| 
+                                (metadata['Video']== video +'scan')]['FPS'].values[0]
     
 
     return pressure, frame_rate
