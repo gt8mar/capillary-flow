@@ -10,6 +10,7 @@ by: Marcus Forst
 import os
 import time
 import numpy as np
+import platform
 import cv2
 import pandas as pd
 from src.tools.get_images import get_images
@@ -66,9 +67,21 @@ def extract_metadata(path, video):
     print(video)
     print(path)
     # remove leading and trailing whitespaces
-    video = video.strip(' ')
+    
     """input path: string; outputs pressure: string, frame rate: integer"""
     metadata = pd.read_excel(path)
+    # list all entries in the 'video' column
+    # print(metadata['Video'])
+    # make all entries in the 'video' column strings
+    metadata['Video'] = metadata['Video'].astype(str)
+    video = str(video).strip()
+    # print the row of the metadata file that contains the video
+    # print(metadata.loc[metadata['Video'] == stripped_video])
+
+    # print the types of that row
+    # print(metadata.loc[metadata['Video'] == stripped_video].dtypes)
+
+    # print('hopefully this works')
     # Check if the video is in the metadata
     if not metadata['Video'].str.contains(video).any():
         print(f'Video {video} not found in metadata file')
@@ -78,9 +91,9 @@ def extract_metadata(path, video):
         pressure_thing = metadata.loc[(metadata['Video'] == video )| 
                                 (metadata["Video"]== video + 'bp')| 
                                 (metadata['Video']== video +'scan')]['Pressure']
-        print(pressure_thing)
+        # print(pressure_thing)
         pressure = pressure_thing.values[0]
-        print(pressure)
+        # print(pressure)
         frame_rate = metadata.loc[(metadata['Video'] == video )| 
                                 (metadata["Video"]== video + 'bp')| 
                                 (metadata['Video']== video +'scan')]['FPS'].values[0]
@@ -109,9 +122,15 @@ def pic2vid(images, participant = 'part11', date = '230427', location = 'loc01',
     """
     SET = 'set01'
     images = np.array(images)
-    output_path = '/hpc/projects/capillary-flow/results/videos'
-    if overlay:
+    
+    if platform.system() == 'Windows':
+        output_path = 'C:\\Users\\ejerison\\capillary-flow\\results\\videos'
+        metadata_path = f'C:\\Users\\ejerison\\capillary-flow\\metadata\\{participant}_{date}.xlsx'
+    else:
+        output_path = '/hpc/projects/capillary-flow/results/videos'
         metadata_path = f'/hpc/projects/capillary-flow/metadata/{participant}_{date}.xlsx'
+    
+    if overlay:
         pressure, frame_rate = extract_metadata(metadata_path, video_folder)
         print(frame_rate)
     else:
@@ -172,12 +191,12 @@ def pic2vid(images, participant = 'part11', date = '230427', location = 'loc01',
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    input_folder = 'C:\\Users\\gt8mar\\capillary-flow\\data\\part_11\\230427\\vid1\\moco'
+    input_folder = 'E:\\Marcus\\data\\part60\\240628\\loc02\\vids\\vid34\\moco'
     images = get_images(input_folder)
     image_files = []
     for i in range(len(images)): 
         image = np.array(cv2.imread(os.path.join(input_folder, images[i]), cv2.IMREAD_GRAYSCALE))
         image_files.append(image)
-    pic2vid(image_files, color= True)
+    pic2vid(image_files, color= True, participant='part60', date='240628', location='loc02', video_folder='vid34', overlay=True)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
