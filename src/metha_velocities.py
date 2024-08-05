@@ -345,4 +345,9 @@ def main(filename, plot = False, marcus = True):
     
 
 if __name__ == "__main__":
-    main('C:\\Users\\gt8ma\\capillary-flow\\tests\\demo_data.mat')
+    main('C:\\Users\\ejerison\\capillary-flow\\tests\\demo_data.mat')
+
+    #TODO: Add the following to the main function
+    # load our data
+    # load mask 
+    # update velocity boundary conditions
