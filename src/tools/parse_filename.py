@@ -12,7 +12,8 @@ import pandas as pd
 
 def parse_filename(filename):
     """
-    Parses the filename of an image into its participant, date, location and video number.
+    Parses the filename of an image into its participant, date, location and video number. If there is no
+    video number, the function sets the video number to vid01. 
 
     Args:
         filename (str): Filename of the image. format: set_participant_date_video_background.tiff
@@ -33,22 +34,32 @@ def parse_filename(filename):
                                                item.startswith('220') |
                                                item.startswith('240') |
                                                item.startswith('241'))][0]
-    video = [item for item in filename_list if item.startswith('vid')] [0]
+    video_list = [item for item in filename_list if item.startswith('vid')]
+    # If there is no video number, set video to vid01
+    if video_list:
+        video = video_list[0]
+    else:
+        video = 'vid01'
     # get location from metadata
     if platform.system() == 'Windows':
         metadata = pd.read_excel(os.path.join("C:\\Users\\gt8mar\\capillary-flow\\metadata", str(participant) + "_" + str(date) + ".xlsx"))
     else:    
         metadata = pd.read_excel(os.path.join("/hpc/projects/capillary-flow/metadata", str(participant) + "_" + str(date) + ".xlsx"))
-    # make location column entries into strings
-    location = metadata.loc[(metadata['Video'] == video )| 
-                            (metadata["Video"]== video + 'bp')| 
-                            (metadata['Video']== video +'scan')]['Location'].values[0]
     
-    if str(location) == "Temp" or str(location) == "Ex":
-        location = "loc" + str(location)
+    location_list = [item for item in filename_list if item.startswith('loc')]
+    if location_list:
+        location = location_list[0]
     else:
-        location = "loc" + str(location).zfill(2)
-    
+        # make location column entries into strings
+        location = metadata.loc[(metadata['Video'] == video )| 
+                                (metadata["Video"]== video + 'bp')| 
+                                (metadata['Video']== video +'scan')]['Location'].values[0]
+        
+        if str(location) == "Temp" or str(location) == "Ex":
+            location = "loc" + str(location)
+        else:
+            location = "loc" + str(location).zfill(2)
+        
     file_prefix = f'set01_{participant}_{date}_{location}'
     return participant, date, location, video, file_prefix
 
