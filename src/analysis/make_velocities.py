@@ -211,11 +211,16 @@ def find_slopes_hough(image, filename, min_angles=5, output_folder=None, plot = 
     ax1.imshow(edges)
     ax1.set_title("Canny Edge Detection")
 
+    # round the slope to 4 decimal places
+    weighted_average_slope = round(weighted_average_slope, 4)
+    average_slope = round(average_slope, 4)
+
     # Draw lines on the original image
     if weighted_average_slope == 0:
         cv2.line(image, (int(image.shape[1]/2), 0), (int(image.shape[1]/2), image.shape[0]-1), (255,255,0), 2)
     else:
-        cv2.line(image, (int(image.shape[1]/2), 0), (int((image.shape[0]-1)/average_slope) + int(image.shape[1]/2), image.shape[0]-1), (255,255,0), 2)
+        pt2 = (int((image.shape[0]-1)/average_slope) + int(image.shape[1]/2), image.shape[0]-1)
+        cv2.line(image, (int(image.shape[1]/2), 0), pt2, (255,255,0), 2)
         cv2.line(image, (int(image.shape[1]/2), 0), (int((image.shape[0]-1)/weighted_average_slope) + int(image.shape[1]/2), image.shape[0]-1), (0,255,0), 2)
 
     ax2.imshow(image, cmap='gray')
