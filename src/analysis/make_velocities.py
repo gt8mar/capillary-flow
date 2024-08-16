@@ -119,6 +119,18 @@ def plot_box_swarm(data, x_labels, y_axis_label,  plot_title, figure_name,
         if verbose: plt.show()
     return 0
 def remove_horizontal_banding(image_path, filter_size=10):
+    """
+    This function removes horizontal banding from an image by subtracting a
+    smoothed version of the row means from the image.
+
+    Args:
+        image_path (str): the path to the image to be corrected
+        filter_size (int): the size of the Gaussian filter to apply
+
+    Returns:
+        corrected_image (numpy array): the corrected image
+        original_image (numpy array): the original image
+    """
     image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
     row_means = np.mean(image, axis=1)
     smoothed_means = gaussian_filter1d(row_means, filter_size)

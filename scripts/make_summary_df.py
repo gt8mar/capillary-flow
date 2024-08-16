@@ -75,7 +75,6 @@ def compare_participants(df1, df2):
             different_participants.append(participant)
 
     return different_rows, different_participants
-
 def handle_dotted_evac(summary_df):
     # Fill NaN values in the 'Notes' column with an empty string
     summary_df['Notes'] = summary_df['Notes'].fillna('')
@@ -214,5 +213,5 @@ def main(participant_lead, participant_end_inclusive):
 
 if __name__ == '__main__':
     # merge_vel_size(verbose=True)
-    main(28, 32)
+    main(33, 81)
     

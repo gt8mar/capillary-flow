@@ -229,8 +229,8 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
     
         
 
-    legend_handles = [mpatches.Patch(color=palette[0], label=f'{variable} Group ≤50' if variable == 'Age' else '<120' if variable == 'SYS_BP' else 'Male', alpha=0.6),
-                      mpatches.Patch(color=palette[3], label=f'{variable} Group >50' if variable == 'Age' else '≥120' if variable == 'SYS_BP' else 'Female', alpha=0.6)]
+    legend_handles = [mpatches.Patch(color=palette[0], label=f'{variable} ≤50' if variable == 'Age' else 'BP <120' if variable == 'SYS_BP' else 'Male', alpha=0.6),
+                      mpatches.Patch(color=palette[3], label=f'{variable} >50' if variable == 'Age' else 'BP ≥120' if variable == 'SYS_BP' else 'Female', alpha=0.6)]
 
     ax.set_xlabel('Pressure (psi)', fontproperties=source_sans)
     if dimensionless:
@@ -1857,14 +1857,14 @@ def collapse_df(df):
     # Combine age into the final DataFrame
     final_df = pd.merge(final_df, ages, left_on='Participant', right_index=True)
     
-    # If there is an 'Area Score' column, add it to the final DataFrame
-    if 'Area Score' in df.columns:
-        area_scores = df.groupby('Participant')['Area Score'].mean().rename('Area Score')
+    # If there is an 'Age Score' column, add it to the final DataFrame
+    if 'Age Score' in df.columns:
+        area_scores = df.groupby('Participant')['Age Score'].mean().rename('Age Score')
         final_df = pd.merge(final_df, area_scores, left_on='Participant', right_index=True)
     
-    # If there is a 'Log Area Score' column, add it to the final DataFrame
-    if 'Log Area Score' in df.columns:
-        log_area_scores = df.groupby('Participant')['Log Area Score'].mean().rename('Log Area Score')
+    # If there is a 'Log Age Score' column, add it to the final DataFrame
+    if 'Log Age Score' in df.columns:
+        log_area_scores = df.groupby('Participant')['Log Age Score'].mean().rename('Log Age Score')
         final_df = pd.merge(final_df, log_area_scores, left_on='Participant', right_index=True)
 
     # If there is a 'KS Statistic' column, add it to the final DataFrame
@@ -1905,7 +1905,7 @@ def plot_stats(df):
     plt.show()
 
     # Pair plot to visualize relationships between Median Velocity and other features
-    sns.pairplot(df[['Median Velocity', 'Pressure 0.2', 'Pressure 0.8', 'Pressure 1.2', 'Age', 'Median SYS_BP', 'Area Score', 'Log Area Score', 'KS Statistic', 'EMD Score']])
+    sns.pairplot(df[['Median Velocity', 'Pressure 0.2', 'Pressure 0.8', 'Pressure 1.2', 'Age', 'Median SYS_BP', 'Age Score', 'Log Age Score', 'KS Statistic', 'EMD Score']])
     plt.show()
 
     # Correlation matrix
@@ -1925,10 +1925,10 @@ def make_models(df, variable = 'Median Velocity', log = False, plot = False):
 
     # preparing the data
     if log:
-        X = df.drop(['Participant', 'Median Velocity', 'Area Score', 'Log Area Score', 'EMD Score', 'KS Statistic',                      
+        X = df.drop(['Participant', 'Median Velocity', 'Age Score', 'Log Age Score', 'EMD Score', 'KS Statistic',                      
                      'Pressure 0.2', 'Pressure 0.4', 'Pressure 0.6', 'Pressure 0.8', 'Pressure 1.0', 'Pressure 1.2'], axis=1)  # Using log pressures, age, and sys_bp as features
     else: 
-        X = df.drop(['Participant', 'Log Median Velocity', 'Area Score', 'Log Area Score', 'EMD Score', 'KS Statistic',
+        X = df.drop(['Participant', 'Log Median Velocity', 'Age Score', 'Log Age Score', 'EMD Score', 'KS Statistic',
                      'Log Pressure 0.2', 'Log Pressure 0.4', 'Log Pressure 0.6', 'Log Pressure 0.8', 'Log Pressure 1.0', 'Log Pressure 1.2'], axis=1)  # Using pressures, age, and sys_bp as features
     
     if variable == 'Median Velocity':
@@ -1937,10 +1937,10 @@ def make_models(df, variable = 'Median Velocity', log = False, plot = False):
     elif variable == 'Log Median Velocity':
         Y = df['Log Median Velocity']
         X.drop(['Log Median Velocity'], axis=1, inplace=True)
-    elif variable == 'Log Area Score':
-        Y = df['Log Area Score']
-    elif variable == 'Area Score':
-        Y = df['Area Score']
+    elif variable == 'Log Age Score':
+        Y = df['Log Age Score']
+    elif variable == 'Age Score':
+        Y = df['Age Score']
     else:
         Y = df['Median Velocity']
         X.drop(['Log Median Velocity', 'Median Velocity'], axis=1, inplace=True)
@@ -2135,9 +2135,9 @@ def compare_log_and_linear(df, variable = 'Median Velocity', plot = False):
     if variable == 'Median Velocity':
         y_original = df['Median Velocity']
         y_transformed = df['log_Median_Velocity']
-    elif variable == 'Area Score':
-        y_original = df['Area Score']
-        y_transformed = df['Log Area Score']
+    elif variable == 'Age Score':
+        y_original = df['Age Score']
+        y_transformed = df['Log Age Score']
     else:
         y_original = df['Age']
         y_transformed = df['Age']
@@ -2568,18 +2568,15 @@ def calculate_auc_ci_delong(y_true, y_scores, alpha=0.95):
     ci_upper = min(1, ci_upper)  # Ensure upper bound is not above 1
     return auc, auc_var, ci_lower, ci_upper
 
-def make_roc_curve_one_var(df, feature, target='Age', flip=False, plot = False, n_bootstraps=1000, ci_percentile=95):
+def make_roc_curve_one_var(df, feature, target='Age', flip=False, plot=False, write=False, n_bootstraps=1000, ci_percentile=95):
     if target != 'Age':
         raise ValueError('Please choose target for this function (only Age is supported)')
     age_threshold = 50
     if flip:
-        # Categorize 'old' (0) and 'young' (1) based on age threshold
         df['Age Category'] = (df['Age'] < age_threshold).astype(int)
     else:
-        # Categorize 'old' (1) and 'young' (0) based on age threshold
         df['Age Category'] = (df['Age'] >= age_threshold).astype(int)
 
-    # Calculate ROC and AUC for the actual data
     thresholds = np.linspace(df[feature].min(), df[feature].max(), 50)
     tprs = []
     fprs = []
@@ -2590,10 +2587,8 @@ def make_roc_curve_one_var(df, feature, target='Age', flip=False, plot = False, 
         tprs.append(tpr[1])
         fprs.append(fpr[1])
 
-    # Calculate the actual AUC
     roc_auc = auc(fprs, tprs)
 
-    # Calculate AUC and confidence interval using DeLong's method
     y_true = df['Age Category'].values
     y_scores = df[feature].values
     auc_score, auc_var, ci_lower, ci_upper = calculate_auc_ci_delong(y_true, y_scores)
@@ -2601,14 +2596,16 @@ def make_roc_curve_one_var(df, feature, target='Age', flip=False, plot = False, 
     print(f'delong auc below')
     print(f'AUC: {auc_score:.2f}, auc variance: {auc_var}, auc std: {np.sqrt(auc_var)}, 95% CI: [{ci_lower:.2f}, {ci_upper:.2f}]')
 
-    
+    # Since the DeLong method doesn't directly provide TPRs, we use the original ROC curve for TPRs
+    delong_tprs = tprs  # Use the TPRs from the original ROC calculation
 
-    # Bootstrap to calculate AUC confidence interval
+    plot_roc_with_ci(fprs, delong_tprs, roc_auc, [delong_tprs], ci_lower, ci_upper, feature, 'delong', plot, write=write)
+
     bootstrapped_aucs = []
+    bootstrapped_tprs = []
 
     rng = np.random.RandomState(42)
     for _ in range(n_bootstraps):
-        # Resample with replacement
         df_resampled = df.sample(n=len(df), replace=True, random_state=rng)
         tprs_resampled = []
         fprs_resampled = []
@@ -2619,10 +2616,10 @@ def make_roc_curve_one_var(df, feature, target='Age', flip=False, plot = False, 
             tprs_resampled.append(tpr[1])
             fprs_resampled.append(fpr[1])
 
-        # Sort fprs and tprs before calculating AUC
         fprs_resampled, tprs_resampled = zip(*sorted(zip(fprs_resampled, tprs_resampled)))
         bootstrapped_auc = auc(fprs_resampled, tprs_resampled)
         bootstrapped_aucs.append(bootstrapped_auc)
+        bootstrapped_tprs.append(np.interp(np.linspace(0, 1, 100), fprs_resampled, tprs_resampled))
 
     bootstrapped_aucs = np.array(bootstrapped_aucs)
     auc_mean = np.mean(bootstrapped_aucs)
@@ -2633,23 +2630,52 @@ def make_roc_curve_one_var(df, feature, target='Age', flip=False, plot = False, 
     print('bootstrapping auc below')
     print(f'AUC: {roc_auc:.2f}, 95% CI: [{ci_lower:.2f}, {ci_upper:.2f}], auc_mean: {auc_mean:.2f}, auc_std: {auc_std:.2f}')
 
-    # Plot ROC Curve
-    plt.figure(figsize=(8, 6))
-    plt.plot(fprs, tprs, marker='o', linestyle='-', color='blue', label='ROC curve')
-    plt.plot([0, 1], [0, 1], color='grey', linestyle='--', label='Random guess')
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title(f'ROC Curve for Age Classification using {feature}')
-    plt.legend(loc='lower right')
+    # Plot ROC Curve with confidence interval using bootstrapped data
+    plot_roc_with_ci(fprs, tprs, roc_auc, bootstrapped_tprs, ci_lower, ci_upper, feature, 'bootstrap', plot, write)
+    return 0
 
-    # Print AUC and its confidence interval on the plot
-    plt.text(0.6, 0.2, f'AUC: {roc_auc:.2f}\n95% CI: [{ci_lower:.2f}, {ci_upper:.2f}]', fontsize=12, bbox=dict(facecolor='white', alpha=0.5))
+
+def plot_roc_with_ci(fprs, tprs, roc_auc, bootstrapped_tprs, ci_lower, ci_upper, feature, method='bootstrap', plot=False, write=False):
+    
+    # Set up style and font
+    sns.set_style("whitegrid")
+    source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 5, 'lines.linewidth': 0.5
+    })
+
+    base_color = '#1f77b4' #'#6B0F1A'
+
+    fig, ax = plt.subplots(figsize=(2.4, 2.0))    
+    # Plot the mean ROC curve
+    ax.plot(fprs, tprs, marker='', linestyle='-', markersize=2, color=base_color, label=f'ROC curve (AUC = {roc_auc:.2f})')
+    
+    # Calculate and plot the confidence interval for the ROC curve
+    if len(bootstrapped_tprs) > 1:
+        tprs_lower = np.percentile(bootstrapped_tprs, 2.5, axis=0)
+        tprs_upper = np.percentile(bootstrapped_tprs, 97.5, axis=0)
+        ax.fill_between(np.linspace(0, 1, 100), tprs_lower, tprs_upper, color=base_color, alpha=0.2, label=f'95% CI:[{ci_lower:.2f}, {ci_upper:.2f}]')
+    
+    ax.plot([0, 1], [0, 1], color='grey', linestyle='--', markersize=2, label='Random guess')
+    ax.set_xlabel('False Positive Rate', fontproperties=source_sans)
+    ax.set_ylabel('True Positive Rate', fontproperties=source_sans)
+    ax.set_title(f'Age Classification using {feature}', fontproperties=source_sans, fontsize=8)
+    ax.legend(loc='lower right', prop=source_sans)
+    ax.grid(True, linewidth=0.3)
+
+    plt.tight_layout()
+    
+    if write:
+        plt.savefig(os.path.join('C:\\Users\\gt8mar\\capillary-flow\\results\\', f'roc_curve_{method}_{feature}.png'), dpi=600)
     if plot:
         plt.show()
     else:
         plt.close()
     return 0
-
 def run_regression(df, plot = False):
     """
     Runs a linear regression analysis on the inputted DataFrame and plots results.
@@ -2666,16 +2692,16 @@ def run_regression(df, plot = False):
     if plot:
         plot_stats(collapsed_df)
 
-    # make_models(collapsed_df, variable = 'Area Score', log = False, plot=False)
-    # make_models(collapsed_df, variable = 'Log Area Score', log = True, plot=False)
+    # make_models(collapsed_df, variable = 'Age Score', log = False, plot=False)
+    # make_models(collapsed_df, variable = 'Log Age Score', log = True, plot=False)
     # make_models(collapsed_df, variable = 'Median Velocity', log = False, plot=False)
         
-    # compare_log_and_linear(collapsed_df, "Area Score", plot=False)
-    logistic_regression_features = ['Log Area Score', 'Pressure 0.2', 'Pressure 0.4', 'Pressure 1.2', 
+    # compare_log_and_linear(collapsed_df, "Age Score", plot=False)
+    logistic_regression_features = ['Log Age Score', 'Pressure 0.2', 'Pressure 0.4', 'Pressure 1.2', 
                                     'Median SYS_BP']
     # make lasso features all features not including the target Age
     lasso_features = collapsed_df.columns.tolist()
-    # lasso_features = ['Age', 'Participant', 'Log Area Score', 'Pressure 0.2', 'Pressure 1.2', 'Median SYS_BP']
+    # lasso_features = ['Age', 'Participant', 'Log Age Score', 'Pressure 0.2', 'Pressure 1.2', 'Median SYS_BP']
     lasso_features.remove('Participant')
     lasso_features.remove('Age')
     # remove_features = ['Log Pressure 0.2', 'Log Pressure 0.4', 'Log Pressure 0.6', 'Log Pressure 0.8', 'Log Pressure 1.0', 'Log Pressure 1.2']
@@ -2699,8 +2725,8 @@ def run_regression(df, plot = False):
 
     # -------------------------------------------------------------------------------------------------------
 
-    # compare_log_and_linear(collapsed_df, "Area Score", plot=False)
-    logistic_features2 = ['Log Area Score', 'Pressure 1.2', 
+    # compare_log_and_linear(collapsed_df, "Age Score", plot=False)
+    logistic_features2 = ['Log Age Score', 'Pressure 1.2', 
                                     'Median SYS_BP']
 
     # Make models
@@ -2709,10 +2735,10 @@ def run_regression(df, plot = False):
     # logistic_model_eval2 = perform_logistic_regression_and_evaluate(collapsed_df, logistic_features2, target)
 
     plt.close('all')
-    make_roc_curve_one_var(collapsed_df, 'Log Area Score', target='Age', flip = True)
-    make_roc_curve_one_var(collapsed_df, 'Area Score', target='Age', flip = True)
-    make_roc_curve_one_var(collapsed_df, 'Log Pressure 1.2', target='Age', flip = False)
-    make_roc_curve_one_var(collapsed_df, 'Pressure 1.2', target='Age', flip = False)
+    make_roc_curve_one_var(collapsed_df, 'Log Age Score', target='Age', flip = True, write=True)
+    make_roc_curve_one_var(collapsed_df, 'Age Score', target='Age', flip = True, write=True)
+    make_roc_curve_one_var(collapsed_df, 'Log Pressure 1.2', target='Age', flip = False, write=True)
+    make_roc_curve_one_var(collapsed_df, 'Pressure 1.2', target='Age', flip = False, write=True)
 
     # # Calculate AUC with age threshold of 50
     # y_true = (collapsed_df['Age'] > 50).astype(int)
@@ -2760,6 +2786,85 @@ def run_regression(df, plot = False):
 #     participant_scores = data.groupby('Participant')['Corrected Velocity'].apply(lambda x: entire_dataset_area - calculate_cdf_area(x))
 
 #     return participant_scores
+
+def calculate_bp_stats(sub_df):
+    bp_below_120 = sub_df[sub_df['SYS_BP'] < 120].shape[0]
+    bp_above_120 = sub_df[sub_df['SYS_BP'] >= 120].shape[0]
+    return bp_below_120, bp_above_120
+
+def get_dataset_characteristics(df):
+    # collapse df so each participant has one row. Take the median of the systolic blood pressure
+    collapsed_df = df.groupby(['Participant', 'Sex']).agg({'SYS_BP': 'median', 'Age': 'mean'}).reset_index()
+    # Calculate overall statistics
+    total_participants = len(collapsed_df)
+    mean_age = collapsed_df['Age'].mean()
+    std_age = collapsed_df['Age'].std()
+    # included = collapsed_df['Included'].sum()
+    # excluded = total_participants - included
+    bp_below_120_total = collapsed_df[collapsed_df['SYS_BP'] < 120].shape[0]
+    bp_above_120_total = collapsed_df[collapsed_df['SYS_BP'] >= 120].shape[0]
+
+    # Calculate age-based statistics
+    under_fifty = collapsed_df[collapsed_df['Age'] < 50]
+    above_fifty = collapsed_df[collapsed_df['Age'] >= 50]
+
+    under_fifty_stats = {
+        'total': len(under_fifty),
+        'mean_age': under_fifty['Age'].mean(),
+        'std_age': under_fifty['Age'].std(),
+        'bp_below_120': calculate_bp_stats(under_fifty)[0],
+        'bp_above_120': calculate_bp_stats(under_fifty)[1]
+        }
+
+    above_fifty_stats = {
+        'total': len(above_fifty),
+        'mean_age': above_fifty['Age'].mean(),
+        'std_age': above_fifty['Age'].std(),
+        'bp_below_120': calculate_bp_stats(above_fifty)[0],
+        'bp_above_120': calculate_bp_stats(above_fifty)[1]
+    }
+
+    # Calculate sex-based statistics
+    males = collapsed_df[collapsed_df['Sex'] == 'M']
+    females = collapsed_df[collapsed_df['Sex'] == 'F']
+
+    male_stats = {
+        'total': len(males),
+        'mean_age': males['Age'].mean(),
+        'std_age': males['Age'].std(),
+        'bp_below_120': calculate_bp_stats(males)[0],
+        'bp_above_120': calculate_bp_stats(males)[1]
+    }
+
+    female_stats = {
+        'total': len(females),
+        'mean_age': females['Age'].mean(),
+        'std_age': females['Age'].std(),
+        'bp_below_120': calculate_bp_stats(females)[0],
+        'bp_above_120': calculate_bp_stats(females)[1]
+    }
+
+    # Output to LaTeX table
+    latex_table = f"""
+    \\begin{{table}}[h]
+        \\centering
+        \\caption{{Participant Demographics and Characteristics}}
+        \\begin{{tabular}}{{@{{}}lcccc@{{}}}}
+            \\toprule
+            \\textbf{{Group}} & \\textbf{{Total Participants (Mean Age $\\pm$ SD)}} & \\textbf{{BP $<$ 120 sys}} & \\textbf{{BP $>$ 120 sys}} \\
+            \\midrule
+            Total & {total_participants} ({mean_age:.1f} $\\pm$ {std_age:.1f}) & {bp_below_120_total} ({(bp_below_120_total / total_participants) * 100:.0f}\\%) & {bp_above_120_total} ({(bp_above_120_total / total_participants) * 100:.0f}\\%) \\\\
+            Under Fifty & {under_fifty_stats['total']} ({under_fifty_stats['mean_age']:.1f} $\\pm$ {under_fifty_stats['std_age']:.1f}) & {under_fifty_stats['bp_below_120']} ({(under_fifty_stats['bp_below_120'] / under_fifty_stats['total']) * 100:.0f}\\%) & {under_fifty_stats['bp_above_120']} ({(under_fifty_stats['bp_above_120'] / under_fifty_stats['total']) * 100:.0f}\\%) \\\\
+            Above Fifty & {above_fifty_stats['total']} ({above_fifty_stats['mean_age']:.1f} $\\pm$ {above_fifty_stats['std_age']:.1f}) & {above_fifty_stats['bp_below_120']} ({(above_fifty_stats['bp_below_120'] / above_fifty_stats['total']) * 100:.0f}\\%) & {above_fifty_stats['bp_above_120']} ({(above_fifty_stats['bp_above_120'] / above_fifty_stats['total']) * 100:.0f}\\%) \\\\
+            Male Participants & {male_stats['total']} ({male_stats['mean_age']:.1f} $\\pm$ {male_stats['std_age']:.1f}) & {male_stats['bp_below_120']} ({(male_stats['bp_below_120'] / male_stats['total']) * 100:.0f}\\%) & {male_stats['bp_above_120']} ({(male_stats['bp_above_120'] / male_stats['total']) * 100:.0f}\\%) \\\\
+            Female Participants & {female_stats['total']} ({female_stats['mean_age']:.1f} $\\pm$ {female_stats['std_age']:.1f}) & {female_stats['bp_below_120']} ({(female_stats['bp_below_120'] / female_stats['total']) * 100:.0f}\\%) & {female_stats['bp_above_120']} ({(female_stats['bp_above_120'] / female_stats['total']) * 100:.0f}\\%) \\\\
+            \\bottomrule
+        \\end{{tabular}}
+    \\end{{table}}
+    """
+
+    print(latex_table)
+
 
 def empirical_cdf(data):
     """Generates the empirical CDF for a dataset."""
@@ -2878,19 +2983,19 @@ def calculate_area_score(data, start=10, end=700, plot = False, verbose = False,
         if verbose:
             print(f'Participant {participant} has a CDF area of {participant_area:.2f} and a log CDF area of {participant_area_log:.2f}')
         area_scores.append([participant, participant_area-area, participant_area_log-area_log])
-    # plot area scores
-    area_scores_df = pd.DataFrame(area_scores, columns=['Participant', 'Area Score', 'Log Area Score'])
+    # plot Age Scores
+    area_scores_df = pd.DataFrame(area_scores, columns=['Participant', 'Age Score', 'Log Age Score'])
     plt.figure(figsize=(10, 6))
     if log:
-        area_scores_df = area_scores_df.sort_values(by='Log Area Score', ascending=False)
-        plt.bar(area_scores_df['Participant'], area_scores_df['Log Area Score'], width=0.5)
-        plt.ylabel('Log Area Score')
-        plt.title('Log Area Score for Each Participant')
+        area_scores_df = area_scores_df.sort_values(by='Log Age Score', ascending=False)
+        plt.bar(area_scores_df['Participant'], area_scores_df['Log Age Score'], width=0.5)
+        plt.ylabel('Log Age Score')
+        plt.title('Log Age Score for Each Participant')
     else:
-        area_scores_df = area_scores_df.sort_values(by='Area Score', ascending=False)
-        plt.bar(area_scores_df['Participant'], area_scores_df['Area Score'], width=0.5)
-        plt.ylabel('Area Score')
-        plt.title('Area Score for Each Participant')
+        area_scores_df = area_scores_df.sort_values(by='Age Score', ascending=False)
+        plt.bar(area_scores_df['Participant'], area_scores_df['Age Score'], width=0.5)
+        plt.ylabel('Age Score')
+        plt.title('Age Score for Each Participant')
     plt.xlabel(f'Participant')
     plt.xticks(rotation=45)
     if plot:
@@ -2898,6 +3003,50 @@ def calculate_area_score(data, start=10, end=700, plot = False, verbose = False,
     else:
         plt.close()
     return area_scores_df
+
+def plot_area_score(df, log = False, plot = False, write = False):
+    plt.close()
+
+    # Set up style and font
+    sns.set_style("whitegrid")
+    source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 5, 'lines.linewidth': 0.5
+    })
+
+    base_color = '#1f77b4'
+
+    fig, ax = plt.subplots(figsize=(2.4, 2.0))
+    if log:
+        # plot Age Score vs age scatter
+        ax.scatter(df['Age'], df['Log Age Score'], color=base_color, marker='o', s=3)
+        ax.set_xlabel('Age', fontproperties=source_sans)
+        ax.set_ylabel('Log Age Score', fontproperties=source_sans)
+        ax.set_title('Log Age Score vs. Age', fontproperties=source_sans, fontsize=8)
+    else:
+        # plot Age Score vs age scatter
+        ax.scatter(df['Age'], df['Age Score'], color=base_color, marker='o', s=3)
+        ax.set_xlabel('Age', fontproperties=source_sans)
+        ax.set_ylabel('Age Score', fontproperties=source_sans)
+        ax.set_title('Age Score vs. Age', fontproperties=source_sans, fontsize=8)
+    ax.grid(True, linewidth=0.3)
+    plt.tight_layout()
+
+    if write:
+        if log:
+            plt.savefig(os.path.join('C:\\Users\\gt8mar\\capillary-flow\\results\\', f'log_age_score_vs_age.png'), dpi=600)
+        else:
+            plt.savefig(os.path.join('C:\\Users\\gt8mar\\capillary-flow\\results\\', f'age_score_vs_age.png'), dpi=600)
+    if plot:
+        plt.show()
+    else:
+        plt.close()
+    return 0
+
 
 def plot_medians_pvals(summary_df_nhp_video_medians):
     if 'Sex' not in summary_df_nhp_video_medians.columns:
@@ -3338,20 +3487,14 @@ def main(verbose = False):
     # plot_cdf_comp_pressure(summary_df)
 
     
-    area_scores_df = calculate_area_score(summary_df_no_high_pressure, log = True, plot=True)
-    # add area scores to summary_df_no_high_pressure
+    area_scores_df = calculate_area_score(summary_df_no_high_pressure, log = True, plot=False)
+    # add Age Scores to summary_df_no_high_pressure
     summary_df_no_high_pressure = summary_df_no_high_pressure.merge(area_scores_df, on='Participant', how='inner')
 
    
     
 
-    # # plot area score vs age scatter
-    # plt.figure(figsize=(10, 6))
-    # plt.scatter(summary_df_no_high_pressure['Age'], summary_df_no_high_pressure['Log Area Score'])
-    # plt.xlabel('Age')
-    # plt.ylabel('Log Area Score')
-    # plt.title('Log Area Score vs. Age')
-    # plt.show()
+   
 
 
 
@@ -3506,12 +3649,17 @@ def main(verbose = False):
     plot_CI(summary_df_nhp_video_medians_copy, variable = 'Age', ci_percentile=95, write = True)
     plot_CI(summary_df_nhp_video_medians_copy, variable = 'SYS_BP', ci_percentile=95, write = True)
 
+    summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.drop(columns=['Age Score', 'Log Age Score'])
     medians_area_scores_df = calculate_area_score(summary_df_nhp_video_medians_copy, log = True, plot=False)
-    # add area scores to summary_df_nhp_video_medians_copy
+    # add Age Scores to summary_df_nhp_video_medians_copy
     summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.merge(medians_area_scores_df, on='Participant', how='inner')
     # print columns of summary_df_nhp_video_medians_copy
     # print(summary_df_nhp_video_medians_copy.columns)
+    plot_area_score(summary_df_nhp_video_medians_copy, log = True, write = True)
 
+    
+    plt.close()
+    
     
 
                                   
@@ -3530,11 +3678,11 @@ def main(verbose = False):
         
     # run_regression(summary_df_no_high_pressure)
 
-    summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.rename(columns={'Area Score_y': 'Area Score', 'Log Area Score_y': 'Log Area Score'})
-    run_regression(summary_df_nhp_video_medians_copy)
+    summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.rename(columns={'Age Score_y': 'Age Score', 'Log Age Score_y': 'Log Age Score'})
+    # run_regression(summary_df_nhp_video_medians_copy)
     
     # plot_CI(summary_df_no_high_pressure)        
-        
+    get_dataset_characteristics(summary_df_nhp_video_medians_copy)
 
     
   
@@ -3588,22 +3736,22 @@ def main(verbose = False):
     # area_scores_fav_df = calculate_area_score(favorite_df_no_high_pressure, plot = False, log = True)
     # favorite_df_no_high_pressure = favorite_df_no_high_pressure.merge(area_scores_fav_df, on='Participant', how='inner')
 
-    # # # plot area score vs age scatter
+    # # # plot Age Score vs age scatter
     # # plt.figure(figsize=(10, 6))
-    # # plt.scatter(favorite_df_no_high_pressure['Age'], favorite_df_no_high_pressure['Area Score'])
+    # # plt.scatter(favorite_df_no_high_pressure['Age'], favorite_df_no_high_pressure['Age Score'])
     # # plt.xlabel('Age')
-    # # plt.ylabel('Area Score')
-    # # plt.title('Area Score vs. Age')
+    # # plt.ylabel('Age Score')
+    # # plt.title('Age Score vs. Age')
     # # plt.show()
 
-    # # # plot area score vs age scatter for medians
+    # # # plot Age Score vs age scatter for medians
     # # plt.figure(figsize=(10, 6))
-    # # plt.scatter(summary_df_nhp_video_medians_copy['Age'], summary_df_nhp_video_medians_copy['Area Score_x'])
-    # # plt.scatter(summary_df_nhp_video_medians_copy['Age'], summary_df_nhp_video_medians_copy['Area Score_y'])
-    # # plt.scatter(favorite_df_no_high_pressure['Age'], favorite_df_no_high_pressure['Area Score'])
+    # # plt.scatter(summary_df_nhp_video_medians_copy['Age'], summary_df_nhp_video_medians_copy['Age Score_x'])
+    # # plt.scatter(summary_df_nhp_video_medians_copy['Age'], summary_df_nhp_video_medians_copy['Age Score_y'])
+    # # plt.scatter(favorite_df_no_high_pressure['Age'], favorite_df_no_high_pressure['Age Score'])
     # # plt.xlabel('Age')
-    # # plt.ylabel('Area Score')
-    # # plt.title('Area Score vs. Age')
+    # # plt.ylabel('Age Score')
+    # # plt.title('Age Score vs. Age')
     # # plt.legend(['Corrected Velocity', 'Video Median Velocity', 'Favorite Capillaries'])
     # # plt.show()
 
@@ -3643,8 +3791,8 @@ def main(verbose = False):
     # # merge ks statistic df with summary df
     # favorite_df_no_high_pressure = favorite_df_no_high_pressure.merge(ks_statistic_df, on='Participant', how='inner')
 
-    # # rename Area Score columns to omit _x
-    # favorite_df_no_high_pressure = favorite_df_no_high_pressure.rename(columns={'Area Score_x': 'Area Score', 'Log Area Score_x': 'Log Area Score'})
+    # # rename Age Score columns to omit _x
+    # favorite_df_no_high_pressure = favorite_df_no_high_pressure.rename(columns={'Age Score_x': 'Age Score', 'Log Age Score_x': 'Log Age Score'})
     # # run_regression(favorite_df_no_high_pressure, plot = True)
     
 
