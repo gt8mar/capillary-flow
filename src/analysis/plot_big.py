@@ -88,7 +88,7 @@ def adjust_brightness_of_colors(color_list, brightness_scale=0.1):
 
 
 # Function to calculate mean, standard error, and 95% CI
-def calculate_stats(group, dimensionless = False):
+def calculate_stats(group, ci_percentile = 95, dimensionless = False):
     if dimensionless:
         mean = group['Dimensionless Velocity'].mean()
         sem = stats.sem(group['Dimensionless Velocity'])
@@ -3158,13 +3158,16 @@ def main(verbose = False):
     if platform.system() == 'Windows':
         if 'gt8mar' in os.getcwd():
             path = 'C:\\Users\\gt8mar\\capillary-flow\\results\\summary_df_test.csv'
+            classified_kymos_path = 'C:\\Users\\gt8mar\\capillary-flow\\classified_kymos.csv'
         else:
             path = 'C:\\Users\\gt8ma\\capillary-flow\\results\\summary_df_test.csv'
+            classified_kymos_path = 'C:\\Users\\gt8ma\\capillary-flow\\classified_kymos.csv'
     else:
         path = '/hpc/projects/capillary-flow/results/summary_df_test.csv'
+        classified_kymos_path = '/hpc/projects/capillary-flow/results/classified_kymos.csv'
 
     summary_df = pd.read_csv(path)
-    classified_kymos_df = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\classified_kymos.csv')
+    classified_kymos_df = pd.read_csv(classified_kymos_path)
     classified_kymos_df['Capillary'] = classified_kymos_df['Image_Path'].apply(extract_capillary)
     
     # Merge the dataframes on the common columns
@@ -3176,7 +3179,7 @@ def main(verbose = False):
 
     # If there is a value in "Classified Velocity" overwrite the value in "Corrected Velocity" with that value:
     summary_df['Corrected Velocity'] = np.where(summary_df['Classified_Velocity'].notnull(), summary_df['Classified_Velocity'], summary_df['Corrected Velocity'])
-    summary_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\merged_csv2.csv', index=False)
+    # summary_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\merged_csv2.csv', index=False)
     summary_df = summary_df.drop(columns=['Capillary'])
     summary_df = summary_df.rename(columns={'Capillary_new': 'Capillary'})
 
@@ -3402,9 +3405,9 @@ def main(verbose = False):
     # plot_CI_overlaps(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='SYS_BP')
     # plot_CI_overlaps(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='Age')
     # plot_CI_overlaps(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='Sex')
-    plot_CI(summary_df_nhp_video_medians_copy, variable = 'Sex', ci_percentile=95, write = True)
-    plot_CI(summary_df_nhp_video_medians_copy, variable = 'Age', ci_percentile=95, write = True)
-    plot_CI(summary_df_nhp_video_medians_copy, variable = 'SYS_BP', ci_percentile=95, write = True)
+    # plot_CI(summary_df_nhp_video_medians_copy, variable = 'Sex', ci_percentile=95, write = True)
+    # plot_CI(summary_df_nhp_video_medians_copy, variable = 'Age', ci_percentile=95, write = True)
+    # plot_CI(summary_df_nhp_video_medians_copy, variable = 'SYS_BP', ci_percentile=95, write = True)
 
     medians_area_scores_df = calculate_area_score(summary_df_nhp_video_medians_copy, log = True, plot=False)
     # add area scores to summary_df_nhp_video_medians_copy
@@ -3431,7 +3434,7 @@ def main(verbose = False):
     # run_regression(summary_df_no_high_pressure)
 
     summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.rename(columns={'Area Score_y': 'Area Score', 'Log Area Score_y': 'Log Area Score'})
-    run_regression(summary_df_nhp_video_medians_copy)
+    # run_regression(summary_df_nhp_video_medians_copy)
     
     # plot_CI(summary_df_no_high_pressure)        
         
@@ -3454,6 +3457,14 @@ def main(verbose = False):
     # # favorite_df.to_csv('C:\\Users\\gt8ma\\capillary-flow\\favorite_caps.csv', index=False)
     # # print(favorite_df.columns)
 
+    # load favorite_caps.csv and merge with summary_df to keep updated velocity values
+    favorite_df = pd.read_csv('C:\\Users\\gt8ma\\capillary-flow\\favorite_caps.csv')
+    # drop all rows with no values in 'Corrected Velocity'
+    favorite_df = favorite_df.dropna(subset=['Velocity'])
+    # for each row in favorite_df, add the "Corrected Velocity" from the same participant, location, video, and capillary in summary_df
+    favorite_df['Corrected Velocity'] = favorite_df.apply(lambda row: summary_df[(summary_df['Participant'] == row['Participant']) & (summary_df['Location'] == row['Location']) & (summary_df['Video'] == row['Video']) & (summary_df['Capillary'] == row['Capillary'])]['Corrected Velocity'].values[0], axis=1)
+    print(favorite_df.columns)
+
     # # remove part22 and part23
     # # favorite_df = favorite_df[~favorite_df['Participant'].isin(['part22', 'part23'])]
     
@@ -3464,12 +3475,12 @@ def main(verbose = False):
     # # plot_loc_histograms(favorite_df, 'SYS_BP')
     # # plot_densities(favorite_df)
 
-    # favorite_df_no_high_pressure = favorite_df[favorite_df['Pressure'] <= 1.2]
+    favorite_df_no_high_pressure = favorite_df[favorite_df['Pressure'] <= 1.2]
     # print(f'The length of favorite_df_no_high_pressure is {len(favorite_df_no_high_pressure)}')
-    # # plot_CI(favorite_df_no_high_pressure, variable = 'Age', ci_percentile=95)
-    # # plot_CI(favorite_df_no_high_pressure, variable = 'Age', method = 'mean', ci_percentile=95)
-    # # plot_CI(favorite_df_no_high_pressure, variable = 'SYS_BP', ci_percentile=95)
-    # # plot_CI(favorite_df_no_high_pressure, variable = 'SYS_BP', method = 'mean', ci_percentile=95)
+    # plot_CI(favorite_df_no_high_pressure, variable = 'Age', ci_percentile=95, write=False)
+    # plot_CI(favorite_df_no_high_pressure, variable = 'Age', ci_percentile=95, method = 'mean', write=False)
+    # plot_CI(favorite_df_no_high_pressure, variable = 'SYS_BP', ci_percentile=95, write=False)
+    # plot_CI(favorite_df_no_high_pressure, variable = 'SYS_BP', ci_percentile=95, method = 'mean', write=False)
 
     # # plot_box_whisker_pressure(favorite_df_no_high_pressure, 'Age', log_scale=True)
     # # plot_box_whisker_pressure(favorite_df_no_high_pressure, 'SYS_BP', log_scale=True)
@@ -3529,15 +3540,14 @@ def main(verbose = False):
     # ecdf_fn = empirical_cdf_fn(favorite_df_no_high_pressure['Corrected Velocity'])
     # ks_statistic_df = pd.DataFrame(columns=['Participant', 'KS Statistic', 'KS P-Value', 'EMD Score'])
     # for participant in favorite_df_no_high_pressure['Participant'].unique():
-    #     participant_df = favorite_df_no_high_pressure[favorite_df_no_high_pressure['Participant'] == participant]
-    #     participant_df_nhp = favorite_df_no_high_pressure[favorite_df_no_high_pressure['Participant'] == participant]
-    #     participant_metrics = calculate_metrics(participant_df['Corrected Velocity'])
-    #     skewness.append([participant,participant_metrics['skewness']])
-    #     kurtosis.append([participant,participant_metrics['kurtosis']])
-    #     ks_statistic, p_value = kstest(participant_df['Corrected Velocity'], ecdf_fn)
-    #     emd_score = wasserstein_distance(participant_df['Corrected Velocity'], favorite_df_no_high_pressure['Corrected Velocity'])
-    #     ks_statistic_df = pd.concat([ks_statistic_df, pd.DataFrame({'Participant': [participant], 'KS Statistic': [ks_statistic], 'KS P-Value': [p_value], 'EMD Score': [emd_score]})])
-    #     # plot_ks_statistic(participant_df['Corrected Velocity'], favorite_df_no_high_pressure['Corrected Velocity'])
+        # participant_df = favorite_df_no_high_pressure[favorite_df_no_high_pressure['Participant'] == participant]
+        # participant_metrics = calculate_metrics(participant_df['Corrected Velocity'])
+        # skewness.append([participant,participant_metrics['skewness']])
+        # kurtosis.append([participant,participant_metrics['kurtosis']])
+        # ks_statistic, p_value = kstest(participant_df['Corrected Velocity'], ecdf_fn)
+        # emd_score = wasserstein_distance(participant_df['Corrected Velocity'], favorite_df_no_high_pressure['Corrected Velocity'])
+        # ks_statistic_df = pd.concat([ks_statistic_df, pd.DataFrame({'Participant': [participant], 'KS Statistic': [ks_statistic], 'KS P-Value': [p_value], 'EMD Score': [emd_score]})])
+        # plot_ks_statistic(participant_df['Corrected Velocity'], favorite_df_no_high_pressure['Corrected Velocity'])
  
     
     # # merge ks statistic df with summary df
@@ -3549,12 +3559,61 @@ def main(verbose = False):
     
 
 
-    # # plot velocities for each participant:
-    # for participant in favorite_df_no_high_pressure['Participant'].unique():
-    #     favorite_df_copy = favorite_df_no_high_pressure.copy()
-    #     participant_df = favorite_df_copy[favorite_df_copy['Participant'] == participant]
-    #     # Sort the data by 'Video':
-    #     participant_df = participant_df.sort_values(by='Video')
+    # plot velocities for each participant:
+    for participant in favorite_df_no_high_pressure['Participant'].unique():
+        favorite_df_copy = favorite_df_no_high_pressure.copy()
+        participant_df = favorite_df_copy[favorite_df_copy['Participant'] == participant]
+        # Sort the data by 'Video':
+        participant_df = participant_df.sort_values(by='Video')
+
+        
+
+        # if a video and the next video have the same pressure and location, average their "Corrected velocities and drop the first video row"
+        for i in range(len(participant_df)-1):
+            if (participant_df.iloc[i]['Pressure'] == participant_df.iloc[i+1]['Pressure']) and (participant_df.iloc[i]['Location'] == participant_df.iloc[i+1]['Location']):
+                participant_df.iloc[i+1]['Corrected Velocity'] = (participant_df.iloc[i]['Corrected Velocity'] + participant_df.iloc[i+1]['Corrected Velocity']) / 2
+                participant_df.iloc[i]['Corrected Velocity'] = None
+            
+        # drop rows with no Corrected Velocity
+        participant_df = participant_df.dropna(subset=['Corrected Velocity'])
+        
+        # separate the data into locations
+        grouped_df = participant_df.groupby('Location')
+        locations = participant_df['Location'].unique()
+        for location in locations:
+            location_data = grouped_df.get_group(location)
+            # plot the velocities with 'u' in the 'Up_Down' column
+            location_data_up = location_data[location_data['Up_Down'] == 'u']
+            location_data_down = location_data[location_data['Up_Down'] == 'd']
+
+            # # plot
+            # plt.figure(figsize=(6, 4))
+            # sns.lineplot(x='Pressure', y='Corrected Velocity', data=location_data_up, marker='o')
+            # sns.lineplot(x='Pressure', y='Corrected Velocity', data=location_data_down, marker='x')
+            # # set y axis to be 0 to 4000
+            # plt.ylim((0, 4000))
+            # plt.title(f'Corrected Velocities for {participant} at {location} with "Up" Pressure')
+            # plt.xlabel('Pressure')
+            # plt.ylabel('Velocity (um/s)')
+            # plt.show()
+
+            # use trapezoidal rule to calculate area under the curve for each 'Up' and 'Down' curve
+            # calculate area under datapoints using trapezoidal rule
+            area_up = np.trapz(location_data_up['Corrected Velocity'], location_data_up['Pressure'])
+            area_down = np.trapz(location_data_down['Corrected Velocity'], location_data_down['Pressure'])
+            hysterisis = area_up - area_down
+            antihysterisis = area_up + area_down
+            # add to favorite_df_no_high_pressure
+            favorite_df_no_high_pressure.loc[(favorite_df_no_high_pressure['Participant'] == participant) & (favorite_df_no_high_pressure['Location'] == location), 'Hysterisis'] = hysterisis
+            favorite_df_no_high_pressure.loc[(favorite_df_no_high_pressure['Participant'] == participant) & (favorite_df_no_high_pressure['Location'] == location), 'Antihysterisis'] = antihysterisis
+
+    # # plot scatter of age vs hysterisis
+    plt.figure(figsize=(6, 4))  
+    sns.scatterplot(x='Age', y='Antihysterisis', data=favorite_df_no_high_pressure[favorite_df_no_high_pressure['Participant']!='part09'])
+    plt.title('Hysterisis vs Age')
+    plt.xlabel('Age')
+    plt.ylabel('Hysterisis')
+    plt.show()
 
     #     # iterate through videos in order and see if the video following the current video has the same pressure. Print the participant, capillary, location, video, pressure, and corrected velocity for each video that has the same pressure as the following video.
     #     for i in range(len(participant_df)-1):
