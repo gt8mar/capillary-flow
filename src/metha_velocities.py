@@ -345,7 +345,8 @@ def main(filename, plot = False, marcus = True):
     
 
 if __name__ == "__main__":
-    main('C:\\Users\\ejerison\\capillary-flow\\tests\\demo_data.mat')
+    main('C:\\Users\\gt8mar\\capillary-flow\\tests\\demo_data.mat')
+    # main('C:\\Users\\ejerison\\capillary-flow\\tests\\demo_data.mat')
 
     #TODO: Add the following to the main function
     # load our data
