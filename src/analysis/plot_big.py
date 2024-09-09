@@ -890,6 +890,16 @@ def plot_histograms(df, variable = 'Age', diam_slice = None, normalize_bins = 'T
     plt.show()
     return 0
 def plot_velocities(participant_df, write=False):
+    """
+    Plots the velocities of capillaries for a given participant.
+
+    Args:
+        participant_df (DataFrame): The DataFrame containing the participant data.
+        write (bool, optional): Whether to save the plot as an image file. Defaults to False.
+
+    Returns:
+        int: Always returns 0.
+    """
     participant_df = participant_df.copy()
     # Assuming there's a 'Location' column or similar to distinguish the same capillary used in different contexts
     # If not, you might need to create a composite key or a unique identifier based on your specific needs
@@ -3330,6 +3340,91 @@ def calculate_age(date, birthday):
         age -= 1
     return age
 
+def plot_models(df, result, variable='Age', log=False):
+    # Extract residuals and fitted values from the mixed-effects model
+    residuals = result.resid
+    fitted = result.fittedvalues
+
+    # 1. Residual Plot
+    plt.figure(figsize=(8, 6))
+    sns.residplot(x=fitted, y=residuals, lowess=True, line_kws={'color': 'red'})
+    plt.xlabel('Fitted values')
+    plt.ylabel('Residuals')
+    plt.title('Residuals vs Fitted')
+    plt.show()
+
+    # 2. QQ Plot
+    plt.figure(figsize=(8, 6))
+    sm.qqplot(residuals, line='45', fit=True)
+    plt.title('QQ Plot of Residuals')
+    plt.show()
+
+    # 3. Fitted vs Residuals Plot
+    plt.figure(figsize=(8, 6))
+    plt.scatter(fitted, residuals)
+    plt.axhline(y=0, color='red', linestyle='--')
+    plt.xlabel('Fitted Values')
+    plt.ylabel('Residuals')
+    plt.title('Fitted vs Residuals')
+    plt.show()
+
+    # 4. Cook's Distance for Mixed-Effects Model
+    influence = result.get_influence()
+    cooks = influence.cooks_distance[0]
+
+    plt.figure(figsize=(8, 6))
+    plt.stem(np.arange(len(cooks)), cooks, markerfmt=",", use_line_collection=True)
+    plt.title("Cook's Distance")
+    plt.xlabel('Observation Index')
+    plt.ylabel("Cook's Distance")
+    plt.show()
+    
+    
+    plt.figure(figsize=(8, 6))
+    plt.scatter(result, df['Log_Video_Median_Velocity'], alpha=0.5)
+    plt.plot([min(result), max(result)], [min(result), max(result)], color='red', linestyle='--')
+    plt.xlabel('Fitted Values')
+    plt.ylabel('Actual Log Video Median Velocity')
+    plt.title('Predicted vs Actual Values')
+    plt.show()
+
+    # Effect plot for Age
+    ages = np.linspace(df['Age'].min(), df['Age'].max(), 100)
+    pressures = [df['Pressure'].mean()] * 100
+    predicted_log_velocity = result.predict(pd.DataFrame({'Age': ages, 'Pressure': pressures}))
+
+    plt.figure(figsize=(8, 6))
+    plt.plot(ages, predicted_log_velocity)
+    plt.xlabel('Age')
+    plt.ylabel('Predicted Log Video Median Velocity')
+    plt.title('Effect of Age on Log Video Median Velocity')
+    plt.show()
+
+    # Effect plot for Pressure
+    ages = [df['Age'].mean()] * 100
+    pressures = np.linspace(df['Pressure'].min(), df['Pressure'].max(), 100)
+    predicted_log_velocity = result.predict(pd.DataFrame({'Age': ages, 'Pressure': pressures}))
+
+    plt.figure(figsize=(8, 6))
+    plt.plot(pressures, predicted_log_velocity)
+    plt.xlabel('Pressure')
+    plt.ylabel('Predicted Log Video Median Velocity')
+    plt.title('Effect of Pressure on Log Video Median Velocity')
+    plt.show()
+
+    # Extract random effects
+    random_effects = result.random_effects
+
+    # Plot random intercepts
+    random_intercepts = [re['Group'] for re in random_effects.values()]
+    plt.figure(figsize=(8, 6))
+    plt.bar(range(len(random_intercepts)), random_intercepts)
+    plt.xlabel('Participant')
+    plt.ylabel('Random Intercept')
+    plt.title('Random Intercepts by Participant')
+    plt.show()
+
+
 
 
 def main(verbose = False):
@@ -3595,6 +3690,31 @@ def main(verbose = False):
     # print (f'KS 2 Sample Statistic for BP: {ks_2samp_stat_bp}, p-value: {ks_2samp_p_bp}')
     # print (f'KS 2 Sample Statistic for Sex: {ks_2samp_stat_sex}, p-value: {ks_2samp_p_sex}')
     
+    # make an age group column for summary_df_nhp_video_medians
+    summary_df_nhp_video_medians['Age_Group'] = np.where(summary_df_nhp_video_medians['Age'] >= 50, 'Above 50', 'Below 50')
+    summary_df_nhp_video_medians['Video_Median_Velocity'] = summary_df_nhp_video_medians['Video Median Velocity']
+    summary_df_nhp_video_medians['Log_Video_Median_Velocity'] = np.log((summary_df_nhp_video_medians['Video Median Velocity']+1))
+
+    # Convert age group to categorical variable
+    summary_df_nhp_video_medians['Age_Group'] = pd.Categorical(summary_df_nhp_video_medians['Age_Group'], categories=['Below 50', 'Above 50'], ordered=True)
+    gee_model = smf.gee('Log_Video_Median_Velocity ~ Age + Pressure', groups=summary_df_nhp_video_medians['Participant'], data=summary_df_nhp_video_medians, cov_struct=sm.cov_struct.Autoregressive() )   #family=sm.families.Poisson()
+    gee_results = gee_model.fit()
+
+    # Print the results
+    print('GEE Results for Age Group:')
+    print(gee_results.summary())
+    # print(gee_results.summary().as_latex())
+
+    mixed_model = smf.mixedlm('Log_Video_Median_Velocity ~ Age + Pressure', summary_df_nhp_video_medians, groups=summary_df_nhp_video_medians['Participant'], re_formula='~Pressure') #re_formula=1  #family=sm.families.Poisson()
+    mixed_results = mixed_model.fit()  
+    print('Mixed Model Results for Age Group and Pressure:')
+    print(mixed_results.summary())
+    # print(mixed_results.summary().as_latex())
+
+    # plot_models(summary_df_nhp_video_medians, mixed_results, variable='Age', log=True)
+    
+
+
 
     # plot_cdf_comp_pressure(summary_df_nhp_video_medians)
 
@@ -3705,21 +3825,30 @@ def main(verbose = False):
 
     
   
-    # # ####### Favorite Capillaries ######
-    # if platform.system() == 'Windows':
-    #     if 'gt8mar' in os.getcwd():
-    #         favorite_capillaries = pd.read_excel('C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\chosen_caps.xlsx', sheet_name='Sheet1')
-    #     else:
-    #         favorite_capillaries = pd.read_excel('C:\\Users\\gt8ma\\capillary-flow\\results\\velocities\\chosen_caps.xlsx', sheet_name='Sheet1')
+    # ####### Favorite Capillaries ######
+    if platform.system() == 'Windows':
+        if 'gt8mar' in os.getcwd():
+            favorite_capillaries = pd.read_excel('C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\chosen_caps.xlsx', sheet_name='Sheet1')
+        else:
+            favorite_capillaries = pd.read_excel('C:\\Users\\gt8ma\\capillary-flow\\results\\velocities\\chosen_caps.xlsx', sheet_name='Sheet1')
     
-    # favorite_capillaries = favorite_capillaries.rename(columns={'Chosen Capillary': 'Capillary'})
+    favorite_capillaries = favorite_capillaries.rename(columns={'Chosen Capillary': 'Capillary'})
 
-    # # slice summary_df into favorite capillaries if capillary, location, and participant match
-    # favorite_df = summary_df.merge(favorite_capillaries, on=['Participant', 'Location', 'Capillary'], how='inner')
+    # slice summary_df into favorite capillaries if capillary, location, and participant match
+    favorite_df = summary_df.merge(favorite_capillaries, on=['Participant', 'Location', 'Capillary'], how='inner')
 
     # # save to csv
     # # favorite_df.to_csv('C:\\Users\\gt8ma\\capillary-flow\\favorite_caps.csv', index=False)
     # # print(favorite_df.columns)
+
+     # load favorite_caps.csv and merge with summary_df to keep updated velocity values
+    favorite_df = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\favorite_caps.csv')
+    # drop all rows with no values in 'Corrected Velocity'
+    favorite_df = favorite_df.dropna(subset=['Velocity'])
+    # for each row in favorite_df, add the "Corrected Velocity" from the same participant, location, video, and capillary in summary_df
+    favorite_df['Corrected Velocity'] = favorite_df.apply(lambda row: summary_df[(summary_df['Participant'] == row['Participant']) & (summary_df['Location'] == row['Location']) & (summary_df['Video'] == row['Video']) & (summary_df['Capillary'] == row['Capillary'])]['Corrected Velocity'].values[0], axis=1)
+    # print(favorite_df.columns)
+
 
     # # remove part22 and part23
     # # favorite_df = favorite_df[~favorite_df['Participant'].isin(['part22', 'part23'])]
@@ -3731,7 +3860,7 @@ def main(verbose = False):
     # # plot_loc_histograms(favorite_df, 'SYS_BP')
     # # plot_densities(favorite_df)
 
-    # favorite_df_no_high_pressure = favorite_df[favorite_df['Pressure'] <= 1.2]
+    favorite_df_no_high_pressure = favorite_df[favorite_df['Pressure'] <= 1.2]
     # print(f'The length of favorite_df_no_high_pressure is {len(favorite_df_no_high_pressure)}')
     # # plot_CI(favorite_df_no_high_pressure, variable = 'Age', ci_percentile=95)
     # # plot_CI(favorite_df_no_high_pressure, variable = 'Age', method = 'mean', ci_percentile=95)
@@ -3816,31 +3945,76 @@ def main(verbose = False):
     
 
 
-    # # plot velocities for each participant:
-    # for participant in favorite_df_no_high_pressure['Participant'].unique():
-    #     favorite_df_copy = favorite_df_no_high_pressure.copy()
-    #     participant_df = favorite_df_copy[favorite_df_copy['Participant'] == participant]
-    #     # Sort the data by 'Video':
-    #     participant_df = participant_df.sort_values(by='Video')
+    # plot velocities for each participant:
+    for participant in favorite_df_no_high_pressure['Participant'].unique():
+        favorite_df_copy = favorite_df_no_high_pressure.copy()
+        participant_df = favorite_df_copy[favorite_df_copy['Participant'] == participant]
+        # Sort the data by 'Video':
+        participant_df = participant_df.sort_values(by='Video')
 
-    #     # iterate through videos in order and see if the video following the current video has the same pressure. Print the participant, capillary, location, video, pressure, and corrected velocity for each video that has the same pressure as the following video.
-    #     for i in range(len(participant_df)-1):
-    #         if (participant_df.iloc[i]['Pressure'] == participant_df.iloc[i+1]['Pressure']) and (participant_df.iloc[i]['Pressure'] != 0.2):
-    #             # print(participant_df.iloc[i][['Participant', 'Capillary', 'Location', 'Video', 'Pressure', 'Corrected Velocity']]) # TODO: average out or drop videos
-    #             pass
-    #     # print(participant_df[['Participant', 'Capillary', 'Location', 'Video', 'Pressure', 'Corrected Velocity']])
+        # if a video and the next video have the same pressure and location, average their "Corrected velocities and drop the first video row"
+        for i in range(len(participant_df)-1):
+            if (participant_df.iloc[i]['Pressure'] == participant_df.iloc[i+1]['Pressure']) and (participant_df.iloc[i]['Location'] == participant_df.iloc[i+1]['Location']):
+                participant_df.iloc[i+1]['Corrected Velocity'] = (participant_df.iloc[i]['Corrected Velocity'] + participant_df.iloc[i+1]['Corrected Velocity']) / 2
+                participant_df.iloc[i]['Corrected Velocity'] = None
+            
+        # drop rows with no Corrected Velocity
+        participant_df = participant_df.dropna(subset=['Corrected Velocity'])
+        
+        # separate the data into locations
+        grouped_df = participant_df.groupby('Location')
+        locations = participant_df['Location'].unique()
+        for location in locations:
+            location_data = grouped_df.get_group(location)
+            # plot the velocities with 'u' in the 'Up_Down' column
+            location_data_up = location_data[location_data['Up_Down'] == 'u']
+            location_data_down = location_data[location_data['Up_Down'] == 'd']
+
+        # plot
+            plt.figure(figsize=(6, 4))
+            sns.lineplot(x='Pressure', y='Corrected Velocity', data=location_data_up, marker='o')
+            sns.lineplot(x='Pressure', y='Corrected Velocity', data=location_data_down, marker='x')
+            # set y axis to be 0 to 4000
+            plt.ylim((0, 4000))
+            plt.title(f'Corrected Velocities for {participant} at {location} with "Up" Pressure')
+            plt.xlabel('Pressure')
+            plt.ylabel('Velocity (um/s)')
+            plt.show()
+
+            # use trapezoidal rule to calculate area under the curve for each 'Up' and 'Down' curve
+            # calculate area under datapoints using trapezoidal rule
+            area_up = np.trapz(location_data_up['Corrected Velocity'], location_data_up['Pressure'])
+            area_down = np.trapz(location_data_down['Corrected Velocity'], location_data_down['Pressure'])
+            hysterisis = area_up - area_down
+            antihysterisis = area_up + area_down
+            # add to favorite_df_no_high_pressure
+            favorite_df_no_high_pressure.loc[(favorite_df_no_high_pressure['Participant'] == participant) & (favorite_df_no_high_pressure['Location'] == location), 'Hysterisis'] = hysterisis
+            favorite_df_no_high_pressure.loc[(favorite_df_no_high_pressure['Participant'] == participant) & (favorite_df_no_high_pressure['Location'] == location), 'Antihysterisis'] = antihysterisis
+
+    # # plot scatter of age vs hysterisis
+    plt.figure(figsize=(6, 4))  
+    sns.scatterplot(x='Age', y='Antihysterisis', data=favorite_df_no_high_pressure[favorite_df_no_high_pressure['Participant']!='part09'])
+    plt.title('Hysterisis vs Age')
+    plt.xlabel('Age')
+    plt.ylabel('Hysterisis')
+    plt.show()
+
+
+
+       
+        # print(participant_df[['Participant', 'Capillary', 'Location', 'Video', 'Pressure', 'Corrected Velocity']])
 
         
-    #     # Select columns to print:
+        # Select columns to print:
 
 
-    #     # plot_velocities(participant_df, write = False)
-    #     # plot_densities_individual(summary_df, participant_df, participant)
-    #     # plot_densities_pressure_individual(summary_df, participant_df, participant)
-    #     # plot_cdf(favorite_df_no_high_pressure['Corrected Velocity'], 
-    #     #          subsets=[favorite_df_no_high_pressure[favorite_df_no_high_pressure['Participant'] == participant]['Corrected Velocity']],
-    #     #          labels=['Entire Dataset', participant], title=f'CDF Comparison of velocities for {participant}', 
-    #     #          normalize = False)
+        # plot_velocities(participant_df, write = False)
+        # plot_densities_individual(summary_df, participant_df, participant)
+        # plot_densities_pressure_individual(summary_df, participant_df, participant)
+        # plot_cdf(favorite_df_no_high_pressure['Corrected Velocity'], 
+        #          subsets=[favorite_df_no_high_pressure[favorite_df_no_high_pressure['Participant'] == participant]['Corrected Velocity']],
+        #          labels=['Entire Dataset', participant], title=f'CDF Comparison of velocities for {participant}', 
+        #          normalize = False)
 
 
 
