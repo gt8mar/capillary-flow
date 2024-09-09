@@ -91,7 +91,7 @@ def adjust_brightness_of_colors(color_list, brightness_scale=0.1):
 
 
 # Function to calculate mean, standard error, and 95% CI
-def calculate_stats(group, dimensionless = False):
+def calculate_stats(group, ci_percentile = 95, dimensionless = False):
     if dimensionless:
         mean = group['Dimensionless Velocity'].mean()
         sem = stats.sem(group['Dimensionless Velocity'])
@@ -186,8 +186,8 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
     # Iterate over each group to perform the KS test
     ks_stats = []
     for pressure in df['Pressure'].unique():
-        group_1 = grouped.get_group('≤50' if variable == 'Age' else '<120' if variable == 'SYS_BP' else 'Male')
-        group_2 = grouped.get_group('>50' if variable == 'Age' else '≥120' if variable == 'SYS_BP' else 'Female')
+        group_1 = grouped.get_group('≤50' if variable == 'Age' else '<120' if variable == 'SYS_BP' else 'M')
+        group_2 = grouped.get_group('>50' if variable == 'Age' else '≥120' if variable == 'SYS_BP' else 'F')
         
         group_1_velocities = group_1[group_1['Pressure'] == pressure]['Corrected Velocity']
         group_2_velocities = group_2[group_2['Pressure'] == pressure]['Corrected Velocity']
@@ -231,8 +231,8 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
     
         
 
-    legend_handles = [mpatches.Patch(color=palette[0], label=f'{variable} ≤50' if variable == 'Age' else 'BP <120' if variable == 'SYS_BP' else 'Male', alpha=0.6),
-                      mpatches.Patch(color=palette[3], label=f'{variable} >50' if variable == 'Age' else 'BP ≥120' if variable == 'SYS_BP' else 'Female', alpha=0.6)]
+    legend_handles = [mpatches.Patch(color=palette[0], label=f'{variable} Group ≤50' if variable == 'Age' else '<120' if variable == 'SYS_BP' else 'M', alpha=0.6),
+                      mpatches.Patch(color=palette[3], label=f'{variable} Group >50' if variable == 'Age' else '≥120' if variable == 'SYS_BP' else 'F', alpha=0.6)]
 
     ax.set_xlabel('Pressure (psi)', fontproperties=source_sans)
     if dimensionless:
@@ -2585,10 +2585,13 @@ def make_roc_curve_one_var(df, feature, target='Age', flip=False, plot=False, wr
         raise ValueError('Please choose target for this function (only Age is supported)')
     age_threshold = 50
     if flip:
+        # Categorize 'old' (0) and 'young' (1) based on age threshold
         df['Age Category'] = (df['Age'] < age_threshold).astype(int)
     else:
+        # Categorize 'old' (1) and 'young' (0) based on age threshold
         df['Age Category'] = (df['Age'] >= age_threshold).astype(int)
 
+    # Calculate ROC and AUC for the actual data
     thresholds = np.linspace(df[feature].min(), df[feature].max(), 50)
     tprs = []
     fprs = []
@@ -2599,8 +2602,10 @@ def make_roc_curve_one_var(df, feature, target='Age', flip=False, plot=False, wr
         tprs.append(tpr[1])
         fprs.append(fpr[1])
 
+    # Calculate the actual AUC
     roc_auc = auc(fprs, tprs)
 
+    # Calculate AUC and confidence interval using DeLong's method
     y_true = df['Age Category'].values
     y_scores = df[feature].values
     auc_score, auc_var, ci_lower, ci_upper = calculate_auc_ci_delong(y_true, y_scores)
@@ -2613,11 +2618,13 @@ def make_roc_curve_one_var(df, feature, target='Age', flip=False, plot=False, wr
 
     plot_roc_with_ci(fprs, delong_tprs, roc_auc, [delong_tprs], ci_lower, ci_upper, feature, 'delong', plot, write=write)
 
+    # Bootstrap to calculate AUC confidence interval
     bootstrapped_aucs = []
     bootstrapped_tprs = []
 
     rng = np.random.RandomState(42)
     for _ in range(n_bootstraps):
+        # Resample with replacement
         df_resampled = df.sample(n=len(df), replace=True, random_state=rng)
         tprs_resampled = []
         fprs_resampled = []
@@ -2628,6 +2635,7 @@ def make_roc_curve_one_var(df, feature, target='Age', flip=False, plot=False, wr
             tprs_resampled.append(tpr[1])
             fprs_resampled.append(fpr[1])
 
+        # Sort fprs and tprs before calculating AUC
         fprs_resampled, tprs_resampled = zip(*sorted(zip(fprs_resampled, tprs_resampled)))
         bootstrapped_auc = auc(fprs_resampled, tprs_resampled)
         bootstrapped_aucs.append(bootstrapped_auc)
@@ -3163,13 +3171,11 @@ def perform_anova_analysis(df, variable ='Age', log = False, plot = True):
     # Rename the aggregated velocity for clarity
     participant_medians.rename(columns={'Video Median Velocity': 'Participant_Median_Velocity'}, inplace=True)
 
-
     if log:
         median_variable = 'Log_Participant_Median_Velocity'
     else:
         median_variable = 'Participant_Median_Velocity'
-    
-        
+      
     # Fit model for ANOVA including SYS_BP
     model = ols(f'{median_variable} ~ Age + C(Sex) + SYS_BP + Age:C(Sex) + Age:SYS_BP + C(Sex):SYS_BP', data=participant_medians).fit()
         
@@ -3431,13 +3437,16 @@ def main(verbose = False):
     if platform.system() == 'Windows':
         if 'gt8mar' in os.getcwd():
             path = 'C:\\Users\\gt8mar\\capillary-flow\\results\\summary_df_test.csv'
+            classified_kymos_path = 'C:\\Users\\gt8mar\\capillary-flow\\classified_kymos_real.csv'
         else:
             path = 'C:\\Users\\gt8ma\\capillary-flow\\results\\summary_df_test.csv'
+            classified_kymos_path = 'C:\\Users\\gt8ma\\capillary-flow\\classified_kymos.csv'
     else:
         path = '/hpc/projects/capillary-flow/results/summary_df_test.csv'
+        classified_kymos_path = '/hpc/projects/capillary-flow/results/classified_kymos.csv'
 
     summary_df = pd.read_csv(path)
-    classified_kymos_df = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\classified_kymos_real.csv')
+    classified_kymos_df = pd.read_csv(classified_kymos_path)
     second_classified_kymos_df = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\classified_kymos_part28_to_part32.csv')
     third_classified_kymos_df = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\classified_kymos_part33_to_part81.csv')
     total_classified_kymos_df = pd.concat([second_classified_kymos_df, third_classified_kymos_df], ignore_index=True)
@@ -3477,7 +3486,7 @@ def main(verbose = False):
 
     # sort by participant, date, location, video, capillary
     classified_kymos_df = classified_kymos_df.sort_values(by=['Participant', 'Date', 'Location', 'Video', 'Capillary']).reset_index(drop=True)
-   
+
     
     # Merge the dataframes on the common columns
     summary_df = pd.merge(summary_df, classified_kymos_df[['Participant', 'Date', 'Location', 'Video', 'Capillary', 'Classified_Velocity']], 
@@ -3496,7 +3505,9 @@ def main(verbose = False):
 
     # If there is a value in "Classified Velocity" overwrite the value in "Corrected Velocity" with that value:
     summary_df['Corrected Velocity'] = np.where(summary_df['Classified_Velocity'].notnull(), summary_df['Classified_Velocity'], summary_df['Corrected Velocity'])
-    summary_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\merged_csv2.csv', index=False)
+
+    # summary_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\merged_csv2.csv', index=False)
+
     # if row has no "Capillary_new" value, copy the "Capillary" value to "Capillary_new"
     summary_df['Capillary_new'] = np.where(summary_df['Capillary_new'].isnull(), summary_df['Capillary'], summary_df['Capillary_new'])
     summary_df = summary_df.drop(columns=['Capillary'])
@@ -3587,15 +3598,6 @@ def main(verbose = False):
     area_scores_df = calculate_area_score(summary_df_no_high_pressure, log = True, plot=False)
     # add Age-Scores to summary_df_no_high_pressure
     summary_df_no_high_pressure = summary_df_no_high_pressure.merge(area_scores_df, on='Participant', how='inner')
-
-   
-    
-
-   
-
-
-
-
 
 
     # summary_metrics = calculate_metrics(summary_df['Corrected Velocity'])
@@ -3775,9 +3777,9 @@ def main(verbose = False):
     # plot_CI_overlaps(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='SYS_BP')
     # plot_CI_overlaps(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='Age')
     # plot_CI_overlaps(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='Sex')
-    plot_CI(summary_df_nhp_video_medians_copy, variable = 'Sex', ci_percentile=95, write = True)
-    plot_CI(summary_df_nhp_video_medians_copy, variable = 'Age', ci_percentile=95, write = True)
-    plot_CI(summary_df_nhp_video_medians_copy, variable = 'SYS_BP', ci_percentile=95, write = True)
+    # plot_CI(summary_df_nhp_video_medians_copy, variable = 'Sex', ci_percentile=95, write = True)
+    # plot_CI(summary_df_nhp_video_medians_copy, variable = 'Age', ci_percentile=95, write = True)
+    # plot_CI(summary_df_nhp_video_medians_copy, variable = 'SYS_BP', ci_percentile=95, write = True)
 
     summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.drop(columns=['Age-Score', 'Log Age-Score'])
     medians_area_scores_df = calculate_area_score(summary_df_nhp_video_medians_copy, log = True, plot=False)
@@ -3817,7 +3819,10 @@ def main(verbose = False):
         
     # run_regression(summary_df_no_high_pressure)
 
+    summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.rename(columns={'Area Score_y': 'Area Score', 'Log Area Score_y': 'Log Area Score'})
+
     summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.rename(columns={'Age-Score_y': 'Age-Score', 'Log Age-Score_y': 'Log Age-Score'})
+
     # run_regression(summary_df_nhp_video_medians_copy)
     
     # plot_CI(summary_df_no_high_pressure)        
@@ -3862,10 +3867,10 @@ def main(verbose = False):
 
     favorite_df_no_high_pressure = favorite_df[favorite_df['Pressure'] <= 1.2]
     # print(f'The length of favorite_df_no_high_pressure is {len(favorite_df_no_high_pressure)}')
-    # # plot_CI(favorite_df_no_high_pressure, variable = 'Age', ci_percentile=95)
-    # # plot_CI(favorite_df_no_high_pressure, variable = 'Age', method = 'mean', ci_percentile=95)
-    # # plot_CI(favorite_df_no_high_pressure, variable = 'SYS_BP', ci_percentile=95)
-    # # plot_CI(favorite_df_no_high_pressure, variable = 'SYS_BP', method = 'mean', ci_percentile=95)
+    # plot_CI(favorite_df_no_high_pressure, variable = 'Age', ci_percentile=95, write=False)
+    # plot_CI(favorite_df_no_high_pressure, variable = 'Age', ci_percentile=95, method = 'mean', write=False)
+    # plot_CI(favorite_df_no_high_pressure, variable = 'SYS_BP', ci_percentile=95, write=False)
+    # plot_CI(favorite_df_no_high_pressure, variable = 'SYS_BP', ci_percentile=95, method = 'mean', write=False)
 
     # # plot_box_whisker_pressure(favorite_df_no_high_pressure, 'Age', log_scale=True)
     # # plot_box_whisker_pressure(favorite_df_no_high_pressure, 'SYS_BP', log_scale=True)
@@ -3925,15 +3930,14 @@ def main(verbose = False):
     # ecdf_fn = empirical_cdf_fn(favorite_df_no_high_pressure['Corrected Velocity'])
     # ks_statistic_df = pd.DataFrame(columns=['Participant', 'KS Statistic', 'KS P-Value', 'EMD Score'])
     # for participant in favorite_df_no_high_pressure['Participant'].unique():
-    #     participant_df = favorite_df_no_high_pressure[favorite_df_no_high_pressure['Participant'] == participant]
-    #     participant_df_nhp = favorite_df_no_high_pressure[favorite_df_no_high_pressure['Participant'] == participant]
-    #     participant_metrics = calculate_metrics(participant_df['Corrected Velocity'])
-    #     skewness.append([participant,participant_metrics['skewness']])
-    #     kurtosis.append([participant,participant_metrics['kurtosis']])
-    #     ks_statistic, p_value = kstest(participant_df['Corrected Velocity'], ecdf_fn)
-    #     emd_score = wasserstein_distance(participant_df['Corrected Velocity'], favorite_df_no_high_pressure['Corrected Velocity'])
-    #     ks_statistic_df = pd.concat([ks_statistic_df, pd.DataFrame({'Participant': [participant], 'KS Statistic': [ks_statistic], 'KS P-Value': [p_value], 'EMD Score': [emd_score]})])
-    #     # plot_ks_statistic(participant_df['Corrected Velocity'], favorite_df_no_high_pressure['Corrected Velocity'])
+        # participant_df = favorite_df_no_high_pressure[favorite_df_no_high_pressure['Participant'] == participant]
+        # participant_metrics = calculate_metrics(participant_df['Corrected Velocity'])
+        # skewness.append([participant,participant_metrics['skewness']])
+        # kurtosis.append([participant,participant_metrics['kurtosis']])
+        # ks_statistic, p_value = kstest(participant_df['Corrected Velocity'], ecdf_fn)
+        # emd_score = wasserstein_distance(participant_df['Corrected Velocity'], favorite_df_no_high_pressure['Corrected Velocity'])
+        # ks_statistic_df = pd.concat([ks_statistic_df, pd.DataFrame({'Participant': [participant], 'KS Statistic': [ks_statistic], 'KS P-Value': [p_value], 'EMD Score': [emd_score]})])
+        # plot_ks_statistic(participant_df['Corrected Velocity'], favorite_df_no_high_pressure['Corrected Velocity'])
  
     
     # # merge ks statistic df with summary df
@@ -3951,6 +3955,55 @@ def main(verbose = False):
         participant_df = favorite_df_copy[favorite_df_copy['Participant'] == participant]
         # Sort the data by 'Video':
         participant_df = participant_df.sort_values(by='Video')
+
+        
+
+        # if a video and the next video have the same pressure and location, average their "Corrected velocities and drop the first video row"
+        for i in range(len(participant_df)-1):
+            if (participant_df.iloc[i]['Pressure'] == participant_df.iloc[i+1]['Pressure']) and (participant_df.iloc[i]['Location'] == participant_df.iloc[i+1]['Location']):
+                participant_df.iloc[i+1]['Corrected Velocity'] = (participant_df.iloc[i]['Corrected Velocity'] + participant_df.iloc[i+1]['Corrected Velocity']) / 2
+                participant_df.iloc[i]['Corrected Velocity'] = None
+            
+        # drop rows with no Corrected Velocity
+        participant_df = participant_df.dropna(subset=['Corrected Velocity'])
+        
+        # separate the data into locations
+        grouped_df = participant_df.groupby('Location')
+        locations = participant_df['Location'].unique()
+        for location in locations:
+            location_data = grouped_df.get_group(location)
+            # plot the velocities with 'u' in the 'Up_Down' column
+            location_data_up = location_data[location_data['Up_Down'] == 'u']
+            location_data_down = location_data[location_data['Up_Down'] == 'd']
+
+            # # plot
+            # plt.figure(figsize=(6, 4))
+            # sns.lineplot(x='Pressure', y='Corrected Velocity', data=location_data_up, marker='o')
+            # sns.lineplot(x='Pressure', y='Corrected Velocity', data=location_data_down, marker='x')
+            # # set y axis to be 0 to 4000
+            # plt.ylim((0, 4000))
+            # plt.title(f'Corrected Velocities for {participant} at {location} with "Up" Pressure')
+            # plt.xlabel('Pressure')
+            # plt.ylabel('Velocity (um/s)')
+            # plt.show()
+
+            # use trapezoidal rule to calculate area under the curve for each 'Up' and 'Down' curve
+            # calculate area under datapoints using trapezoidal rule
+            area_up = np.trapz(location_data_up['Corrected Velocity'], location_data_up['Pressure'])
+            area_down = np.trapz(location_data_down['Corrected Velocity'], location_data_down['Pressure'])
+            hysterisis = area_up - area_down
+            antihysterisis = area_up + area_down
+            # add to favorite_df_no_high_pressure
+            favorite_df_no_high_pressure.loc[(favorite_df_no_high_pressure['Participant'] == participant) & (favorite_df_no_high_pressure['Location'] == location), 'Hysterisis'] = hysterisis
+            favorite_df_no_high_pressure.loc[(favorite_df_no_high_pressure['Participant'] == participant) & (favorite_df_no_high_pressure['Location'] == location), 'Antihysterisis'] = antihysterisis
+
+    # # plot scatter of age vs hysterisis
+    plt.figure(figsize=(6, 4))  
+    sns.scatterplot(x='Age', y='Antihysterisis', data=favorite_df_no_high_pressure[favorite_df_no_high_pressure['Participant']!='part09'])
+    plt.title('Hysterisis vs Age')
+    plt.xlabel('Age')
+    plt.ylabel('Hysterisis')
+    plt.show()
 
         # if a video and the next video have the same pressure and location, average their "Corrected velocities and drop the first video row"
         for i in range(len(participant_df)-1):
