@@ -23,6 +23,7 @@ from sklearn.ensemble import RandomForestClassifier
 import matplotlib as mpl
 from matplotlib.font_manager import FontProperties
 from matplotlib.colors import to_rgb, LinearSegmentedColormap
+import matplotlib.ticker as ticker
 import colorsys
 import matplotlib.patches as mpatches
 import datetime
@@ -3167,7 +3168,7 @@ def perform_anova_analysis(df, variable ='Age', log = False, plot = True):
         'SYS_BP': 'median'  # Assumes systolic blood pressure is constant
     }).reset_index()
 
-    participant_medians['Log_Participant_Median_Velocity'] = np.log(participant_medians['Video Median Velocity']+1)
+    participant_medians['Log_Participant_Median_Velocity'] = np.log(participant_medians['Video Median Velocity'])
     # Rename the aggregated velocity for clarity
     participant_medians.rename(columns={'Video Median Velocity': 'Participant_Median_Velocity'}, inplace=True)
 
@@ -3285,6 +3286,72 @@ def perform_anova_analysis(df, variable ='Age', log = False, plot = True):
         plt.show()
 
     return model
+
+def plot_indiv_velocities(location_data_up, location_data_down, participant, location, log = False):
+    # if location data up or down are empty or only contain nan values, return 0
+    if location_data_up.empty or location_data_down.empty:
+        return 1
+    if location_data_up['Corrected Velocity'].isnull().all() or location_data_down['Corrected Velocity'].isnull().all():
+        return 1
+    
+    # Set up style and font
+    # sns.set(style="ticks")
+    # sns.set_style("ticks")
+    source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 5, 'lines.linewidth': 0.5
+    })
+
+    blue_color = '#1f77b4'
+    purple_color = '#674F92'
+
+    # plot
+    fig, ax = plt.subplots(figsize=(2.4, 2.0))
+    sns.lineplot(x='Pressure', y='Corrected Velocity', data=location_data_down, marker='o', color=purple_color)
+    sns.lineplot(x='Pressure', y='Corrected Velocity', data=location_data_up, marker='o', color=blue_color)
+    # set y axis to be 0 to 4000
+    if log:
+        ax.set_yscale('log')
+        ax.set_ylim((1, 5000))
+        # Set the major ticks with large bins (e.g., 10, 100, 1000, 10000, etc.)
+        ax.yaxis.set_major_locator(ticker.LogLocator(base=10.0, numticks=10))
+        ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
+        # Set minor ticks (2, 3, ..., 9 between major ticks)
+        ax.yaxis.set_minor_locator(ticker.LogLocator(base=10.0, subs=np.arange(0.1, 1, 0.1), numticks=10))
+        ax.yaxis.set_minor_formatter(ticker.NullFormatter())
+
+
+    else:
+        ax.set_ylim((0, max(np.nanmax(location_data_up['Corrected Velocity']), np.nanmax(location_data_down['Corrected Velocity']))))
+        pass
+
+        
+
+    
+     # ax.grid(False, which='minor')
+    # ax.yaxis.set_tick_params(which='minor', direction='in', length=4, width=0.5)
+    # Show the plot with small ticks only on the y-axis
+    # ax.yaxis.set_tick_params(which='minor', length=4)  # Adjust tick length for minor ticks
+    # ax.yaxis.set_tick_params(which='major', length=7)
+    # ax.grid(True, which='major', axis='y')
+
+    # ax.set_ylim((0, 4500))
+
+    # make y axis log scale
+    ax.set_title(f'Velocities for {participant} at {location}', fontsize=8)
+    ax.set_xlabel('Pressure (psi)')
+    ax.set_ylabel('Velocity (um/s)')
+    # ax.legend(['Up', 'Down'], title='Direction', title_fontsize=6, prop=source_sans)
+
+    plt.tight_layout()
+    plt.savefig(f'C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\{participant}_{location}_test.pdf', dpi=400)
+    # plt.show()
+    plt.close()
+    return 0
     
 def summarize_set01(filepath='C:\\Users\\gt8mar\\capillary-flow\\metadata\\merged\\merged_metadata.csv'):
     # Load the Excel file
@@ -3551,6 +3618,11 @@ def main(verbose = False):
     
     # create a subset of summary_df with no pressure values greater than 1.2
     summary_df_no_high_pressure = summary_df[summary_df['Pressure'] <= 1.2]
+    # add one to 'Corrected Velocity' to avoid log(0)
+    summary_df_no_high_pressure['Corrected Velocity'] = summary_df_no_high_pressure['Corrected Velocity'] #+ 10
+    print(summary_df_no_high_pressure['Corrected Velocity'].min())
+    if summary_df_no_high_pressure['Corrected Velocity'].min() < 0:
+        raise ValueError('Minimum value of Corrected Velocity is less than 0')
     old_nhp = summary_df_no_high_pressure[summary_df_no_high_pressure['Age'] > 50]
     young_nhp = summary_df_no_high_pressure[summary_df_no_high_pressure['Age'] <= 50]
     normbp_nhp = summary_df_no_high_pressure[summary_df_no_high_pressure['SYS_BP'] <= 120]
@@ -3695,7 +3767,7 @@ def main(verbose = False):
     # make an age group column for summary_df_nhp_video_medians
     summary_df_nhp_video_medians['Age_Group'] = np.where(summary_df_nhp_video_medians['Age'] >= 50, 'Above 50', 'Below 50')
     summary_df_nhp_video_medians['Video_Median_Velocity'] = summary_df_nhp_video_medians['Video Median Velocity']
-    summary_df_nhp_video_medians['Log_Video_Median_Velocity'] = np.log((summary_df_nhp_video_medians['Video Median Velocity']+1))
+    summary_df_nhp_video_medians['Log_Video_Median_Velocity'] = np.log((summary_df_nhp_video_medians['Video Median Velocity'])+1)
 
     # Convert age group to categorical variable
     summary_df_nhp_video_medians['Age_Group'] = pd.Categorical(summary_df_nhp_video_medians['Age_Group'], categories=['Below 50', 'Above 50'], ordered=True)
@@ -3843,20 +3915,12 @@ def main(verbose = False):
     favorite_df = summary_df.merge(favorite_capillaries, on=['Participant', 'Location', 'Capillary'], how='inner')
 
     # # save to csv
-    # # favorite_df.to_csv('C:\\Users\\gt8ma\\capillary-flow\\favorite_caps.csv', index=False)
+    # favorite_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\favorite_caps_new.csv', index=False)
     # # print(favorite_df.columns)
+    favorite_df = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\favorite_caps_new.csv')
 
-     # load favorite_caps.csv and merge with summary_df to keep updated velocity values
-    favorite_df = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\favorite_caps.csv')
-    # drop all rows with no values in 'Corrected Velocity'
-    favorite_df = favorite_df.dropna(subset=['Velocity'])
-    # for each row in favorite_df, add the "Corrected Velocity" from the same participant, location, video, and capillary in summary_df
-    favorite_df['Corrected Velocity'] = favorite_df.apply(lambda row: summary_df[(summary_df['Participant'] == row['Participant']) & (summary_df['Location'] == row['Location']) & (summary_df['Video'] == row['Video']) & (summary_df['Capillary'] == row['Capillary'])]['Corrected Velocity'].values[0], axis=1)
-    # print(favorite_df.columns)
-
-
-    # # remove part22 and part23
-    # # favorite_df = favorite_df[~favorite_df['Participant'].isin(['part22', 'part23'])]
+    # remove part22 and part23
+    favorite_df = favorite_df[~favorite_df['Participant'].isin(['part22', 'part23'])]
     
     # # plot_histograms(favorite_df, 'Age')
     # # plot_histograms(favorite_df, 'SYS_BP')
@@ -3866,6 +3930,10 @@ def main(verbose = False):
     # # plot_densities(favorite_df)
 
     favorite_df_no_high_pressure = favorite_df[favorite_df['Pressure'] <= 1.2]
+    
+    # save to csv for debugging
+    # favorite_df_no_high_pressure.to_csv('C:\\Users\\gt8mar\\capillary-flow\\favorite_caps_nhp.csv', index=False)
+    
     # print(f'The length of favorite_df_no_high_pressure is {len(favorite_df_no_high_pressure)}')
     # plot_CI(favorite_df_no_high_pressure, variable = 'Age', ci_percentile=95, write=False)
     # plot_CI(favorite_df_no_high_pressure, variable = 'Age', ci_percentile=95, method = 'mean', write=False)
@@ -3955,6 +4023,7 @@ def main(verbose = False):
         participant_df = favorite_df_copy[favorite_df_copy['Participant'] == participant]
         # Sort the data by 'Video':
         participant_df = participant_df.sort_values(by='Video')
+        participant_df['Corrected Velocity'] = participant_df['Corrected Velocity']+1
 
         
 
@@ -3973,19 +4042,9 @@ def main(verbose = False):
         for location in locations:
             location_data = grouped_df.get_group(location)
             # plot the velocities with 'u' in the 'Up_Down' column
-            location_data_up = location_data[location_data['Up_Down'] == 'u']
-            location_data_down = location_data[location_data['Up_Down'] == 'd']
-
-            # # plot
-            # plt.figure(figsize=(6, 4))
-            # sns.lineplot(x='Pressure', y='Corrected Velocity', data=location_data_up, marker='o')
-            # sns.lineplot(x='Pressure', y='Corrected Velocity', data=location_data_down, marker='x')
-            # # set y axis to be 0 to 4000
-            # plt.ylim((0, 4000))
-            # plt.title(f'Corrected Velocities for {participant} at {location} with "Up" Pressure')
-            # plt.xlabel('Pressure')
-            # plt.ylabel('Velocity (um/s)')
-            # plt.show()
+            location_data_up = location_data[(location_data['Up_Down'] == 'u') | (location_data['Up_Down'] == 't')]
+            location_data_down = location_data[(location_data['Up_Down'] == 'd') | (location_data['Up_Down'] == 't')]
+            plot_indiv_velocities(location_data_up, location_data_down, participant, location, log = False)
 
             # use trapezoidal rule to calculate area under the curve for each 'Up' and 'Down' curve
             # calculate area under datapoints using trapezoidal rule
@@ -3997,63 +4056,7 @@ def main(verbose = False):
             favorite_df_no_high_pressure.loc[(favorite_df_no_high_pressure['Participant'] == participant) & (favorite_df_no_high_pressure['Location'] == location), 'Hysterisis'] = hysterisis
             favorite_df_no_high_pressure.loc[(favorite_df_no_high_pressure['Participant'] == participant) & (favorite_df_no_high_pressure['Location'] == location), 'Antihysterisis'] = antihysterisis
 
-    # # plot scatter of age vs hysterisis
-    plt.figure(figsize=(6, 4))  
-    sns.scatterplot(x='Age', y='Antihysterisis', data=favorite_df_no_high_pressure[favorite_df_no_high_pressure['Participant']!='part09'])
-    plt.title('Hysterisis vs Age')
-    plt.xlabel('Age')
-    plt.ylabel('Hysterisis')
-    plt.show()
-
-        # if a video and the next video have the same pressure and location, average their "Corrected velocities and drop the first video row"
-        for i in range(len(participant_df)-1):
-            if (participant_df.iloc[i]['Pressure'] == participant_df.iloc[i+1]['Pressure']) and (participant_df.iloc[i]['Location'] == participant_df.iloc[i+1]['Location']):
-                participant_df.iloc[i+1]['Corrected Velocity'] = (participant_df.iloc[i]['Corrected Velocity'] + participant_df.iloc[i+1]['Corrected Velocity']) / 2
-                participant_df.iloc[i]['Corrected Velocity'] = None
-            
-        # drop rows with no Corrected Velocity
-        participant_df = participant_df.dropna(subset=['Corrected Velocity'])
-        
-        # separate the data into locations
-        grouped_df = participant_df.groupby('Location')
-        locations = participant_df['Location'].unique()
-        for location in locations:
-            location_data = grouped_df.get_group(location)
-            # plot the velocities with 'u' in the 'Up_Down' column
-            location_data_up = location_data[location_data['Up_Down'] == 'u']
-            location_data_down = location_data[location_data['Up_Down'] == 'd']
-
-        # plot
-            plt.figure(figsize=(6, 4))
-            sns.lineplot(x='Pressure', y='Corrected Velocity', data=location_data_up, marker='o')
-            sns.lineplot(x='Pressure', y='Corrected Velocity', data=location_data_down, marker='x')
-            # set y axis to be 0 to 4000
-            plt.ylim((0, 4000))
-            plt.title(f'Corrected Velocities for {participant} at {location} with "Up" Pressure')
-            plt.xlabel('Pressure')
-            plt.ylabel('Velocity (um/s)')
-            plt.show()
-
-            # use trapezoidal rule to calculate area under the curve for each 'Up' and 'Down' curve
-            # calculate area under datapoints using trapezoidal rule
-            area_up = np.trapz(location_data_up['Corrected Velocity'], location_data_up['Pressure'])
-            area_down = np.trapz(location_data_down['Corrected Velocity'], location_data_down['Pressure'])
-            hysterisis = area_up - area_down
-            antihysterisis = area_up + area_down
-            # add to favorite_df_no_high_pressure
-            favorite_df_no_high_pressure.loc[(favorite_df_no_high_pressure['Participant'] == participant) & (favorite_df_no_high_pressure['Location'] == location), 'Hysterisis'] = hysterisis
-            favorite_df_no_high_pressure.loc[(favorite_df_no_high_pressure['Participant'] == participant) & (favorite_df_no_high_pressure['Location'] == location), 'Antihysterisis'] = antihysterisis
-
-    # # plot scatter of age vs hysterisis
-    plt.figure(figsize=(6, 4))  
-    sns.scatterplot(x='Age', y='Antihysterisis', data=favorite_df_no_high_pressure[favorite_df_no_high_pressure['Participant']!='part09'])
-    plt.title('Hysterisis vs Age')
-    plt.xlabel('Age')
-    plt.ylabel('Hysterisis')
-    plt.show()
-
-
-
+    
        
         # print(participant_df[['Participant', 'Capillary', 'Location', 'Video', 'Pressure', 'Corrected Velocity']])
 
@@ -4105,13 +4108,13 @@ def main(verbose = False):
     #         # add hysterisis to the favorite_df
     #         favorite_df.loc[(favorite_df['Participant'] == participant) & (favorite_df['Capillary'] == capillary), 'Hysterisis'] = hysterisis
             
-    # # # Plot scatter of age vs hysterisis 
-    # # plt.figure(figsize=(10, 6))
-    # # sns.scatterplot(x='Age', y='Hysterisis', data=favorite_df)
-    # # plt.title('Hysterisis vs Age')
-    # # plt.xlabel('Age')
-    # # plt.ylabel('Hysterisis')
-    # # plt.show()
+#    # # plot scatter of age vs hysterisis
+#     plt.figure(figsize=(6, 4))  
+#     sns.scatterplot(x='Age', y='Antihysterisis', data=favorite_df_no_high_pressure[favorite_df_no_high_pressure['Participant']!='part09'])
+#     plt.title('Hysterisis vs Age')
+#     plt.xlabel('Age')
+#     plt.ylabel('Hysterisis')
+#     plt.show()
 
     
 
