@@ -182,7 +182,8 @@ if __name__ == "__main__":
     ticks = time.time()
     # path = 'D:\\Marcus\\backup\\data\\part25\\230601\\loc02\\vids\\vid27'
     # short_path = 'D:\\Marcus\\backup\\data\\part24\\230601\\loc03\\vids'
-    short_path = 'I:\\Marcus\\data\\part49\\240619\\loc02\\vids\\vid14'
+    # short_path = 'I:\\Marcus\\data\\part49\\240619\\loc02\\vids\\vid14'
+    short_path = 'C:\\Users\\gt8mar\\Desktop\\data\\part81\\240718\\loc02\\vids\\vid21'
     # vids = ['vid' + str(i) for i in range(38, 49)]
     # for vid in vids:
     #     long_path = os.path.join(short_path, vid)

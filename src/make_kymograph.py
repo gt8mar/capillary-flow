@@ -336,8 +336,9 @@ if __name__ == "__main__":
     ticks = time.time()
     if platform.system() == 'Windows':
         # path = 'F:\\Marcus\\data\\part09\\230414\\loc01'
-        path = 'C:\\Users\\gt8mar\\capillary-flow\\tests\\part22\\230530\\loc02'
-        main(path, write=False, verbose=True)
+        # path = 'C:\\Users\\gt8mar\\capillary-flow\\tests\\part22\\230530\\loc02'
+        path = 'F:\\Marcus\\data\\2022\\test_220513\\part00\\220513\\loc01'
+        main(path, write=True, verbose=False)
     else:
         path = '/hpc/projects/capillary-flow/data/part09/230414/loc01'
         main(path, write = True)
