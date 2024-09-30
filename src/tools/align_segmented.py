@@ -1,7 +1,7 @@
 """
 Filename: align_segmented.py
 -------------------------------------------------------------
-This file aligns segmented images based on translations between moco images.
+This file aligns segmented images or masks based on translations between moco images.
 by: Gabby Rincon
 """
 
@@ -54,30 +54,44 @@ def uncrop_segmented(path, input_seg_img):
     if gap_bottom > 0:
         gap_bottom = 0
 
-    # Convert the segmented image to grayscale
-    input_seg_img = rgb2gray(input_seg_img)
+    # Convert the segmented image to grayscale if it's not already
+    if len(input_seg_img.shape) > 2:
+        input_seg_img = rgb2gray(input_seg_img)
 
     # Pad the image based on the calculated gaps
     uncropped_input_seg_img = np.pad(input_seg_img, ((abs(gap_top), abs(gap_bottom)), (abs(gap_left), abs(gap_right))), mode='constant', constant_values=0)
     return uncropped_input_seg_img, gap_left, gap_right, gap_bottom, gap_top
 
-def align_segmented(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
+def align_segmented(path="f:\\Marcus\\data\\part30\\231130\\loc02", align_masks=True):
     """
-    Aligns segmented images based on translations between moco images.
+    Aligns segmented images or masks based on translations between moco images.
 
     Args:
         path (str): The path to the location directory for a given participant.
+        align_masks (bool): If True, align masks instead of segmented images.
 
     Creates:
-        Directories for registered moco images and registered segmented images.
+        Directories for registered moco images and registered segmented images or masks.
         CSV files with translations, resize values, and crop values.
     """
     vid_folder_fp = os.path.join(path, "vids")
     segmented_folder_fp = os.path.join(path, "segmented", "hasty")
+    masks_vids_fp = []
+    # List and sort all png files in segmented folder
+    for mask in os.listdir(segmented_folder_fp):
+        if mask.endswith(".png"):
+            vid = parse_filename(mask)[3]
+            masks_vids_fp.append((vid, os.path.join(segmented_folder_fp, mask)))
+            
+    # sort the list of mask tuples by the video number
+    masks_vids_fp = sorted(masks_vids_fp, key=lambda x: int(x[0].split("vid")[1]))
+    
 
     # Create folder to save registered moco images
     reg_moco_folder = os.path.join(segmented_folder_fp, "moco_registered")
+    reg_mask_folder = os.path.join(segmented_folder_fp, "mask_registered")
     os.makedirs(reg_moco_folder, exist_ok=True)
+    os.makedirs(reg_mask_folder, exist_ok=True)
 
     # Make list of filepaths of vid 0 in moco folders of all vids
     moco_vids_fp = []
@@ -96,29 +110,33 @@ def align_segmented(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
 
     # Set reference image
     reference_moco_tuple = moco_vids_fp[0]
+    reference_mask_tuple = masks_vids_fp[0]
     first_video = reference_moco_tuple[0]
     first_video_path = os.path.join(vid_folder_fp, first_video)
     reference_moco_fp = reference_moco_tuple[1]
+    reference_mask_fp = reference_mask_tuple[1]
     reference_moco_img = cv2.imread(reference_moco_fp)
+    reference_mask_img = cv2.imread(reference_mask_fp, cv2.IMREAD_UNCHANGED)
     reference_moco_filename = f'{first_video}_moco_0000.tif'
-
+    reference_mask_filename = f'{first_video}_mask_0000.png'
 
     # Save reference moco image with contrast adjustment
     contrast_reference_moco_img = cv2.equalizeHist(cv2.cvtColor(reference_moco_img, cv2.COLOR_BGR2GRAY))
     cv2.imwrite(os.path.join(reg_moco_folder, reference_moco_filename), np.pad(contrast_reference_moco_img, ((PAD_VALUE, PAD_VALUE), (PAD_VALUE, PAD_VALUE))))
+    cv2.imwrite(os.path.join(reg_mask_folder, reference_mask_filename), np.pad(reference_mask_img, ((PAD_VALUE, PAD_VALUE), (PAD_VALUE, PAD_VALUE))))
 
-    # Create folder to save registered segmented images
+    # Create folder to save registered segmented images or masks
     reg_folder_path = os.path.join(segmented_folder_fp, "registered")
     os.makedirs(reg_folder_path, exist_ok=True)
 
     crops = []
 
-    # Process the first segmented frame
-    sorted_seg_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(segmented_folder_fp, x)) and x.endswith(".png"), os.listdir(segmented_folder_fp)))  # Sort numerically
+    sorted_seg_listdir = sorted(filter(lambda x: os.path.isfile(os.path.join(segmented_folder_fp, x)) and x.endswith(".png"), os.listdir(segmented_folder_fp)))
     first_seg_fp = os.path.join(segmented_folder_fp, sorted_seg_listdir[0])
-    first_seg_img = cv2.imread(first_seg_fp)
     
-    # Use the shifts from the Results.csv file to uncrop the first segmented image we will register to
+    first_seg_img = cv2.imread(first_seg_fp, cv2.IMREAD_UNCHANGED)
+    
+    # Use the shifts from the Results.csv file to uncrop the first segmented image or mask we will register to
     first_seg_img, left, right, bottom, top = uncrop_segmented(first_video_path, first_seg_img)
 
     translations = []
@@ -131,25 +149,44 @@ def align_segmented(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
         if "vid" in sorted_vids_listdir[i]: 
             # Register vids
             input_moco_tuple = moco_vids_fp[i]
+            input_mask_tuple = masks_vids_fp[i]
             input_moco_fp = input_moco_tuple[1]
+            input_mask_fp = input_mask_tuple[1]
             video = input_moco_tuple[0]
+            if align_masks:
+                if input_moco_tuple[0] != input_mask_tuple[0]:
+                    print(f"Error: Mismatched video names: {input_moco_tuple[0]} and {input_mask_tuple[0]}")
+                    video = input_mask_tuple[0]
             input_moco_img = cv2.imread(input_moco_fp)
+            input_mask_img = cv2.imread(input_mask_fp, cv2.IMREAD_UNCHANGED)
             input_moco_filename = f'{video}_moco_0000.tif'
-            [dx, dy], registered_image = register_images(reference_moco_img, input_moco_img, prevdx, prevdy)
+            if align_masks:
+                [dx, dy], registered_image = register_images(reference_mask_img, input_mask_img, prevdx, prevdy)
+            else:
+                [dx, dy], registered_image = register_images(reference_moco_img, input_moco_img, prevdx, prevdy)
 
             dx = int(dx)
             dy = int(dy)
             translations.append([dx + prevdx, dy + prevdy])
 
             # Update reference image and previous translations
-            reference_moco_img = input_moco_img
-            prevdx += dx
-            prevdy += dy
+            if align_masks:
+                reference_mask_img = input_mask_img
+                prevdx += dx
+                prevdy += dy
 
-            # Save registered moco frame
-            cv2.imwrite(os.path.join(reg_moco_folder, input_moco_filename), registered_image)
+                # Save registered mask
+                cv2.imwrite(os.path.join(reg_mask_folder, input_moco_filename), registered_image)
 
-    # Calculate the maximum size of segmented images
+            else:
+                reference_moco_img = input_moco_img
+                prevdx += dx
+                prevdy += dy
+
+                # Save registered moco frame
+                cv2.imwrite(os.path.join(reg_moco_folder, input_moco_filename), registered_image)
+
+    # Calculate the maximum size of segmented images or masks
     minx = min(0, min(entry[0] for entry in translations))
     maxx = max(0, max(entry[0] for entry in translations))
     miny = min(0, min(entry[1] for entry in translations))
@@ -161,15 +198,14 @@ def align_segmented(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
         if "vid" in sorted_vids_listdir[x]: 
             participant, date, location, seg_video, __= parse_filename(sorted_seg_listdir[x])
             seg_video_filepath = os.path.join(vid_folder_fp, seg_video)
-            # Get image to segment
             input_seg_fp = os.path.join(segmented_folder_fp, sorted_seg_listdir[x])
-            input_seg_img = cv2.imread(input_seg_fp)
+            input_seg_img = cv2.imread(input_seg_fp, cv2.IMREAD_UNCHANGED)
 
-            # Make segmented image same size using Results.csv file from video folder
+            # Make segmented image or mask same size using Results.csv file from video folder
             input_seg_img, left, right, bottom, top = uncrop_segmented(seg_video_filepath, input_seg_img)
             crops.append((left, right, bottom, top))
 
-            # Transform segmented image
+            # Transform segmented image or mask
             padbottom = abs(miny) + translations[x][1]
             padtop = abs(maxy) - translations[x][1]
             padright = abs(minx) + translations[x][0]
@@ -178,9 +214,14 @@ def align_segmented(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
 
             resize_vals.append([minx, maxx, miny, maxy])
 
-            # Save segmented image
-            registered_seg_img = (registered_seg_img * 255).astype(np.uint8)
-            io.imsave(os.path.join(reg_folder_path, os.path.basename(input_seg_fp)), registered_seg_img)
+            # Save segmented image or mask
+            if align_masks:
+                # For masks, we assume they're already binary (0 or 255)
+                io.imsave(os.path.join(reg_folder_path, os.path.basename(input_seg_fp)), registered_seg_img.astype(np.uint8))
+            else:
+                # For segmented images, scale to 0-255 range
+                registered_seg_img = (registered_seg_img * 255).astype(np.uint8)
+                io.imsave(os.path.join(reg_folder_path, os.path.basename(input_seg_fp)), registered_seg_img)
 
     # Save translations to CSV file
     translations_csv_fp = os.path.join(segmented_folder_fp, "translations.csv")
@@ -207,6 +248,6 @@ def align_segmented(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    align_segmented()
+    align_segmented(align_masks=True)  # Set to True to align masks instead of segmented images
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
