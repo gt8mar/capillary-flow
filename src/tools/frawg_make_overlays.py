@@ -14,7 +14,7 @@ def rename_files(rename_map_fp, individual_caps_folder):
             os.rename(old_name, new_name)
 
 def main(path, rename = False):
-    backgrounds_folder = os.path.join(path, 'backgrounds')
+    backgrounds_folder = os.path.join(path, 'stdevs')
     individual_caps_folder = os.path.join(path, 'individual_caps')
     segmented_folder = os.path.join(path, 'segmented')
     if rename:
@@ -37,8 +37,12 @@ def main(path, rename = False):
         (0, 128, 128),  # Teal
         (128, 128, 0),  # Olive
         (128, 0, 128),  # Purple
+        (0, 128, 128),  # Light Teal
+        (139, 69, 19),  # Saddle Brown
+        (255, 69, 0),   # Red-Orange
+        (128, 0, 0),    # Maroon
     ]
-
+    i = 0
     colors = predefined_colors.copy()
     for bg_file in os.listdir(backgrounds_folder):
         for sg_file in os.listdir(segmented_folder):
@@ -48,15 +52,20 @@ def main(path, rename = False):
                     bg_image = cv2.cvtColor(bg_image, cv2.COLOR_BGR2BGRA)
                     for cap_file in os.listdir(individual_caps_folder):
                         if cap_file.endswith('.png'):
-                            cap_image = cv2.imread(os.path.join(individual_caps_folder, cap_file), cv2.IMREAD_GRAYSCALE)
-                            cap_file = cap_file.strip('.png')
-
+                            cap_name = cap_file.strip('.png')
                             # cap_name = cap_file[:-7]
-                            cap_name = cap_file[:-3] # this takes off the capillary number label. Ex: 24-2-14_WkSlAwakeFrog4Rankle1_00 would lose the _00
-                            if cap_name in bg_file:
-                                overlay= np.zeros_like(bg_image)
-                                color = colors.pop(0)
+                            cap_name = cap_name[:-3] # this takes off the capillary number label. Ex: 24-2-14_WkSlAwakeFrog4Rankle1_00 would lose the _00
+                            # put SD_ at the front of the capillary name
+                            cap_name = 'SD_' + cap_name
+                            if cap_name == bg_file.strip('.tiff'):
+                                cap_image = cv2.imread(os.path.join(individual_caps_folder, cap_file), cv2.IMREAD_GRAYSCALE)
 
+                                overlay= np.zeros_like(bg_image)
+                                color = colors[i]
+                                if i < len(predefined_colors) - 1:
+                                    i += 1
+                                else:
+                                    i = 0
                                 #add cap overlay
                                 overlay = np.zeros((*bg_image.shape[:2], 4), dtype=np.uint8)
                                 for y, x in np.ndindex(bg_image.shape[:2]):
@@ -85,6 +94,8 @@ def main(path, rename = False):
                                 cv2.putText(overlayed, capnum, (xcoord, ycoord), cv2.FONT_HERSHEY_PLAIN, 2, (255, 255, 255), 6, cv2.LINE_AA)
 
                                 bg_image = overlayed
+                            else:
+                                continue
                     
                     #save
                     cv2.imwrite(os.path.join(overlays_folder, bg_file[:-5] + '_overlay.png'), bg_image)
@@ -97,19 +108,23 @@ def main(path, rename = False):
 
 if __name__ == "__main__":
     ticks = time.time()
-    umbrella_folder = 'J:\\frog\\data'
+    umbrella_folder = '/hpc/projects/capillary-flow/frog/'
     for date in os.listdir(umbrella_folder):
-        if not date.startswith('24'):
+        if not date.startswith('240729'):
             continue
         if date == 'archive':
+            continue
+        if date.endswith('alb'):
             continue
         for frog in os.listdir(os.path.join(umbrella_folder, date)):
             if frog.startswith('STD'):
                 continue
-            if not frog.startswith('Frog'):
+            if not frog.startswith('Frog4'): # only process Frog4 for now
                 continue
             for side in os.listdir(os.path.join(umbrella_folder, date, frog)):
                 if side.startswith('STD'):
+                    continue
+                if not side.startswith('Left'): # only process the left side for now
                     continue
                 if side == 'archive':
                     continue
