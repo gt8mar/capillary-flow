@@ -5,23 +5,16 @@ import cv2
 from src.tools.naming_overlay_old import get_label_position
 import csv
 
-def rename_files(rename_map_fp, individual_caps_folder):
-    with open(rename_map_fp, 'r') as f:
-        reader = csv.reader(f)
-        for row in reader:
-            old_name = os.path.join(individual_caps_folder, row[0])
-            new_name = os.path.join(individual_caps_folder, row[1])
-            os.rename(old_name, new_name)
-
 def main(path, rename = False):
     backgrounds_folder = os.path.join(path, 'stdevs')
-    individual_caps_folder = os.path.join(path, 'individual_caps')
     segmented_folder = os.path.join(path, 'segmented')
     if rename:
         old_overlays_folder = os.path.join(path, 'overlays')
         overlays_folder = os.path.join(path, 'overlays_renamed')
-        rename_files(os.path.join(old_overlays_folder, 'rename_map.csv'), individual_caps_folder)
+        os.makedirs(overlays_folder, exist_ok = True)
+        individual_caps_folder = os.path.join(path, 'individual_caps_renamed')
     else:
+        individual_caps_folder = os.path.join(path, 'individual_caps')
         overlays_folder = os.path.join(path, 'overlays')
     os.makedirs(overlays_folder, exist_ok = True)
 
@@ -47,17 +40,21 @@ def main(path, rename = False):
     for bg_file in os.listdir(backgrounds_folder):
         for sg_file in os.listdir(segmented_folder):
             if bg_file.endswith('.tiff') and sg_file.endswith('.png'):
-                if bg_file.strip('.tiff') == sg_file.strip('.png'):
+                if bg_file.replace('.tiff', '') == sg_file.replace('.png', ''):
+                    print('Processing: ' + bg_file)
                     bg_image = cv2.imread(os.path.join(backgrounds_folder, bg_file))
                     bg_image = cv2.cvtColor(bg_image, cv2.COLOR_BGR2BGRA)
                     for cap_file in os.listdir(individual_caps_folder):
                         if cap_file.endswith('.png'):
-                            cap_name = cap_file.strip('.png')
+                            cap_name = cap_file.replace('.png', '')
                             # cap_name = cap_file[:-7]
-                            cap_name = cap_name[:-3] # this takes off the capillary number label. Ex: 24-2-14_WkSlAwakeFrog4Rankle1_00 would lose the _00
+                            if rename:
+                                cap_name = cap_name[:-2] # this takes off the capillary number label. Ex: 24-2-14_WkSlAwakeFrog4Rankle1_a would lose the _a
+                            else:
+                                cap_name = cap_name[:-3] # this takes off the capillary number label. Ex: 24-2-14_WkSlAwakeFrog4Rankle1_00 would lose the _00
                             # put SD_ at the front of the capillary name
                             cap_name = 'SD_' + cap_name
-                            if cap_name == bg_file.strip('.tiff'):
+                            if cap_name == bg_file.replace('.tiff', ''):
                                 cap_image = cv2.imread(os.path.join(individual_caps_folder, cap_file), cv2.IMREAD_GRAYSCALE)
 
                                 overlay= np.zeros_like(bg_image)
@@ -130,7 +127,7 @@ if __name__ == "__main__":
                     continue
                 print('Processing: ' + date + ' ' + frog + ' ' + side)
                 path = os.path.join(umbrella_folder, date, frog, side)
-                main(path)
+                main(path, rename=True)
     #main(path = 'D:\\frog\\data\\240530\\Frog5\\Right')
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
