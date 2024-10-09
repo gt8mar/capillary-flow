@@ -243,6 +243,7 @@ def main(path, fps, verbose = False, write = False, write_data = True,
 
     Args:
         path (str): path to the location folder containing kymographs
+        fps (int or string): frames per second of the video or flag to use calibration data
         verbose (bool): If True, show plots
         write (bool): If True, write plots to file
         test (bool): If True, use test data
@@ -266,6 +267,11 @@ def main(path, fps, verbose = False, write = False, write_data = True,
     side = path.split("\\")[-1]
     missing_log = []
     for image in images:
+        #if fps is not a number, print letter 
+        if not fps.isdigit():
+            fps = image.split("Frog4fps")[1].split('Lankle')[0] #hardcode to get the fps between Frog4fps and Lankle
+            fps = int(fps)
+        
         #date = image.split(" ")[0]
         #print(image)
         video = image.split('_')[0]
@@ -386,19 +392,24 @@ def main(path, fps, verbose = False, write = False, write_data = True,
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    umbrella_folder = 'J:\\frog\\data'
+    # umbrella_folder = 'J:\\frog\\data'
+    umbrella_folder = '/hpc/projects/capillary-flow/frog/'
     for date in os.listdir(umbrella_folder):
-        if not date.startswith('24'):
+        if not date.startswith('240729'):
             continue
-        if date == 'archive': # TO DELETE
+        if date == 'archive': 
+            continue
+        if date.endswith('alb'):
             continue
         for frog in os.listdir(os.path.join(umbrella_folder, date)):
             if frog.startswith('STD'):
                 continue
-            if not frog.startswith('Frog'):
+            if not frog.startswith('Frog4'):
                 continue   
             for side in os.listdir(os.path.join(umbrella_folder, date, frog)):
                 if side.startswith('STD'):
+                    continue
+                if not side.startswith('Left'): # only process the left side for now
                     continue
                 if side == 'archive':
                     continue
@@ -413,7 +424,7 @@ if __name__ == "__main__":
                     fps = 130
 
 
-                main(path, fps, write = True, write_data=True, verbose= False, test = False)
+                main(path, 'individual', write = True, write_data=True, verbose= False, test = False)
     #main(path = 'E:\\frawg\\gabbyanalysis', write = True, write_data=True, verbose= False, test = False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))

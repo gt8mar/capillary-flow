@@ -127,7 +127,7 @@ if __name__ == "__main__":
                     continue
                 print('Processing: ' + date + ' ' + frog + ' ' + side)
                 path = os.path.join(umbrella_folder, date, frog, side)
-                main(path, rename=True)
+                main(path, rename=False)
     #main(path = 'D:\\frog\\data\\240530\\Frog5\\Right')
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
