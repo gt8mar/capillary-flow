@@ -233,7 +233,7 @@ def find_slopes(image, filename, output_folder=None, method = 'ridge', verbose =
         plt.close()
     return weighted_average_slope
 
-def main(path, fps, verbose = False, write = False, write_data = True,
+def main(path, fps_type, fps, verbose = False, write = False, write_data = True,
          test = False):
     """
     This function takes in a path to a folder containing kymographs and outputs
@@ -242,8 +242,9 @@ def main(path, fps, verbose = False, write = False, write_data = True,
     graph.
 
     Args:
-        path (str): path to the location folder containing kymographs
-        fps (int or string): frames per second of the video or flag to use calibration data
+        path (str): path to the location folder containing kymographs Ex: '/hpc/projects/capillary-flow/frog/240729/Frog4/Left'
+        fps_type (str): 'individual' or 'constant'
+        fps (int or None): frames per second of the video or flag to use calibration data
         verbose (bool): If True, show plots
         write (bool): If True, write plots to file
         test (bool): If True, use test data
@@ -262,28 +263,37 @@ def main(path, fps, verbose = False, write = False, write_data = True,
     # Create a dataframe to store the results
     df = pd.DataFrame(columns = ['Date', 'Frog', 'Side', 'Condition', 'Capillary', 'Velocity (um/s)'])
 
-    date = path.split("\\")[-3]
-    frog = path.split("\\")[-2]
-    side = path.split("\\")[-1]
+    if platform.system() != 'Windows':
+        date = path.split("/")[-3]
+        frog = path.split("/")[-2]
+        side = path.split("/")[-1]
+    else:
+        date = path.split("\\")[-3]
+        frog = path.split("\\")[-2]
+        side = path.split("\\")[-1]
     missing_log = []
     for image in images:
         #if fps is not a number, print letter 
-        if not fps.isdigit():
+        if fps_type == 'individual':
             fps = image.split("Frog4fps")[1].split('Lankle')[0] #hardcode to get the fps between Frog4fps and Lankle
             fps = int(fps)
-        
-        #date = image.split(" ")[0]
-        #print(image)
-        video = image.split('_')[0]
-        condition = get_condition(image)
+            condition = image.split("Frog4fps")[1].split('_kymograph')[0]
+            filename = image.replace('kymograph', 'velocities').replace('.tiff', '').replace('_0','_')    
+        else:
+            fps = fps
+            condition = get_condition(image) 
+            video = image.split('_')[0]
+            # filename = f'{date}_{video}_{capillary_name}'
+            filename = image.replace('kymograph', 'velocities').replace('.tiff', '')    
 
+   
+      
         kymo_raw = cv2.imread(os.path.join(input_folder, image), cv2.IMREAD_GRAYSCALE)
 
         #fps = FPS
         
         # Get the capillary name for the video
-        capillary_name = image[image.find('.tiff') - 1]
-        filename = f'{date}_{video}_{capillary_name}'
+        capillary_name = image.replace('.tiff', '').split('_')[-1].replace('0', '')
         kymo_blur = gaussian_filter(kymo_raw, sigma = 2)
         
         if write:
@@ -298,7 +308,7 @@ def main(path, fps, verbose = False, write = False, write_data = True,
 
     # Write the dataframe to a file
     if write_data:
-        df.to_csv(os.path.join(output_folder, f"{date}_{frog}_{side}_velocity_data.csv"), index=False)    
+        df.to_csv(os.path.join(output_folder, filename + '.csv'), index=False)    
         #df.to_csv(os.path.join(results_folder, f"{file_prefix}_velocity_data.csv"), index=False)    
 
     # print(df)
@@ -416,15 +426,13 @@ if __name__ == "__main__":
                 print('Processing: ' + date + ' ' + frog + ' ' + side)
                 path = os.path.join(umbrella_folder, date, frog, side)
 
-                if date in ['240213', '240214', '240229']:
-                    fps = 100
-                elif date == '240530':
-                    fps = 220
-                else:
-                    fps = 130
-
-
-                main(path, 'individual', write = True, write_data=True, verbose= False, test = False)
+                # if date in ['240213', '240214', '240229']:
+                #     fps = 100
+                # elif date == '240530':
+                #     fps = 220
+                # else:
+                #     fps = 130
+                main(path, fps_type='individual', fps = None, write = True, write_data=True, verbose= False, test = False)
     #main(path = 'E:\\frawg\\gabbyanalysis', write = True, write_data=True, verbose= False, test = False)
     print("--------------------")
     print("Runtime: " + str(time.time() - ticks))
