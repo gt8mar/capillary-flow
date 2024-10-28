@@ -19,13 +19,14 @@ import csv
 from src.tools.parse_path import parse_path
 from src.tools.parse_filename import parse_filename
 
+PAD_VALUE = 250
+MAX_TRANSLATION = 200
+
 # Import the appropriate module based on the operating system
 if platform.system() != 'Windows':
-    from src.tools.register_images import register_images
+    from src.tools.register_images import register_images_moco, register_images
 else:
-    from register_images import register_images
-
-PAD_VALUE = 250
+    from register_images import register_images_moco, register_images
 
 def uncrop_segmented(path, input_seg_img):
     """
@@ -60,6 +61,8 @@ def uncrop_segmented(path, input_seg_img):
     # Pad the image based on the calculated gaps
     uncropped_input_seg_img = np.pad(input_seg_img, ((abs(gap_top), abs(gap_bottom)), (abs(gap_left), abs(gap_right))), mode='constant', constant_values=0)
     return uncropped_input_seg_img, gap_left, gap_right, gap_bottom, gap_top
+
+
 
 def align_segmented(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
     """
@@ -135,7 +138,13 @@ def align_segmented(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
             video = input_moco_tuple[0]
             input_moco_img = cv2.imread(input_moco_fp)
             input_moco_filename = f'{video}_moco_0000.tif'
-            [dx, dy], registered_image = register_images(reference_moco_img, input_moco_img, prevdx, prevdy)
+            # [dx, dy], registered_image = register_images_moco(reference_moco_img, input_moco_img, max_shift=MAX_TRANSLATION)
+
+            [dx, dy], registered_image = register_images(reference_moco_img, input_moco_img, prevdx, prevdy, max_shift=MAX_TRANSLATION, pin=True)
+            # # Alternatively, you can clamp the translations to the max value
+            # dx = np.clip(dx, -MAX_TRANSLATION, MAX_TRANSLATION)
+            # dy = np.clip(dy, -MAX_TRANSLATION, MAX_TRANSLATION)
+
 
             dx = int(dx)
             dy = int(dy)

@@ -521,11 +521,11 @@ def main(path='F:\\Marcus\\data\\part09\\230414\\loc01', verbose = False, write 
         if write:
             # weighted_average_slope = find_slopes(kymo_blur, velocity_filename, output_folder, method = 'lasso', verbose = False, write=True)
             weighted_average_slope = find_slopes_hough(kymo_blur, velocity_filename, min_angles=5, output_folder=output_folder, plot=False, write=True,
-                        plot_title = "Kymograph", too_fast = False, too_slow = False)
+                                                        plot_title = "Kymograph", too_fast = False, too_slow = False)
         else:
             # weighted_average_slope = find_slopes(kymo_blur, velocity_filename, output_folder, method = 'lasso', verbose = verbose, write=False)
             weighted_average_slope = find_slopes_hough(kymo_blur, velocity_filename,min_angles=5,  output_folder=output_folder, plot=verbose, write=False,
-                        plot_title = "Kymograph", too_fast = False, too_slow = False)
+                                                        plot_title = "Kymograph", too_fast = False, too_slow = False)
         # transform slope from pixels/frames into um/s:
         um_slope = np.absolute(weighted_average_slope) *fps/PIX_UM
         # add row to dataframe
