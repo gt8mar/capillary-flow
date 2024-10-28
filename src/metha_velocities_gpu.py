@@ -15,12 +15,13 @@ def load_marcus_data():
     Load data from human capillaries. Now returns all data on GPU.
 
     Returns:
-        dict: Dictionary containing loaded data (mask, pixel diameter, video array, fps).
+        dict: Dictionary containing all data on GPU.
     """
     mask_path = '/hpc/projects/capillary-flow/frog/240729/Frog4/Left/masks/SD_24-07-29_CalFrog4fps100Lankle_mask.png'
     maskIm = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
-    # Move mask to GPU immediately after loading
-    maskIm = cp.array(maskIm > 0, dtype=cp.int32)
+    maskIm[maskIm > 0] = 1
+    # Convert to binary mask on GPU where anything greater than 0 is 1
+    maskIm = cp.array(maskIm > 0, dtype=cp.uint8)
     
     pixel_diam_um = 0.8
     pixel_diam_mm = pixel_diam_um / 1000
@@ -28,8 +29,7 @@ def load_marcus_data():
     
     images = get_images.get_images('/hpc/projects/capillary-flow/frog/240729/Frog4/Left/vids/24-07-29_CalFrog4fps100Lankle')
     video_array = load_image_array.load_image_array(images, '/hpc/projects/capillary-flow/frog/240729/Frog4/Left/vids/24-07-29_CalFrog4fps100Lankle')
-    # Move video array to GPU immediately after loading
-    video_array = cp.array(video_array)
+    video_array = cp.array(video_array, dtype=cp.float32)
     
     data = {
         'maskIm': maskIm,
@@ -40,83 +40,6 @@ def load_marcus_data():
     print("Data loaded successfully on GPU")
     return data
 
-def process_pixel(i, loopPix, maskIm, video_array, selected_fwd_array, selected_bak_array, 
-                 loopPix_coords, V_MAX_MMS, pixel_diam_mm, fps, 
-                 disp_row_fwd, disp_col_fwd, disp_row_bak, disp_col_bak):
-    """
-    Process a single pixel for velocity calculation. Modified for parallel processing.
-    
-    Args:
-        i (int): Local index within this GPU's assigned pixels
-        loopPix (cupy.ndarray): Array of pixel indices for this GPU
-        maskIm (cupy.ndarray): Binary image mask
-        video_array (cupy.ndarray): Full video array
-        selected_fwd_array (cupy.ndarray): Pre-computed forward arrays for this GPU's pixels
-        selected_bak_array (cupy.ndarray): Pre-computed backward arrays for this GPU's pixels
-        loopPix_coords (tuple): Coordinates for pixels assigned to this GPU
-        V_MAX_MMS (float): Maximum velocity in mm/sec
-        pixel_diam_mm (float): Pixel diameter in mm
-        fps (float): Frames per second
-        disp_row_fwd (cupy.ndarray): Array to store forward row displacements
-        disp_col_fwd (cupy.ndarray): Array to store forward column displacements
-        disp_row_bak (cupy.ndarray): Array to store backward row displacements
-        disp_col_bak (cupy.ndarray): Array to store backward column displacements
-    
-    Returns:
-        tuple: Displacement values and z-scores for the processed pixel
-    """
-    print(f"Processing pixel {i} of {len(loopPix)}")
-    # Get the current pixel index
-    pixel_index = loopPix[i]
-    row, col = cp.unravel_index(pixel_index, maskIm.shape)
-    
-    # Get the signal for current pixel
-    pixel_signal = video_array[pixel_index, 1:-1]
-    
-    # Calculate inverse RMS differences
-    signal_repeated = cp.tile(pixel_signal, (len(loopPix), 1))
-    fwd_im_inv = cp.mean((signal_repeated - selected_fwd_array) ** 2, axis=1) ** -0.5
-    bak_im_inv = cp.mean((signal_repeated - selected_bak_array) ** 2, axis=1) ** -0.5
-    
-    # Convert to Z-scores
-    fwd_im_inv_z = (fwd_im_inv - cp.nanmean(fwd_im_inv)) / cp.nanstd(fwd_im_inv)
-    bak_im_inv_z = (bak_im_inv - cp.nanmean(bak_im_inv)) / cp.nanstd(bak_im_inv)
-    
-    # Calculate standard deviation Z-scores
-    stdIm = cp.std(video_array, axis=1)
-    stdIm_inv = 1.0 / stdIm
-    stdIm_inv_z = (stdIm_inv - cp.nanmean(stdIm_inv)) / cp.nanstd(stdIm_inv)
-    stdIm_inv_z = stdIm_inv_z[loopPix]
-    
-    # Calculate difference Z-scores
-    fwd_dif_inv_z = fwd_im_inv_z - stdIm_inv_z
-    bak_dif_inv_z = bak_im_inv_z - stdIm_inv_z
-    
-    # Find maximum values and their indices
-    fwd_val, fwd_i = cp.max(fwd_dif_inv_z), cp.argmax(fwd_dif_inv_z)
-    bak_val, bak_i = cp.max(bak_dif_inv_z), cp.argmax(bak_dif_inv_z)
-    
-    # Get coordinates for maximum values
-    fwd_r, fwd_c = loopPix_coords[0][fwd_i], loopPix_coords[1][fwd_i]
-    bak_r, bak_c = loopPix_coords[0][bak_i], loopPix_coords[1][bak_i]
-    
-    # Calculate displacements
-    disp_row_fwd[i] = fwd_r - row
-    disp_col_fwd[i] = fwd_c - col
-    disp_row_bak[i] = bak_r - row
-    disp_col_bak[i] = bak_c - col
-    
-    # Calculate minimum Z-value for significance
-    rdist = cp.sqrt((loopPix_coords[1][i] - loopPix_coords[1]) ** 2 + 
-                    (loopPix_coords[0][i] - loopPix_coords[0]) ** 2)
-    goodPix = rdist <= (V_MAX_MMS / (pixel_diam_mm * fps))
-    this_numPix_p = cp.nansum(goodPix)
-    this_p_criterion = 0.025 / this_numPix_p
-    min_zval = abs(norm.ppf(this_p_criterion))
-    
-    return (disp_row_fwd[i], disp_col_fwd[i], 
-            disp_row_bak[i], disp_col_bak[i], 
-            fwd_val, bak_val, min_zval)
 
 def calculate_standard_deviation(video_array, maskIm):
     """Calculate standard deviation image.
@@ -217,113 +140,187 @@ def save_partial_results(output_data, output_path, gpu_id):
     """
     partial_path = f"{output_path}_partial_{gpu_id}.npz"
     np.savez(partial_path, **output_data)
+    
+def process_pixel(i, loopPix, maskIm, video_array, selected_fwd_array, selected_bak_array, 
+                 loopPix_coords, V_MAX_MMS, pixel_diam_mm, fps, 
+                 disp_row_fwd, disp_col_fwd, disp_row_bak, disp_col_bak):
+    """
+    Process a single pixel for velocity calculation.
+    """
+    try:
+        # Get the current pixel index - convert to numpy scalar for indexing
+        pixel_index = int(loopPix[i].get())  # Convert CuPy array element to Python int
+        
+        # Use divmod for row, col calculation instead of unravel_index
+        height = maskIm.shape[0]
+        row = pixel_index // maskIm.shape[1]
+        col = pixel_index % maskIm.shape[1]
+        
+        # Convert to CuPy arrays for further calculations
+        row = cp.array(row)
+        col = cp.array(col)
+        
+        # Get the signal for current pixel
+        pixel_signal = video_array[pixel_index, 1:-1]
+        
+        # Calculate inverse RMS differences
+        signal_repeated = cp.tile(pixel_signal, (len(loopPix), 1))
+        fwd_im_inv = cp.mean((signal_repeated - selected_fwd_array) ** 2, axis=1) ** -0.5
+        bak_im_inv = cp.mean((signal_repeated - selected_bak_array) ** 2, axis=1) ** -0.5
+        
+        # Convert to Z-scores
+        fwd_im_inv_z = (fwd_im_inv - cp.nanmean(fwd_im_inv)) / cp.nanstd(fwd_im_inv)
+        bak_im_inv_z = (bak_im_inv - cp.nanmean(bak_im_inv)) / cp.nanstd(bak_im_inv)
+        
+        # Calculate standard deviation Z-scores
+        stdIm = cp.std(video_array, axis=1)
+        stdIm_inv = 1.0 / stdIm
+        stdIm_inv_z = (stdIm_inv - cp.nanmean(stdIm_inv)) / cp.nanstd(stdIm_inv)
+        stdIm_inv_z = stdIm_inv_z[loopPix]
+        
+        # Calculate difference Z-scores
+        fwd_dif_inv_z = fwd_im_inv_z - stdIm_inv_z
+        bak_dif_inv_z = bak_im_inv_z - stdIm_inv_z
+        
+        # Find maximum values and their indices
+        fwd_val = float(cp.max(fwd_dif_inv_z).get())
+        fwd_i = int(cp.argmax(fwd_dif_inv_z).get())
+        bak_val = float(cp.max(bak_dif_inv_z).get())
+        bak_i = int(cp.argmax(bak_dif_inv_z).get())
+        
+        # Get coordinates for maximum values
+        fwd_r = int(loopPix_coords[0][fwd_i].get())
+        fwd_c = int(loopPix_coords[1][fwd_i].get())
+        bak_r = int(loopPix_coords[0][bak_i].get())
+        bak_c = int(loopPix_coords[1][bak_i].get())
+        
+        # Calculate displacements
+        disp_row_fwd[i] = float(fwd_r - row.get())
+        disp_col_fwd[i] = float(fwd_c - col.get())
+        disp_row_bak[i] = float(bak_r - row.get())
+        disp_col_bak[i] = float(bak_c - col.get())
+        
+        # Calculate minimum Z-value for significance
+        rdist = cp.sqrt((loopPix_coords[1][i] - loopPix_coords[1]) ** 2 + 
+                      (loopPix_coords[0][i] - loopPix_coords[0]) ** 2)
+        goodPix = rdist <= (V_MAX_MMS / (pixel_diam_mm * fps))
+        this_numPix_p = float(cp.nansum(goodPix).get())
+        this_p_criterion = 0.025 / this_numPix_p
+        min_zval = abs(norm.ppf(this_p_criterion))
+        
+        return (disp_row_fwd[i], disp_col_fwd[i], 
+                disp_row_bak[i], disp_col_bak[i], 
+                fwd_val, bak_val, min_zval)
+    except Exception as e:
+            print(f"Error processing pixel {i}: {str(e)}")
+            raise
+
 
 def main(filename, plot=False, write=True, marcus=True, gpu_id=0, num_gpus=1):
     """
     Main function to run the image analysis.
     """
-    # Set the GPU device
-    cp.cuda.Device(gpu_id).use()
-    print(f"Processing on GPU {gpu_id} of {num_gpus}")
+    try:
+        # Set the GPU device
+        cp.cuda.Device(gpu_id).use()
+        print(f"Processing on GPU {gpu_id} of {num_gpus}")
 
-    if marcus:
-        data = load_marcus_data()
-        video_array_3D = data['video_array']
-        video_array_3D = cp.transpose(video_array_3D, (1, 2, 0))
-        video_array = cp.reshape(video_array_3D, (-1, video_array_3D.shape[2]))
-        maskIm = data['maskIm']
-        fps = data['fps']
-        pixel_diam_mm = data['pixel_diam_mm']
-    else:
-        data = scipy.io.loadmat(filename)
-        video_array = cp.array(data['windowArray'])
-        maskIm = cp.array(data['maskIm'])
-        fps = data['fps'][0][0]
-        pixel_diam_mm = data['pixel_diam_mm'][0][0]
-        video_array_3D = cp.reshape(video_array, (maskIm.shape[1], maskIm.shape[0], -1))
-        video_array_3D = cp.transpose(video_array_3D, (1, 0, 2))
+        if marcus:
+            data = load_marcus_data()
+            video_array_3D = data['video_array']
+            video_array_3D = cp.transpose(video_array_3D, (1, 2, 0))
+            video_array = cp.reshape(video_array_3D, (-1, video_array_3D.shape[2]))
+            maskIm = data['maskIm']
+            fps = data['fps']
+            pixel_diam_mm = data['pixel_diam_mm']
+        else:
+            data = scipy.io.loadmat(filename)
+            video_array = cp.array(data['windowArray'], dtype=cp.float32)
+            maskIm = cp.array(data['maskIm'] > 0, dtype=cp.uint8)
+            fps = float(data['fps'][0][0])
+            pixel_diam_mm = float(data['pixel_diam_mm'][0][0])
+            video_array_3D = cp.reshape(video_array, (maskIm.shape[1], maskIm.shape[0], -1))
+            video_array_3D = cp.transpose(video_array_3D, (1, 0, 2))
 
-    print("Finding loop pixel coordinates...")
-    loopPix_coords = cp.where(maskIm == 1)
-    loopPix = cp.ravel_multi_index(loopPix_coords, maskIm.shape)
-    
-    # Split work among GPUs
-    start_idx, end_idx = split_work(len(loopPix), num_gpus, gpu_id)
-    loopPix = loopPix[start_idx:end_idx]
-    loopPix_coords = (loopPix_coords[0][start_idx:end_idx], 
-                     loopPix_coords[1][start_idx:end_idx])
-
-    video_array = cp.reshape(video_array_3D, (maskIm.shape[0] * maskIm.shape[1], -1))
-
-    print(f"GPU {gpu_id}: Processing pixels {start_idx} to {end_idx}")
-    
-    # Pre-compute arrays for this GPU's portion
-    fwd_array = video_array[:, 2:]
-    bak_array = video_array[:, :-2]
-    selected_fwd_array = fwd_array[loopPix, :]
-    selected_bak_array = bak_array[loopPix, :]
-
-    # Initialize arrays for this GPU's portion
-    numPix_loop = len(loopPix)
-    disp_row_fwd, disp_col_fwd = cp.zeros(numPix_loop), cp.zeros(numPix_loop)
-    disp_row_bak, disp_col_bak = cp.zeros(numPix_loop), cp.zeros(numPix_loop)
-
-    # Process pixels assigned to this GPU
-    for i in range(numPix_loop):
-        if i % 1000 == 0:
-            print(f"GPU {gpu_id}: Processing pixel {i + start_idx}/{end_idx}")
+        print("Finding loop pixel coordinates...")
+        print(f"Mask shape: {maskIm.shape}")
+        print(f"Mask dtype: {maskIm.dtype}")
+        print(f"Number of masked pixels: {cp.sum(maskIm > 0)}")
         
-        # Process pixel (existing process_pixel function logic here)
-        pixel_results = process_pixel(
-            i, loopPix, maskIm, video_array, selected_fwd_array, selected_bak_array,
-            loopPix_coords, V_MAX_MMS, pixel_diam_mm, fps,
-            disp_row_fwd, disp_col_fwd, disp_row_bak, disp_col_bak)
+        # Convert boolean mask to indices
+        loopPix_coords = cp.where(maskIm > 0)
+        if len(loopPix_coords[0]) == 0:
+            raise ValueError("No pixels found in mask!")
+            
+        print(f"Found {len(loopPix_coords[0])} pixels in mask")
         
-        disp_row_fwd[i], disp_col_fwd[i], disp_row_bak[i], disp_col_bak[i] = pixel_results[:4]
+        # Calculate linear indices
+        loopPix = cp.ravel_multi_index(loopPix_coords, maskIm.shape)
+        video_array = cp.reshape(video_array_3D, (maskIm.shape[0] * maskIm.shape[1], -1))
 
-    # Calculate velocities for this GPU's portion
-    v_raw_fwd = cp.sqrt(disp_row_fwd ** 2 + disp_col_fwd ** 2) * (pixel_diam_mm * fps)
-    v_raw_bak = cp.sqrt(disp_row_bak ** 2 + disp_col_bak ** 2) * (pixel_diam_mm * fps)
-    velocities = cp.nanmean(cp.column_stack((v_raw_fwd, -v_raw_bak)), axis=1)
+        # Process full array on single GPU
+        start_idx = 0
+        end_idx = len(loopPix)
+        loopPix = loopPix[start_idx:end_idx]
+        loopPix_coords = (loopPix_coords[0][start_idx:end_idx], 
+                         loopPix_coords[1][start_idx:end_idx])
 
-    # Save partial results
-    if write:
-        output_data = {
-            'velocities': cp.asnumpy(velocities),
-            'coordinates': (cp.asnumpy(loopPix_coords[0]), cp.asnumpy(loopPix_coords[1])),
-            'shape': maskIm.shape
-        }
-        save_partial_results(output_data, '/hpc/projects/capillary-flow/frog/results/velocity', gpu_id)
-
-    print(f"GPU {gpu_id}: Processing complete")
-    return True
-
-def combine_results(num_gpus, output_path):
-    """
-    Combine partial results from all GPUs into final velocity map.
-    """
-    # Initialize final velocity map
-    first_data = np.load(f"{output_path}_partial_0.npz")
-    shape = tuple(first_data['shape'])
-    final_map = np.full(shape, np.nan)
-
-    # Combine results from all GPUs
-    for gpu_id in range(num_gpus):
-        data = np.load(f"{output_path}_partial_{gpu_id}.npz")
-        velocities = data['velocities']
-        coords = data['coordinates']
-        final_map[coords[0], coords[1]] = velocities
+        print(f"GPU {gpu_id}: Processing pixels {start_idx} to {end_idx}")
         
-        # Clean up partial files
-        os.remove(f"{output_path}_partial_{gpu_id}.npz")
+        # Pre-compute arrays
+        fwd_array = video_array[:, 2:]
+        bak_array = video_array[:, :-2]
+        selected_fwd_array = fwd_array[loopPix, :]
+        selected_bak_array = bak_array[loopPix, :]
 
-    # Save final velocity map
-    plt.figure(figsize=(10, 8))
-    plt.imshow(final_map, cmap='jet', interpolation='nearest')
-    plt.colorbar(label='Velocity (mm/s)')
-    plt.title('Velocity Map')
-    plt.savefig(f"{output_path}_final.png", dpi=300, bbox_inches='tight')
-    plt.close()
+        # Initialize arrays
+        numPix_loop = len(loopPix)
+        disp_row_fwd = cp.zeros(numPix_loop, dtype=cp.float32)
+        disp_col_fwd = cp.zeros(numPix_loop, dtype=cp.float32)
+        disp_row_bak = cp.zeros(numPix_loop, dtype=cp.float32)
+        disp_col_bak = cp.zeros(numPix_loop, dtype=cp.float32)
+
+        # Process pixels
+        for i in range(numPix_loop):
+            if i % 1000 == 0:
+                print(f"Processing pixel {i} of {numPix_loop}")
+            
+            pixel_results = process_pixel(
+                i, loopPix, maskIm, video_array, selected_fwd_array, selected_bak_array,
+                loopPix_coords, V_MAX_MMS, pixel_diam_mm, fps,
+                disp_row_fwd, disp_col_fwd, disp_row_bak, disp_col_bak)
+            
+            disp_row_fwd[i], disp_col_fwd[i], disp_row_bak[i], disp_col_bak[i] = pixel_results[:4]
+
+        # Calculate velocities
+        print("Calculating velocities...")
+        v_raw_fwd = cp.sqrt(disp_row_fwd ** 2 + disp_col_fwd ** 2) * (pixel_diam_mm * fps)
+        v_raw_bak = cp.sqrt(disp_row_bak ** 2 + disp_col_bak ** 2) * (pixel_diam_mm * fps)
+        
+        # Create velocity map
+        vMap = cp.full(maskIm.shape, cp.nan, dtype=cp.float32)
+        velocities = cp.nanmean(cp.column_stack((v_raw_fwd, -v_raw_bak)), axis=1)
+        vMap[loopPix_coords] = velocities
+
+        if write:
+            print("Saving velocity map...")
+            vMap_np = cp.asnumpy(vMap)
+            plt.figure(figsize=(10, 8))
+            plt.imshow(vMap_np, cmap='jet', interpolation='nearest')
+            plt.colorbar(label='Velocity (mm/s)')
+            plt.title('Velocity Map')
+            plt.savefig('/hpc/projects/capillary-flow/frog/results/velocity_map.png', 
+                       dpi=300, bbox_inches='tight')
+            plt.close()
+
+        print(f"GPU {gpu_id}: Processing complete")
+        return True
+
+    except Exception as e:
+        print(f"Error on GPU {gpu_id}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 if __name__ == "__main__":
     import sys
@@ -335,13 +332,9 @@ if __name__ == "__main__":
     try:
         gpu_id = int(sys.argv[1])
         num_gpus = int(sys.argv[2])
-        success = main('/hpc/projects/capillary-flow/frog/demo_data.mat', 
-                      plot=False, marcus=True, gpu_id=gpu_id, 
-                      num_gpus=num_gpus, write=True)
-        
-        # Only GPU 0 combines results after all GPUs are done
-        if gpu_id == 0 and success:
-            combine_results(num_gpus, '/hpc/projects/capillary-flow/frog/results/velocity')
+        main('/hpc/projects/capillary-flow/frog/demo_data.mat', 
+             plot=False, marcus=True, gpu_id=gpu_id, 
+             num_gpus=num_gpus, write=True)
             
     except Exception as e:
         print(f"Error on GPU {gpu_id}: {str(e)}")
