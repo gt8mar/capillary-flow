@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 #SBATCH --job-name=capillary_velocity_analysis
-#SBATCH --time=01:00:00
+#SBATCH --time=10:00:00
 #SBATCH --gpus=1    # Changed to 1 GPU per node
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
