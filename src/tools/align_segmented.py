@@ -62,8 +62,6 @@ def uncrop_segmented(path, input_seg_img):
     uncropped_input_seg_img = np.pad(input_seg_img, ((abs(gap_top), abs(gap_bottom)), (abs(gap_left), abs(gap_right))), mode='constant', constant_values=0)
     return uncropped_input_seg_img, gap_left, gap_right, gap_bottom, gap_top
 
-
-
 def align_segmented(path="f:\\Marcus\\data\\part30\\231130\\loc02"):
     """
     Aligns segmented images based on translations between moco images.

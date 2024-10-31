@@ -46,8 +46,10 @@ def uncrop_segmented(video_path, input_seg_img):
     if gap_bottom > 0:
         gap_bottom = 0
 
-    # Convert the segmented image to grayscale
-    input_seg_img = rgb2gray(input_seg_img)
+    # check if the segmented image is grayscale
+    if len(input_seg_img.shape) == 3:    
+        # Convert the segmented image to grayscale
+        input_seg_img = rgb2gray(input_seg_img)
 
     # Pad the image based on the calculated gaps
     uncropped_input_seg_img = np.pad(input_seg_img, ((abs(gap_top), abs(gap_bottom)), (abs(gap_left), abs(gap_right))), mode='constant', constant_values=0)
@@ -78,6 +80,56 @@ def create_capillary_masks(binary_mask):
         capillary_masks.append(capillary_mask)
     
     return capillary_masks
+
+def create_overlay_with_label(frame_img, cap_mask, color, label):
+    """
+    Create an overlay of a capillary mask on a frame image with a label.
+
+    Args:
+        frame_img (numpy.ndarray): The original frame image in BGR format.
+        cap_mask (numpy.ndarray): The capillary mask (2D binary mask).
+        color (tuple): The color to use for the capillary overlay (BGR).
+        label (str): The label to add to the overlay.
+    """
+    # Get dimensions of the mask
+    height, width = cap_mask.shape
+    
+    # Create colored mask
+    colored_mask = np.zeros((height, width, 3), dtype=np.uint8)
+    colored_mask[cap_mask > 0] = color
+    
+    # Create alpha channel
+    alpha = np.zeros((height, width), dtype=np.uint8)
+    alpha[cap_mask > 0] = 128  # 50% transparency
+    
+    # Convert to BGRA
+    frame_bgra = cv2.cvtColor(frame_img, cv2.COLOR_BGR2BGRA)
+    overlay_bgra = np.dstack((colored_mask, alpha))
+    
+    # Blend images
+    result = frame_bgra.copy()
+    mask_region = (overlay_bgra[:, :, 3] > 0)
+    result[mask_region] = cv2.addWeighted(
+        frame_bgra[mask_region],
+        0.5,
+        overlay_bgra[mask_region],
+        0.5,
+        0
+    )
+    
+    # Find centroid of the mask for label placement
+    moments = cv2.moments(cap_mask)
+    if moments['m00'] != 0:
+        cx = int(moments['m10'] / moments['m00'])
+        cy = int(moments['m01'] / moments['m00'])
+    else:
+        cx, cy = width // 2, height // 2
+    
+    # Add label
+    cv2.putText(result, label, (cx, cy), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 0), 3, cv2.LINE_AA)
+    cv2.putText(result, label, (cx, cy), cv2.FONT_HERSHEY_PLAIN, 2, (255, 255, 255), 2, cv2.LINE_AA)
+    
+    return cv2.cvtColor(result, cv2.COLOR_BGRA2BGR)
 
 def main(location_path):
     """
@@ -114,31 +166,42 @@ def main(location_path):
 
         # set values in segmented image to 0 or 255
         segmented_image[segmented_image > 0 ] = 255
-        segmented_image_uncropped = uncrop_segmented(os.path.join(location_path, 'vids', f'vid{video_number}'), segmented_image)
-        background_image_uncropped = uncrop_segmented(os.path.join(location_path, 'backgrounds'), background_image)
+        segmented_image_uncropped, gap_left, gap_right, gap_bottom, gap_top = uncrop_segmented(os.path.join(location_path, 'vids', f'vid{video_number}'), segmented_image)
+        background_image_uncropped, gap_left, gap_right, gap_bottom, gap_top = uncrop_segmented(os.path.join(location_path, 'vids', f'vid{video_number}'), background_image)
+
+        # Initialize the background image once
+        background_image_bgr = cv2.cvtColor(background_image_uncropped, cv2.COLOR_GRAY2BGR)
+        # Convert to BGRA for alpha blending
+        result = cv2.cvtColor(background_image_bgr, cv2.COLOR_BGR2BGRA)
 
         # find capillaries using 
         capillaries = create_capillary_masks(segmented_image_uncropped)
+        colors = plt.cm.get_cmap('tab20', len(capillaries))
+
         for i in range(len(capillaries)):
-            capillary_mask = capillaries[i]
+            capillary_mask = (capillaries[i] * 255).astype(np.uint8)  # Scale to 0-255
             capillary_name = str(i).zfill(2)
             capillary_filename = image_name.replace('_seg.png', f'_seg_cap_{capillary_name}.png')
             cap_names = cap_names.append({'File Name': capillary_filename, 'Capillary Name': ''}, ignore_index=True)
+            # make folders if they don't exist
+            os.makedirs(os.path.join(location_path, 'segmented','hasty','individual_caps_original'), exist_ok=True)
             # save the capillary image
             cv2.imwrite(os.path.join(location_path, 'segmented','hasty', 'individual_caps_original', capillary_filename), capillary_mask)
-            # overlay the capillary on the background image with a color palette
-            overlay = np.zeros_like(background_image_uncropped)
-            # load a nice color palette from matplotlib
-            colors = plt.cm.get_cmap('tab20', len(capillaries))
+                
+            # Convert the color to BGR format and scale to 0-255
+            color = (np.array(colors(i)[:3]) * 255).astype(np.uint8)
+            # Create overlay for this capillary
+            result = create_overlay_with_label(cv2.cvtColor(result, cv2.COLOR_BGRA2BGR), capillary_mask, color, capillary_name)
+            result = cv2.cvtColor(result, cv2.COLOR_BGR2BGRA)  # Convert back to BGRA for next iteration
 
-            # Apply the color to the overlay
-            overlay[capillary_mask > 0] = colors(i)[:3] * 255  # Convert to RGB and scale to 0-255
-            alpha = 0.5  # Set the transparency level (0.0 is fully transparent, 1.0 is fully opaque)
-            background_image_uncropped = cv2.cvtColor(background_image_uncropped, cv2.COLOR_GRAY2BGR)  # Convert to BGR for overlay
-            combined = cv2.addWeighted(background_image_uncropped, 1 - alpha, overlay, alpha, 0)
+        # Final conversion to BGR for saving
+        final_result = cv2.cvtColor(result, cv2.COLOR_BGRA2BGR)
 
-        cv2.imwrite(os.path.join(location_path, 'segmented', 'hasty', 'overlays', image_name.replace('_seg.png', '_overlay.png')), combined)
-        cv2.imwrite(os.path.join(f'/hpc/projects/capillary-flow/results/size/overlays', image_name.replace('_seg.png', '_overlay.png')), combined)
+        # Make the folders if they don't exist
+        os.makedirs(os.path.join(location_path, 'segmented','hasty','overlays'), exist_ok=True)
+        os.makedirs(os.path.join('/hpc/projects/capillary-flow/results/size/overlays'), exist_ok=True)
+        cv2.imwrite(os.path.join(location_path, 'segmented', 'hasty', 'overlays', image_name.replace('_seg.png', '_overlay.png')), final_result)
+        cv2.imwrite(os.path.join(f'/hpc/projects/capillary-flow/results/size/overlays', image_name.replace('_seg.png', '_overlay.png')), final_result)
 
             
     
@@ -148,6 +211,9 @@ def main(location_path):
     # save the capillary names
     cap_names_filename = f'{file_prefix}_cap_names.csv'
     cap_names_filename = cap_names_filename.replace('set01_', '').replace('set_01', '')
+    # make folders if they don't exist
+    os.makedirs(os.path.join(location_path, 'segmented','hasty','individual_caps_original'), exist_ok=True)
+    os.makedirs(os.path.join('/hpc/projects/capillary-flow/results/size/name_csvs'), exist_ok=True)
     cap_names.to_csv(os.path.join(location_path, 'segmented', 'hasty','individual_caps_original', cap_names_filename), index=False)
     cap_names.to_csv(os.path.join('/hpc/projects/capillary-flow/results/size/name_csvs', cap_names_filename), index=False)   
 
