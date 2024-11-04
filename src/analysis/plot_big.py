@@ -35,7 +35,7 @@ hostname = platform.node()
 # Dictionary mapping hostnames to folder paths
 cap_flow_folder_paths = {
     "LAPTOP-I5KTBOR3": 'C:\\Users\\gt8ma\\capillary-flow',
-    "ComputerName2": "C:\\Users\\gt8mar\\capillary-flow",
+    "Quake-Blood": "C:\\Users\\gt8mar\\capillary-flow",
     "ComputerName3": "C:\\Users\\ejerison\\capillary-flow",
     # Add more computers as needed
 }
@@ -3779,24 +3779,30 @@ def main(verbose = False):
     # print(table_fig)
     participant_20 = summary_df_nhp_video_medians[summary_df_nhp_video_medians['Participant'] == 'part20']
     # plot_box_and_whisker(summary_df_nhp_video_medians, highbp_nhp_video_medians, normbp_nhp_video_medians, column = 'Video Median Velocity', variable='SYS_BP', log_scale=True)
-    plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], 
-             subsets= [old_nhp_video_medians['Video Median Velocity'], young_nhp_video_medians['Video Median Velocity']], 
-             labels=['Entire Dataset', 'Old', 'Young'], title = 'CDF Comparison of Video Median Velocities by Age',
-             write =True, variable='Age')
-    # plot_individual_cdfs(summary_df_nhp_video_medians)
-    plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], 
-             subsets= [highbp_nhp_video_medians['Video Median Velocity'], normbp_nhp_video_medians['Video Median Velocity']], 
-             labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Video Median Velocities by BP nhp',
-             write = True, variable='SYS_BP')
-    plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], 
-             subsets=[male_medians_subset['Video Median Velocity'], female_medians_subset['Video Median Velocity']],
-                labels=['Entire Dataset', 'Male', 'Female'], title='CDF Comparison of Video Median Velocities by Sex', 
-                normalize = False, variable='Sex', write=True)
-    plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], 
-             subsets= [participant_20['Video Median Velocity']], 
-             labels=['Entire Dataset', 'part20'], title = 'CDF of Velocities for Participant 20',
-             write =True, variable='Individual')
     
+    """ ---------- """
+    # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], 
+    #          subsets= [old_nhp_video_medians['Video Median Velocity'], young_nhp_video_medians['Video Median Velocity']], 
+    #          labels=['Entire Dataset', 'Old', 'Young'], title = 'CDF Comparison of Video Median Velocities by Age',
+    #          write =True, variable='Age')
+    # # plot_individual_cdfs(summary_df_nhp_video_medians)
+    # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], 
+    #          subsets= [highbp_nhp_video_medians['Video Median Velocity'], normbp_nhp_video_medians['Video Median Velocity']], 
+    #          labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Video Median Velocities by BP nhp',
+    #          write = True, variable='SYS_BP')
+    # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], 
+    #          subsets=[male_medians_subset['Video Median Velocity'], female_medians_subset['Video Median Velocity']],
+    #             labels=['Entire Dataset', 'Male', 'Female'], title='CDF Comparison of Video Median Velocities by Sex', 
+    #             normalize = False, variable='Sex', write=True)
+    # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], 
+    #          subsets= [participant_20['Video Median Velocity']], 
+    #          labels=['Entire Dataset', 'part20'], title = 'CDF of Velocities for Participant 20',
+    #          write =True, variable='Individual')
+    """ ----------"""
+
+
+
+
     # ks_2samp_stat_age, ks_2samp_p_age = ks_2samp(old_nhp_video_medians['Video Median Velocity'], young_nhp_video_medians['Video Median Velocity'])
     # ks_2samp_stat_bp, ks_2samp_p_bp = ks_2samp(highbp_nhp_video_medians['Video Median Velocity'], normbp_nhp_video_medians['Video Median Velocity'])
     # ks_2samp_stat_sex, ks_2samp_p_sex = ks_2samp(male_medians_subset['Video Median Velocity'], female_medians_subset['Video Median Velocity'])
@@ -3811,6 +3817,10 @@ def main(verbose = False):
 
     # Convert age group to categorical variable
     summary_df_nhp_video_medians['Age_Group'] = pd.Categorical(summary_df_nhp_video_medians['Age_Group'], categories=['Below 50', 'Above 50'], ordered=True)
+    # Save this to a csv
+    summary_df_nhp_video_medians.to_csv(os.path.join(cap_flow_path, 'summary_df_nhp_video_medians.csv'), index=False)
+
+    # Perform GEE and Mixed Model Analysis
     gee_model = smf.gee('Log_Video_Median_Velocity ~ Age + Pressure', groups=summary_df_nhp_video_medians['Participant'], data=summary_df_nhp_video_medians, cov_struct=sm.cov_struct.Autoregressive() )   #family=sm.families.Poisson()
     gee_results = gee_model.fit()
 
@@ -4091,7 +4101,7 @@ def main(verbose = False):
             # plot the velocities with 'u' in the 'Up_Down' column
             location_data_up = location_data[(location_data['Up_Down'] == 'u') | (location_data['Up_Down'] == 't')]
             location_data_down = location_data[(location_data['Up_Down'] == 'd') | (location_data['Up_Down'] == 't')]
-            plot_indiv_velocities(location_data_up, location_data_down, participant, location, log = False)
+            # plot_indiv_velocities(location_data_up, location_data_down, participant, location, log = False)
 
             # use trapezoidal rule to calculate area under the curve for each 'Up' and 'Down' curve
             # calculate area under datapoints using trapezoidal rule
