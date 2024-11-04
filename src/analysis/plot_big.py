@@ -1636,7 +1636,7 @@ def calculate_cdf(data, normalize=False):
         return sorted_data, p
     
 def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title='CDF Comparison', 
-             write=False, normalize=False, variable = 'Age'):
+             write=False, normalize=False, variable = 'Age', log = True):
     """
     Plots the CDF of the entire dataset and the inputted subsets.
 
@@ -1669,6 +1669,9 @@ def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title='CDF Comp
         base_color = '2ca02c'#80C6C3 #ff7f0e
     elif variable == 'Sex':
         base_color = '674F92'#947EB0#2ca02c#CAC0D89467bd
+    elif variable == 'Individual':
+        base_color = '#1f77b4'
+        individual_color = '#6B0F1A' #'#ff7f0e'
     else:
         raise ValueError(f"Unsupported variable: {variable}")
 
@@ -1682,9 +1685,15 @@ def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title='CDF Comp
 
     fig, ax = plt.subplots(figsize=(2.4, 2.0))
 
+    if log:
+        data = data+1
+        for i in range(len(subsets)):
+            subsets[i]= subsets[i]+1
+    
     # Plot main dataset
     x, y = calculate_cdf(data, normalize)
     ax.plot(x, y, label=labels[0])
+    
 
     # Plot subsets
     for i in  range(len(subsets)):
@@ -1698,14 +1707,26 @@ def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title='CDF Comp
             i_color = 4
             dot_color=3
         x, y = calculate_cdf(subsets[i], normalize)
-        ax.plot(x, y, label=labels[i+1], linestyle='--', color=palette[i_color])
+        if variable == 'Individual':
+            ax.plot(x, y, label=labels[i+1], linestyle='--', color=individual_color)
+        else:
+            ax.plot(x, y, label=labels[i+1], linestyle='--', color=palette[i_color])
 
-    ax.set_ylabel('CDF')
-    ax.set_xlabel('Velocity (um/s)' if 'Pressure' not in title else 'Pressure (psi)')
-    ax.set_title(title, fontsize=8)
+    ax.set_ylabel('CDF', fontproperties=source_sans)
+    if log:
+        ax.set_xlabel('Velocity + 1 (um/s)' if 'Pressure' not in title else 'Pressure (psi)', fontproperties=source_sans)
+    else:
+        ax.set_xlabel('Velocity (um/s)' if 'Pressure' not in title else 'Pressure (psi)', fontproperties=source_sans)
+    ax.set_title(title, fontsize=8, fontproperties=source_sans)
+
+    if log:
+        ax.set_xscale('log')
+        # ax.set_xticklabels([1, 10, 100, 1000, 5000])
+        ax.xaxis.set_major_locator(ticker.LogLocator(base=10.0, numticks=5))
+        ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
     
     # Adjust legend
-    ax.legend(loc='lower right', bbox_to_anchor=(1, 0.2))
+    ax.legend(loc='lower right', bbox_to_anchor=(1, 0.01), prop=source_sans, fontsize=6)
     
     ax.grid(True, linewidth=0.3)
 
@@ -2673,7 +2694,7 @@ def plot_roc_with_ci(fprs, tprs, roc_auc, bootstrapped_tprs, ci_lower, ci_upper,
 
     fig, ax = plt.subplots(figsize=(2.4, 2.0))    
     # Plot the mean ROC curve
-    ax.plot(fprs, tprs, marker='', linestyle='-', markersize=2, color=base_color, label=f'ROC curve (AUC = {roc_auc:.2f})')
+    ax.plot(fprs, tprs, marker='', linestyle='-', markersize=2, color=base_color, label=f'ROC curve (AUC = {roc_auc:.2f}'+'\u00B1'+'{:.2f})'.format((ci_upper - ci_lower)/4))
     
     # Calculate and plot the confidence interval for the ROC curve
     if len(bootstrapped_tprs) > 1:
@@ -3326,7 +3347,7 @@ def plot_indiv_velocities(location_data_up, location_data_down, participant, loc
 
 
     else:
-        ax.set_ylim((0, max(np.nanmax(location_data_up['Corrected Velocity']), np.nanmax(location_data_down['Corrected Velocity']))))
+        ax.set_ylim((-0.1*max(np.nanmax(location_data_up['Corrected Velocity']), np.nanmax(location_data_down['Corrected Velocity']))*1.1, max(np.nanmax(location_data_up['Corrected Velocity']), np.nanmax(location_data_down['Corrected Velocity']))*1.1))
         pass
 
         
@@ -3620,6 +3641,9 @@ def main(verbose = False):
     summary_df_no_high_pressure = summary_df[summary_df['Pressure'] <= 1.2]
     # add one to 'Corrected Velocity' to avoid log(0)
     summary_df_no_high_pressure['Corrected Velocity'] = summary_df_no_high_pressure['Corrected Velocity'] #+ 10
+    # set all values of 'Corrected Velocity' greater than 4500 to 4500
+    summary_df_no_high_pressure.loc[summary_df_no_high_pressure['Corrected Velocity'] > 4500, 'Corrected Velocity'] = 4500
+
     print(summary_df_no_high_pressure['Corrected Velocity'].min())
     if summary_df_no_high_pressure['Corrected Velocity'].min() < 0:
         raise ValueError('Minimum value of Corrected Velocity is less than 0')
@@ -3696,12 +3720,12 @@ def main(verbose = False):
         # plt.legend()
         # plt.title('Density Plot of Entire Dataset vs. Subset')
         # plt.show()
-
-        # # Plot CDF
-        # plot_cdf(summary_df['Corrected Velocity'], subsets= [participant_df['Corrected Velocity']], labels=['Entire Dataset', participant], title = f'CDF Comparison of velocities for {participant}')
-        # plot_cdf(summary_df_no_high_pressure['Corrected Velocity'], subsets= [participant_df_nhp['Corrected Velocity']], labels=['Entire Dataset', participant], title = f'CDF Comparison of velocities for {participant} nhp', write=False)
-        # plot_cdf_comp_pressure(participant_df)
-        # plot_cdf_comp_pressure(participant_df_nhp)    
+        # if participant == 'part20':
+        #     # Plot CDF
+        #     # plot_cdf(summary_df['Corrected Velocity'], subsets= [participant_df['Corrected Velocity']], labels=['Entire Dataset', participant], title = f'CDF Comparison of velocities for {participant}')
+        #     plot_cdf(summary_df_no_high_pressure['Corrected Velocity'], subsets= [participant_df_nhp['Corrected Velocity']], labels=['Entire Dataset', participant], title = f'CDF Comparison of velocities for {participant} nhp', write=False)
+        #     plot_cdf_comp_pressure(participant_df)
+        #     plot_cdf_comp_pressure(participant_df_nhp)    
     
     # merge ks statistic df with summary df
     summary_df_no_high_pressure = summary_df_no_high_pressure.merge(ks_statistic_df, on='Participant', how='inner')
@@ -3742,6 +3766,7 @@ def main(verbose = False):
     perform_anova_analysis(summary_df_nhp_video_medians, log=False, plot = False)
     # table_fig = summarize_set01()
     # print(table_fig)
+    participant_20 = summary_df_nhp_video_medians[summary_df_nhp_video_medians['Participant'] == 'part20']
     # plot_box_and_whisker(summary_df_nhp_video_medians, highbp_nhp_video_medians, normbp_nhp_video_medians, column = 'Video Median Velocity', variable='SYS_BP', log_scale=True)
     plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], 
              subsets= [old_nhp_video_medians['Video Median Velocity'], young_nhp_video_medians['Video Median Velocity']], 
@@ -3756,6 +3781,10 @@ def main(verbose = False):
              subsets=[male_medians_subset['Video Median Velocity'], female_medians_subset['Video Median Velocity']],
                 labels=['Entire Dataset', 'Male', 'Female'], title='CDF Comparison of Video Median Velocities by Sex', 
                 normalize = False, variable='Sex', write=True)
+    plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], 
+             subsets= [participant_20['Video Median Velocity']], 
+             labels=['Entire Dataset', 'part20'], title = 'CDF of Velocities for Participant 20',
+             write =True, variable='Individual')
     
     # ks_2samp_stat_age, ks_2samp_p_age = ks_2samp(old_nhp_video_medians['Video Median Velocity'], young_nhp_video_medians['Video Median Velocity'])
     # ks_2samp_stat_bp, ks_2samp_p_bp = ks_2samp(highbp_nhp_video_medians['Video Median Velocity'], normbp_nhp_video_medians['Video Median Velocity'])
