@@ -67,7 +67,7 @@ def main(test=False):
     else:
         for folder in os.listdir('/hpc/projects/capillary-flow/frog'):
             # check if folder is a folder and if it starts with '24'
-            if os.path.isdir(os.path.join('/hpc/projects/capillary-flow/frog', folder)) and folder.startswith('24'):
+            if os.path.isdir(os.path.join('/hpc/projects/capillary-flow/frog', folder)) and folder.startswith('27-7-29'):
                 for folder2 in os.listdir(os.path.join('/hpc/projects/capillary-flow/frog', folder)):
                     if folder2.startswith('Frog'):
                         for folder3 in os.listdir(os.path.join('/hpc/projects/capillary-flow/frog', folder, folder2)):

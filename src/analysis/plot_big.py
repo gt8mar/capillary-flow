@@ -29,7 +29,21 @@ import matplotlib.patches as mpatches
 import datetime
 import statsmodels.formula.api as smf
 
+# Get the hostname of the computer
+hostname = platform.node()
 
+# Dictionary mapping hostnames to folder paths
+cap_flow_folder_paths = {
+    "LAPTOP-I5KTBOR3": 'C:\\Users\\gt8ma\\capillary-flow',
+    "ComputerName2": "C:\\Users\\gt8mar\\capillary-flow",
+    "ComputerName3": "C:\\Users\\ejerison\\capillary-flow",
+    # Add more computers as needed
+}
+default_folder_path = "/hpc/projects/capillary-flow"
+
+
+# Determine the folder path based on the hostname
+cap_flow_path = cap_flow_folder_paths.get(hostname, default_folder_path)
 
 
 # #For editable text. Except latex text is still shapes sadly
@@ -248,9 +262,9 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
     plt.tight_layout()
     if write:
         if video_median:
-            plt.savefig(f'C:\\Users\\gt8mar\\capillary-flow\\results\\{variable}_videomedians_CI.png', dpi=600)
+            plt.savefig(os.path.join(cap_flow_path, 'results', f'{variable}_videomedians_CI.png'), dpi=600)
         else:
-            plt.savefig(f'C:\\Users\\gt8mar\\capillary-flow\\results\\{variable}_CI.png', dpi=600)
+            plt.savefig(os.path.join(cap_flow_path, 'results', f'{variable}_CI.png'), dpi=600)
     else:
         plt.show()
     return 0
@@ -954,7 +968,7 @@ def plot_velocities(participant_df, write=False):
 
     plt.tight_layout()
     if write:
-        plt.savefig(f'C:\\Users\\gt8mar\\capillary-flow\\results\\{participant}_fav_cap_v.png', dpi = 600)
+        plt.savefig(os.path.join(cap_flow_path, 'results', f'{participant}_fav_cap_v.png'), dpi = 600)
         plt.close()
     else:
         plt.show()
@@ -1015,7 +1029,7 @@ def plot_median_diameter(summary_df):
     plt.show()
     return 0
 def compile_metadata(size=False):
-    metadata_folder = 'C:\\Users\\gt8mar\\capillary-flow\\metadata'
+    metadata_folder = os.path.join(cap_flow_path, 'metadata')
     # Read the metadata files if they are csvs
     metadata_files = [f for f in os.listdir(metadata_folder) if f.endswith('.xlsx')]
     metadata_dfs = [pd.read_excel(os.path.join(metadata_folder, f)) for f in metadata_files]
@@ -1071,9 +1085,9 @@ def handle_dotted_evac(summary_df):
     summary_df.loc[condition_evac, 'Centerline'] = 0
     return summary_df
 def merge_vel_size(verbose=False):
-    size_df = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\results\\cap_diameters.csv')
+    size_df = pd.read_csv(os.path.join(cap_flow_path, 'results', 'cap_diameters.csv'))
     # velocity_df = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\big_df - Copy.csv')
-    velocity_df = pd.read_excel('C:\\Users\\gt8mar\\capillary-flow\\results\\big_df.xlsx')
+    velocity_df = pd.read_excel(os.path.join(cap_flow_path, 'results', 'big_df.xlsx'))
     # velocity_df_old = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\results\\velocities\\big_df.csv')
     metadata_df = compile_metadata(size=True)
     print(metadata_df.head)
@@ -1136,7 +1150,7 @@ def merge_vel_size(verbose=False):
     summary_df['Corrected Velocity'] = summary_df['Manual Velocity'].fillna(summary_df['Corrected Velocity'])
    
     # save summary_df to csv
-    summary_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\summary_df_test.csv', index=False)
+    summary_df.to_csv(os.path.join(cap_flow_path, 'summary_df_test.csv'), index=False)
     return summary_df
 def calc_vel_bins(theta):
     v_tan = np.tan(np.radians(theta))*2.44*(227.8/2)
@@ -1742,7 +1756,7 @@ def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title='CDF Comp
 
 def save_plot(fig, title, dpi=600):
     filename = f"{title.replace(' ', '_')}.png"
-    filepath = os.path.join('C:\\Users\\gt8mar\\capillary-flow\\results', filename)
+    filepath = os.path.join(cap_flow_path, 'results', filename)
     fig.savefig(filepath, dpi=dpi, bbox_inches='tight')
     plt.close(fig)
     
@@ -2712,7 +2726,7 @@ def plot_roc_with_ci(fprs, tprs, roc_auc, bootstrapped_tprs, ci_lower, ci_upper,
     plt.tight_layout()
     
     if write:
-        plt.savefig(os.path.join('C:\\Users\\gt8mar\\capillary-flow\\results\\', f'roc_curve_{method}_{feature}.png'), dpi=600)
+        plt.savefig(os.path.join(cap_flow_path, 'results', f'roc_curve_{method}_{feature}.png'), dpi=600)
     if plot:
         plt.show()
     else:
@@ -3080,9 +3094,9 @@ def plot_area_score(df, log = False, plot = False, write = False):
 
     if write:
         if log:
-            plt.savefig(os.path.join('C:\\Users\\gt8mar\\capillary-flow\\results\\', f'log_age_score_vs_age.png'), dpi=600)
+            plt.savefig(os.path.join(cap_flow_path, 'results', f'log_age_score_vs_age.png'), dpi=600)
         else:
-            plt.savefig(os.path.join('C:\\Users\\gt8mar\\capillary-flow\\results\\', f'age_score_vs_age.png'), dpi=600)
+            plt.savefig(os.path.join(cap_flow_path, 'results', f'age_score_vs_age.png'), dpi=600)
     if plot:
         plt.show()
     else:
@@ -3374,7 +3388,7 @@ def plot_indiv_velocities(location_data_up, location_data_down, participant, loc
     plt.close()
     return 0
     
-def summarize_set01(filepath='C:\\Users\\gt8mar\\capillary-flow\\metadata\\merged\\merged_metadata.csv'):
+def summarize_set01(filepath=os.path.join(cap_flow_path, 'metadata', 'merged', 'merged_metadata.csv')):
     # Load the Excel file
     df = pd.read_csv(filepath)
 
@@ -3523,23 +3537,20 @@ def plot_models(df, result, variable='Age', log=False):
 
 def main(verbose = False):
     if platform.system() == 'Windows':
-        if 'gt8mar' in os.getcwd():
-            path = 'C:\\Users\\gt8mar\\capillary-flow\\results\\summary_df_test.csv'
-            classified_kymos_path = 'C:\\Users\\gt8mar\\capillary-flow\\classified_kymos_real.csv'
-        else:
-            path = 'C:\\Users\\gt8ma\\capillary-flow\\results\\summary_df_test.csv'
-            classified_kymos_path = 'C:\\Users\\gt8ma\\capillary-flow\\classified_kymos.csv'
+        path = os.path.join(cap_flow_path, 'results', 'summary_df_test.csv')
+        classified_kymos_path = os.path.join(cap_flow_path, 'classified_kymos_real.csv')
+        
     else:
         path = '/hpc/projects/capillary-flow/results/summary_df_test.csv'
         classified_kymos_path = '/hpc/projects/capillary-flow/results/classified_kymos.csv'
 
     summary_df = pd.read_csv(path)
     classified_kymos_df = pd.read_csv(classified_kymos_path)
-    second_classified_kymos_df = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\classified_kymos_part28_to_part32.csv')
-    third_classified_kymos_df = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\classified_kymos_part33_to_part81.csv')
+    second_classified_kymos_df = pd.read_csv(os.path.join(cap_flow_path, 'classified_kymos_part28_to_part32.csv'))
+    third_classified_kymos_df = pd.read_csv(os.path.join(cap_flow_path, 'classified_kymos_part33_to_part81.csv'))
     total_classified_kymos_df = pd.concat([second_classified_kymos_df, third_classified_kymos_df], ignore_index=True)
     # write to csv
-    total_classified_kymos_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\classified_kymos_part28_to_part81.csv', index=False)
+    total_classified_kymos_df.to_csv(os.path.join(cap_flow_path, 'classified_kymos_part28_to_part81.csv'), index=False)
     metadata_df = compile_metadata()
     # merge metadata with second_classified_kymos_df to add metadata to the second classified kymos.
     total_classified_kymos_df = pd.merge(total_classified_kymos_df, metadata_df, on=['Participant', 'Date', 'Location', 'Video'], how='left')
@@ -3608,7 +3619,7 @@ def main(verbose = False):
     summary_df = pd.concat([summary_df, total_classified_kymos_df], ignore_index=True)
     # sort by participant, date, location, video, capillary
     summary_df = summary_df.sort_values(by=['Participant', 'Date', 'Location', 'Video', 'Capillary']).reset_index(drop=True)
-    summary_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\merged_csv4.csv', index=False)
+    summary_df.to_csv(os.path.join(cap_flow_path, 'merged_csv4.csv'), index=False)
 
     
     old_subset = summary_df[summary_df['Age'] > 50]
@@ -3946,7 +3957,14 @@ def main(verbose = False):
     # # save to csv
     # favorite_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\favorite_caps_new.csv', index=False)
     # # print(favorite_df.columns)
-    favorite_df = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\favorite_caps_new.csv')
+
+    # load favorite_caps.csv and merge with summary_df to keep updated velocity values
+    favorite_df = pd.read_csv(os.path.join(cap_flow_path, 'favorite_caps.csv'))
+    # drop all rows with no values in 'Corrected Velocity'
+    favorite_df = favorite_df.dropna(subset=['Velocity'])
+    # for each row in favorite_df, add the "Corrected Velocity" from the same participant, location, video, and capillary in summary_df
+    favorite_df['Corrected Velocity'] = favorite_df.apply(lambda row: summary_df[(summary_df['Participant'] == row['Participant']) & (summary_df['Location'] == row['Location']) & (summary_df['Video'] == row['Video']) & (summary_df['Capillary'] == row['Capillary'])]['Corrected Velocity'].values[0], axis=1)
+    print(favorite_df.columns)
 
     # remove part22 and part23
     favorite_df = favorite_df[~favorite_df['Participant'].isin(['part22', 'part23'])]

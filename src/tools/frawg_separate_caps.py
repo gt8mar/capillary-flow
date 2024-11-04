@@ -6,6 +6,10 @@ import csv
 
 def main(path):
     segmented_folder = os.path.join(path, 'segmented')
+    if os.path.exists(segmented_folder):
+        pass
+    else:
+        return 0
     output_folder = os.path.join(path, 'individual_caps')
     os.makedirs(output_folder, exist_ok = True)
     for file in os.listdir(segmented_folder):
@@ -25,14 +29,17 @@ def main(path):
             if file.endswith('.png'):
                 file = file.strip('.png')
                 csvwriter.writerow([file])
-
+    return 0
 if __name__ == "__main__":
     ticks = time.time()
-    umbrella_folder = 'J:\\frog\\data'
+    # umbrella_folder = 'J:\\frog\\data'
+    umbrella_folder = '/hpc/projects/capillary-flow/frog/' 
     for date in os.listdir(umbrella_folder):
-        if not date.startswith('24'):
+        if not date.startswith('240729'):
             continue
         if date == 'archive':
+            continue
+        if date.endswith('alb'):
             continue
         for frog in os.listdir(os.path.join(umbrella_folder, date)):
             if frog.startswith('STD'):

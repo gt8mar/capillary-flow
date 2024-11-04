@@ -5,33 +5,34 @@ This file takes a series of images and calculates the standard deviation image b
 processing each pixel to find the maximum forward and backward displacements. This
 information is then used to display a velocity map.
 
-By: Marcus Forst
+By: Marcus Forst (adapted from MATLAB code from Metha Group)
 """
-
 
 import numpy as np
 import scipy.io
 import scipy.stats
 from matplotlib import pyplot as plt
 from scipy.stats import norm
+import cv2
+from src.tools import get_images, load_image_array
 
 
 # FPS = 113.9 #227.8 #169.3
-# PIX_UM = 2.44 #1.74
+# PIX_UM = 0.8 #2.44 #1.74
 V_MAX_MMS = 4.5  # mm/sec
 
-def calculate_standard_deviation(windowArray, maskIm):
+def calculate_standard_deviation(video_array, maskIm):
     """Calculate standard deviation image.
     
     Args:
-        windowArray (numpy.ndarray): Array containing window data.
+        video_array (numpy.ndarray): Array containing window data.
         maskIm (numpy.ndarray): Binary image mask.
 
     Returns:
         numpy.ndarray: Standard deviation image.
     """
     ySize, xSize = maskIm.shape
-    return np.reshape(np.std(windowArray, axis=1), (ySize, xSize))
+    return np.reshape(np.std(video_array, axis=1), (ySize, xSize))
 
 def initialize_arrays(numPix_loop):
     """Initialize arrays for displacement and Z-values.
@@ -82,29 +83,134 @@ def update_displacements(fwd_im_inv_z, bak_im_inv_z, stdIm_inv_z, loopPix, xSize
     bak_val, bak_i = np.max(bak_dif_inv_z), np.argmax(bak_dif_inv_z)
     return fwd_val, bak_val, divmod(fwd_i, xSize), divmod(bak_i, xSize)
 
-def main(filename, plot = False, marcus = True):
-    """Main function to run the image analysis.
+def compare_data_shapes(filepath_marcus, filepath_mat):
+    """
+    Compares the shapes of arrays in two different data files: Marcus' data format and a .mat file.
+
+    Args:
+        filepath_marcus (str): Path to the data file in Marcus' format.
+        filepath_mat (str): Path to the .mat data file.
+
+    Returns:
+        dict: Dictionary containing the shapes of the arrays in both files for comparison.
+    """
+    # Load Marcus data
+    data_marcus = load_marcus_data()
+    video_array_marcus = data_marcus['video_array']
+    maskIm_marcus = data_marcus['maskIm']
+    
+    # Load .mat data
+    data_mat = scipy.io.loadmat(filepath_mat)
+    video_array_mat = data_mat['windowArray']
+    maskIm_mat = data_mat.get('maskIm', None)  # Check if maskIm exists in .mat data
+
+    # Check the presence of maskIm in .mat file, handle if it’s missing
+    if maskIm_mat is None:
+        print("Warning: 'maskIm' not found in the .mat file. Defaulting to None.")
+    
+    # Store shapes for comparison
+    shapes_comparison = {
+        "Marcus Data": {
+            "video_array_shape": video_array_marcus.shape,
+            "maskIm_shape": maskIm_marcus.shape,
+        },
+        ".mat Data": {
+            "video_array_shape": video_array_mat.shape,
+            "maskIm_shape": maskIm_mat.shape if maskIm_mat is not None else "Not available",
+        }
+    }
+
+    # Print out the shapes for easy comparison
+    print("Shape Comparison:")
+    for data_type, shapes in shapes_comparison.items():
+        print(f"{data_type}:")
+        for array_name, shape in shapes.items():
+            print(f"  {array_name}: {shape}")
+
+    return shapes_comparison
+
+def load_marcus_data():
+    """
+    Load data from human capillaries in the same form as the
+    Metha MATLAB data. 
+
+    Args:
+        filepath (str): Path to the data file.
+
+    Returns:
+        (same stuff as the MATLAB data)
+    """
+    # What do we want this function to output? To gather? 
+    # what information are we trying to get here?
+    # mask, pixel_diam_mm, video_array, fps
+    # Maybe need header, version, global etc, unclear.
+    mask_path = 'D:\\frog\\masks\\SD_24-07-29_CalFrog4fps100Lankle_mask.png'
+    maskIm = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
+    pixel_diam_um = 0.8
+    pixel_diam_mm = pixel_diam_um / 1000
+    # fps = mask_path.replace('.png', '').split('Lankle')[0].split('fps')[-1]
+    fps = 100
+    images = get_images.get_images('D:\\frog\\vids\\24-07-29_CalFrog4fps100Lankle')
+    video_array = load_image_array.load_image_array(images, 'D:\\frog\\vids\\24-07-29_CalFrog4fps100Lankle')
+    # mask_template = video_array[0]
+    # maskIm = np.ones_like(mask_template)
+    data = {'maskIm': maskIm,
+            'pixel_diam_mm': pixel_diam_mm,
+            'fps': fps,
+            'video_array': video_array}
+    return data
+
+def main(filename, plot = False, write = False, marcus = True):
+    """
+    Main function to run the image analysis.
 
     Args:
         filename (str): Path to the data file to load.
     """
-    # Load required data: an image volume, a binary mask, the frame rate, and pixel size
-    data = scipy.io.loadmat(filename)
-    print(data.keys())
+    if marcus:
+        data = load_marcus_data()
+        video_array_3D = data['video_array']  # Assuming the variable names are the same in the MATLAB file
+        # reshape video_array so that it goes from (t, row, col), to (row, col, t)
+        video_array_3D = np.transpose(video_array_3D, (1, 2, 0))
+        video_array = np.reshape(video_array_3D, (-1, video_array_3D.shape[2]))
+        flattened_stdIm = np.std(video_array, axis=1)
+        maskIm = data['maskIm']
+        fps = data['fps']
+        pixel_diam_mm = data['pixel_diam_mm']
+    else:
+        # Load required data: an image volume, a binary mask, the frame rate, and pixel size
+        data = scipy.io.loadmat(filename)
+        data['video_array'] = data['windowArray']
+        print(data.keys())
 
-    # Extract data from the loaded .mat file
-    windowArray = data['windowArray']  # Assuming the variable names are the same in the MATLAB file
-    maskIm = data['maskIm']
-    fps = data['fps']
-    pixel_diam_mm = data['pixel_diam_mm']
+        # Extract data from the loaded .mat file
+        video_array = data['video_array']  # Assuming the variable names are the same in the MATLAB file
+        maskIm = data['maskIm']
+        fps = data['fps']
+        pixel_diam_mm = data['pixel_diam_mm']
 
-    print("windowArray shape:", windowArray.shape)
+        # Calculate standard deviation image (in vector orientation)
+        print("video_array shape:", video_array.shape)
+        flattened_stdIm = np.std(video_array, axis=1)
+
+        # reshape video_array to have the same shape as maskIm plus a time dimension
+        video_array_3D = np.reshape(video_array, (xSize, ySize, -1))
+        # transpose video_array to be in the same orientationas maskIm
+        video_array_3D = np.transpose(video_array_3D, (1, 0, 2))
+        
+    stdIm = video_array_3D.std(axis=2)
+    # plt.imshow(stdIm)
+    # plt.show()
+
+    
+
+    print("video_array shape:", video_array.shape)
     print("maskIm shape:", maskIm.shape)
-    print("Number of nan values in windowArray:", np.sum(np.isnan(windowArray)))
+    print("Number of nan values in video_array:", np.sum(np.isnan(video_array)))
 
-    # Set all values in the binary mask to 1
-    # maskIm[:] = 1
-
+    # Set all values in the binary mask greater than 0 to 1
+    maskIm[maskIm > 0] = 1
+    
     # Tunable parameters
     v_max_mms = 4.5  # mm/sec
     p_criterion = 0.025  # Bonferroni adjusted one-tailed criterion
@@ -117,18 +223,7 @@ def main(filename, plot = False, marcus = True):
         plt.show()
     flattened_maskIm = maskIm.flatten()
 
-    # Calculate standard deviation image (in vector orientation)
-    print("windowArray shape:", windowArray.shape)
-    flattened_stdIm = np.std(windowArray, axis=1)
-
-    # reshape windowArray to have the same shape as maskIm plus a time dimension
-    windowArray_3D = np.reshape(windowArray, (xSize, ySize, -1))
-    # transpose windowArray to be in the same orientationas maskIm
-    windowArray_3D = np.transpose(windowArray_3D, (1, 0, 2))
     
-    stdIm = windowArray_3D.std(axis=2)
-    # plt.imshow(stdIm)
-    # plt.show()
  
     # Mask the standard deviation image
     stdIm_masked = stdIm*maskIm
@@ -138,14 +233,16 @@ def main(filename, plot = False, marcus = True):
     # set all values in stdIm_masked that are not 1 to nan
     stdIm_masked[maskIm == 0] = np.nan
 
-    # make 3D array of maskIm to have the same shape as windowArray
-    maskIm_3D = np.repeat(maskIm[:, :, np.newaxis], windowArray_3D.shape[2], axis=2)
+    # make 3D array of maskIm to have the same shape as video_array
+    maskIm_3D = np.repeat(maskIm[:, :, np.newaxis], video_array_3D.shape[2], axis=2)
     print("maskIm shape:", maskIm.shape)
-    print("windowArray shape:", windowArray_3D.shape)
+    print("video_array shape:", video_array_3D.shape)
 
-    masked_windowArray = windowArray_3D * maskIm_3D
+    masked_video_array = video_array_3D * maskIm_3D
 
     loopPix_coords = np.where(maskIm == 1)
+    print("Unique values in maskIm:", np.unique(maskIm))
+
     
 
 
@@ -155,12 +252,12 @@ def main(filename, plot = False, marcus = True):
 
     # Convert the coordinates to linear indices
     loopPix = np.ravel_multi_index(loopPix_coords, maskIm.shape)
-    windowArray = np.reshape(windowArray_3D, (xSize*ySize, -1))
+    video_array = np.reshape(video_array_3D, (xSize*ySize, -1))
     print("loopPix shape:", loopPix.shape)
-    print("flattened_windowArray shape:", windowArray.shape)
+    print("flattened_video_array shape:", video_array.shape)
 
-    # check to see if there are nan values in windowArray where loopPix is
-    print(f"Number of nan values in windowArray where loopPix is: {np.sum(np.isnan(windowArray[loopPix]))}")
+    # check to see if there are nan values in video_array where loopPix is
+    print(f"Number of nan values in video_array where loopPix is: {np.sum(np.isnan(video_array[loopPix]))}")
     
     # slice flattened_stdIm to get the values at loopPix
     stdIm_slice = flattened_stdIm[loopPix]
@@ -168,8 +265,8 @@ def main(filename, plot = False, marcus = True):
     print("Number of nan values in stdIm_slice:", np.sum(np.isnan(stdIm_slice)))
     
     # Pre-compute arrays 
-    fwd_array = windowArray[:, 2:]
-    bak_array = windowArray[:, :-2]
+    fwd_array = video_array[:, 2:]
+    bak_array = video_array[:, :-2]
 
     selected_fwd_array = fwd_array[loopPix,:]
     selected_bak_array = bak_array[loopPix,:]
@@ -228,9 +325,9 @@ def main(filename, plot = False, marcus = True):
         # Convert linear index to 2D index (row, column)
         row, col = divmod(pixel_index, xSize)  # divmod gives the quotient and remainder, useful for index conversion
         
-        # Extract the signal from the windowArray
+        # Extract the signal from the video_array
         # Python indexing is zero-based and slice end is exclusive
-        pixel_signal = windowArray[pixel_index, 1:-1]  # omitting the first and last elements just like MATLAB
+        pixel_signal = video_array[pixel_index, 1:-1]  # omitting the first and last elements just like MATLAB
         signal_repeated = np.tile(pixel_signal, (numPix_loop, 1))
         
        
@@ -332,22 +429,34 @@ def main(filename, plot = False, marcus = True):
     plt.imshow(vMap, cmap='jet', interpolation='nearest')
     plt.colorbar()
     plt.title('Velocity (mm/s)')
-    plt.show()
+    if write:
+        plt.imsave('C:\\Users\\ejerison\\capillary-flow\\velocity_map.png', vMap, cmap='jet')
+    if plot:
+        plt.show()
+    else:
+        plt.close()
 
     # Adjust the colormap to set zero velocity to a specific color if needed
     cust_map = plt.cm.jet
     cust_map.set_under('black')  # Set velocities of zero to black
     plt.imshow(vMap, cmap=cust_map, interpolation='nearest', vmin=0.01)  # Adjust vmin to slightly above 0 to use set_under
     plt.colorbar()
-
-
-
-    
+    if write:
+        plt.imsave('C:\\Users\\ejerison\\capillary-flow\\velocity_map2.png', vMap, cmap=cust_map)
+    if plot:
+        plt.show()
+    else: 
+        plt.close()
+    return 0
 
 if __name__ == "__main__":
-    main('C:\\Users\\gt8mar\\capillary-flow\\tests\\demo_data.mat')
-    # main('C:\\Users\\ejerison\\capillary-flow\\tests\\demo_data.mat')
-
+    # main('C:\\Users\\gt8mar\\capillary-flow\\tests\\demo_data.mat', plot=True, marcus=False)
+    main('C:\\Users\\ejerison\\capillary-flow\\tests\\demo_data.mat', plot=True, marcus=True)
+    # Example usage:
+    # compare_data_shapes(
+    #     'C:\\Users\\ejerison\\capillary-flow\\tests\\demo_data_marcus_format.mat',
+    #     'C:\\Users\\ejerison\\capillary-flow\\tests\\demo_data.mat'
+    # )
     #TODO: Add the following to the main function
     # load our data
     # load mask 

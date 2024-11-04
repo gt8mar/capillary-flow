@@ -260,14 +260,18 @@ def main(path, write = True, variable_radii = False, verbose = False, plot = Fal
 
             # save the kymograph
             if write:
+                if capillary_number.isalpha():
+                    capillary_name = capillary_number
+                else:
+                    capillary_name = str(int(capillary_number)).zfill(2)
                 # save to output folder
                 print(f'saving {video_key}_kymograph_{str(capillary_number).zfill(2)}.csv')
                 np.savetxt(os.path.join(output_folder, 
-                                        f'{video_key}_kymograph_{str(capillary_number).zfill(2)}.csv'), 
+                                        f'{video_key}_kymograph_{capillary_name}.csv'), 
                                         kymograph, delimiter=',', fmt = '%s')
                 im = Image.fromarray(kymograph)
                 im.save(os.path.join(output_folder, 
-                                    f'{video_key}_kymograph_{str(capillary_number).zfill(2)}.tiff'))
+                                    f'{video_key}_kymograph_{capillary_name}.tiff'))
 
             if plot:
                 # Plot pixels vs time:
@@ -283,21 +287,26 @@ def main(path, write = True, variable_radii = False, verbose = False, plot = Fal
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    umbrella_folder = 'J:\\frog\\data'
+    # umbrella_folder = 'J:\\frog\\data'
+    umbrella_folder = '/hpc/projects/capillary-flow/frog/'
     for date in os.listdir(umbrella_folder):
-        if not date.startswith('24'):
+        if not date.startswith('240729'):
             continue
         if date == 'archive' or date in ['240213', '240214', '240229', '240402', '240404', '240411', '240419']: # TO DELETE
+            continue
+        if date.endswith('alb'):
             continue
         for frog in os.listdir(os.path.join(umbrella_folder, date)):
             if frog.startswith('STD'):
                 continue
-            if not frog.startswith('Frog'):
+            if not frog.startswith('Frog4'):
                 continue   
             for side in os.listdir(os.path.join(umbrella_folder, date, frog)):
                 if side.startswith('STD'):
                     continue
                 if side == 'archive':
+                    continue
+                if not side.startswith('Left'): # only process the left side for now
                     continue
                 print('Processing: ' + date + ' ' + frog + ' ' + side)
                 path = os.path.join(umbrella_folder, date, frog, side)
