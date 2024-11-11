@@ -3,7 +3,8 @@ import time
 import csv
 
 def main(path):
-    output_folder = 'J:\\frog\\results\\all_data.csv'
+    # output_folder = 'J:\\frog\\results\\all_data.csv'
+    output_folder = '/hpc/projects/capillary-flow/frog/results/all_data.csv'
 
     rbc_counts_folder = os.path.join(path, 'rbc_count')
     rbc_csv = os.path.join(rbc_counts_folder, 'edge_counts.csv')
@@ -56,19 +57,24 @@ def main(path):
 
 if __name__ == "__main__":
     ticks = time.time()
-    umbrella_folder = 'J:\\frog\\data'
+    # umbrella_folder = 'J:\\frog\\data'
+    umbrella_folder = '/hpc/projects/capillary-flow/frog/'
     for date in os.listdir(umbrella_folder):
-        if not date.startswith('24'):
+        if not date.startswith('240729'):
             continue
         if date == 'archive': 
+            continue
+        if date.endswith('alb'):
             continue
         for frog in os.listdir(os.path.join(umbrella_folder, date)):
             if frog.startswith('STD'):
                 continue
-            if not frog.startswith('Frog'):
+            if not frog.startswith('Frog4'):
                 continue   
             for side in os.listdir(os.path.join(umbrella_folder, date, frog)):
                 if side.startswith('STD'):
+                    continue
+                if not side.startswith('Left'): # only process the left side for now
                     continue
                 if side == 'archive':
                     continue

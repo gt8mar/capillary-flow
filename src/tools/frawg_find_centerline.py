@@ -257,7 +257,7 @@ def main(path, verbose = True, write = True, plot=False):
             flattened_radii = []
             skeleton_data = []
             for cap in contours:
-                capnum = cap.strip(".png")[-1:]
+                capnum = cap.replace(".png",'')[-1:]
                 # check to see if contours is zero
                 if contours[cap].shape[0] == 0:
                     pass
@@ -331,19 +331,25 @@ def main(path, verbose = True, write = True, plot=False):
 # to call the main() function.
 if __name__ == "__main__":
     ticks = time.time()
-    umbrella_folder = 'J:\\frog\\data'
+    # umbrella_folder = 'J:\\frog\\data'
+    umbrella_folder = '/hpc/projects/capillary-flow/frog/'
     for date in os.listdir(umbrella_folder):
-        if not date.startswith('24'):
+        if not date.startswith('240729'):
             continue
         if date == 'archive':
+            continue
+        if date.endswith('alb'):
             continue
         for frog in os.listdir(os.path.join(umbrella_folder, date)):
             if frog.startswith('STD'):
                 continue
-            if not frog.startswith('Frog'):
+            if not frog.startswith('Frog4'):
                 continue
+
             for side in os.listdir(os.path.join(umbrella_folder, date, frog)):
                 if side.startswith('STD'):
+                    continue
+                if not side.startswith('Left'): # only process the left side for now
                     continue
                 if side == 'archive':
                     continue
