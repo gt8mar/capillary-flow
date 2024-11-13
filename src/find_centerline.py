@@ -268,6 +268,15 @@ def main(path ='F:\\Marcus\\data\\hasty_seg\\230626\\part10\\230425\\loc01', # '
             # Make a numpy array of images with isolated capillaries. The mean/sum of this is segmented_2D.
             contour = find_connected_components(segmented)    # , verbose=False, write=write, write_path = os.path.join(output_folder, 'images', cap_map_filename)
             
+            # If contour is empty numpy array, skip the rest of the loop
+            if contour == []:
+                print(f"Capillary {centerline_filename} has no contour")
+                continue
+            if contour.shape == ():
+                continue
+            if contour.shape == (0,):
+                continue
+
             capillary_radii = []
             skeleton_coords = []
             flattened_radii = []

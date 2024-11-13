@@ -138,8 +138,12 @@ def load_marcus_data():
         filepath (str): Path to the data file.
 
     Returns:
-        (same stuff as the MATLAB data)
-    """
+        dict: Dictionary containing:
+            - maskIm (numpy.ndarray): Binary mask image.
+            - pixel_diam_mm (float): Pixel diameter in millimeters.
+            - fps (int): Frames per second.
+            - video_array (numpy.ndarray): Array of video data.
+        """
     # What do we want this function to output? To gather? 
     # what information are we trying to get here?
     # mask, pixel_diam_mm, video_array, fps
@@ -170,11 +174,26 @@ def main(filename, plot = False, write = False, marcus = True):
     if marcus:
         data = load_marcus_data()
         video_array_3D = data['video_array']  # Assuming the variable names are the same in the MATLAB file
+        print(video_array_3D.shape)
         # reshape video_array so that it goes from (t, row, col), to (row, col, t)
-        video_array_3D = np.transpose(video_array_3D, (1, 2, 0))
+        video_array_3D = video_array_3D[:100, :, :] # downsize for testing
+        print(video_array_3D.shape)
+        downsampled_video_array = np.zeros((video_array_3D.shape[0], video_array_3D.shape[1]//2, video_array_3D.shape[2]//2))
+        # downsample the spatial data 2x2 using an average filter
+        for i in range(video_array_3D.shape[0]):
+            frame = video_array_3D[i]
+            frame = np.array(frame, dtype=np.uint8)
+            print(frame.shape)
+            downsampled_frame = cv2.resize(frame, (frame.shape[1]//2 ,frame.shape[0]//2), interpolation=cv2.INTER_AREA)
+            downsampled_video_array[i] = downsampled_frame
+
+        # video_array_3D = np.array([cv2.resize(frame, (frame.shape[1]//2 ,frame.shape[0]//2), interpolation=cv2.INTER_AREA) for frame in video_array_3D])
+        video_array_3D = np.transpose(downsampled_video_array, (1, 2, 0))
         video_array = np.reshape(video_array_3D, (-1, video_array_3D.shape[2]))
         flattened_stdIm = np.std(video_array, axis=1)
         maskIm = data['maskIm']
+        # resize mask
+        maskIm = cv2.resize(maskIm, (maskIm.shape[1]//2,maskIm.shape[0]//2), interpolation=cv2.INTER_AREA)
         fps = data['fps']
         pixel_diam_mm = data['pixel_diam_mm']
     else:
@@ -210,7 +229,7 @@ def main(filename, plot = False, write = False, marcus = True):
 
     # Set all values in the binary mask greater than 0 to 1
     maskIm[maskIm > 0] = 1
-    
+
     # Tunable parameters
     v_max_mms = 4.5  # mm/sec
     p_criterion = 0.025  # Bonferroni adjusted one-tailed criterion
