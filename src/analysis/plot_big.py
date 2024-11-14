@@ -4128,7 +4128,7 @@ def main(verbose = False):
     # # plot_individual_cdfs(summary_df_nhp_video_medians)
     # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], 
     #          subsets= [highbp_nhp_video_medians['Video Median Velocity'], normbp_nhp_video_medians['Video Median Velocity']], 
-    #          labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Video Median Velocities by BP nhp',
+    #          labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Video Median Velocities by BP',
     #          write = True, variable='SYS_BP')
     # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], 
     #          subsets=[male_medians_subset['Video Median Velocity'], female_medians_subset['Video Median Velocity']],
