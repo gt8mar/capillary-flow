@@ -118,10 +118,287 @@ def calculate_stats(group, ci_percentile = 95, dimensionless = False):
         ci = 1.96 * sem
         return pd.Series({'Mean Velocity': mean, 'Lower Bound': mean - ci, 'Upper Bound': mean + ci})
 
-
-
-
 def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000, 
+            ci_percentile=99.5, write=True, dimensionless=False, video_median=False):
+    """Plots the mean/median and CI for the variable of interest, with KS statistic."""
+    # Set up style and font
+    sns.set_style("whitegrid")
+    source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 5, 'lines.linewidth': 0.5
+    })
+
+    # Set color palette based on variable
+    if variable == 'Age':
+        base_color = '#1f77b4'
+        conditions = [df[variable] <= 50, df[variable] > 50]
+        choices = ['≤50', '>50']
+    elif variable == 'SYS_BP':
+        base_color = '2ca02c'
+        conditions = [df[variable] < 120, df[variable] >= 120]
+        choices = ['<120', '≥120']
+    elif variable == 'Sex':
+        base_color = '674F92'
+        conditions = [df[variable] == 'M', df[variable] == 'F']
+        choices = ['Male', 'Female']
+    elif variable == 'Diabetes':
+        base_color = 'ff7f0e'
+        conditions = [
+            df[variable].isin([False, None, 'Control']),
+            df[variable].isin([True, 'TYPE 1', 'TYPE 2', 'Diabetes'])
+        ]
+        choices = ['Control', 'Diabetic']
+    elif variable == 'Hypertension':
+        base_color = 'd62728'
+        conditions = [
+            df[variable].isin([False, None, 'Control']),
+            df[variable].isin([True, 1.0, 'Hypertension'])
+        ]
+        choices = ['Control', 'Hypertensive']
+    else:
+        raise ValueError(f"Unsupported variable: {variable}")
+
+    palette = create_monochromatic_palette(base_color)
+    palette = adjust_brightness_of_colors(palette, brightness_scale=.2)
+    sns.set_palette(palette)
+
+    if video_median:
+        df = df.groupby(['Participant', 'Video', 'Capillary']).first().reset_index()
+        df.rename(columns={'Dimensionless Velocity': 'Dimensionless Velocity OG'}, inplace=True) 
+        df.rename(columns={'Video Median Dimensionless Velocity': 'Dimensionless Velocity'}, inplace=True)      
+
+    # Group data with more explicit handling
+    group_col = f'{variable} Group'
+    df[group_col] = np.select(conditions, choices, default='Unknown')
+    
+    # Filter out 'Unknown' values
+    df = df[df[group_col] != 'Unknown']
+    
+    # Print unique values for debugging
+    print(f"Unique values in {variable}: {df[variable].unique()}")
+    print(f"Unique values in {group_col}: {df[group_col].unique()}")
+
+    # Calculate stats
+    stats_func = calculate_median_ci if method == 'bootstrap' else calculate_stats
+    stats_df = df.groupby([group_col, 'Pressure']).apply(stats_func, ci_percentile=ci_percentile, dimensionless=dimensionless).reset_index()
+
+    # Calculate KS statistic
+    grouped = df.groupby(group_col)
+    ks_stats = []
+    
+    for pressure in df['Pressure'].unique():
+        try:
+            group_1 = grouped.get_group(choices[0])
+            group_2 = grouped.get_group(choices[1])
+            
+            group_1_velocities = group_1[group_1['Pressure'] == pressure]['Corrected Velocity']
+            group_2_velocities = group_2[group_2['Pressure'] == pressure]['Corrected Velocity']
+            
+            # Only perform KS test if both groups have data
+            if len(group_1_velocities) > 0 and len(group_2_velocities) > 0:
+                ks_stat, p_value = ks_2samp(group_1_velocities, group_2_velocities)
+                ks_stats.append({'Pressure': pressure, 'KS Statistic': ks_stat, 'p-value': p_value})
+            else:
+                print(f"Warning: Insufficient data for KS test at pressure {pressure}")
+                print(f"Group {choices[0]} size: {len(group_1_velocities)}")
+                print(f"Group {choices[1]} size: {len(group_2_velocities)}")
+        except KeyError as e:
+            print(f"Warning: Could not find group for pressure {pressure}: {e}")
+            continue
+
+    if ks_stats:  # Only create DataFrame if we have statistics
+        ks_df = pd.DataFrame(ks_stats)
+        print(variable)
+        print(ks_df)
+
+    # Plot
+    plt.close()
+    fig, ax = plt.subplots(figsize=(2.4, 2.0))
+
+    for i, (label, group_df) in enumerate(stats_df.groupby(group_col)):
+        if i == 0:
+            i_color = 0
+            dot_color = 0
+        elif i == 1:
+            i_color = 3
+            dot_color = 2
+        elif i == 2:
+            i_color = 4
+            dot_color = 3
+        
+        if dimensionless:
+            y_col = 'Median Dimensionless Velocity' if method == 'bootstrap' else 'Mean Dimensionless Velocity'
+        else:
+            y_col = 'Median Velocity' if method == 'bootstrap' else 'Mean Velocity'
+        lower_col = 'CI Lower Bound' if method == 'bootstrap' else 'Lower Bound'
+        upper_col = 'CI Upper Bound' if method == 'bootstrap' else 'Upper Bound'
+        
+        ax.errorbar(group_df['Pressure'], group_df[y_col], 
+                    yerr=[group_df[y_col] - group_df[lower_col], group_df[upper_col] - group_df[y_col]],
+                    label=f'{variable} Group {label}', fmt='-o', markersize=2, color=palette[dot_color])
+        ax.fill_between(group_df['Pressure'], group_df[lower_col], group_df[upper_col], alpha=0.4, color=palette[i_color])
+
+    legend_handles = [mpatches.Patch(color=palette[0], label=choices[0], alpha=0.6),
+                     mpatches.Patch(color=palette[3], label=choices[1], alpha=0.6)]
+
+    ax.set_xlabel('Pressure (psi)', fontproperties=source_sans)
+    if dimensionless:
+        ax.set_ylabel('Dimensionless Velocity', fontproperties=source_sans)
+        ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Dimensionless Velocity vs. Pressure with {ci_percentile}% CI', fontproperties=source_sans, fontsize=8)
+    else:
+        ax.set_ylabel('Velocity (um/s)', fontproperties=source_sans)
+        ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Velocity vs. Pressure with {ci_percentile}% CI', fontproperties=source_sans, fontsize=8)
+    ax.legend(handles=legend_handles, prop=source_sans)
+    ax.grid(True, linewidth=0.3)
+
+    plt.tight_layout()
+    if write:
+        if video_median:
+            plt.savefig(os.path.join(cap_flow_path, 'results', f'{variable}_videomedians_CI.png'), dpi=600)
+        else:
+            plt.savefig(os.path.join(cap_flow_path, 'results', f'{variable}_CI.png'), dpi=600)
+    else:
+        plt.show()
+    return 0
+
+def plot_CI_test(df, variable='Age', method='bootstrap', n_iterations=1000, 
+            ci_percentile=99.5, write=True, dimensionless=False, video_median=False):
+    """Plots the mean/median and CI for the variable of interest, with KS statistic."""
+    # Set up style and font
+    sns.set_style("whitegrid")
+    source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 5, 'lines.linewidth': 0.5
+    })
+
+    # Set color palette based on variable
+    if variable == 'Age':
+        base_color = '#1f77b4'
+        conditions = [df[variable] <= 50, df[variable] > 50]
+        choices = ['≤50', '>50']
+    elif variable == 'SYS_BP':
+        base_color = '2ca02c'
+        conditions = [df[variable] < 120, df[variable] >= 120]
+        choices = ['<120', '≥120']
+    elif variable == 'Sex':
+        base_color = '674F92'
+        conditions = [df[variable] == 'M', df[variable] == 'F']
+        choices = ['Male', 'Female']
+    elif variable == 'Diabetes_plot':
+        base_color = 'ff7f0e'
+        # Assuming the DataFrame has values 0 and 1 or 'Control' and 'Diabetes'
+        conditions = [df[variable].isin(['Control', 0]), df[variable].isin(['Diabetes', 1])]
+        choices = ['Control', 'Diabetic']
+    elif variable == 'Hypertension_plot':
+        base_color = 'd62728'
+        # Assuming the DataFrame has values 0 and 1 or 'Control' and 'Hypertension'
+        conditions = [df[variable].isin(['Control', 0]), df[variable].isin(['Hypertension', 1])]
+        choices = ['Control', 'Hypertensive']
+    else:
+        raise ValueError(f"Unsupported variable: {variable}")
+
+    palette = create_monochromatic_palette(base_color)
+    palette = adjust_brightness_of_colors(palette, brightness_scale=.2)
+    sns.set_palette(palette)
+
+    if video_median:
+        df = df.groupby(['Participant', 'Video', 'Capillary']).first().reset_index()
+        df.rename(columns={'Dimensionless Velocity': 'Dimensionless Velocity OG'}, inplace=True) 
+        df.rename(columns={'Video Median Dimensionless Velocity': 'Dimensionless Velocity'}, inplace=True)      
+
+    # Group data with more explicit handling
+    group_col = f'{variable} Group'
+    df[group_col] = np.select(conditions, choices, default='Unknown')
+    
+    # Print unique values for debugging
+    print(f"Unique values in {variable}: {df[variable].unique()}")
+    print(f"Unique values in {group_col}: {df[group_col].unique()}")
+
+    # Calculate stats
+    stats_func = calculate_median_ci if method == 'bootstrap' else calculate_stats
+    stats_df = df.groupby([group_col, 'Pressure']).apply(stats_func, ci_percentile=ci_percentile, dimensionless=dimensionless).reset_index()
+
+    # Calculate KS statistic
+    grouped = df.groupby(group_col)
+    ks_stats = []
+    
+    for pressure in df['Pressure'].unique():
+        try:
+            group_1 = grouped.get_group(choices[0])
+            group_2 = grouped.get_group(choices[1])
+            
+            group_1_velocities = group_1[group_1['Pressure'] == pressure]['Corrected Velocity']
+            group_2_velocities = group_2[group_2['Pressure'] == pressure]['Corrected Velocity']
+            
+            ks_stat, p_value = ks_2samp(group_1_velocities, group_2_velocities)
+            ks_stats.append({'Pressure': pressure, 'KS Statistic': ks_stat, 'p-value': p_value})
+        except KeyError as e:
+            print(f"Warning: Could not find group for pressure {pressure}: {e}")
+            continue
+
+    ks_df = pd.DataFrame(ks_stats)
+    print(variable)
+    print(ks_df)
+
+    # Plot
+    plt.close()
+    fig, ax = plt.subplots(figsize=(2.4, 2.0))
+
+    for i, (label, group_df) in enumerate(stats_df.groupby(group_col)):
+        if i == 0:
+            i_color = 0
+            dot_color = 0
+        elif i == 1:
+            i_color = 3
+            dot_color = 2
+        elif i == 2:
+            i_color = 4
+            dot_color = 3
+        
+        if dimensionless:
+            y_col = 'Median Dimensionless Velocity' if method == 'bootstrap' else 'Mean Dimensionless Velocity'
+        else:
+            y_col = 'Median Velocity' if method == 'bootstrap' else 'Mean Velocity'
+        lower_col = 'CI Lower Bound' if method == 'bootstrap' else 'Lower Bound'
+        upper_col = 'CI Upper Bound' if method == 'bootstrap' else 'Upper Bound'
+        
+        ax.errorbar(group_df['Pressure'], group_df[y_col], 
+                    yerr=[group_df[y_col] - group_df[lower_col], group_df[upper_col] - group_df[y_col]],
+                    label=f'{variable} Group {label}', fmt='-o', markersize=2, color=palette[dot_color])
+        ax.fill_between(group_df['Pressure'], group_df[lower_col], group_df[upper_col], alpha=0.4, color=palette[i_color])
+
+    legend_handles = [mpatches.Patch(color=palette[0], label=choices[0], alpha=0.6),
+                     mpatches.Patch(color=palette[3], label=choices[1], alpha=0.6)]
+
+    ax.set_xlabel('Pressure (psi)', fontproperties=source_sans)
+    if dimensionless:
+        ax.set_ylabel('Dimensionless Velocity', fontproperties=source_sans)
+        ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Dimensionless Velocity vs. Pressure with {ci_percentile}% CI', fontproperties=source_sans, fontsize=8)
+    else:
+        ax.set_ylabel('Velocity (um/s)', fontproperties=source_sans)
+        ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Velocity vs. Pressure with {ci_percentile}% CI', fontproperties=source_sans, fontsize=8)
+    ax.legend(handles=legend_handles, prop=source_sans)
+    ax.grid(True, linewidth=0.3)
+
+    plt.tight_layout()
+    if write:
+        if video_median:
+            plt.savefig(os.path.join(cap_flow_path, 'results', f'{variable}_videomedians_CI.png'), dpi=600)
+        else:
+            plt.savefig(os.path.join(cap_flow_path, 'results', f'{variable}_CI.png'), dpi=600)
+    else:
+        plt.show()
+    return 0
+
+def plot_CI_old(df, variable='Age', method='bootstrap', n_iterations=1000, 
             ci_percentile=99.5, write=True, dimensionless=False, video_median=False):
     """Plots the mean/median and CI for the variable of interest, with KS statistic.
 
@@ -215,11 +492,23 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
     print(ks_df)
 
     plt.close()
+    
+    sns.set_style("whitegrid")
+    source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 5, 'lines.linewidth': 0.5
+    })
+
     # Plot
     fig, ax = plt.subplots(figsize=(2.4, 2.0))
 
-
+    group_labels = []
     for i, (label, group_df) in enumerate(stats_df.groupby(group_col)):
+        group_labels.append(label)
         if i == 0:
             i_color = 0
             dot_color = 0
@@ -244,11 +533,10 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
                     label=f'{variable} Group {label}', fmt='-o', markersize=2, color=palette[dot_color])
         ax.fill_between(group_df['Pressure'], group_df[lower_col], group_df[upper_col], alpha=0.4, color=palette[i_color])
     
+    # Create legend handles using the stored group labels
+    legend_handles = [mpatches.Patch(color=palette[0], label=f'{variable} Group {group_labels[0]}', alpha=0.6),
+                      mpatches.Patch(color=palette[3], label=f'{variable} Group {group_labels[1]}', alpha=0.6)]
         
-
-    legend_handles = [mpatches.Patch(color=palette[0], label=f'{variable} Group ≤50' if variable == 'Age' else '<120' if variable == 'SYS_BP' else 'M', alpha=0.6),
-                      mpatches.Patch(color=palette[3], label=f'{variable} Group >50' if variable == 'Age' else '≥120' if variable == 'SYS_BP' else 'F', alpha=0.6)]
-
     ax.set_xlabel('Pressure (psi)', fontproperties=source_sans)
     if dimensionless:
         ax.set_ylabel('Dimensionless Velocity', fontproperties=source_sans)
@@ -996,11 +1284,9 @@ def plot_caps_by_size(summary_df):
     larger_diameter_df = summary_df[summary_df['Participant'].isin(larger_diameters)]
 
     # plot the histogram of velocities for each participant in sliced dfs
-    main(smaller_diameter_df, 'Age', diam_slice = 'smaller')
-    main(larger_diameter_df, 'Age', diam_slice = 'larger')
-    main(smaller_diameter_df, 'SYS_BP', diam_slice = 'smaller')
-    main(larger_diameter_df, 'SYS_BP', diam_slice = 'larger')
+    
     return 0
+
 def plot_median_diameter(summary_df):
     """
     Plot the median diameter for each participant.
@@ -1035,10 +1321,25 @@ def compile_metadata(size=False):
     metadata_dfs = [pd.read_excel(os.path.join(metadata_folder, f)) for f in metadata_files]
     metadata_df = pd.concat(metadata_dfs)
 
-    # make slice of metadata_df with only bp measurements
+    # make slice of metadata_df without bp measurements
     non_bp_metadata = metadata_df[~metadata_df['Video'].str.contains('bp')]
-   
+
+    non_bp_metadata['Location'] = non_bp_metadata['Location'].astype(str)
+
+    # non_strings = non_bp_metadata[~non_bp_metadata['Location'].apply(lambda x: isinstance(x, str))]
+
+    non_bp_metadata = non_bp_metadata[~non_bp_metadata['Video'].str.contains('scan')]
+
+    # # remove part00
+    non_bp_metadata = non_bp_metadata[non_bp_metadata['Participant'] != 'part00']
+
+    # # remove locations 'Temp' and 'temp' and 'Ex'
+    non_bp_metadata = non_bp_metadata[~non_bp_metadata['Location'].str.contains('Temp')]
+    non_bp_metadata = non_bp_metadata[~non_bp_metadata['Location'].str.contains('temp')]
+    non_bp_metadata = non_bp_metadata[~non_bp_metadata['Location'].str.contains('Ex')]
+
     # add 'loc' and a leading zero to the location column
+    print(non_bp_metadata['Participant'].unique())
     non_bp_metadata['Location'] = 'loc' + non_bp_metadata['Location'].astype(str).str.zfill(2)
 
     # Convert 'Video' identifiers to integers for comparison
@@ -1686,6 +1987,10 @@ def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title='CDF Comp
     elif variable == 'Individual':
         base_color = '#1f77b4'
         individual_color = '#6B0F1A' #'#ff7f0e'
+    elif variable == 'Diabetes_plot':
+        base_color = '#ff7f0e' 
+    elif variable == 'Hypertension_plot':
+        base_color = '#9467bd'
     else:
         raise ValueError(f"Unsupported variable: {variable}")
 
@@ -3548,7 +3853,12 @@ def main(verbose = False):
     classified_kymos_df = pd.read_csv(classified_kymos_path)
     second_classified_kymos_df = pd.read_csv(os.path.join(cap_flow_path, 'classified_kymos_part28_to_part32.csv'))
     third_classified_kymos_df = pd.read_csv(os.path.join(cap_flow_path, 'classified_kymos_part33_to_part81.csv'))
+    fourth_classified_kymos_df = pd.read_csv(os.path.join(cap_flow_path, 'classified_kymos_part40_to_part48.csv'))
+    fifth_classified_kymos_df = pd.read_csv(os.path.join(cap_flow_path, 'classified_kymos_part34_to_part80.csv'))
     total_classified_kymos_df = pd.concat([second_classified_kymos_df, third_classified_kymos_df], ignore_index=True)
+    # total_classified_kymos_df = pd.concat([total_classified_kymos_df, fourth_classified_kymos_df], ignore_index=True)
+    # total_classified_kymos_df = pd.concat([total_classified_kymos_df, fifth_classified_kymos_df], ignore_index=True)
+    
     # write to csv
     total_classified_kymos_df.to_csv(os.path.join(cap_flow_path, 'classified_kymos_part28_to_part81.csv'), index=False)
     metadata_df = compile_metadata()
@@ -3556,8 +3866,10 @@ def main(verbose = False):
     total_classified_kymos_df = pd.merge(total_classified_kymos_df, metadata_df, on=['Participant', 'Date', 'Location', 'Video'], how='left')
     # print second classified kymos to csv
     # total_classified_kymos_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\classified_kymos_testing_part28_to_part32.csv', index=False)
+    
     # remove all rows with 'SET' != 'set01'
     total_classified_kymos_df = total_classified_kymos_df[total_classified_kymos_df['SET'] == 'set01']
+
     # remove all rows with 'Second_Classification' == 'Unclear'
     total_classified_kymos_df = total_classified_kymos_df[total_classified_kymos_df['Second_Classification'] != 'Unclear']
     # Extract the capillary name from the image path for second classified kymos
@@ -3572,6 +3884,14 @@ def main(verbose = False):
     total_classified_kymos_df = total_classified_kymos_df.sort_values(by=['Participant', 'Date', 'Location', 'Video', 'Capillary']).reset_index(drop=True)
 
     # calculate age for each participant from 'Date' (format YYMMDD) and 'Birthday' (format YYYYMMDD)
+    # make all birthday values strings
+    total_classified_kymos_df['Birthday'] = total_classified_kymos_df['Birthday'].astype(int).astype(str)
+    # print all unique birthday values
+    print(total_classified_kymos_df['Birthday'].unique())
+  
+
+    # print participants who don't have a 'Birthday' value in format YYYYMMDD
+    print(total_classified_kymos_df[total_classified_kymos_df['Birthday'].str.len() != 8]['Participant'].unique())
     total_classified_kymos_df['Age'] = total_classified_kymos_df.apply(lambda x: calculate_age(x['Date'], x['Birthday']), axis=1)
 
     # create 'SYS_BP' column from 'BP' column  
@@ -3598,6 +3918,16 @@ def main(verbose = False):
     summary_df.loc[summary_df['Participant'] == 'part21', 'Sex'] = 'M'
     summary_df.loc[summary_df['Participant'] == 'part22', 'Sex'] = 'M'
 
+    # # make 'SET' for part09 - part20 'set01'
+    # for i in range(9, 21):
+    #     summary_df.loc[summary_df['Participant'] == f'part{i}', 'SET'] = 'set01'
+    # for i in range(21, 25):
+    #     summary_df.loc[summary_df['Participant'] == f'part{i}', 'SET'] = 'set02'
+    # for i in range(25, 30):
+    #     summary_df.loc[summary_df['Participant'] == f'part{i}', 'SET'] = 'set01'
+    # # set 'SET' for part30 to 'set02'
+    # summary_df.loc[summary_df['Participant'] == 'part30', 'SET'] = 'set03'
+    # summary_df.loc[summary_df['Participant'] == 'part09', 'SET'] = 'set01'
     
     # Save or display the resulting dataframe
     # merged_df.to_csv('C:\\Users\\gt8ma\\capillary-flow\\merged_csv.csv', index=False)
@@ -3771,6 +4101,16 @@ def main(verbose = False):
     """
     # remove part21, part22, part24
     summary_df_nhp_video_medians = summary_df_nhp_video_medians[~summary_df_nhp_video_medians['Participant'].isin(['part21', 'part22', 'part24', 'part23'])]
+    # summary_df_nhp_video_medians = summary_df_nhp_video_medians[~summary_df_nhp_video_medians['Participant'].isin(['part24'])]
+
+    
+    # print out each participant and whether they have diabetes or not
+    for participant in summary_df_nhp_video_medians['Participant'].unique():
+        participant_df = summary_df_nhp_video_medians[summary_df_nhp_video_medians['Participant'] == participant]
+        print(f'{participant}: {participant_df["Diabetes"].iloc[0]}')
+        print(f'{participant}: {participant_df["Hypertension"].iloc[0]}')
+        print(f'{participant}: {participant_df["SET"].iloc[0]}')
+
     # summary_df_nhp_video_medians = summary_df_nhp_video_medians[~summary_df_nhp_video_medians['Participant'].isin(['part22', 'part24'])]
     # plot_medians_pvals(summary_df_nhp_video_medians)
     # analyze_velocity_influence(summary_df_nhp_video_medians)
@@ -3788,7 +4128,7 @@ def main(verbose = False):
     # # plot_individual_cdfs(summary_df_nhp_video_medians)
     # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], 
     #          subsets= [highbp_nhp_video_medians['Video Median Velocity'], normbp_nhp_video_medians['Video Median Velocity']], 
-    #          labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Video Median Velocities by BP nhp',
+    #          labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Video Median Velocities by BP',
     #          write = True, variable='SYS_BP')
     # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], 
     #          subsets=[male_medians_subset['Video Median Velocity'], female_medians_subset['Video Median Velocity']],
@@ -3837,7 +4177,32 @@ def main(verbose = False):
 
     # plot_models(summary_df_nhp_video_medians, mixed_results, variable='Age', log=True)
     
+    # # Diabetes group is set03
+    # diabetes_group = summary_df_nhp_video_medians[summary_df_nhp_video_medians['SET'] == 'set03']
+    # # Hypertension group is set02
+    # hypertension_group = summary_df_nhp_video_medians[summary_df_nhp_video_medians['SET'] == 'set02']
+    # # Normal group is set01
+    # normal_group = summary_df_nhp_video_medians[summary_df_nhp_video_medians['SET'] == 'set01']
 
+    # diabetes_group.loc[:, 'Diabetes_plot'] = 'Diabetes'
+    # normal_group.loc[:, 'Diabetes_plot'] = 'Control'
+    # hypertension_group.loc[:, 'Hypertension_plot'] = 'Hypertension'
+    # normal_group.loc[:, 'Hypertension_plot'] = 'Control'
+
+
+    # # compare diabetes group to normal group using cdfs
+    # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets=[diabetes_group['Video Median Velocity'], normal_group['Video Median Velocity']], labels=['Entire Dataset', 'Diabetes', 'Control'], title='CDF Comparison of Video Median Velocities by Diabetes', write=True, variable='Diabetes_plot')
+    # # compare hypertension group to normal group using cdfs
+    # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets=[hypertension_group['Video Median Velocity'], normal_group['Video Median Velocity']], labels=['Entire Dataset', 'Hypertension', 'Control'], title='CDF Comparison of Video Median Velocities by Hypertension', write=True, variable='Hypertension_plot')
+    # # compare diabetes group to hypertension group using cdfs
+    # # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], subsets=[diabetes_group['Video Median Velocity'], hypertension_group['Video Median Velocity']], labels=['Entire Dataset', 'Diabetes', 'Hypertension'], title='CDF Comparison of Video Median Velocities by Diabetes and Hypertension', write=True, variable='Diabetes')
+
+    # compare diabetes group to normal group using CIs
+    # plot_CI(summary_df_nhp_video_medians, variable='Diabetes_plot', ci_percentile=95, video_median=True)
+    # compare hypertension group to normal group using CIs
+    # plot_CI(summary_df_nhp_video_medians, variable='Hypertension_plot', ci_percentile=95, video_median=True)
+    # # compare diabetes group to hypertension group using CIs
+    # plot_CI(summary_df_nhp_video_medians, variable='SET', ci_percentile=95, video_median=True)
 
 
     # plot_cdf_comp_pressure(summary_df_nhp_video_medians)
@@ -3900,7 +4265,7 @@ def main(verbose = False):
     # plot_CI_overlaps(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='Age')
     # plot_CI_overlaps(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='Sex')
     # plot_CI(summary_df_nhp_video_medians_copy, variable = 'Sex', ci_percentile=95, write = True)
-    # plot_CI(summary_df_nhp_video_medians_copy, variable = 'Age', ci_percentile=95, write = True)
+    plot_CI_old(summary_df_nhp_video_medians_copy, variable = 'Age', ci_percentile=95, write = True)
     # plot_CI(summary_df_nhp_video_medians_copy, variable = 'SYS_BP', ci_percentile=95, write = True)
 
     summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.drop(columns=['Age-Score', 'Log Age-Score'])

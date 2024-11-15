@@ -21,6 +21,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.metrics import accuracy_score, roc_auc_score, auc, confusion_matrix, roc_curve, recall_score, precision_score, f1_score, r2_score, mean_squared_error, precision_recall_curve
 from sklearn.ensemble import RandomForestClassifier
 import matplotlib as mpl
+import matplotlib.ticker as ticker
 from matplotlib.font_manager import FontProperties
 from matplotlib.colors import to_rgb, LinearSegmentedColormap
 import colorsys
@@ -107,7 +108,7 @@ def calculate_stats(group, ci_percentile = 95, dimensionless = False):
 
 
 def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000, 
-            ci_percentile=99.5, write=True, dimensionless=False, video_median=False):
+            ci_percentile=99.5, write=True, dimensionless=False, video_median=False, log_scale=False):
     """Plots the mean/median and CI for the variable of interest, with KS statistic.
 
     This function creates a plot comparing different groups based on the specified
@@ -123,6 +124,7 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
         write (bool, optional): Whether to write the plot to a file. Defaults to True.
         dimensionless (bool, optional): Whether to plot dimensionless velocity. Defaults to False.
         video_median (bool, optional): Whether to use video medians. Defaults to False.
+        log_scale (bool, optional): Whether to use a log scale for the y-axis. Defaults to False.
 
     Returns:
         int: 0 if the plot was created successfully.
@@ -160,6 +162,9 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
     palette = adjust_brightness_of_colors(palette, brightness_scale=.2)
     sns.set_palette(palette)
 
+    if log_scale:
+        df['Corrected Velocity'] = df['Corrected Velocity'] + 10
+
     if video_median:
         # collapse the data for each participant and video to a single row by selecting just the first row for each participant and video combination
         df = df.groupby(['Participant', 'Video', 'Capillary']).first().reset_index()
@@ -186,25 +191,48 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
     # Iterate over each group to perform the KS test
     ks_stats = []
     for pressure in df['Pressure'].unique():
-        group_1 = grouped.get_group('≤50' if variable == 'Age' else '<120' if variable == 'SYS_BP' else 'M')
-        group_2 = grouped.get_group('>50' if variable == 'Age' else '≥120' if variable == 'SYS_BP' else 'F')
+        group_1 = grouped.get_group('≤50' if variable == 'Age' else '<120' if variable == 'SYS_BP' else 'Male')
+        group_2 = grouped.get_group('>50' if variable == 'Age' else '≥120' if variable == 'SYS_BP' else 'Female')
         
-        group_1_velocities = group_1[group_1['Pressure'] == pressure]['Corrected Velocity']
-        group_2_velocities = group_2[group_2['Pressure'] == pressure]['Corrected Velocity']
+        if log_scale:
+            group_1_velocities = np.log(group_1[group_1['Pressure'] == pressure]['Corrected Velocity'])
+            group_2_velocities = np.log(group_2[group_2['Pressure'] == pressure]['Corrected Velocity'])
+        else:
+            group_1_velocities = group_1[group_1['Pressure'] == pressure]['Corrected Velocity']
+            group_2_velocities = group_2[group_2['Pressure'] == pressure]['Corrected Velocity']
         
         ks_stat, p_value = ks_2samp(group_1_velocities, group_2_velocities)
-        ks_stats.append({'Pressure': pressure, 'KS Statistic': ks_stat, 'p-value': p_value})
+
+        if log_scale:
+            group_1_median = np.log(group_1[group_1['Pressure'] == pressure]['Corrected Velocity'].median())
+            group_2_median = np.log(group_2[group_2['Pressure'] == pressure]['Corrected Velocity'].median())
+        else:
+            group_1_median = group_1[group_1['Pressure'] == pressure]['Corrected Velocity'].median()
+            group_2_median = group_2[group_2['Pressure'] == pressure]['Corrected Velocity'].median()
+        ks_stats.append({'Pressure': pressure, 'KS Statistic': ks_stat, 'p-value': p_value, 'Group 1 Median': group_1_median, 'Group 2 Median': group_2_median})
 
     ks_df = pd.DataFrame(ks_stats)
     print(variable)
     print(ks_df)
 
     plt.close()
+
+    sns.set_style("whitegrid")
+    source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 5, 'lines.linewidth': 0.5
+    })
+
     # Plot
     fig, ax = plt.subplots(figsize=(2.4, 2.0))
 
-
+    group_labels = []
     for i, (label, group_df) in enumerate(stats_df.groupby(group_col)):
+        group_labels.append(label)
         if i == 0:
             i_color = 0
             dot_color = 0
@@ -229,17 +257,23 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
                     label=f'{variable} Group {label}', fmt='-o', markersize=2, color=palette[dot_color])
         ax.fill_between(group_df['Pressure'], group_df[lower_col], group_df[upper_col], alpha=0.4, color=palette[i_color])
     
+    # Add log scale if requested
+    if log_scale:
+        ax.set_yscale('log')
+        ax.yaxis.set_major_locator(ticker.LogLocator(base=10.0, numticks=5))
+        ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
         
 
-    legend_handles = [mpatches.Patch(color=palette[0], label=f'{variable} Group ≤50' if variable == 'Age' else '<120' if variable == 'SYS_BP' else 'M', alpha=0.6),
-                      mpatches.Patch(color=palette[3], label=f'{variable} Group >50' if variable == 'Age' else '≥120' if variable == 'SYS_BP' else 'F', alpha=0.6)]
-
+    # Create legend handles using the stored group labels
+    legend_handles = [mpatches.Patch(color=palette[0], label=f'{variable} Group {group_labels[0]}', alpha=0.6),
+                      mpatches.Patch(color=palette[3], label=f'{variable} Group {group_labels[1]}', alpha=0.6)]
+        
     ax.set_xlabel('Pressure (psi)', fontproperties=source_sans)
     if dimensionless:
-        ax.set_ylabel('Dimensionless Velocity', fontproperties=source_sans)
+        ax.set_ylabel('Dimensionless Velocity' + (' (log scale)' if log_scale else ''), fontproperties=source_sans)
         ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Dimensionless Velocity vs. Pressure with {ci_percentile}% CI', fontproperties=source_sans, fontsize=8)
     else:
-        ax.set_ylabel('Velocity (um/s)', fontproperties=source_sans)
+        ax.set_ylabel('Velocity' + (' + 10 (um/s)' if log_scale else ' (um/s)'), fontproperties=source_sans)
         ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Velocity vs. Pressure with {ci_percentile}% CI', fontproperties=source_sans, fontsize=8)
     ax.legend(handles=legend_handles, prop=source_sans)
     ax.grid(True, linewidth=0.3)
@@ -1625,7 +1659,7 @@ def calculate_cdf(data, normalize=False):
         return sorted_data, p
     
 def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title='CDF Comparison', 
-             write=False, normalize=False, variable = 'Age'):
+             write=False, normalize=False, variable = 'Age', log = True):
     """
     Plots the CDF of the entire dataset and the inputted subsets.
 
@@ -1640,6 +1674,7 @@ def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title='CDF Comp
     Returns:
         0 if successful, 1 if no subsets provided
     """
+    plt.close()
     # Set up style and font
     sns.set_style("whitegrid")
     source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
@@ -1658,6 +1693,9 @@ def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title='CDF Comp
         base_color = '2ca02c'#80C6C3 #ff7f0e
     elif variable == 'Sex':
         base_color = '674F92'#947EB0#2ca02c#CAC0D89467bd
+    elif variable == 'Individual':
+        base_color = '#1f77b4'
+        individual_color = '#6B0F1A' #'#ff7f0e'
     else:
         raise ValueError(f"Unsupported variable: {variable}")
 
@@ -1670,6 +1708,11 @@ def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title='CDF Comp
         return 1
 
     fig, ax = plt.subplots(figsize=(2.4, 2.0))
+
+    if log:
+        data = data+1
+        for i in range(len(subsets)):
+            subsets[i]= subsets[i]+1
 
     # Plot main dataset
     x, y = calculate_cdf(data, normalize)
@@ -1687,17 +1730,31 @@ def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title='CDF Comp
             i_color = 4
             dot_color=3
         x, y = calculate_cdf(subsets[i], normalize)
-        ax.plot(x, y, label=labels[i+1], linestyle='--', color=palette[i_color])
+        if variable == 'Individual':
+            ax.plot(x, y, label=labels[i+1], linestyle='--', color=individual_color)
+        else:
+            ax.plot(x, y, label=labels[i+1], linestyle='--', color=palette[i_color])
 
-    ax.set_ylabel('CDF')
-    ax.set_xlabel('Velocity (um/s)' if 'Pressure' not in title else 'Pressure (psi)')
-    ax.set_title(title, fontsize=8)
+    ax.set_ylabel('CDF', fontproperties=source_sans)
+    if log:
+        ax.set_xlabel('Velocity + 1 (um/s)' if 'Pressure' not in title else 'Pressure (psi)', fontproperties=source_sans)
+    else:
+        ax.set_xlabel('Velocity (um/s)' if 'Pressure' not in title else 'Pressure (psi)', fontproperties=source_sans)
+    ax.set_title(title, fontsize=8, fontproperties=source_sans)
     
+    if log:
+        ax.set_xscale('log')
+        # ax.set_xticklabels([1, 10, 100, 1000, 5000])
+        ax.xaxis.set_major_locator(ticker.LogLocator(base=10.0, numticks=5))
+        ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
+    
+
     # Adjust legend
-    ax.legend(loc='lower right', bbox_to_anchor=(1, 0.2))
+    ax.legend(loc='lower right', bbox_to_anchor=(1, 0.01), prop=source_sans, fontsize=6)
     
     ax.grid(True, linewidth=0.3)
 
+    fig.set_dpi(300)
     # Adjust layout to prevent cutting off labels
     plt.tight_layout()
 
@@ -1705,6 +1762,8 @@ def plot_cdf(data, subsets, labels=['Entire Dataset', 'Subset'], title='CDF Comp
         save_plot(fig, title, dpi=300)
     else:
         plt.show()
+    if write:
+        plt.close()
 
     return 0
 
@@ -3403,7 +3462,6 @@ def main(verbose = False):
     summary_df.loc[summary_df['Participant'] == 'part20', 'Sex'] = 'F'
     summary_df.loc[summary_df['Participant'] == 'part21', 'Sex'] = 'M'
     summary_df.loc[summary_df['Participant'] == 'part22', 'Sex'] = 'M'
-
     
     # Save or display the resulting dataframe
     # merged_df.to_csv('C:\\Users\\gt8ma\\capillary-flow\\merged_csv.csv', index=False)
@@ -3576,20 +3634,31 @@ def main(verbose = False):
     # table_fig = summarize_set01()
     # print(table_fig)
     # plot_box_and_whisker(summary_df_nhp_video_medians, highbp_nhp_video_medians, normbp_nhp_video_medians, column = 'Video Median Velocity', variable='SYS_BP', log_scale=True)
+    
+    """ ---------- """
     plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], 
              subsets= [old_nhp_video_medians['Video Median Velocity'], young_nhp_video_medians['Video Median Velocity']], 
              labels=['Entire Dataset', 'Old', 'Young'], title = 'CDF Comparison of Video Median Velocities by Age',
              write =True, variable='Age')
+    plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], 
+             subsets= [old_nhp_video_medians['Video Median Velocity'], young_nhp_video_medians['Video Median Velocity']], 
+             labels=['Entire Dataset', '>50', '≤50'], title = 'CDF Comparison of Video Median Velocities by Age',
+             write =True, variable='Age')
     # plot_individual_cdfs(summary_df_nhp_video_medians)
     plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], 
              subsets= [highbp_nhp_video_medians['Video Median Velocity'], normbp_nhp_video_medians['Video Median Velocity']], 
-             labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Video Median Velocities by BP nhp',
+             labels=['Entire Dataset', 'High BP', 'Normal BP'], title = 'CDF Comparison of Video Median Velocities by BP',
              write = True, variable='SYS_BP')
     plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], 
              subsets=[male_medians_subset['Video Median Velocity'], female_medians_subset['Video Median Velocity']],
                 labels=['Entire Dataset', 'Male', 'Female'], title='CDF Comparison of Video Median Velocities by Sex', 
                 normalize = False, variable='Sex', write=True)
-    
+    # plot_cdf(summary_df_nhp_video_medians['Video Median Velocity'], 
+    #          subsets= [participant_20['Video Median Velocity']], 
+    #          labels=['Entire Dataset', 'part20'], title = 'CDF of Velocities for Participant 20',
+    #          write =True, variable='Individual')
+    # # plot_individual_cdfs(summary_df_nhp_video_medians)
+    """ ----------"""
     # ks_2samp_stat_age, ks_2samp_p_age = ks_2samp(old_nhp_video_medians['Video Median Velocity'], young_nhp_video_medians['Video Median Velocity'])
     # ks_2samp_stat_bp, ks_2samp_p_bp = ks_2samp(highbp_nhp_video_medians['Video Median Velocity'], normbp_nhp_video_medians['Video Median Velocity'])
     # ks_2samp_stat_sex, ks_2samp_p_sex = ks_2samp(male_medians_subset['Video Median Velocity'], female_medians_subset['Video Median Velocity'])
@@ -3657,9 +3726,9 @@ def main(verbose = False):
     # plot_CI_overlaps(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='SYS_BP')
     # plot_CI_overlaps(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='Age')
     # plot_CI_overlaps(summary_df_nhp_video_medians_copy, ci_percentile=95, variable='Sex')
-    # plot_CI(summary_df_nhp_video_medians_copy, variable = 'Sex', ci_percentile=95, write = True)
-    # plot_CI(summary_df_nhp_video_medians_copy, variable = 'Age', ci_percentile=95, write = True)
-    # plot_CI(summary_df_nhp_video_medians_copy, variable = 'SYS_BP', ci_percentile=95, write = True)
+    plot_CI(summary_df_nhp_video_medians_copy, variable = 'Sex', ci_percentile=95, write = True)
+    plot_CI(summary_df_nhp_video_medians_copy, variable = 'Age', ci_percentile=95, write = True)
+    plot_CI(summary_df_nhp_video_medians_copy, variable = 'SYS_BP', ci_percentile=95, write = True)
 
     summary_df_nhp_video_medians_copy = summary_df_nhp_video_medians_copy.drop(columns=['Age-Score', 'Log Age-Score'])
     medians_area_scores_df = calculate_area_score(summary_df_nhp_video_medians_copy, log = True, plot=False)
