@@ -22,6 +22,7 @@ def concatenate_csv_files(folder_path, output_file):
 
 if __name__ == "__main__":
     # Example usage
-    folder_path = 'C:\\Users\\gt8ma\\capillary-flow\\results\\velocities\\part40-48'
-    output_file = 'C:\\Users\\gt8ma\\capillary-flow\\results\\velocity_df_part40_to_part48.csv'
+    # folder_path = 'C:\\Users\\gt8ma\\capillary-flow\\results\\velocities\\part40-48'
+    folder_path = 'D:\\Marcus\\results\\velocities\\part34-80'
+    output_file = 'D:\\Marcus\\results\\velocity_df_part34_to_part80.csv'
     concatenate_csv_files(folder_path, output_file)
