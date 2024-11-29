@@ -174,17 +174,17 @@ def main(filename, plot = False, write = False, marcus = True):
     if marcus:
         data = load_marcus_data()
         video_array_3D = data['video_array']  # Assuming the variable names are the same in the MATLAB file
-        print(video_array_3D.shape)
+        # print(video_array_3D.shape)
         # reshape video_array so that it goes from (t, row, col), to (row, col, t)
         video_array_3D = video_array_3D[:100, :, :] # downsize for testing
-        print(video_array_3D.shape)
-        downsampled_video_array = np.zeros((video_array_3D.shape[0], video_array_3D.shape[1]//2, video_array_3D.shape[2]//2))
+        # print(video_array_3D.shape)
+        downsampled_video_array = np.zeros((video_array_3D.shape[0], video_array_3D.shape[1]//4, video_array_3D.shape[2]//4))
         # downsample the spatial data 2x2 using an average filter
         for i in range(video_array_3D.shape[0]):
             frame = video_array_3D[i]
             frame = np.array(frame, dtype=np.uint8)
-            print(frame.shape)
-            downsampled_frame = cv2.resize(frame, (frame.shape[1]//2 ,frame.shape[0]//2), interpolation=cv2.INTER_AREA)
+            # print(frame.shape)
+            downsampled_frame = cv2.resize(frame, (frame.shape[1]//4 ,frame.shape[0]//4), interpolation=cv2.INTER_AREA)
             downsampled_video_array[i] = downsampled_frame
 
         # video_array_3D = np.array([cv2.resize(frame, (frame.shape[1]//2 ,frame.shape[0]//2), interpolation=cv2.INTER_AREA) for frame in video_array_3D])
@@ -193,7 +193,7 @@ def main(filename, plot = False, write = False, marcus = True):
         flattened_stdIm = np.std(video_array, axis=1)
         maskIm = data['maskIm']
         # resize mask
-        maskIm = cv2.resize(maskIm, (maskIm.shape[1]//2,maskIm.shape[0]//2), interpolation=cv2.INTER_AREA)
+        maskIm = cv2.resize(maskIm, (maskIm.shape[1]//4,maskIm.shape[0]//4), interpolation=cv2.INTER_AREA)
         fps = data['fps']
         pixel_diam_mm = data['pixel_diam_mm']
     else:
@@ -211,6 +211,7 @@ def main(filename, plot = False, write = False, marcus = True):
         # Calculate standard deviation image (in vector orientation)
         print("video_array shape:", video_array.shape)
         flattened_stdIm = np.std(video_array, axis=1)
+        ySize, xSize = maskIm.shape
 
         # reshape video_array to have the same shape as maskIm plus a time dimension
         video_array_3D = np.reshape(video_array, (xSize, ySize, -1))
@@ -221,6 +222,16 @@ def main(filename, plot = False, write = False, marcus = True):
     # plt.imshow(stdIm)
     # plt.show()
 
+    # mean_frame = np.mean(video_array_3D, axis=2)
+    # plt.figure(figsize=(10,5))
+    # plt.subplot(121)
+    # plt.imshow(mean_frame, cmap='gray')
+    # plt.title('Mean Frame')
+    # plt.subplot(122)
+    # plt.imshow(mean_frame, cmap='gray')
+    # plt.imshow(maskIm, alpha=0.5, cmap='jet')
+    # plt.title('Mask Overlay')
+    # plt.show()
     
 
     print("video_array shape:", video_array.shape)
@@ -337,74 +348,118 @@ def main(filename, plot = False, write = False, marcus = True):
     # Print to console
     print('Processing...')
 
-    for i in range(len(loopPix)):
-        # Get the linear index from loopPix (assuming loopPix is a flat array of indices)
-        pixel_index = loopPix[i]
+    """ --------- loop replacement --------- """
 
-        # Convert linear index to 2D index (row, column)
-        row, col = divmod(pixel_index, xSize)  # divmod gives the quotient and remainder, useful for index conversion
-        
-        # Extract the signal from the video_array
-        # Python indexing is zero-based and slice end is exclusive
-        pixel_signal = video_array[pixel_index, 1:-1]  # omitting the first and last elements just like MATLAB
-        signal_repeated = np.tile(pixel_signal, (numPix_loop, 1))
-        
-       
-        # Calculate inverse RMS difference
-        fwd_im_inv = np.mean((signal_repeated - selected_fwd_array) ** 2, axis=1) ** -0.5
-        bak_im_inv = np.mean((signal_repeated - selected_bak_array) ** 2, axis=1) ** -0.5
-        
-        # plt.plot(fwd_im_inv)
-        # plt.plot(bak_im_inv)
-        # plt.show()
+    # Replace the previous vectorized code with this chunked version
+    print("Processing in chunks...")
+    chunk_size = 2000  # Adjust this based on your available memory
 
-        # print number of values in fwd_im_inv and bak_im_inv that are nan
-        if np.sum(np.isnan(fwd_im_inv)) ==10806:
-            print(f"Number of nan values in fwd_im_inv: {i} {np.sum(np.isnan(fwd_im_inv))}")
+    # Initialize arrays for results
+    fwd_zvals = np.zeros(len(loopPix))
+    bak_zvals = np.zeros(len(loopPix))
+    disp_row_fwd = np.zeros(len(loopPix))
+    disp_col_fwd = np.zeros(len(loopPix))
+    disp_row_bak = np.zeros(len(loopPix))
+    disp_col_bak = np.zeros(len(loopPix))
+    min_zvals = np.zeros(len(loopPix))
+
+    # Add before the chunk processing:
+    max_search_radius = 5  # pixels
+    print(f"\nInitializing with max search radius of {max_search_radius} pixels")
+
+    # Process in chunks
+    for chunk_start in range(0, len(loopPix), chunk_size):
+        chunk_end = min(chunk_start + chunk_size, len(loopPix))
+        print(f"\nProcessing chunk {chunk_start//chunk_size + 1} of {(len(loopPix)-1)//chunk_size + 1}")
         
-        if np.sum(np.isnan(bak_im_inv)) ==3152:
-            print(f"Number of nan values in bak_im_inv: {i} {np.sum(np.isnan(bak_im_inv))}")    
-
-        # if fwd_im_inv is empty, print i
-        # if np.isnan(fwd_im_inv).all():
-            # print("fwd_im_inv is empty at i = ", i)
-        # if fwd_im_inv.size == 0:
-        #     print("fwd_im_inv is empty at i = ", i)
-        # if np.isnan(bak_im_inv).all():
-        #     print("bak_im_inv is empty at i = ", i)
-        # if bak_im_inv.size == 0:
-        #     print("bak_im_inv is empty at i = ", i)
-
+        # Get chunk pixel positions
+        chunk_rows, chunk_cols = np.unravel_index(loopPix[chunk_start:chunk_end], (ySize, xSize))
+        
+        # Create distance masks for all pixels in chunk at once
+        row_dists = np.abs(chunk_rows[:, np.newaxis] - ymeshvec[np.newaxis, :])
+        col_dists = np.abs(chunk_cols[:, np.newaxis] - xmeshvec[np.newaxis, :])
+        valid_correlations = (row_dists <= max_search_radius) & (col_dists <= max_search_radius)
+        
+        print(f"Valid correlation statistics for first pixel in chunk:")
+        print(f"Number of pixels within search radius: {np.sum(valid_correlations[0])}")
+        print(f"Distance range to valid pixels: {np.min(row_dists[0][valid_correlations[0]]):.1f} to {np.max(row_dists[0][valid_correlations[0]]):.1f} rows")
+        print(f"                                {np.min(col_dists[0][valid_correlations[0]]):.1f} to {np.max(col_dists[0][valid_correlations[0]]):.1f} cols")
+        
+        # Get chunk signals
+        chunk_signals = video_array[loopPix[chunk_start:chunk_end], 1:-1]
+        print(f"Chunk signals shape: {chunk_signals.shape}")
+        
+        # Calculate RMS differences only for valid pixels
+        chunk_fwd_inv = np.full((chunk_end-chunk_start, len(loopPix)), np.nan)
+        chunk_bak_inv = np.full((chunk_end-chunk_start, len(loopPix)), np.nan)
+        
+        # Create mask for broadcasting
+        valid_mask = valid_correlations[:, :, np.newaxis]
+        print(f"Valid mask shape: {valid_mask.shape}")
+        
+        # Calculate correlations only for valid pixels
+        chunk_signals_expanded = chunk_signals[:, np.newaxis, :].repeat(len(loopPix), axis=1)
+        chunk_signals_masked = np.where(valid_mask, chunk_signals_expanded, np.nan)
+        print(f"Masked signals shape: {chunk_signals_masked.shape}")
+        
+        # Calculate RMS differences
+        chunk_fwd_inv = np.mean((chunk_signals_masked - selected_fwd_array[np.newaxis, :, :]) ** 2, axis=2) ** -0.5
+        chunk_bak_inv = np.mean((chunk_signals_masked - selected_bak_array[np.newaxis, :, :]) ** 2, axis=2) ** -0.5
+        
+        print("\nCorrelation statistics:")
+        print(f"Forward correlations range: {np.nanmin(chunk_fwd_inv):.3f} to {np.nanmax(chunk_fwd_inv):.3f}")
+        print(f"Backward correlations range: {np.nanmin(chunk_bak_inv):.3f} to {np.nanmax(chunk_bak_inv):.3f}")
+        print(f"Number of valid correlations: {np.sum(~np.isnan(chunk_fwd_inv))}")
+        
         # Z-score normalization
-        fwd_im_inv_z = (fwd_im_inv - np.nanmean(fwd_im_inv)) / np.nanstd(fwd_im_inv)
-        bak_im_inv_z = (bak_im_inv - np.nanmean(bak_im_inv)) / np.nanstd(bak_im_inv)
+        chunk_fwd_inv_z = (chunk_fwd_inv - np.nanmean(chunk_fwd_inv, axis=1)[:, np.newaxis]) / np.nanstd(chunk_fwd_inv, axis=1)[:, np.newaxis]
+        chunk_bak_inv_z = (chunk_bak_inv - np.nanmean(chunk_bak_inv, axis=1)[:, np.newaxis]) / np.nanstd(chunk_bak_inv, axis=1)[:, np.newaxis]
+        
+        # Subtract standard deviation image
+        chunk_fwd_dif_z = chunk_fwd_inv_z - stdIm_inv_z[np.newaxis, :]
+        chunk_bak_dif_z = chunk_bak_inv_z - stdIm_inv_z[np.newaxis, :]
+        
+        print("\nZ-score statistics:")
+        print(f"Forward Z-scores range: {np.nanmin(chunk_fwd_dif_z):.3f} to {np.nanmax(chunk_fwd_dif_z):.3f}")
+        print(f"Backward Z-scores range: {np.nanmin(chunk_bak_dif_z):.3f} to {np.nanmax(chunk_bak_dif_z):.3f}")
+        
+        # Find peaks (only consider valid correlations)
+        chunk_fwd_dif_z[~valid_correlations] = -np.inf
+        chunk_bak_dif_z[~valid_correlations] = -np.inf
+        
+        fwd_zvals[chunk_start:chunk_end] = np.nanmax(chunk_fwd_dif_z, axis=1)
+        bak_zvals[chunk_start:chunk_end] = np.nanmax(chunk_bak_dif_z, axis=1)
+        chunk_fwd_indices = np.argmax(chunk_fwd_dif_z, axis=1)
+        chunk_bak_indices = np.argmax(chunk_bak_dif_z, axis=1)
+        
+        # Calculate displacements
+        fwd_rows, fwd_cols = np.unravel_index(loopPix[chunk_fwd_indices], (ySize, xSize))
+        bak_rows, bak_cols = np.unravel_index(loopPix[chunk_bak_indices], (ySize, xSize))
+        
+        disp_row_fwd[chunk_start:chunk_end] = fwd_rows - chunk_rows
+        disp_col_fwd[chunk_start:chunk_end] = fwd_cols - chunk_cols
+        disp_row_bak[chunk_start:chunk_end] = bak_rows - chunk_rows
+        disp_col_bak[chunk_start:chunk_end] = bak_cols - chunk_cols
+        
+        print("\nDisplacement statistics for this chunk:")
+        print(f"Forward displacements: ({np.min(disp_row_fwd[chunk_start:chunk_end]):.1f}, {np.min(disp_col_fwd[chunk_start:chunk_end]):.1f}) to ({np.max(disp_row_fwd[chunk_start:chunk_end]):.1f}, {np.max(disp_col_fwd[chunk_start:chunk_end]):.1f})")
+        print(f"Backward displacements: ({np.min(disp_row_bak[chunk_start:chunk_end]):.1f}, {np.min(disp_col_bak[chunk_start:chunk_end]):.1f}) to ({np.max(disp_row_bak[chunk_start:chunk_end]):.1f}, {np.max(disp_col_bak[chunk_start:chunk_end]):.1f})")
+        
+        # Calculate statistical correction for chunk
+        chunk_rdist = np.sqrt((xmeshvec[chunk_start:chunk_end, np.newaxis] - xmeshvec) ** 2 + 
+                            (ymeshvec[chunk_start:chunk_end, np.newaxis] - ymeshvec) ** 2)
+        chunk_goodPix = chunk_rdist <= rcutoff
+        chunk_numPix_p = np.sum(chunk_goodPix, axis=1)
+        min_zvals[chunk_start:chunk_end] = np.abs(norm.ppf(p_criterion / chunk_numPix_p))
+        
+        print(f"\nStatistical threshold range: {np.min(min_zvals[chunk_start:chunk_end]):.3f} to {np.max(min_zvals[chunk_start:chunk_end]):.3f}")
+    print("\nFinal displacement statistics:")
+    print(f"Forward displacement range: {np.nanmin(disp_row_fwd):.2f} to {np.nanmax(disp_row_fwd):.2f} (rows)")
+    print(f"                           {np.nanmin(disp_col_fwd):.2f} to {np.nanmax(disp_col_fwd):.2f} (cols)")
+    print(f"Backward displacement range: {np.nanmin(disp_row_bak):.2f} to {np.nanmax(disp_row_bak):.2f} (rows)")
+    print(f"                            {np.nanmin(disp_col_bak):.2f} to {np.nanmax(disp_col_bak):.2f} (cols)")
 
-        # Subtraction of standard deviation image
-        fwd_dif_inv_z = fwd_im_inv_z - stdIm_inv_z
-        bak_dif_inv_z = bak_im_inv_z - stdIm_inv_z
-
-        # Find and store the biggest peak
-        fwd_val, fwd_i = np.max(fwd_dif_inv_z), np.argmax(fwd_dif_inv_z)
-        bak_val, bak_i = np.max(bak_dif_inv_z), np.argmax(bak_dif_inv_z)
-
-        fwd_zvals[i] = fwd_val
-        bak_zvals[i] = bak_val
-
-        # Convert to row and column displacements
-        fwd_r, fwd_c = np.unravel_index(loopPix[fwd_i], (ySize, xSize))
-        bak_r, bak_c = np.unravel_index(loopPix[bak_i], (ySize, xSize))
-
-        disp_row_fwd[i] = fwd_r - row
-        disp_col_fwd[i] = fwd_c - col
-        disp_row_bak[i] = bak_r - row
-        disp_col_bak[i] = bak_c - col
-
-        # Distance calculation and statistical correction
-        rdist = np.sqrt((xmeshvec[i] - xmeshvec) ** 2 + (ymeshvec[i] - ymeshvec) ** 2)
-        goodPix = rdist <= rcutoff
-        this_numPix_p = np.nansum(goodPix)
-        this_p_criterion = p_criterion / this_numPix_p
-        min_zvals[i] = abs(norm.ppf(this_p_criterion))
+    """ --------- end loop replacement --------- """
         
     print("\nProcessing complete.")
     
@@ -412,28 +467,45 @@ def main(filename, plot = False, write = False, marcus = True):
     # np.savetxt('C:\\Users\\gt8ma\\capillary-flow\\displacements.csv', np.column_stack((disp_row_fwd, disp_col_fwd, disp_row_bak, disp_col_bak)), delimiter=',')
         
     # Assuming necessary arrays and scaleFactor, v_max_mms, min_zvals are already defined
+    # for testing set scaleFactor = 1
+    if marcus:
+        scaleFactor = 1
     # Calculate raw forward and backward velocities
     v_raw_fwd = np.sqrt(disp_row_fwd**2 + disp_col_fwd**2) * scaleFactor
     v_raw_bak = np.sqrt(disp_row_bak**2 + disp_col_bak**2) * scaleFactor
 
+    
     # Identify invalid measurements
     invalid_fwd = (v_raw_fwd > v_max_mms) | (fwd_zvals < min_zvals)
     invalid_bak = (v_raw_bak > v_max_mms) | (bak_zvals < min_zvals)
     print(invalid_fwd.shape)
     print(invalid_fwd)
 
-    invalid_fwd = np.squeeze(invalid_fwd)
-    invalid_bak = np.squeeze(invalid_bak)
+    # After calculating v_raw_fwd and v_raw_bak:
+    masked_v_raw_fwd = v_raw_fwd[~np.isnan(v_raw_fwd)]
+    masked_v_raw_bak = v_raw_bak[~np.isnan(v_raw_bak)]
 
-    # Handle invalid measurements
-    disp_row_fwd[invalid_fwd] = np.nan
-    disp_col_fwd[invalid_fwd] = np.nan
-    disp_row_bak[invalid_bak] = np.nan
-    disp_col_bak[invalid_bak] = np.nan
+    print("\nRaw velocity statistics (masked pixels only):")
+    print(f"Forward velocities: mean={np.nanmean(masked_v_raw_fwd):.3f}, max={np.nanmax(masked_v_raw_fwd):.3f}")
+    print(f"Backward velocities: mean={np.nanmean(masked_v_raw_bak):.3f}, max={np.nanmax(masked_v_raw_bak):.3f}")
+    print(f"Percent invalid forward: {100 * np.sum(invalid_fwd[~np.isnan(v_raw_fwd)])/len(masked_v_raw_fwd):.1f}%")
+    print(f"Percent invalid backward: {100 * np.sum(invalid_bak[~np.isnan(v_raw_bak)])/len(masked_v_raw_bak):.1f}%")
+
+    if not marcus:
+        invalid_fwd = np.squeeze(invalid_fwd)
+        invalid_bak = np.squeeze(invalid_bak)
+
+        # Handle invalid measurements
+        disp_row_fwd[invalid_fwd] = np.nan
+        disp_col_fwd[invalid_fwd] = np.nan
+        disp_row_bak[invalid_bak] = np.nan
+        disp_col_bak[invalid_bak] = np.nan
 
     # Average forward and backward displacements
-    dr = np.nanmean(np.column_stack((disp_row_fwd, -disp_row_bak)), axis=1)
-    dc = np.nanmean(np.column_stack((disp_col_fwd, -disp_col_bak)), axis=1)
+    dr = np.nanmean(np.column_stack((disp_row_fwd, disp_row_bak)), axis=1)
+    dc = np.nanmean(np.column_stack((disp_col_fwd, disp_col_bak)), axis=1)
+    print("dr shape:", dr.shape)
+    print("dc shape:", dc.shape)
 
     # Compute velocity
     dv = np.sqrt(dr**2 + dc**2) * scaleFactor
@@ -449,28 +521,16 @@ def main(filename, plot = False, write = False, marcus = True):
     plt.colorbar()
     plt.title('Velocity (mm/s)')
     if write:
-        plt.imsave('C:\\Users\\ejerison\\capillary-flow\\velocity_map.png', vMap, cmap='jet')
+        plt.savefig('C:\\Users\\ejerison\\capillary-flow\\velocity_map.png')
     if plot:
         plt.show()
     else:
-        plt.close()
-
-    # Adjust the colormap to set zero velocity to a specific color if needed
-    cust_map = plt.cm.jet
-    cust_map.set_under('black')  # Set velocities of zero to black
-    plt.imshow(vMap, cmap=cust_map, interpolation='nearest', vmin=0.01)  # Adjust vmin to slightly above 0 to use set_under
-    plt.colorbar()
-    if write:
-        plt.imsave('C:\\Users\\ejerison\\capillary-flow\\velocity_map2.png', vMap, cmap=cust_map)
-    if plot:
-        plt.show()
-    else: 
         plt.close()
     return 0
 
 if __name__ == "__main__":
     # main('C:\\Users\\gt8mar\\capillary-flow\\tests\\demo_data.mat', plot=True, marcus=False)
-    main('C:\\Users\\ejerison\\capillary-flow\\tests\\demo_data.mat', plot=True, marcus=True)
+    main('C:\\Users\\ejerison\\capillary-flow\\tests\\demo_data.mat', plot=True, write=False,  marcus=True)
     # Example usage:
     # compare_data_shapes(
     #     'C:\\Users\\ejerison\\capillary-flow\\tests\\demo_data_marcus_format.mat',
