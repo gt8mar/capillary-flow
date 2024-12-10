@@ -53,6 +53,9 @@ def main():
     data = pd.read_csv(data_filepath)
 
     normal_group = data[data['SET'] == 'set01']
+    # print min and max age
+    print(f"min age: {normal_group['Age'].min()}")
+    print(f"max age: {normal_group['Age'].max()}")
     normal_group_old = normal_group[normal_group['Age']>50]
 
     pressure_data = normal_group_old['Pressure']
