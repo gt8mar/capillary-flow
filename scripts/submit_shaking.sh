@@ -13,7 +13,4 @@ cd /hpc/projects/capillary-flow/scripts
 module load anaconda
 conda activate capillary-flow
 echo "Process stabilization data"
-SCRIPT_DIR="/hpc/projects/capillary-flow/scripts"
-PYTHON_SCRIPT="${SCRIPT_DIR}/process_shaking.py"
-
-srun python "$PYTHON_SCRIPT"
+srun python process_shaking.py
