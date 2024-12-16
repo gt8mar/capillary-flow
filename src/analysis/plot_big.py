@@ -308,6 +308,180 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
         plt.show()
     return 0
 
+def plot_CI_twosets(dataset1, dataset2, variable='Age', method='bootstrap', n_iterations=1000,
+            ci_percentile=99.5, write=True, dimensionless=False, video_median=False, 
+            log_scale=False, labels=None, plot = False):
+    """
+    Plots the mean/median and CI for comparing two datasets, with KS statistic.
+    
+    Parameters:
+    dataset1, dataset2: pandas DataFrames containing the data to compare
+    variable: str, determines the color scheme ('Age', 'SYS_BP', 'Sex', 'Diabetes', 'Hypertension', 'UpDown')
+    method: str, 'bootstrap' or other statistical method
+    n_iterations: int, number of bootstrap iterations
+    ci_percentile: float, confidence interval percentile
+    write: bool, whether to save the plot
+    dimensionless: bool, whether to use dimensionless velocity
+    video_median: bool, whether to use video median values
+    log_scale: bool, whether to use log scale for y-axis
+    labels: tuple of (str, str), custom labels for the two datasets
+    """
+    # Set up style and font
+    sns.set_style("whitegrid")
+    source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 5, 'lines.linewidth': 0.5
+    })
+
+    # Set color palette based on variable
+    color_mapping = {
+        'Age': '#1f77b4',
+        'SYS_BP': '#2ca02c',
+        'Sex': '#674F92',
+        'Diabetes': '#ff7f0e',
+        'Hypertension': '#d62728',
+        'UpDown': '#9467bd'
+    }
+    base_color = color_mapping.get(variable, '#1f77b4')  # Default to blue if variable not found
+
+    # Create color palette
+    palette = create_monochromatic_palette(base_color)
+    palette = adjust_brightness_of_colors(palette, brightness_scale=.2)
+    sns.set_palette(palette)
+
+    # Apply log scale if requested
+    if log_scale:
+        dataset1['Corrected Velocity'] = dataset1['Corrected Velocity'] + 10
+        dataset2['Corrected Velocity'] = dataset2['Corrected Velocity'] + 10
+
+    # Handle video median if requested
+    if video_median:
+        dataset1 = dataset1.groupby(['Participant', 'Video', 'Capillary']).first().reset_index()
+        dataset2 = dataset2.groupby(['Participant', 'Video', 'Capillary']).first().reset_index()
+        dataset1.rename(columns={'Dimensionless Velocity': 'Dimensionless Velocity OG',
+                               'Video Median Dimensionless Velocity': 'Dimensionless Velocity'}, inplace=True)
+        dataset2.rename(columns={'Dimensionless Velocity': 'Dimensionless Velocity OG',
+                               'Video Median Dimensionless Velocity': 'Dimensionless Velocity'}, inplace=True)
+
+    # Set default labels if not provided
+    if labels is None:
+        labels = ('Group 1', 'Group 2')
+
+    # Calculate stats for both datasets
+    stats_func = calculate_median_ci if method == 'bootstrap' else calculate_stats
+    
+    stats_1 = (dataset1.groupby('Pressure')
+               .apply(stats_func, ci_percentile=ci_percentile, dimensionless=dimensionless)
+               .reset_index())
+    stats_2 = (dataset2.groupby('Pressure')
+               .apply(stats_func, ci_percentile=ci_percentile, dimensionless=dimensionless)
+               .reset_index())
+
+    # Calculate KS statistics
+    ks_stats = []
+    for pressure in set(dataset1['Pressure'].unique()) & set(dataset2['Pressure'].unique()):
+        try:
+            if log_scale:
+                velocities1 = np.log(dataset1[dataset1['Pressure'] == pressure]['Corrected Velocity'])
+                velocities2 = np.log(dataset2[dataset2['Pressure'] == pressure]['Corrected Velocity'])
+            else:
+                velocities1 = dataset1[dataset1['Pressure'] == pressure]['Corrected Velocity']
+                velocities2 = dataset2[dataset2['Pressure'] == pressure]['Corrected Velocity']
+            
+            ks_stat, p_value = ks_2samp(velocities1, velocities2)
+            median1 = velocities1.median()
+            median2 = velocities2.median()
+            
+            ks_stats.append({
+                'Pressure': pressure,
+                'KS Statistic': ks_stat,
+                'p-value': p_value,
+                f'{labels[0]} Median': median1,
+                f'{labels[1]} Median': median2
+            })
+
+        except KeyError as e:
+            print(f"Warning: Could not calculate KS stat for pressure {pressure}: {e}")
+            continue
+
+    if ks_stats:
+        ks_df = pd.DataFrame(ks_stats)
+        print(f"KS Statistics for {variable}:")
+        print(ks_df)
+
+    # Create plot
+    plt.close()
+    fig, ax = plt.subplots(figsize=(2.4, 2.0))
+
+    # Set up column names based on method and dimensionless flag
+    if dimensionless:
+        y_col = 'Median Dimensionless Velocity' if method == 'bootstrap' else 'Mean Dimensionless Velocity'
+    else:
+        y_col = 'Median Velocity' if method == 'bootstrap' else 'Mean Velocity'
+    lower_col = 'CI Lower Bound' if method == 'bootstrap' else 'Lower Bound'
+    upper_col = 'CI Upper Bound' if method == 'bootstrap' else 'Upper Bound'
+
+    # Plot first dataset
+    ax.errorbar(stats_1['Pressure'], stats_1[y_col],
+                yerr=[stats_1[y_col] - stats_1[lower_col],
+                      stats_1[upper_col] - stats_1[y_col]],
+                label=labels[0], fmt='-o', markersize=2, color=palette[0])
+    ax.fill_between(stats_1['Pressure'], stats_1[lower_col],
+                    stats_1[upper_col], alpha=0.4, color=palette[0])
+
+    # Plot second dataset
+    ax.errorbar(stats_2['Pressure'], stats_2[y_col],
+                yerr=[stats_2[y_col] - stats_2[lower_col],
+                      stats_2[upper_col] - stats_2[y_col]],
+                label=labels[1], fmt='-o', markersize=2, color=palette[3])
+    ax.fill_between(stats_2['Pressure'], stats_2[lower_col],
+                    stats_2[upper_col], alpha=0.4, color=palette[3])
+
+    # Configure log scale if requested
+    if log_scale:
+        ax.set_yscale('log')
+        ax.yaxis.set_major_locator(ticker.LogLocator(base=10.0, numticks=5))
+        ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
+
+    # Create legend handles
+    legend_handles = [
+        mpatches.Patch(color=palette[0], label=labels[0], alpha=0.6),
+        mpatches.Patch(color=palette[3], label=labels[1], alpha=0.6)
+    ]
+
+    # Set labels and title
+    ax.set_xlabel('Pressure (psi)', fontproperties=source_sans)
+    if dimensionless:
+        ax.set_ylabel('Dimensionless Velocity', fontproperties=source_sans)
+        ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Dimensionless Velocity vs. Pressure with {ci_percentile}% CI',
+                    fontproperties=source_sans, fontsize=8)
+    else:
+        ax.set_ylabel('Velocity (um/s)', fontproperties=source_sans)
+        ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Velocity vs. Pressure with {ci_percentile}% CI',
+                    fontproperties=source_sans, fontsize=8)
+
+    ax.legend(handles=legend_handles, prop=source_sans)
+    ax.grid(True, linewidth=0.3)
+
+    plt.tight_layout()
+
+    # Save or display the plot
+    if write:
+        filename = f'{variable}_CI_comparison'
+        if video_median:
+            filename += '_videomedians'
+        plt.savefig(os.path.join(cap_flow_path, 'results', f'{filename}.png'), dpi=600)
+    if plot:
+        plt.show()
+    else:
+        plt.close()
+
+    return 0
+
 def plot_CI_test(df, variable='Age', method='bootstrap', n_iterations=1000, 
             ci_percentile=99.5, write=True, dimensionless=False, video_median=False):
     """Plots the mean/median and CI for the variable of interest, with KS statistic."""
@@ -3513,6 +3687,39 @@ def plot_area_score_disease(df, log = True, plot = True, write = False):
 
     return 0
 
+def plot_model_simulation(df, mixed_model):
+    # define plotting params
+    plt.close()
+    sns.set_style("whitegrid")
+    source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 5, 'lines.linewidth': 0.5
+    })
+
+    # Define pressure range and selected ages
+    pressure_range = np.linspace(df['Pressure'].min(), df['Pressure'].max(), 100)
+    selected_ages = [30, 45, 60, 75]
+    pred_df = pd.DataFrame({'Pressure': np.tile(pressure_range, len(selected_ages)),
+                            'Age': np.repeat(selected_ages, len(pressure_range))})
+
+    # Predict using your fitted mixed model (replace 'mixed_model' with your model variable)
+    pred_df['Predicted_Log_Video_Median_Velocity'] = mixed_model.predict(pred_df)
+
+    # Plot
+    plt.figure(figsize=(3.6, 3.0))
+    sns.lineplot(data=pred_df, x='Pressure', y='Predicted_Log_Video_Median_Velocity', hue='Age', palette='coolwarm')
+    plt.title('Predicted Blood Flow vs. Pressure for Selected Ages', fontproperties=source_sans)
+    plt.xlabel('Pressure Applied', fontproperties=source_sans)
+    plt.ylabel('Predicted Log Video Median Velocity', fontproperties=source_sans)
+    plt.legend(title='Age', prop=source_sans)
+    plt.tight_layout()
+    plt.savefig(os.path.join(cap_flow_path, 'results', 'mixed_model_simulation.png'), dpi=600)
+    return 0
+
 def plot_medians_pvals(summary_df_nhp_video_medians):
     if 'Sex' not in summary_df_nhp_video_medians.columns:
         raise ValueError("DataFrame must include 'Sex' column for ANOVA analysis.")
@@ -4451,17 +4658,23 @@ def main(verbose = False):
     # print (f'KS 2 Sample Statistic for Sex: {ks_2samp_stat_sex}, p-value: {ks_2samp_p_sex}')
     
     # make an age group column for summary_df_nhp_video_medians
-    summary_df_nhp_video_medians['Age_Group'] = np.where(summary_df_nhp_video_medians['Age'] >= 50, 'Above 50', 'Below 50')
+    summary_df_nhp_video_medians['Age_Group'] = np.where(summary_df_nhp_video_medians['Age'] > 50, 'Above 50', 'Below 50')
+    summary_df_nhp_video_medians['Sex_Group'] = np.where(summary_df_nhp_video_medians['Sex'] == 'M', 'M', 'F')
+    summary_df_nhp_video_medians['BP_Group'] = np.where(summary_df_nhp_video_medians['SYS_BP'] > 120, '>120', '<=120')
     summary_df_nhp_video_medians['Video_Median_Velocity'] = summary_df_nhp_video_medians['Video Median Velocity']
     summary_df_nhp_video_medians['Log_Video_Median_Velocity'] = np.log((summary_df_nhp_video_medians['Video Median Velocity'])+1)
 
     # Convert age group to categorical variable
     summary_df_nhp_video_medians['Age_Group'] = pd.Categorical(summary_df_nhp_video_medians['Age_Group'], categories=['Below 50', 'Above 50'], ordered=True)
+    summary_df_nhp_video_medians['Sex_Group'] = pd.Categorical(summary_df_nhp_video_medians['Sex_Group'], categories=['F', 'M'], ordered=True)
+    summary_df_nhp_video_medians['BP_Group'] = pd.Categorical(summary_df_nhp_video_medians['BP_Group'], categories=['<=120', '>120'], ordered=True)
     # Save this to a csv
     summary_df_nhp_video_medians.to_csv(os.path.join(cap_flow_path, 'summary_df_nhp_video_medians.csv'), index=False)
 
-    # Perform GEE and Mixed Model Analysis
-    gee_model = smf.gee('Log_Video_Median_Velocity ~ Age + Pressure', groups=summary_df_nhp_video_medians['Participant'], data=summary_df_nhp_video_medians, cov_struct=sm.cov_struct.Autoregressive() )   #family=sm.families.Poisson()
+    normal_group = summary_df_nhp_video_medians[summary_df_nhp_video_medians['SET'] == 'set01']
+
+    # Perform GEE and Mixed Model Analysis for set01
+    gee_model = smf.gee('Log_Video_Median_Velocity ~ Age * Pressure', groups=normal_group['Participant'], data=normal_group, cov_struct=sm.cov_struct.Autoregressive() )   #family=sm.families.Poisson()
     gee_results = gee_model.fit()
 
     # Print the results
@@ -4469,10 +4682,11 @@ def main(verbose = False):
     print(gee_results.summary())
     # print(gee_results.summary().as_latex())
 
-    mixed_model = smf.mixedlm('Log_Video_Median_Velocity ~ Age + Pressure', summary_df_nhp_video_medians, groups=summary_df_nhp_video_medians['Participant'], re_formula='~Pressure') #re_formula=1  #family=sm.families.Poisson()
+    mixed_model = smf.mixedlm('Log_Video_Median_Velocity ~ Age + Pressure', normal_group, groups=normal_group['Participant'], re_formula='~Pressure') #re_formula=1  #family=sm.families.Poisson()
     mixed_results = mixed_model.fit()  
     print('Mixed Model Results for Age Group and Pressure:')
     print(mixed_results.summary())
+    plot_model_simulation(normal_group, mixed_results)
     # print(mixed_results.summary().as_latex())
 
     # plot_models(summary_df_nhp_video_medians, mixed_results, variable='Age', log=True)
@@ -4519,6 +4733,22 @@ def main(verbose = False):
     # compare diabetes group to hypertension group using CIs
     # plot_CI(summary_df_nhp_video_medians, variable='SET', ci_percentile=95, video_median=True)
 
+    # make groups based on 'UpDown'
+    normal_group_up = normal_group[normal_group['UpDown'].isin(['U','T'])]
+    normal_group_down = normal_group[normal_group['UpDown'].isin(['D','T'])] 
+    normal_group_up_old = normal_group_old[normal_group_old['UpDown'].isin(['U','T'])]
+    normal_group_down_old = normal_group_old[normal_group_old['UpDown'].isin(['D','T'])]
+
+    diabetes_group_up = diabetes_group[diabetes_group['UpDown'].isin(['U','T'])]
+    diabetes_group_down = diabetes_group[diabetes_group['UpDown'].isin(['D','T'])]
+    hypertension_group_up = hypertension_group[hypertension_group['UpDown'].isin(['U','T'])]
+    hypertension_group_down = hypertension_group[hypertension_group['UpDown'].isin(['D','T'])]
+
+    # compare up and down groups using CIs
+    plot_CI_twosets(normal_group_up, normal_group_down, variable='UpDown', ci_percentile=95, video_median=True, plot = True)
+    plot_CI_twosets(normal_group_up_old, normal_group_down_old, variable='UpDown', ci_percentile=95, video_median=True, plot = True)
+    plot_CI_twosets(diabetes_group_up, diabetes_group_down, variable='UpDown', ci_percentile=95, video_median=True, plot = True)
+    plot_CI_twosets(hypertension_group_up, hypertension_group_down, variable='UpDown', ci_percentile=95, video_median=True, plot = True)
 
     # plot_cdf_comp_pressure(summary_df_nhp_video_medians)
 
