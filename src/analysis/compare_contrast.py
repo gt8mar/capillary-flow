@@ -142,7 +142,7 @@ def plot_contrast_comparison_together(image_paths):
     plt.tight_layout()
     return fig
 
-def plot_contrast_boxplots(results):
+def plot_contrast_boxplots_color(results):
     """
     Create box plots comparing green vs white for RMS and Weber contrast.
     """
@@ -211,5 +211,24 @@ if __name__ == '__main__':
     plt.show()
 
     # Create box plots
-    fig = plot_contrast_boxplots(results)
+    fig = plot_contrast_boxplots_color(results)
+    plt.show()
+
+    # load new images:
+    image_folder2 = 'C:\\Users\\gt8mar\\Desktop\\data\\241213_led_sides\\fig'
+    image_paths2 = [os.path.join(image_folder2, f) for f in os.listdir(image_folder2)]
+
+    # Compare images
+    results2 = compare_images(image_paths2)
+
+    # Plot separate graphs
+    fig1 = plot_contrast_comparison(results2)
+    plt.show()
+
+    # Plot combined graph
+    fig2 = plot_contrast_comparison_together(image_paths2)
+    plt.show()
+
+    # Create box plots
+    fig = plot_contrast_boxplots_color(results2)
     plt.show()
