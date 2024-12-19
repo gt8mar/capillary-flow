@@ -34,15 +34,19 @@ def analysis():
 
     # round all pressure values to the first decimal
     agg_df['Pressure'] = agg_df['Pressure'].round(1)
-    # exclude all pressure values that are not in the range of 0 to 1.2
-    agg_df = agg_df[(agg_df['Pressure'] >= 0) & (agg_df['Pressure'] <= 2.0)]
 
-    # Now the columns will be named:
-    # 'TranslationX_mean', 'TranslationX_std', 'TranslationY_mean', 'TranslationY_std'
+    # exclude all pressure values that are not in the range of 0 to 1.2
+    # agg_df = agg_df[(agg_df['Pressure'] >= 0) & (agg_df['Pressure'] <= 2.0)]
+
+    # Now the columns will be named: 'TranslationX_mean', 'TranslationX_std', 'TranslationY_mean', 'TranslationY_std'
+
+    agg_df['TranslationTotal_std'] = np.sqrt(agg_df['TranslationX_std']**2 + agg_df['TranslationY_std']**2)
 
     # Update your correlation calculation to use the correct column names
     cohort_corr_x = agg_df['TranslationX_std'].corr(agg_df['Pressure'])
     cohort_corr_y = agg_df['TranslationY_std'].corr(agg_df['Pressure'])
+    cohort_corr_total = agg_df['TranslationTotal_std'].corr(agg_df['Pressure'])
+    
 
     # # Plot full cohort
     # plt.figure(figsize=(8,6))
@@ -59,15 +63,24 @@ def analysis():
 
     # plot the box and whisker plot of the variation at each pressure
     plt.figure(figsize=(8,6))
-    sns.boxplot(x='Pressure', y='TranslationX_std', data=agg_df)
-    plt.xlabel('Pressure')  
-    plt.ylabel('Standard Deviation of Translation X')
-    plt.title('Variation of Translation X at each Pressure')
-    plt.ylim(0, 20)
+    sns.boxplot(x='Pressure', y='TranslationTotal_std', data=agg_df)
+    plt.xlabel('Pressure (psi)')  
+    plt.ylabel('Standard Deviation of Translation (pixels)')
+    plt.title('Variation of Translation at each Pressure')
+    plt.ylim(0, 40)
     plt.xticks(rotation=45)
     plt.tight_layout()
     plt.show()
     plt.close()
+
+    #
+
+    # Calculate the correlation between the pressure and the log of the standard deviation of the translation
+    agg_df['log_TranslationTotal_std'] = np.log(agg_df['TranslationTotal_std']+1)
+    log_corr_total = agg_df['log_TranslationTotal_std'].corr(agg_df['Pressure'])
+    print(f"Correlation between log of Translation Total std and Pressure: {log_corr_total:.2f}")
+
+
     return 0
 
 def main():

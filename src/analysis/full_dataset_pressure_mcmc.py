@@ -15,9 +15,8 @@ from matplotlib.font_manager import FontProperties
 import matplotlib.ticker as ticker
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
-
-
-
+import pymc as pm
+import arviz as az
 
 # Get the hostname of the computer
 hostname = platform.node()
@@ -138,6 +137,191 @@ def flow_piecewise(P, Q0, beta, P_static, P_plateau):
          lambda P: Q0 * np.exp(-beta * (P - P_static)), 
          lambda P: Q0 * 0.1])  # Plateau flow (0.1 as example)
 
+def plot_random_effects_histogram(random_effects_df, effect_column, title="Random Effects Histogram"):
+    """
+    Plot a histogram of random effects.
+
+    Parameters:
+    random_effects_df (pd.DataFrame): DataFrame containing random effects data.
+    effect_column (str): Name of the column with random effects (e.g., intercept or slope).
+    title (str): Title of the histogram.
+    """
+    plt.figure(figsize=(8, 5))
+    plt.hist(random_effects_df[effect_column], bins=20, edgecolor='black', alpha=0.7)
+    plt.xlabel(effect_column, fontsize=12)
+    plt.ylabel("Frequency", fontsize=12)
+    plt.title(title, fontsize=14)
+    plt.grid(True)
+    plt.show()
+
+def plot_random_intercepts_and_slopes(random_effects_df, participant_column, intercept_column, slope_column):
+    """
+    Plot random intercepts and slopes for participants.
+
+    Parameters:
+    random_effects_df (pd.DataFrame): DataFrame containing random effects data.
+    participant_column (str): Name of the column with participant identifiers.
+    intercept_column (str): Name of the column with random intercepts.
+    slope_column (str): Name of the column with random slopes.
+    """
+    plt.figure(figsize=(10, 6))
+    for _, row in random_effects_df.iterrows():
+        plt.plot(
+            [0, 1], 
+            [row[intercept_column], row[intercept_column] + row[slope_column]], 
+            label=f"{row[participant_column]}"
+        )
+
+    plt.xlabel("Pressure (Standardized)", fontsize=12)
+    plt.ylabel("Log_Video_Median_Velocity", fontsize=12)
+    plt.title("Random Intercepts and Slopes for Participants", fontsize=14)
+    plt.grid(True)
+    plt.show()
+
+def mixed_effects_module(mixed_results):
+    # Extract random effects
+    random_effects = mixed_results.random_effects
+    random_effects_list = [
+        {"Participant": key, "Intercept": value[0], "Pressure": value[1]}
+        for key, value in random_effects.items()
+    ]
+    random_effects_df = pd.DataFrame(random_effects_list)
+    
+    # Plot random intercepts and slopes
+    plot_random_intercepts_and_slopes(
+        random_effects_df,
+        participant_column="Participant",
+        intercept_column="Intercept",
+        slope_column="Pressure"
+    )
+
+    # Plot histogram of random intercepts
+    plot_random_effects_histogram(
+        random_effects_df,
+        effect_column="Intercept",
+        title="Random Intercepts Histogram"
+    )
+
+    # Plot histogram of random slopes
+    plot_random_effects_histogram(
+        random_effects_df,
+        effect_column="Pressure",
+        title="Random Slopes Histogram"
+    )
+    return 0
+
+def plot_group_specific_effects(trace):
+    """
+    Plot group-specific effects from the trace.
+
+    Args:
+        trace (pymc.backends.base.MultiTrace): Trace object from PyMC sampling.
+    Returns:
+        int: 0 if successful.
+    """
+    # Extract group-specific effects from the trace
+    group_intercepts = trace.posterior['Group_Intercepts'].mean(dim=["chain", "draw"]).values
+    group_slopes = trace.posterior['Group_Slopes'].mean(dim=["chain", "draw"]).values
+
+    # Plot group intercepts
+    plt.figure(figsize=(10, 6))
+    plt.bar(range(len(group_intercepts)), group_intercepts, color='skyblue', alpha=0.8)
+    plt.axhline(trace.posterior['Intercept'].mean().values, color='red', linestyle='--', label="Overall Intercept")
+    plt.xlabel("Group Index")
+    plt.ylabel("Intercept Value")
+    plt.title("Group-Specific Intercepts")
+    plt.legend()
+    plt.show()
+
+    # Plot group slopes
+    plt.figure(figsize=(10, 6))
+    plt.bar(range(len(group_slopes)), group_slopes, color='lightgreen', alpha=0.8)
+    plt.axhline(trace.posterior['Slope'].mean().values, color='red', linestyle='--', label="Overall Slope")
+    plt.xlabel("Group Index")
+    plt.ylabel("Slope Value")
+    plt.title("Group-Specific Slopes")
+    plt.legend()
+    plt.show()
+    return 0
+
+def plot_posterior_predictive_checks(idata, model):
+    """
+    Plot posterior predictive checks for the Bayesian model.
+    
+    Args:
+        idata (arviz.InferenceData): InferenceData object containing the posterior samples
+        model (pymc.Model): PyMC model object.
+    
+    Returns:
+        int: 0 if successful.
+    """
+    with model:
+        ppc = pm.sample_posterior_predictive(idata, var_names=["y_obs"], random_seed=42)
+        
+    # Add posterior predictive samples to the InferenceData object
+    idata.extend(ppc)
+    
+    # Plot posterior predictive distribution
+    az.plot_ppc(idata, figsize=(10, 5))
+    plt.title("Posterior Predictive Checks")
+    plt.show()
+    
+    # For slope
+    slope_samples = idata.posterior['Slope'].values.flatten()
+    p_value_slope = (slope_samples > 0).mean() if idata.posterior['Slope'].mean() < 0 else (slope_samples < 0).mean()
+    print(f"Bayesian p-value for Slope: {p_value_slope:.4f}")
+    
+    return 0
+
+
+
+def bayes_module(data):
+    """
+    Bayesian mixed-effects model for the capillary flow data.
+
+    Args:
+        data (pd.DataFrame): DataFrame containing the capillary flow data.
+
+    Returns:
+        int: 0 if successful.
+    """ 
+    # Prepare data
+    n_groups = data["Participant"].nunique()
+    group_idx = data["Participant"].astype("category").cat.codes.values
+
+    # Define the Bayesian model
+    with pm.Model() as model:
+        # Priors
+        intercept = pm.HalfNormal("Intercept", sigma=10)  # Always positive
+        slope = pm.Normal("Slope", mu=0, sigma=5)
+        
+        # Random effects
+        group_intercepts = pm.Normal("Group_Intercepts", mu=intercept, sigma=2, shape=n_groups)
+        group_slopes = pm.Normal("Group_Slopes", mu=slope, sigma=2, shape=n_groups)
+        
+        # Likelihood
+        mu = group_intercepts[group_idx] + group_slopes[group_idx] * data["Pressure"]
+        sigma = pm.HalfNormal("Sigma", sigma=2)
+        y_obs = pm.Normal("y_obs", mu=mu, sigma=sigma, observed=data["Log_Video_Median_Velocity"])
+        
+        # Sampling
+        trace = pm.sample(2000, return_inferencedata=True)
+
+        # idata = pm.sample(2000, tune=1000, return_inferencedata=True)  # return_inferencedata=True is default in newer versions
+
+        az.plot_posterior(trace)
+        plt.show()
+        az.summary(trace)
+        plt.show()
+        print(az.summary(trace))
+
+        # Plot group-specific effects
+        plot_group_specific_effects(trace)
+
+        # Plot posterior predictive checks
+        plot_posterior_predictive_checks(trace, model)
+        return 0
+    
 def main():
     data_filepath = os.path.join(cap_flow_path, 'summary_df_nhp_video_medians.csv')
     data = pd.read_csv(data_filepath)
@@ -147,6 +331,11 @@ def main():
     mixed_results = mixed_model.fit()  
     print('Mixed Model Results for Pressure:')
     print(mixed_results.summary())
+
+    bayes_module(data)
+    
+
+    
 
     # normal_group = data[data['SET'] == 'set01']
     # # print min and max age
