@@ -5,6 +5,7 @@ from skimage.color import rgb2gray
 import matplotlib.pyplot as plt
 from pathlib import Path
 import cv2
+from matplotlib.font_manager import FontProperties
 
 def analyze_image_contrast(image_path):
     """
@@ -146,6 +147,15 @@ def plot_contrast_boxplots_color(results):
     """
     Create box plots comparing green vs white for RMS and Weber contrast.
     """
+    source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 5, 'lines.linewidth': 0.5
+    })
+
     # Initialize data structure for green and white metrics
     metrics_by_color = {
         'green': {'rms_contrast': [], 'weber_contrast': []},
@@ -159,8 +169,8 @@ def plot_contrast_boxplots_color(results):
         metrics_by_color[color]['weber_contrast'].append(metrics['weber_contrast'])
     
     # Create plots
-    fig, axes = plt.subplots(2, 1, figsize=(10, 8))
-    fig.suptitle('Contrast Metrics Comparison: Green vs White', fontsize=14)
+    fig, axes = plt.subplots(2, 1, figsize=(4.8, 4))
+    fig.suptitle('Contrast Metrics Comparison: Green vs White', fontproperties=source_sans)
     
     metrics = ['rms_contrast', 'weber_contrast']
     for idx, metric in enumerate(metrics):
@@ -182,7 +192,7 @@ def plot_contrast_boxplots_color(results):
             ax.plot(x, metrics_by_color[color][metric], 'o', color='black', alpha=0.5, markersize=4)
         
         # Set title and add grid
-        ax.set_title(f'{metric.replace("_", " ").title()}')
+        ax.set_title(f'{metric.replace("_", " ").title()}', fontproperties=source_sans)
         ax.grid(True, linestyle='--', alpha=0.7)
         
         # Add mean values
@@ -190,7 +200,7 @@ def plot_contrast_boxplots_color(results):
         white_mean = np.mean(metrics_by_color['white'][metric])
         ax.text(0.02, 0.98, f'Green mean: {green_mean:.3f}\nWhite mean: {white_mean:.3f}', 
                 transform=ax.transAxes, verticalalignment='top', 
-                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8), fontproperties=source_sans)
     
     plt.tight_layout()
     return fig
@@ -212,6 +222,8 @@ if __name__ == '__main__':
 
     # Create box plots
     fig = plot_contrast_boxplots_color(results)
+    plt.savefig('C:\\Users\\gt8mar\\capillary-flow\\results\\contrast_boxplots.png', dpi=400)
+    plt.savefig('C:\\Users\\gt8mar\\capillary-flow\\results\\contrast_boxplots.pdf', dpi=400)
     plt.show()
 
     # load new images:
