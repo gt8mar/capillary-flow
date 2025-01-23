@@ -7,6 +7,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import logging
 from src.tools.find_earliest_date_dir import find_earliest_date_dir
+from matplotlib.font_manager import FontProperties
+from scipy.stats import pearsonr, spearmanr
+from statsmodels.nonparametric.smoothers_lowess import lowess
+
 
 def clean_translation_data(df):
     # Convert TranslationX and TranslationY to numeric, replacing errors with NaN
@@ -18,11 +22,243 @@ def clean_translation_data(df):
     
     return df
 
+def plot_video_counts_by_pressure(agg_df, pressure_column='Pressure', video_column='Video'):
+    """
+    Plots the number of unique videos at each pressure level.
+
+    Parameters:
+    - agg_df (pd.DataFrame): The aggregated DataFrame.
+    - pressure_column (str): The name of the column representing pressure levels.
+    - video_column (str): The name of the column representing video identifiers.
+    """
+    # sns.set_style("whitegrid")
+    source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 5, 'lines.linewidth': 0.5
+    })
+
+    # Count the number of unique videos at each pressure level
+    pressure_counts = agg_df.groupby(pressure_column)[video_column].nunique()
+
+    # Plot the results
+    plt.figure(figsize=(4.0, 3.0))
+    pressure_counts.plot(kind='bar', color='skyblue', edgecolor='black')
+    plt.title('Number of Videos at Each Pressure', fontproperties=source_sans)
+    plt.xlabel('Pressure (psi)', fontproperties=source_sans)
+    plt.ylabel('Number of Videos', fontproperties=source_sans)
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    # plt.show()
+    plt.savefig('C:\\Users\\gt8mar\\capillary-flow\\results\\video_counts_by_pressure.png', dpi=400)
+    plt.close()
+    return 0
+
+def plot_video_transl_by_pressure(agg_df, pressure_column='Pressure', video_column='Video', show_outliers=False):
+    """
+    Plots the standard deviation of translation at each pressure level.
+
+    Args:
+    - agg_df (pd.DataFrame): The aggregated DataFrame.
+    - pressure_column (str): The name of the column representing pressure levels.
+    - video_column (str): The name of the column representing video identifiers.
+
+    Returns:
+    - None
+    """
+
+    source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 5, 'lines.linewidth': 0.5
+    })
+
+     # plot the box and whisker plot of the variation at each pressure
+    plt.figure(figsize=(4.0, 3.0))
+    sns.boxplot(x='Pressure', y='TranslationTotal_std', data=agg_df, showfliers=show_outliers)
+    plt.xlabel('Pressure (psi)', fontproperties=source_sans)  
+    plt.ylabel('Standard Deviation of Translation (pixels)', fontproperties=source_sans)
+    plt.title('Variation of Translation at each Pressure', fontproperties=source_sans)
+    plt.ylim(0, 40)
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    # plt.show()
+    plt.savefig('C:\\Users\\gt8mar\\capillary-flow\\results\\video_transl_by_pressure.png', dpi=400)
+    plt.close()
+    return 0
+
+def calculate_correlations(agg_df):
+    # Example: X-axis correlation with Pressure
+    pearson_r_x, pearson_p_x = pearsonr(agg_df['TranslationX_std'], agg_df['Pressure'])
+    spearman_r_x, spearman_p_x = spearmanr(agg_df['TranslationX_std'], agg_df['Pressure'])
+
+    print(f"Pearson correlation (X_std vs Pressure) = {pearson_r_x:.3f}, p-value = {pearson_p_x:.3e}")
+    print(f"Spearman correlation (X_std vs Pressure) = {spearman_r_x:.3f}, p-value = {spearman_p_x:.3e}")
+
+    # Repeat for Y_std
+    pearson_r_y, pearson_p_y = pearsonr(agg_df['TranslationY_std'], agg_df['Pressure'])
+    spearman_r_y, spearman_p_y = spearmanr(agg_df['TranslationY_std'], agg_df['Pressure'])
+
+    print(f"Pearson correlation (Y_std vs Pressure) = {pearson_r_y:.3f}, p-value = {pearson_p_y:.3e}")
+    print(f"Spearman correlation (Y_std vs Pressure) = {spearman_r_y:.3f}, p-value = {spearman_p_y:.3e}")
+
+    # And for Total_std
+    pearson_r_t, pearson_p_t = pearsonr(agg_df['TranslationTotal_std'], agg_df['Pressure'])
+    spearman_r_t, spearman_p_t = spearmanr(agg_df['TranslationTotal_std'], agg_df['Pressure'])
+
+    print(f"Pearson correlation (Total_std vs Pressure) = {pearson_r_t:.3f}, p-value = {pearson_p_t:.3e}")
+    print(f"Spearman correlation (Total_std vs Pressure) = {spearman_r_t:.3f}, p-value = {spearman_p_t:.3e}")
+    return 0
+
+# Function to plot Spearman trends with loess smoothing
+def plot_spearman_with_loess(df, x_col, y_col, title):
+    fig, ax = plt.subplots(figsize=(2.4, 2))
+
+    source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 5, 'lines.linewidth': 0.5
+    })
+
+    # Calculate Spearman correlation
+    spearman_corr, p_value = spearmanr(df[x_col], df[y_col])
+    
+    # Loess smoothing for trend line
+    smoothed = lowess(df[y_col], df[x_col], frac=0.3)  # Adjust frac for smoothing level
+    
+    # Scatter plot
+    sns.scatterplot(data=df, x=x_col, y=y_col, alpha=0.6, ax=ax)
+    ax.plot(smoothed[:, 0], smoothed[:, 1], color='red', label='Loess Trend')
+    
+    # Annotations
+    ax.set_title(f"{title}\nSpearman ρ = {spearman_corr:.3f}, p = {p_value:.3e}", fontproperties=source_sans)
+    ax.set_xlabel("Pressure", fontproperties=source_sans)
+    ax.set_ylabel(y_col, fontproperties=source_sans)
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig(f'C:\\Users\\gt8mar\\capillary-flow\\results\\{title}.png', dpi=400)
+    return 0
+
+
+def analyze_decay_rate(agg_df, results_dir):
+    """
+    Analyze the decay rate of translation standard deviation with pressure.
+    
+    Parameters:
+    -----------
+    agg_df : pandas.DataFrame
+        DataFrame containing at least 'Pressure' and 'TranslationTotal_std' columns
+    results_dir : str
+        Directory path where to save the plot
+        
+    Returns:
+    --------
+    dict
+        Dictionary containing the decay parameters: initial_amplitude, decay_rate, r_squared
+    """
+    from sklearn.linear_model import LinearRegression
+
+    source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 5, 'lines.linewidth': 0.5
+    })
+    
+    
+    # Calculate log of translation std
+    agg_df['log_TranslationTotal_std'] = np.log(agg_df['TranslationTotal_std']+1)
+    
+    # Fit exponential decay: y = A*exp(-Bx)
+    # Taking log of both sides: ln(y) = ln(A) - Bx
+    X = agg_df['Pressure'].values.reshape(-1, 1)
+    y = agg_df['log_TranslationTotal_std'].values
+    
+    # Use linear regression to fit the log-transformed data
+    reg = LinearRegression().fit(X, y)
+    
+    # Calculate decay rate (B) and initial amplitude (A)
+    decay_rate = -reg.coef_[0]  # B
+    initial_amplitude = np.exp(reg.intercept_)  # A
+    r_squared = reg.score(X, y)
+    
+    # Plot the data and fit
+    plt.figure(figsize=(4, 3))
+    plt.scatter(agg_df['Pressure'], agg_df['TranslationTotal_std'], 
+                alpha=0.5, label='Data')
+    
+    # Generate points for the fitted curve
+    pressure_range = np.linspace(agg_df['Pressure'].min(), agg_df['Pressure'].max(), 100)
+    fit_curve = initial_amplitude * np.exp(-decay_rate * pressure_range)
+    
+    plt.plot(pressure_range, fit_curve, 'r-', 
+             label=f'Fit: {initial_amplitude:.2f}*exp(-{decay_rate:.2f}x)')
+    
+    plt.xlabel('Pressure', fontproperties=source_sans)
+    plt.ylabel('Translation Total std', fontproperties=source_sans)
+    plt.title('Exponential Decay Fit of Translation vs Pressure', fontproperties=source_sans)
+    plt.legend()
+    plt.yscale('log')
+    
+    # Save the plot
+    decay_plot_path = os.path.join(results_dir, 'translation_decay_fit.png')
+    plt.savefig(decay_plot_path, dpi=400)
+    plt.close()
+    
+    # Create LaTeX table
+    latex_table = f"""
+\\begin{{table}}[h]
+\\centering
+\\begin{{tabular}}{{|l|c|}}
+\\hline
+\\textbf{{Parameter}} & \\textbf{{Value}} \\\\
+\\hline
+Initial Amplitude (A) & {initial_amplitude:.3f} \\\\
+Decay Rate (B) & {decay_rate:.3f} \\\\
+R² & {r_squared:.3f} \\\\
+\\hline
+\\end{{tabular}}
+\\caption{{Exponential decay fit parameters for translation standard deviation vs pressure. The fit follows the form: $y = A e^{{-Bx}}$}}
+\\label{{tab:decay_params}}
+\\end{{table}}
+"""
+    
+    print("\nLaTeX Table:")
+    print(latex_table)
+    
+    # Print numerical results
+    print(f"\nNumerical Results:")
+    print(f"Initial Amplitude (A): {initial_amplitude:.3f}")
+    print(f"Decay Rate (B): {decay_rate:.3f}")
+    print(f"R²: {r_squared:.3f}")
+    
+    return {
+        'initial_amplitude': initial_amplitude,
+        'decay_rate': decay_rate,
+        'r_squared': r_squared
+    }
+
 def analysis():
     final_df = pd.read_csv('C:\\Users\\gt8mar\\capillary-flow\\combined_results.csv')
     results_dir = 'C:\\Users\\gt8mar\\capillary-flow\\results'
     # Analysis: quantify shaking vs pressure
     # Then perform the aggregation
+
+    print(f'the number of frames is {len(final_df)}')
+    # the number of vidoes is the number of unique video/participant pairs
+    print(f'the number of videos is {len(final_df.groupby(["Participant", "Video"]))}')
+
     group_cols = ['Participant', 'Date', 'Location', 'Video', 'Pressure']
     agg_df = final_df.groupby(group_cols).agg({
         'TranslationX': ['mean', 'std'],
@@ -34,6 +270,8 @@ def analysis():
 
     # round all pressure values to the first decimal
     agg_df['Pressure'] = agg_df['Pressure'].round(1)
+
+    plot_video_counts_by_pressure(agg_df, pressure_column='Pressure', video_column='Video')
 
     # exclude all pressure values that are not in the range of 0 to 1.2
     # agg_df = agg_df[(agg_df['Pressure'] >= 0) & (agg_df['Pressure'] <= 2.0)]
@@ -47,42 +285,24 @@ def analysis():
     cohort_corr_y = agg_df['TranslationY_std'].corr(agg_df['Pressure'])
     cohort_corr_total = agg_df['TranslationTotal_std'].corr(agg_df['Pressure'])
     
+    calculate_correlations(agg_df)
 
-    # # Plot full cohort
-    # plt.figure(figsize=(8,6))
-    # plt.scatter(agg_df['Pressure'], agg_df['TranslationX_std'], label='Translation X std', alpha=0.7)
-    # plt.scatter(agg_df['Pressure'], agg_df['TranslationY_std'], label='Translation Y std', alpha=0.7)
-    # plt.xlabel('Pressure')
-    # plt.ylabel('Standard Deviation of Translation')
-    # plt.title(f'Full Cohort: Shaking vs Pressure\nCorr X={cohort_corr_x:.2f}, Corr Y={cohort_corr_y:.2f}')
-    # plt.legend()
-    # cohort_plot_path = os.path.join(results_dir, 'cohort_shaking_vs_pressure.png')
-    # # plt.savefig(cohort_plot_path)
-    # plt.show()
-    # plt.close()
+    plot_video_transl_by_pressure(agg_df, pressure_column='Pressure', video_column='Video')
 
-    # plot the box and whisker plot of the variation at each pressure
-    plt.figure(figsize=(8,6))
-    sns.boxplot(x='Pressure', y='TranslationTotal_std', data=agg_df)
-    plt.xlabel('Pressure (psi)')  
-    plt.ylabel('Standard Deviation of Translation (pixels)')
-    plt.title('Variation of Translation at each Pressure')
-    plt.ylim(0, 40)
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-    plt.show()
-    plt.close()
+    # Calculate the decay rate between the pressure and the log of the standard deviation of the translation
+    # and print a table of the results in latex
+    decay_params = analyze_decay_rate(agg_df, results_dir)
 
-    #
+    # agg_df['log_TranslationTotal_std'] = np.log(agg_df['TranslationTotal_std']+1)
+    # log_corr_total = agg_df['log_TranslationTotal_std'].corr(agg_df['Pressure'])
+    # print(f"Correlation between log of Translation Total std and Pressure: {log_corr_total:.2f}")
 
-    # Calculate the correlation between the pressure and the log of the standard deviation of the translation
-    agg_df['log_TranslationTotal_std'] = np.log(agg_df['TranslationTotal_std']+1)
-    log_corr_total = agg_df['log_TranslationTotal_std'].corr(agg_df['Pressure'])
-    print(f"Correlation between log of Translation Total std and Pressure: {log_corr_total:.2f}")
+    # Plot Spearman trends with loess smoothing
+    # plot_spearman_with_loess(agg_df, 'Pressure', 'TranslationX_std', 'Spearman Trend X_std vs Pressure')
+    # plot_spearman_with_loess(agg_df, 'Pressure', 'TranslationY_std', 'Spearman Trend Y_std vs Pressure')
+    plot_spearman_with_loess(agg_df, 'Pressure', 'TranslationTotal_std', 'Spearman Trend Total_std vs Pressure')
 
-
-    return 0
-
+  
 def main():
     # Set up logging
     log_path = '/hpc/projects/capillary-flow/scripts/process_data.log'

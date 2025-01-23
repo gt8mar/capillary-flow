@@ -4,6 +4,7 @@ from scipy.stats import pearsonr
 from skimage.metrics import structural_similarity as ssim
 import matplotlib.pyplot as plt
 import cv2
+from matplotlib.font_manager import FontProperties
 
 def compare_images(image1, image2, plot=True):
     """
@@ -207,6 +208,43 @@ def analyze_image_quality(image1, image2, names=('Image 1', 'Image 2'), plot=Tru
         'Dynamic_Range_Difference': metrics2['Dynamic_Range'] - metrics1['Dynamic_Range']
     }
 
+def old_method():
+    pass
+    # if plot:
+        # fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
+        
+        # # Profile comparison
+        # x = np.arange(len(profile1))
+        # ax1.plot(x, profile1, label=f'{names[0]}', alpha=0.7)
+        # ax1.plot(x, profile2, label=f'{names[1]}', alpha=0.7)
+        # ax1.set_title('Line Profile Comparison')
+        # ax1.set_xlabel('Position')
+        # ax1.set_ylabel('Intensity')
+        # ax1.grid(True, alpha=0.3)
+        # ax1.legend(loc = 'upper right')
+        
+        # # Add contrast and SNR annotations
+        # for i, (name, metrics) in enumerate(zip(names, [metrics1, metrics2])):    
+        #     ax1.text(0.02, 0.98 - i*0.15, 
+        #             f'{name}:\nSNR: {metrics["SNR"]:.2f}',      # \nContrast: {metrics["Contrast"]:.2f}
+        #             transform=ax1.transAxes,
+        #             verticalalignment='top')
+        
+        # # Normalized profiles for shape comparison
+        # norm_profile1 = (profile1 - np.min(profile1)) / (np.max(profile1) - np.min(profile1))
+        # norm_profile2 = (profile2 - np.min(profile2)) / (np.max(profile2) - np.min(profile2))
+        # ax2.plot(x, norm_profile1, label=f'{names[0]} (normalized)', alpha=0.7)
+        # ax2.plot(x, norm_profile2, label=f'{names[1]} (normalized)', alpha=0.7)
+        # ax2.set_title('Normalized Profiles')
+        # ax2.set_xlabel('Position')
+        # ax2.set_ylabel('Normalized Intensity')
+        # ax2.grid(True, alpha=0.3)
+        # ax2.legend(loc='upper right')
+        
+        # plt.tight_layout()
+        # plt.show()
+    return 0
+
 def analyze_line_profile_quality(profile1, profile2, names=('Two LEDs', 'One LED'), plot=True):
     """
     Compare two line profiles with focus on signal quality and contrast.
@@ -219,6 +257,15 @@ def analyze_line_profile_quality(profile1, profile2, names=('Two LEDs', 'One LED
     Returns:
     dict: Dictionary containing quality metrics
     """
+    source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 5, 'lines.linewidth': 0.5
+    })
+
     if len(profile1) != len(profile2):
         raise ValueError("Line profiles must have the same length")
     
@@ -253,38 +300,30 @@ def analyze_line_profile_quality(profile1, profile2, names=('Two LEDs', 'One LED
     metrics2 = calculate_profile_metrics(profile2)
     
     if plot:
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
+        fig, ax1 = plt.subplots(1, 1, figsize=(4.8, 3.0))
         
         # Profile comparison
         x = np.arange(len(profile1))
         ax1.plot(x, profile1, label=f'{names[0]}', alpha=0.7)
         ax1.plot(x, profile2, label=f'{names[1]}', alpha=0.7)
-        ax1.set_title('Line Profile Comparison')
-        ax1.set_xlabel('Position')
-        ax1.set_ylabel('Intensity')
+        ax1.set_title('Line Profile Comparison', fontproperties=source_sans)
+        ax1.set_xlabel('Position', fontproperties=source_sans)
+        ax1.set_ylabel('Intensity', fontproperties=source_sans)
         ax1.grid(True, alpha=0.3)
-        ax1.legend(loc = 'upper right')
+        ax1.legend(loc='upper right')
         
         # Add contrast and SNR annotations
-        for i, (name, metrics) in enumerate(zip(names, [metrics1, metrics2])):
+        for i, (name, metrics) in enumerate(zip(names, [metrics1, metrics2])):    
             ax1.text(0.02, 0.98 - i*0.15, 
-                    f'{name}:\nContrast: {metrics["Contrast"]:.2f}\nSNR: {metrics["SNR"]:.2f}',
-                    transform=ax1.transAxes,
-                    verticalalignment='top')
-        
-        # Normalized profiles for shape comparison
-        norm_profile1 = (profile1 - np.min(profile1)) / (np.max(profile1) - np.min(profile1))
-        norm_profile2 = (profile2 - np.min(profile2)) / (np.max(profile2) - np.min(profile2))
-        ax2.plot(x, norm_profile1, label=f'{names[0]} (normalized)', alpha=0.7)
-        ax2.plot(x, norm_profile2, label=f'{names[1]} (normalized)', alpha=0.7)
-        ax2.set_title('Normalized Profiles')
-        ax2.set_xlabel('Position')
-        ax2.set_ylabel('Normalized Intensity')
-        ax2.grid(True, alpha=0.3)
-        ax2.legend(loc='upper right')
+                f'{name}:\nSNR: {metrics["SNR"]:.2f}',      # \nContrast: {metrics["Contrast"]:.2f}
+                transform=ax1.transAxes,
+                verticalalignment='top')
         
         plt.tight_layout()
-        plt.show()
+        plt.savefig('C:\\Users\\gt8mar\\capillary-flow\\results\\line_profile_comparisonsnr.png', dpi=400)
+        plt.close()
+        # plt.show()
+    
     
     return {
         f'{names[0]}_Metrics': metrics1,
