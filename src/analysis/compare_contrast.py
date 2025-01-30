@@ -147,13 +147,14 @@ def plot_contrast_boxplots_color(results):
     """
     Create box plots comparing green vs white for RMS and Weber contrast.
     """
-    source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    plt.close('all')
+    source_sans = FontProperties(fname='C:\\Users\\ejerison\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
     
     plt.rcParams.update({
         'pdf.fonttype': 42, 'ps.fonttype': 42,
         'font.size': 7, 'axes.labelsize': 7,
         'xtick.labelsize': 6, 'ytick.labelsize': 6,
-        'legend.fontsize': 5, 'lines.linewidth': 0.5
+        'legend.fontsize': 4, 'lines.linewidth': 0.5
     })
 
     # Initialize data structure for green and white metrics
@@ -169,8 +170,8 @@ def plot_contrast_boxplots_color(results):
         metrics_by_color[color]['weber_contrast'].append(metrics['weber_contrast'])
     
     # Create plots
-    fig, axes = plt.subplots(2, 1, figsize=(4.8, 4))
-    fig.suptitle('Contrast Metrics Comparison: Green vs White', fontproperties=source_sans)
+    fig, axes = plt.subplots(1, 2, figsize=(4.8, 2))
+    fig.suptitle('Contrast Metrics Comparison: Green vs White', fontproperties=source_sans, fontsize = 12)
     
     metrics = ['rms_contrast', 'weber_contrast']
     for idx, metric in enumerate(metrics):
@@ -198,12 +199,15 @@ def plot_contrast_boxplots_color(results):
         # Add mean values
         green_mean = np.mean(metrics_by_color['green'][metric])
         white_mean = np.mean(metrics_by_color['white'][metric])
-        ax.text(0.02, 0.98, f'Green mean: {green_mean:.3f}\nWhite mean: {white_mean:.3f}', 
-                transform=ax.transAxes, verticalalignment='top', 
+        ax.text(0.98, 0.98, f'Green mean: {green_mean:.3f}\nWhite mean: {white_mean:.3f}', 
+                transform=ax.transAxes, verticalalignment='top', horizontalalignment='right',
                 bbox=dict(boxstyle='round', facecolor='white', alpha=0.8), fontproperties=source_sans)
     
     plt.tight_layout()
-    return fig
+    plt.savefig('C:\\Users\\ejerison\\capillary-flow\\results\\contrast_boxplots.png', dpi=400)
+    plt.savefig('C:\\Users\\ejerison\\capillary-flow\\results\\contrast_boxplots.pdf', dpi=400)
+    plt.close()
+    return 0 # fig
 
 if __name__ == '__main__':
     image_folder = 'I:\\Marcus\\data\\2021\\comparison_folder\\new'
@@ -213,34 +217,34 @@ if __name__ == '__main__':
     results = compare_images(image_paths)
     
     # Plot separate graphs
-    fig1 = plot_contrast_comparison(results)
-    plt.show()
+    # fig1 = plot_contrast_comparison(results)
+    # plt.show()
     
     # Plot combined graph
-    fig2 = plot_contrast_comparison_together(image_paths)
-    plt.show()
+    # fig2 = plot_contrast_comparison_together(image_paths)
+    # plt.show()
 
     # Create box plots
     fig = plot_contrast_boxplots_color(results)
-    plt.savefig('C:\\Users\\gt8mar\\capillary-flow\\results\\contrast_boxplots.png', dpi=400)
-    plt.savefig('C:\\Users\\gt8mar\\capillary-flow\\results\\contrast_boxplots.pdf', dpi=400)
-    plt.show()
+    # plt.savefig('C:\\Users\\ejerison\\capillary-flow\\results\\contrast_boxplots.png', dpi=400)
+    # plt.savefig('C:\\Users\\ejerison\\capillary-flow\\results\\contrast_boxplots.pdf', dpi=400)
+    # plt.show()
 
-    # load new images:
-    image_folder2 = 'C:\\Users\\gt8mar\\Desktop\\data\\241213_led_sides\\fig'
-    image_paths2 = [os.path.join(image_folder2, f) for f in os.listdir(image_folder2)]
+    # # load new images:
+    # image_folder2 = 'C:\\Users\\gt8mar\\Desktop\\data\\241213_led_sides\\fig'
+    # image_paths2 = [os.path.join(image_folder2, f) for f in os.listdir(image_folder2)]
 
-    # Compare images
-    results2 = compare_images(image_paths2)
+    # # Compare images
+    # results2 = compare_images(image_paths2)
 
-    # Plot separate graphs
-    fig1 = plot_contrast_comparison(results2)
-    plt.show()
+    # # Plot separate graphs
+    # fig1 = plot_contrast_comparison(results2)
+    # plt.show()
 
-    # Plot combined graph
-    fig2 = plot_contrast_comparison_together(image_paths2)
-    plt.show()
+    # # Plot combined graph
+    # fig2 = plot_contrast_comparison_together(image_paths2)
+    # plt.show()
 
-    # Create box plots
-    fig = plot_contrast_boxplots_color(results2)
-    plt.show()
+    # # Create box plots
+    # fig = plot_contrast_boxplots_color(results2)
+    # plt.show()
