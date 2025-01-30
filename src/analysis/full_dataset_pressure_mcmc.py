@@ -325,6 +325,7 @@ def bayes_module(data):
 def main():
     data_filepath = os.path.join(cap_flow_path, 'summary_df_nhp_video_medians.csv')
     data = pd.read_csv(data_filepath)
+    print(data.columns)
     plot_CI(data, method='bootstrap', n_iterations=1000, ci_percentile=99.5, write=True, dimensionless=False, video_median=True, log_scale=False)
 
     mixed_model = smf.mixedlm('Log_Video_Median_Velocity ~ Pressure', data, groups=data['Participant'], re_formula='~Pressure') #re_formula=1  #family=sm.families.Poisson()
@@ -332,7 +333,7 @@ def main():
     print('Mixed Model Results for Pressure:')
     print(mixed_results.summary())
 
-    bayes_module(data)
+    # bayes_module(data)
     
 
     
