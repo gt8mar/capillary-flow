@@ -185,51 +185,82 @@ def plot_stiffness_comparison(stiffness_params, output_dir):
 
 def calculate_participant_stiffness(df, participant_id):
     """
-    Calculate stiffness parameters for a single participant, including age effects
-    
-    Parameters:
-    -----------
-    df : pandas DataFrame
-        Data for a single participant
-    participant_id : str
-        Participant identifier
-    
-    Returns:
-    --------
-    dict
-        Dictionary containing stiffness parameters for the participant
+    Calculate stiffness parameters for a single participant
     """
-    # Fit linear model including Age as a covariate
-    model = smf.ols('Video_Median_Velocity ~ Pressure + Age', data=df).fit()
-    
-    # Get confidence intervals
-    conf_int = model.conf_int()
-    
-    # Calculate stiffness parameters
-    stiffness_index = -model.params['Pressure']  # Negative because higher pressure -> lower velocity
-    age_effect = model.params['Age']
-    baseline_velocity = model.params['Intercept']
-    
-    # Calculate compliance
-    compliance = 1 / stiffness_index if stiffness_index != 0 else float('inf')
-    
-    # Calculate pressure-velocity sensitivity
-    pressure_range = df['Pressure'].max() - df['Pressure'].min()
-    velocity_range = df['Video_Median_Velocity'].max() - df['Video_Median_Velocity'].min()
-    sensitivity = velocity_range / pressure_range
-    
-    # Calculate R-squared
-    r_squared = model.rsquared
-    
-    return {
-        'Participant': participant_id,
-        'Stiffness_Index': stiffness_index,
-        'Age_Effect': age_effect,
-        'Compliance': compliance,
-        'Baseline_Velocity': baseline_velocity,
-        'Pressure_Sensitivity': sensitivity,
-        'Model_R_Squared': r_squared
-    }
+    try:
+        # Get participant's age
+        participant_age = df['Age'].iloc[0]
+        
+        # Calculate velocity profiles and hysteresis
+        # Group by pressure and UpDown direction, calculate mean velocities
+        velocity_profiles = df.groupby(['Pressure', 'UpDown'])['Video_Median_Velocity'].mean().unstack()
+        
+        # Ensure we have all directions, if not, return NaN for hysteresis metrics
+        if not all(direction in velocity_profiles.columns for direction in ['U', 'D', 'T']):
+            hysteresis = np.nan
+            total_area = np.nan
+        else:
+            # Sort by pressure to ensure correct area calculation
+            velocity_profiles = velocity_profiles.sort_index()
+            
+            # Combine 'U' and 'T' for up curve, use 'D' for down curve
+            up_velocities = velocity_profiles[['U', 'T']].mean(axis=1)
+            down_velocities = velocity_profiles['D']
+            
+            # Calculate areas under curves using trapezoidal rule
+            pressures = velocity_profiles.index.values
+            up_area = np.trapz(up_velocities.values, pressures)
+            down_area = np.trapz(down_velocities.values, pressures)
+            
+            # Calculate hysteresis (up - down area)
+            hysteresis = up_area - down_area
+            
+            # Calculate total area (average of up and down)
+            total_area = (up_area + down_area) / 2
+        
+        # Fit linear model with just Pressure
+        model = smf.ols('Video_Median_Velocity ~ Pressure', data=df).fit()
+        
+        # Calculate other metrics as before
+        stiffness_index = -model.params['Pressure']
+        baseline_velocity = model.params['Intercept']
+        compliance = 1 / stiffness_index if abs(stiffness_index) > 1e-10 else float('inf')
+        pressure_range = df['Pressure'].max() - df['Pressure'].min()
+        velocity_range = df['Video_Median_Velocity'].max() - df['Video_Median_Velocity'].min()
+        sensitivity = velocity_range / pressure_range if pressure_range > 0 else np.nan
+        r_squared = model.rsquared if not np.isnan(model.rsquared) else np.nan
+        
+        return {
+            'Participant': participant_id,
+            'Age': participant_age,
+            'Stiffness_Index': stiffness_index,
+            'Compliance': compliance,
+            'Baseline_Velocity': baseline_velocity,
+            'Pressure_Sensitivity': sensitivity,
+            'Model_R_Squared': r_squared,
+            'N_Observations': len(df),
+            'Velocity_Std': df['Video_Median_Velocity'].std(),
+            'Pressure_Range': pressure_range,
+            'Hysteresis': hysteresis,
+            'Total_Area': total_area
+        }
+        
+    except Exception as e:
+        print(f"\nWarning: Could not calculate stiffness for {participant_id}: {str(e)}")
+        return {
+            'Participant': participant_id,
+            'Age': participant_age if 'participant_age' in locals() else np.nan,
+            'Stiffness_Index': np.nan,
+            'Compliance': np.nan,
+            'Baseline_Velocity': np.nan,
+            'Pressure_Sensitivity': np.nan,
+            'Model_R_Squared': np.nan,
+            'N_Observations': len(df),
+            'Velocity_Std': df['Video_Median_Velocity'].std(),
+            'Pressure_Range': df['Pressure'].max() - df['Pressure'].min(),
+            'Hysteresis': np.nan,
+            'Total_Area': np.nan
+        }
 
 def add_stiffness_metrics_to_df(df):
     """
@@ -249,6 +280,7 @@ def add_stiffness_metrics_to_df(df):
     participant_metrics = []
     for participant in df['Participant'].unique():
         participant_df = df[df['Participant'] == participant]
+        print(f'age of participant {participant} is {participant_df["Age"].iloc[0]}')
         metrics = calculate_participant_stiffness(participant_df, participant)
         participant_metrics.append(metrics)
     
@@ -257,13 +289,82 @@ def add_stiffness_metrics_to_df(df):
     
     # Merge with original dataframe
     result_df = df.merge(metrics_df, on='Participant', how='left')
+    # Rename Age_x to Age
+    result_df = result_df.rename(columns={'Age_x': 'Age'})
+    # drop the Age_y column
+    result_df = result_df.drop(columns=['Age_y'])
+    # print any columns with _x or _y in the column names
+    print(result_df.columns[result_df.columns.str.contains('_x') | result_df.columns.str.contains('_y')])
     
     return result_df
+
+def plot_participant_comparisons(df, output_dir):
+    """
+    Create plots comparing stiffness parameters across participants and against age
+    
+    Parameters:
+    -----------
+    df : pandas DataFrame
+        DataFrame containing metrics for each participant
+    output_dir : str
+        Directory to save output plots
+    """
+    # Parameters to plot
+    params_to_plot = {
+        'Stiffness_Index': 'Capillary Stiffness Index',
+        'Compliance': 'Capillary Compliance',
+        'Baseline_Velocity': 'Baseline Blood Velocity',
+        'Pressure_Sensitivity': 'Pressure-Velocity Sensitivity',
+        'Model_R_Squared': 'Model Fit (R²)'
+    }
+    
+    for param, title in params_to_plot.items():
+        try:
+            # 1. Parameter vs Age scatter plot
+            plt.figure(figsize=(10, 6))
+            sns.scatterplot(data=df, x='Age', y=param)
+            sns.regplot(data=df, x='Age', y=param, scatter=False, color='red')
+            
+            # Calculate correlation
+            correlation = df[['Age', param]].corr().iloc[0, 1]
+            plt.title(f'{title} vs Age\nCorrelation: {correlation:.3f}')
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, f'{param.lower()}_vs_age.png'))
+            plt.close()
+            
+            # 2. Parameter distribution across participants
+            plt.figure(figsize=(12, 6))
+            sns.boxplot(data=df, y=param)
+            sns.swarmplot(data=df, y=param, color='black', size=5, alpha=0.7)
+            plt.title(f'Distribution of {title} Across Participants')
+            plt.xticks([])
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, f'{param.lower()}_distribution.png'))
+            plt.close()
+            
+            # 3. Parameter values by participant (ordered by age)
+            plt.figure(figsize=(15, 6))
+            participant_order = df.sort_values('Age')['Participant'].values
+            sns.barplot(data=df, x='Participant', y=param, order=participant_order)
+            plt.xticks(rotation=45, ha='right')
+            plt.title(f'{title} by Participant (ordered by age)')
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, f'{param.lower()}_by_participant.png'))
+            plt.close()
+            
+        except Exception as e:
+            print(f"\nError plotting {param}: {str(e)}")
+            continue
 
 def main():
     data_filepath = os.path.join(cap_flow_path, 'summary_df_nhp_video_medians.csv')
     output_dir = os.path.join(cap_flow_path, 'results')
     df = pd.read_csv(data_filepath)
+    # check if the dataframe has a hysterisis column
+    if 'Hysterisis' in df.columns:
+        print('it has a hysterisis column')
+    else:
+        print('it does not have a hysterisis column')
 
     # Split data into groups
     healthy_df = df[df['SET'] == 'set01']
@@ -289,6 +390,9 @@ def main():
 
     # Add stiffness metrics to the dataframe
     df = add_stiffness_metrics_to_df(df)
+    
+    # Plot comparisons
+    plot_participant_comparisons(df, output_dir)
     
     # Save the enhanced dataframe
     output_filepath = os.path.join(cap_flow_path, 'summary_df_with_stiffness.csv')
