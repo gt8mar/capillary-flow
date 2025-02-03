@@ -4645,6 +4645,7 @@ def main(verbose = False):
     female_subset = summary_df_no_high_pressure[summary_df_no_high_pressure['Sex']=='F']
 
     summary_df_video_stats = calculate_video_statistics(summary_df_no_high_pressure)
+    summary_df_video_stats['Video Median Velocity'] = summary_df_video_stats['Video_Median_Velocity']
     # Calculate video median velocity 
     # Calculate other video statistics
     
@@ -4725,7 +4726,7 @@ def main(verbose = False):
     summary_df_nhp_video_medians['Sex_Group'] = pd.Categorical(summary_df_nhp_video_medians['Sex_Group'], categories=['F', 'M'], ordered=True)
     summary_df_nhp_video_medians['BP_Group'] = pd.Categorical(summary_df_nhp_video_medians['BP_Group'], categories=['<=120', '>120'], ordered=True)
     # Save this to a csv
-    summary_df_nhp_video_medians.to_csv(os.path.join(cap_flow_path, 'summary_df_nhp_video_medians.csv'), index=False)
+    summary_df_nhp_video_medians.to_csv(os.path.join(cap_flow_path, 'summary_df_nhp_video_stats.csv'), index=False)
 
     normal_group = summary_df_nhp_video_medians[summary_df_nhp_video_medians['SET'] == 'set01']
 
