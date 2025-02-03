@@ -2649,13 +2649,29 @@ def make_log_df(df, plot = False):
     return df
 
 def calculate_video_median_velocity(df, dimensionless= False):
-    # Make a copy of the DataFrame to avoid modifying the original one
+    """
+    Calculate median velocity for each video in the dataset.
+
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        Input DataFrame containing video data with columns 'Participant', 'Video', 
+        and either 'Corrected Velocity' or 'Dimensionless Velocity'
+    dimensionless : bool, optional
+        If True, calculates median of dimensionless velocity instead of corrected velocity.
+        Default is False.
+
+    Returns:
+    --------
+    pandas.DataFrame
+        DataFrame with added column 'Video Median Velocity' or 'Video Median Dimensionless Velocity'
+        containing the median velocity for each video per participant
+    """
     df_copy = df.copy()
 
     if dimensionless:
         video_median_velocity = df_copy.groupby(['Participant', 'Video'])['Dimensionless Velocity'].median().reset_index(name='Video Median Dimensionless Velocity')
         merged_df = pd.merge(df_copy, video_median_velocity, on=['Participant', 'Video'], how='left')
-        collapsed_df = merged_df.drop_duplicates(subset=['Participant', 'Video'])
     else:
         # Group by 'participant' and 'video', then calculate the median of 'Corrected Velocity'
         video_median_velocity = df_copy.groupby(['Participant', 'Video'])['Corrected Velocity'].median().reset_index(name='Video Median Velocity')
@@ -2663,10 +2679,8 @@ def calculate_video_median_velocity(df, dimensionless= False):
         # Merge the median values back to the original DataFrame copy
         merged_df = pd.merge(df_copy, video_median_velocity, on=['Participant', 'Video'], how='left')
 
-        # Drop duplicates to get a collapsed DataFrame with unique participant-video pairs
-        collapsed_df = merged_df.drop_duplicates(subset=['Participant', 'Video'])
 
-    return collapsed_df
+    return merged_df
 
 def plot_median_velocity_of_videos(df):
     # Ensure the DataFrame is sorted by participant and then by video to get the correct order
@@ -4284,6 +4298,42 @@ def plot_models(df, result, variable='Age', log=False):
     plt.title('Random Intercepts by Participant')
     plt.show()
 
+def calculate_video_statistics(df):
+    """
+    Calculate additional velocity statistics for each video
+    
+    Parameters:
+    -----------
+    df : pandas.DataFrame
+        DataFrame containing velocity measurements
+    
+    Returns:
+    --------
+    pandas.DataFrame
+        DataFrame with added velocity statistics columns
+    """
+    # Group by video to calculate statistics
+    video_stats = df.groupby(['Participant', 'Video']).agg({
+        'Corrected Velocity': [
+            ('Video_Median_Velocity', 'median'),
+            ('Video_Mean_Velocity', 'mean'),
+            ('Video_Std_Velocity', 'std'),
+            ('Video_Max_Velocity', 'max'),
+            ('Video_Min_Velocity', 'min'),
+            ('Video_Skew_Velocity', lambda x: skew(x)),
+            ('Video_Kurt_Velocity', lambda x: kurtosis(x))
+        ]
+    })
+    
+    # Flatten multi-level column names
+    video_stats.columns = video_stats.columns.get_level_values(1)
+    video_stats = video_stats.reset_index()
+    
+    # Merge with original DataFrame
+    df = pd.merge(df, video_stats, on=['Participant', 'Video'], how='left')
+    
+    return df
+
 
 
 
@@ -4594,7 +4644,13 @@ def main(verbose = False):
     male_subset = summary_df_no_high_pressure[summary_df_no_high_pressure['Sex']=='M']
     female_subset = summary_df_no_high_pressure[summary_df_no_high_pressure['Sex']=='F']
 
-    summary_df_nhp_video_medians = calculate_video_median_velocity(summary_df_no_high_pressure)
+    summary_df_video_stats = calculate_video_statistics(summary_df_no_high_pressure)
+    # Calculate video median velocity 
+    # Calculate other video statistics
+    
+    # Drop duplicates to get a collapsed DataFrame with unique participant-video pairs
+    summary_df_nhp_video_medians = summary_df_video_stats.drop_duplicates(subset=['Participant', 'Video'])
+
     old_nhp_video_medians = summary_df_nhp_video_medians[summary_df_nhp_video_medians['Age'] > 50]
     young_nhp_video_medians = summary_df_nhp_video_medians[summary_df_nhp_video_medians['Age'] <= 50]
     normbp_nhp_video_medians = summary_df_nhp_video_medians[summary_df_nhp_video_medians['SYS_BP'] <= 120]
