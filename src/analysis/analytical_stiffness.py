@@ -9,6 +9,8 @@ import statsmodels.formula.api as smf
 from scipy.optimize import curve_fit
 from matplotlib.font_manager import FontProperties
 import time
+import umap
+from sklearn.preprocessing import StandardScaler
 
 # Get the hostname of the computer
 hostname = platform.node()
@@ -368,7 +370,7 @@ def plot_participant_comparisons(df, output_dir):
             continue
 
 def load_metadata():
-    """Load metadata and create UpDown column"""
+    """Load metadata and merge UpDown column"""
     if platform.system() == 'Windows':
         metadata_folder = os.path.join(cap_flow_path, 'metadata')
     else:
@@ -379,31 +381,93 @@ def load_metadata():
     metadata_dfs = [pd.read_excel(os.path.join(metadata_folder, f)) for f in metadata_files]
     metadata_df = pd.concat(metadata_dfs)
     
-    # Add 'loc' and leading zero to location column
-    metadata_df['Location'] = 'loc' + metadata_df['Location'].astype(str).str.zfill(2)
-    
-    # Create UpDown column based on pressure sequence
-    metadata_df = metadata_df.sort_values(['Participant', 'Location', 'Video'])
-    
-    # Group by participant and location to find pressure sequences
-    for (participant, location), group in metadata_df.groupby(['Participant', 'Location']):
-        max_pressure_idx = group['Pressure'].idxmax()
-        metadata_df.loc[group.index[:max_pressure_idx], 'UpDown'] = 'U'
-        metadata_df.loc[group.index[max_pressure_idx:], 'UpDown'] = 'D'
-    
     # Select only necessary columns
     metadata_df = metadata_df[['Participant', 'Video', 'UpDown']]
     
     return metadata_df
 
+def run_umap_analysis(metrics_df, output_dir):
+    """
+    Run UMAP dimensionality reduction and create visualizations colored by different variables
+    """
+    # Select numerical columns for UMAP
+    numerical_cols = ['Stiffness_Index', 'Baseline_Velocity', 
+                     'Pressure_Sensitivity', 'Model_R_Squared', 'Hysteresis', 
+                     'Total_Area', 'Velocity_Std', 'Pressure_Range']
+    
+    # Remove 'Compliance' as it can contain infinity
+    if 'Compliance' in numerical_cols:
+        numerical_cols.remove('Compliance')
+    
+    # Replace inf values with NaN and then fill with large numbers
+    features = metrics_df[numerical_cols].copy()
+    features = features.replace([np.inf, -np.inf], np.nan)
+    
+    # Fill NaN values with column means
+    features = features.fillna(features.mean())
+    
+    # Standardize the features
+    scaler = StandardScaler()
+    features_scaled = scaler.fit_transform(features)
+    
+    # Run UMAP
+    reducer = umap.UMAP(random_state=42)
+    embedding = reducer.fit_transform(features_scaled)
+    
+    # Add UMAP coordinates to the DataFrame
+    metrics_df['UMAP1'] = embedding[:, 0]
+    metrics_df['UMAP2'] = embedding[:, 1]
+    
+    # Create visualizations for different variables
+    variables_to_plot = {
+        'SET': 'Set',
+        'Age': 'Age',
+        'Stiffness_Index': 'Stiffness Index',
+        'Hysteresis': 'Hysteresis'
+    }
+    
+    for var, title in variables_to_plot.items():
+        if var in metrics_df.columns:  # Only plot if variable exists
+            plt.figure(figsize=(5, 3))
+            
+            if var == 'SET':
+                # Categorical coloring
+                sns.scatterplot(data=metrics_df, x='UMAP1', y='UMAP2', hue=var, 
+                              palette='deep', s=50, alpha=0.7)
+            else:
+                # Continuous coloring
+                scatter = plt.scatter(metrics_df['UMAP1'], metrics_df['UMAP2'], 
+                                    c=metrics_df[var], cmap='viridis', s=50, alpha=0.7)
+                plt.colorbar(scatter, label=title)
+            
+            plt.title(f'UMAP Visualization Colored by {title}')
+            plt.xlabel('UMAP1')
+            plt.ylabel('UMAP2')
+            
+            # Add participant labels
+            for idx, row in metrics_df.iterrows():
+                plt.annotate(row['Participant'], 
+                            (row['UMAP1'], row['UMAP2']),
+                            xytext=(5, 5), textcoords='offset points',
+                            fontsize=6, alpha=0.7)
+            
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, f'umap_{var.lower()}.png'), 
+                        dpi=300, bbox_inches='tight')
+            plt.close()
+
 def main():
     start_total = time.time()
     
-    print("\nStarting data processing...")
+    # print("\nStarting data processing...")
     start = time.time()
     data_filepath = os.path.join(cap_flow_path, 'summary_df_nhp_video_medians.csv')
     output_dir = os.path.join(cap_flow_path, 'results')
     df = pd.read_csv(data_filepath)
+    
+    # Drop UpDown column from df if it exists to avoid duplicates
+    if 'UpDown' in df.columns:
+        df = df.drop(columns=['UpDown'])
     
     # Load metadata and merge UpDown column
     metadata_df = load_metadata()
@@ -428,13 +492,17 @@ def main():
             skipped_plots.append((participant, str(e)))
     
     # Uncomment for diagnostics:
-    print_diagnostic_summary(df, velocity_profiles_dict, plotted_participants, skipped_plots)
+    # print_diagnostic_summary(df, velocity_profiles_dict, plotted_participants, skipped_plots)
     
     metrics_df = pd.DataFrame(participant_metrics)
     plot_participant_comparisons(metrics_df, output_dir)
+    
+    # Run UMAP analysis
+    run_umap_analysis(metrics_df, output_dir)
+    
     metrics_df.to_csv(os.path.join(output_dir, 'participant_stiffness_metrics.csv'), index=False)
     
-    print(f"\nTotal execution time: {time.time() - start_total:.2f} seconds")
+    # print(f"\nTotal execution time: {time.time() - start_total:.2f} seconds")
 
 if __name__ == "__main__":
     main()
