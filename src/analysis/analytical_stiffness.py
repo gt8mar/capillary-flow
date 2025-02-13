@@ -11,6 +11,9 @@ from matplotlib.font_manager import FontProperties
 import time
 import umap
 from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import cross_val_score, KFold
 
 # Get the hostname of the computer
 hostname = platform.node()
@@ -168,7 +171,7 @@ def calculate_velocity_profiles(df):
         profiles = participant_df.groupby(['Pressure', 'UpDown'])['Video_Median_Velocity'].mean().unstack()
         
         # Uncomment for diagnostics:
-        print_diagnostic_velocity_profile(participant, participant_df, profiles)
+        # print_diagnostic_velocity_profile(participant, participant_df, profiles)
         
         # Drop the 'T' column if it exists and contains only NaN values
         if 'T' in profiles.columns and profiles['T'].isna().all():
@@ -178,72 +181,108 @@ def calculate_velocity_profiles(df):
     
     return velocity_profiles_dict
 
-def calculate_participant_stiffness(df, participant_id, velocity_profiles):
-    """
-    Calculate stiffness parameters for a single participant
+def calculate_health_score(participant_df):
+    """Calculate health score based on various metrics"""
+    score = 1.0  # Start with perfect health
     
-    Parameters:
-    -----------
-    df : pandas.DataFrame
-        DataFrame containing participant data
-    participant_id : str
-        Identifier for the participant
-    velocity_profiles : pandas.DataFrame
-        Pre-calculated velocity profiles with up/down curves
-    """
+    # Blood pressure component (if available)
+    if 'DIA_BP' in participant_df.columns and not participant_df['DIA_BP'].isna().all():
+        dia_bp = participant_df['DIA_BP'].median()
+        # More nuanced BP scoring
+        if dia_bp > 90:  # High
+            score *= 0.8
+        elif dia_bp > 85:  # Borderline high
+            score *= 0.9
+        elif dia_bp < 60:  # Low
+            score *= 0.9
+        elif dia_bp < 65:  # Borderline low
+            score *= 0.95
+    
+    # Age component - slight reduction for older age
+    if 'Age' in participant_df.columns:
+        age = participant_df['Age'].iloc[0]
+        if age > 65:
+            score *= 0.95
+        elif age > 55:
+            score *= 0.98
+    
+    # Disease states
+    if 'Hypertension' in participant_df.columns:
+        if participant_df['Hypertension'].iloc[0] == True:
+            score *= 0.8
+    if 'Diabetes' in participant_df.columns:
+        if participant_df['Diabetes'].iloc[0] == True:
+            score *= 0.8
+        elif participant_df['Diabetes'].iloc[0] == 'PRE':
+            score *= 0.9
+    if 'HeartDisease' in participant_df.columns:
+        if participant_df['HeartDisease'].iloc[0] == True:
+            score *= 0.7
+    
+    # BMI component (if height and weight are available)
+    if all(col in participant_df.columns for col in ['Height', 'Weight']):
+        height_m = participant_df['Height'].iloc[0] / 100  # Convert cm to m
+        weight_kg = participant_df['Weight'].iloc[0]
+        bmi = weight_kg / (height_m ** 2)
+        if bmi > 30:  # Obese
+            score *= 0.85
+        elif bmi > 25:  # Overweight
+            score *= 0.95
+        elif bmi < 18.5:  # Underweight
+            score *= 0.95
+    
+    return score
+
+def calculate_participant_stiffness(participant_df, participant_id, velocity_profiles):
+    """Calculate stiffness parameters for a single participant"""
     try:
-        # Get participant's age
-        participant_age = df['Age'].iloc[0]
+        # Get the SET value and age without binning
+        set_value = participant_df['SET'].iloc[0] if 'SET' in participant_df.columns else None
+        participant_age = participant_df['Age'].iloc[0] if 'Age' in participant_df.columns else None
+        
+        # Calculate health score
+        health_score = calculate_health_score(participant_df)
         
         # Calculate hysteresis and total area
         hysteresis, total_area, _, _ = calculate_hysteresis(velocity_profiles)
         
         # Fit linear model with just Pressure
-        model = smf.ols('Video_Median_Velocity ~ Pressure', data=df).fit()
+        model = smf.ols('Video_Median_Velocity ~ Pressure', data=participant_df).fit()
         
-        # Calculate other metrics
+        # Calculate metrics with error checking
         stiffness_index = -model.params['Pressure']
         baseline_velocity = model.params['Intercept']
-        compliance = 1 / stiffness_index if abs(stiffness_index) > 1e-10 else float('inf')
-        pressure_range = df['Pressure'].max() - df['Pressure'].min()
-        velocity_range = df['Video_Median_Velocity'].max() - df['Video_Median_Velocity'].min()
+        compliance = 1 / stiffness_index if abs(stiffness_index) > 1e-10 else np.nan
+        pressure_range = participant_df['Pressure'].max() - participant_df['Pressure'].min()
+        velocity_range = participant_df['Video_Median_Velocity'].max() - participant_df['Video_Median_Velocity'].min()
         sensitivity = velocity_range / pressure_range if pressure_range > 0 else np.nan
-
+        
         # Handle potential division by zero in R-squared calculation
         centered_tss = model.centered_tss
         r_squared = 1 - model.ssr/centered_tss if abs(centered_tss) > 1e-10 else np.nan
         
-        return {
+        metrics = {
             'Participant': participant_id,
+            'SET': set_value,
             'Age': participant_age,
+            'Health_Score': health_score,
             'Stiffness_Index': stiffness_index,
             'Compliance': compliance,
             'Baseline_Velocity': baseline_velocity,
             'Pressure_Sensitivity': sensitivity,
             'Model_R_Squared': r_squared,
-            'N_Observations': len(df),
-            'Velocity_Std': df['Video_Median_Velocity'].std(),
+            'N_Observations': len(participant_df),
+            'Velocity_Std': participant_df['Video_Median_Velocity'].std(),
             'Pressure_Range': pressure_range,
             'Hysteresis': hysteresis,
             'Total_Area': total_area
         }
         
+        return metrics
+        
     except Exception as e:
         print(f"\nWarning: Could not calculate stiffness for {participant_id}: {str(e)}")
-        return {
-            'Participant': participant_id,
-            'Age': participant_age if 'participant_age' in locals() else np.nan,
-            'Stiffness_Index': np.nan,
-            'Compliance': np.nan,
-            'Baseline_Velocity': np.nan,
-            'Pressure_Sensitivity': np.nan,
-            'Model_R_Squared': np.nan,
-            'N_Observations': len(df),
-            'Velocity_Std': df['Video_Median_Velocity'].std(),
-            'Pressure_Range': df['Pressure'].max() - df['Pressure'].min(),
-            'Hysteresis': np.nan,
-            'Total_Area': np.nan
-        }
+        return None  # Return None instead of partial metrics
 
 def plot_velocity_curves(df, participant_id, output_dir):
     """Plot velocity vs pressure curves for a single participant"""
@@ -264,7 +303,7 @@ def plot_velocity_curves(df, participant_id, output_dir):
     velocity_profiles = participant_df.groupby(['Pressure', 'UpDown'])['Video_Median_Velocity'].mean().unstack()
     
     # Uncomment for diagnostics:
-    print_diagnostic_plotting(participant_id, velocity_profiles)
+    # print_diagnostic_plotting(participant_id, velocity_profiles)
     
     hysteresis, _, up_velocities, down_velocities = calculate_hysteresis(velocity_profiles)
     
@@ -287,7 +326,7 @@ def plot_velocity_curves(df, participant_id, output_dir):
         output_path = os.path.join(output_dir, f'velocity_profile_{participant_id}.png')
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         # Uncomment for diagnostics:
-        print_diagnostic_plotting(participant_id, velocity_profiles, output_path)
+        # print_diagnostic_plotting(participant_id, velocity_profiles, output_path)
         plt.close()
 
 def plot_participant_comparisons(df, output_dir):
@@ -371,6 +410,8 @@ def plot_participant_comparisons(df, output_dir):
 
 def load_metadata():
     """Load metadata and merge UpDown column"""
+    print("\nLoading metadata...")
+    
     if platform.system() == 'Windows':
         metadata_folder = os.path.join(cap_flow_path, 'metadata')
     else:
@@ -381,128 +422,635 @@ def load_metadata():
     metadata_dfs = [pd.read_excel(os.path.join(metadata_folder, f)) for f in metadata_files]
     metadata_df = pd.concat(metadata_dfs)
     
-    # Select only necessary columns
-    metadata_df = metadata_df[['Participant', 'Video', 'UpDown']]
+    # Print debug info
+    print(f"\nFound {len(metadata_files)} metadata files")
+    print("Columns in metadata:", metadata_df.columns.tolist())
+    print("\nExample BP values from metadata:")
+    if 'BP' in metadata_df.columns:
+        print(metadata_df[['Participant', 'Video', 'BP']].head())
+    else:
+        print("Warning: 'BP' column not found in metadata")
     
     return metadata_df
 
-def run_umap_analysis(metrics_df, output_dir):
-    """
-    Run UMAP dimensionality reduction and create visualizations colored by different variables
-    """
-    # Select numerical columns for UMAP
-    numerical_cols = ['Stiffness_Index', 'Baseline_Velocity', 
-                     'Pressure_Sensitivity', 'Model_R_Squared', 'Hysteresis', 
-                     'Total_Area', 'Velocity_Std', 'Pressure_Range']
+def run_umap_analysis(metrics_df, df, output_dir):
+    """Run UMAP analysis on the metrics"""
+    print("\nRunning UMAP analysis...")
     
-    # Remove 'Compliance' as it can contain infinity
-    if 'Compliance' in numerical_cols:
-        numerical_cols.remove('Compliance')
+    # Separate numeric and non-numeric columns
+    numeric_cols = metrics_df.select_dtypes(include=['float64', 'int64']).columns
+    non_numeric_cols = metrics_df.select_dtypes(exclude=['float64', 'int64']).columns
     
-    # Replace inf values with NaN and then fill with large numbers
-    features = metrics_df[numerical_cols].copy()
+    # Remove Pressure_Range from feature columns since it's constant
+    feature_cols = [col for col in numeric_cols 
+                   if col not in ['SET', 'Participant', 'Age', 'Pressure_Range']]
+    
+    # Print feature info before handling NaN
+    print("\nFeatures used in UMAP clustering (before NaN handling):")
+    for col in feature_cols:
+        print(f"- {col}")
+        print(f"  Range: {metrics_df[col].min():.2f} to {metrics_df[col].max():.2f}")
+        print(f"  Missing values: {metrics_df[col].isna().sum()}")
+    
+    # Handle missing values by filling with median
+    X = metrics_df[feature_cols].copy()
+    for col in feature_cols:
+        if X[col].isna().any():
+            median_val = X[col].median()
+            X[col] = X[col].fillna(median_val)
+            print(f"\nFilled {X[col].isna().sum()} missing values in {col} with median: {median_val:.2f}")
+    
+    # Run UMAP with different n_neighbors values
+    n_neighbors_values = [5, 15, 30]
+    
+    for n_neighbors in n_neighbors_values:
+        print(f"\nRunning UMAP with n_neighbors={n_neighbors}")
+        reducer = umap.UMAP(n_neighbors=n_neighbors, random_state=42)
+        embedding = reducer.fit_transform(X.values)
+        
+        # Add UMAP coordinates to metrics_df
+        metrics_df[f'UMAP1_{n_neighbors}'] = embedding[:, 0]
+        metrics_df[f'UMAP2_{n_neighbors}'] = embedding[:, 1]
+    
+    return metrics_df  # Return the updated DataFrame
+
+def impute_height_weight(df):
+    """
+    Impute missing height and weight values based on age and sex averages
+    """
+    # Create age groups (e.g., 5-year bins)
+    df['Age_Group'] = pd.qcut(df['Age'], q=5)
+    
+    # Calculate average height/weight by age group and sex
+    height_means = df.groupby(['Age_Group', 'Sex'])['Height'].transform('mean')
+    weight_means = df.groupby(['Age_Group', 'Sex'])['Weight'].transform('mean')
+    
+    # If still missing (due to missing age or sex), use overall means
+    height_overall_mean = df['Height'].mean()
+    weight_overall_mean = df['Weight'].mean()
+    
+    # Impute missing values
+    df['Height'] = df['Height'].fillna(height_means).fillna(height_overall_mean)
+    df['Weight'] = df['Weight'].fillna(weight_means).fillna(weight_overall_mean)
+    
+    return df
+
+def analyze_pressure_importance(df, participant_df, output_dir):
+    """Analyze which pressures are most informative for health scores using PCA"""
+    print("\nAnalyzing pressure importance...")
+    
+    # Create pressure-velocity matrix
+    pressure_matrix = df.pivot_table(
+        index='Participant',
+        columns='Pressure',
+        values='Video_Median_Velocity',
+        aggfunc='median'
+    )
+    
+    # Print the pressures being analyzed
+    print("\nPressures included in analysis:")
+    for pressure in pressure_matrix.columns:
+        print(f"- {pressure:.1f} psi")
+    
+    # Replace inf values with NaN and then fill with column means
+    features = pressure_matrix.copy()
     features = features.replace([np.inf, -np.inf], np.nan)
-    
-    # Fill NaN values with column means
     features = features.fillna(features.mean())
+    
+    # Print summary of data cleaning
+    print(f"\nShape of pressure matrix: {features.shape}")
+    print(f"Number of participants: {len(features)}")
+    print(f"Number of pressure points: {len(features.columns)}")
     
     # Standardize the features
     scaler = StandardScaler()
     features_scaled = scaler.fit_transform(features)
     
-    # Run UMAP
-    reducer = umap.UMAP(random_state=42)
-    embedding = reducer.fit_transform(features_scaled)
+    # Run PCA
+    pca = PCA()
+    pca_result = pca.fit_transform(features_scaled)
     
-    # Add UMAP coordinates to the DataFrame
-    metrics_df['UMAP1'] = embedding[:, 0]
-    metrics_df['UMAP2'] = embedding[:, 1]
+    # Calculate explained variance
+    explained_variance = pca.explained_variance_ratio_
+    print("\nExplained variance ratio per component:")
+    for i, var in enumerate(explained_variance):
+        print(f"PC{i+1}: {var:.3f}")
     
-    # Create visualizations for different variables
-    variables_to_plot = {
-        'SET': 'Set',
-        'Age': 'Age',
-        'Stiffness_Index': 'Stiffness Index',
-        'Hysteresis': 'Hysteresis'
-    }
+    # Calculate correlation between PCs and health score
+    pc_correlations = []
+    for i in range(pca.n_components_):
+        correlation = np.corrcoef(pca_result[:, i], 
+                                participant_df.loc[features.index, 'Health_Score'])[0, 1]
+        pc_correlations.append(abs(correlation))
     
-    for var, title in variables_to_plot.items():
-        if var in metrics_df.columns:  # Only plot if variable exists
-            plt.figure(figsize=(5, 3))
-            
-            if var == 'SET':
-                # Categorical coloring
-                sns.scatterplot(data=metrics_df, x='UMAP1', y='UMAP2', hue=var, 
-                              palette='deep', s=50, alpha=0.7)
+    print("\nCorrelations between PCs and Health Score:")
+    for i, corr in enumerate(pc_correlations):
+        print(f"PC{i+1}: {corr:.3f}")
+    
+    # Get pressure importance scores
+    pressure_importance = pd.DataFrame(
+        np.abs(pca.components_[0:3]) * np.array(pc_correlations[0:3])[:, np.newaxis],
+        columns=features.columns
+    ).sum(axis=0)
+    
+    # Plot explained variance
+    plt.figure(figsize=(6, 4))
+    plt.bar(range(1, len(explained_variance) + 1), explained_variance * 100)
+    plt.xlabel('Principal Component')
+    plt.ylabel('Explained Variance (%)')
+    plt.title('Explained Variance by Principal Component')
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'pca_explained_variance.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    # Plot pressure importance scores
+    plt.figure(figsize=(8, 4))
+    pressure_importance.sort_values().plot(kind='bar')
+    plt.xlabel('Pressure (psi)')
+    plt.ylabel('Importance Score')
+    plt.title('Pressure Importance Scores')
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'pressure_importance.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    # Plot first two PCs colored by health score
+    plt.figure(figsize=(6, 4))
+    scatter = plt.scatter(pca_result[:, 0], pca_result[:, 1], 
+                         c=participant_df.loc[features.index, 'Health_Score'],
+                         cmap='viridis')
+    plt.colorbar(scatter, label='Health Score')
+    plt.xlabel('PC1')
+    plt.ylabel('PC2')
+    plt.title('PCA Results Colored by Health Score')
+    
+    # Add participant labels
+    for idx, row in features.iterrows():
+        plt.annotate(idx, 
+                    (pca_result[features.index.get_loc(idx), 0],
+                     pca_result[features.index.get_loc(idx), 1]),
+                    xytext=(5, 5), textcoords='offset points',
+                    fontsize=6, alpha=0.7)
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'pca_health_score.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    return pressure_importance.sort_values(ascending=False)
+
+def analyze_pressure_importance_rf(df, participant_df, output_dir):
+    """Analyze which pressures are most informative using Random Forest"""
+    print("\nAnalyzing pressure importance using Random Forest...")
+    
+    # Create pressure-velocity matrix
+    pressure_matrix = df.pivot_table(
+        index='Participant',
+        columns='Pressure',
+        values='Video_Median_Velocity',
+        aggfunc='median'
+    )
+    
+    # Print the pressures being analyzed
+    print("\nPressures included in analysis:")
+    for pressure in pressure_matrix.columns:
+        print(f"- {pressure:.1f} psi")
+    
+    # Replace inf values with NaN and then fill with column means
+    features = pressure_matrix.copy()
+    features = features.replace([np.inf, -np.inf], np.nan)
+    features = features.fillna(features.mean())
+    
+    # Get health scores for matching participants and handle missing values
+    health_scores = participant_df.loc[features.index, 'Health_Score']
+    
+    # Print diagnostic information
+    print("\nHealth scores shape:", health_scores.shape)
+    print("Number of NaN health scores:", health_scores.isna().sum())
+    print("Number of NaN feature values:", features.isna().sum().sum())
+    
+    # Remove any rows with NaN values
+    valid_mask = ~health_scores.isna()
+    features_clean = features[valid_mask]
+    health_scores_clean = health_scores[valid_mask]
+    
+    print(f"\nAfter removing NaN values:")
+    print(f"Features shape: {features_clean.shape}")
+    print(f"Health scores shape: {health_scores_clean.shape}")
+    
+    # Standardize the features
+    scaler = StandardScaler()
+    features_scaled = scaler.fit_transform(features_clean)
+    
+    # Train Random Forest
+    rf = RandomForestRegressor(n_estimators=100, random_state=42)
+    rf.fit(features_scaled, health_scores_clean)
+    
+    # Get feature importance scores
+    importance_scores = pd.Series(
+        rf.feature_importances_,
+        index=features_clean.columns,
+        name='Importance'
+    ).sort_values(ascending=False)
+    
+    # Perform cross-validation
+    cv_scores = cross_val_score(rf, features_scaled, health_scores_clean, cv=5)
+    print(f"\nCross-validation R² scores: {cv_scores}")
+    print(f"Mean R² score: {cv_scores.mean():.3f} (±{cv_scores.std()*2:.3f})")
+    
+    # Plot feature importance with error bars from cross-validation
+    importances = []
+    for train_idx, test_idx in KFold(n_splits=5, shuffle=True, random_state=42).split(features_scaled):
+        rf = RandomForestRegressor(n_estimators=100, random_state=42)
+        rf.fit(features_scaled[train_idx], health_scores_clean[train_idx])
+        importances.append(rf.feature_importances_)
+    
+    importance_df = pd.DataFrame(importances, columns=features_clean.columns)
+    
+    plt.figure(figsize=(8, 4))
+    plt.errorbar(x=range(len(features_clean.columns)),
+                y=importance_df.mean(),
+                yerr=importance_df.std() * 2,
+                fmt='o', capsize=5)
+    plt.xticks(range(len(features_clean.columns)), features_clean.columns, rotation=45)
+    plt.xlabel('Pressure (psi)')
+    plt.ylabel('Random Forest Importance')
+    plt.title('Pressure Importance from Random Forest\n(with 95% confidence intervals)')
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'rf_pressure_importance_with_errors.png'), 
+                dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    # Compare with PCA importance
+    pca_importance = analyze_pressure_importance(df, participant_df, output_dir)
+    
+    # Create comparison plot
+    plt.figure(figsize=(10, 5))
+    comparison_df = pd.DataFrame({
+        'Random Forest': importance_scores,
+        'PCA': pca_importance
+    })
+    comparison_df.plot(kind='bar')
+    plt.xlabel('Pressure (psi)')
+    plt.ylabel('Importance Score')
+    plt.title('Pressure Importance: Random Forest vs PCA')
+    plt.xticks(rotation=45)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'pressure_importance_comparison.png'), dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    return importance_scores, comparison_df
+
+def audit_health_score_inputs(df):
+    """Check and print all entries in columns used for health score calculation"""
+    print("\nAuditing health score input data...")
+    
+    # Detailed DIA_BP analysis
+    print("\nDiastolic BP Analysis:")
+    missing_dia_bp = df[df['DIA_BP'].isna()]
+    print(f"Number of missing DIA_BP values: {len(missing_dia_bp)}")
+    print("\nParticipants with missing DIA_BP:")
+    print(missing_dia_bp['Participant'].value_counts())
+    
+    # Hypertension analysis
+    print("\nHypertension Analysis:")
+    print("Data type:", df['Hypertension'].dtype)
+    print("Unique values with types:")
+    for val in df['Hypertension'].unique():
+        print(f"Value: {val}, Type: {type(val)}")
+    
+    # Original audit code...
+    health_columns = [
+        'Participant', 'Hypertension', 'Diabetes', 'HeartDisease',
+        'SYS_BP', 'DIA_BP', 'Age', 'Height', 'Weight', 'Sex'
+    ]
+    
+    # Check which columns exist
+    missing_cols = [col for col in health_columns if col not in df.columns]
+    if missing_cols:
+        print("\nWarning: Missing columns:", missing_cols)
+    
+    existing_cols = [col for col in health_columns if col in df.columns]
+    
+    # Get unique values for each column
+    print("\nUnique values in each column:")
+    for col in existing_cols:
+        unique_vals = df[col].unique()
+        n_unique = len(unique_vals)
+        n_missing = df[col].isna().sum()
+        print(f"\n{col}:")
+        print(f"Number of unique values: {n_unique}")
+        print(f"Number of missing values: {n_missing}")
+        print("Unique values:", sorted(unique_vals) if n_unique < 20 else f"{n_unique} values (too many to display)")
+        
+        # For numerical columns, show summary statistics
+        if df[col].dtype in ['int64', 'float64']:
+            print("Summary statistics:")
+            print(df[col].describe())
+        
+        # For categorical columns, show value counts
+        else:
+            print("Value counts:")
+            print(df[col].value_counts())
+    
+    # Check for potential data quality issues
+    print("\nPotential data quality issues:")
+    
+    # Check age range
+    if 'Age' in df.columns:
+        age_min, age_max = df['Age'].min(), df['Age'].max()
+        if age_min < 0 or age_max > 120:
+            print(f"Warning: Age range ({age_min}, {age_max}) seems unusual")
+    
+    # Check height range (in cm)
+    if 'Height' in df.columns:
+        height_min, height_max = df['Height'].min(), df['Height'].max()
+        if height_min < 100 or height_max > 250:
+            print(f"Warning: Height range ({height_min}, {height_max}) seems unusual")
+    
+    # Check weight range (in kg)
+    if 'Weight' in df.columns:
+        weight_min, weight_max = df['Weight'].min(), df['Weight'].max()
+        if weight_min < 30 or weight_max > 250:
+            print(f"Warning: Weight range ({weight_min}, {weight_max}) seems unusual")
+    
+    # Check blood pressure ranges
+    if 'SYS_BP' in df.columns:
+        sys_min, sys_max = df['SYS_BP'].min(), df['SYS_BP'].max()
+        if sys_min < 70 or sys_max > 220:
+            print(f"Warning: Systolic BP range ({sys_min}, {sys_max}) seems unusual")
+    
+    if 'DIA_BP' in df.columns:
+        dia_min, dia_max = df['DIA_BP'].min(), df['DIA_BP'].max()
+        if dia_min < 40 or dia_max > 120:
+            print(f"Warning: Diastolic BP range ({dia_min}, {dia_max}) seems unusual")
+    
+    # Update the boolean column check in audit_health_score_inputs
+    bool_columns = ['Hypertension', 'Diabetes', 'HeartDisease']
+    for col in bool_columns:
+        if col in df.columns:
+            if col == 'Diabetes':
+                invalid_values = df[~df[col].isin(['True', 'False', 'PRE', np.nan])][col].unique()
             else:
-                # Continuous coloring
-                scatter = plt.scatter(metrics_df['UMAP1'], metrics_df['UMAP2'], 
-                                    c=metrics_df[var], cmap='viridis', s=50, alpha=0.7)
-                plt.colorbar(scatter, label=title)
-            
-            plt.title(f'UMAP Visualization Colored by {title}')
-            plt.xlabel('UMAP1')
-            plt.ylabel('UMAP2')
-            
-            # Add participant labels
-            for idx, row in metrics_df.iterrows():
-                plt.annotate(row['Participant'], 
-                            (row['UMAP1'], row['UMAP2']),
-                            xytext=(5, 5), textcoords='offset points',
-                            fontsize=6, alpha=0.7)
-            
-            plt.tight_layout()
-            plt.savefig(os.path.join(output_dir, f'umap_{var.lower()}.png'), 
-                        dpi=300, bbox_inches='tight')
-            plt.close()
+                invalid_values = df[~df[col].isin([True, False, 'Yes', 'No', np.nan])][col].unique()
+            if len(invalid_values) > 0:
+                print(f"Warning: Invalid values in {col}: {invalid_values}")
+    
+    print("\nAudit complete.")
+
+def fix_diastolic_bp(df):
+    """Extract and fill missing DIA_BP values from BP column"""
+    print("\nFixing missing DIA_BP values...")
+    
+    def extract_diastolic(bp_str):
+        if pd.isna(bp_str):
+            return np.nan
+        try:
+            return float(bp_str.split('/')[1].strip())
+        except (IndexError, ValueError, AttributeError):
+            return np.nan
+    
+    # Convert DIA_BP column to float64 if it exists
+    if 'DIA_BP' in df.columns:
+        df['DIA_BP'] = pd.to_numeric(df['DIA_BP'], errors='coerce')
+    
+    # Extract DIA_BP from BP string
+    if 'BP' in df.columns:
+        bp_values = df['BP'].apply(extract_diastolic)
+        df['DIA_BP'] = df['DIA_BP'].fillna(bp_values)
+    
+    # Fill remaining missing values with participant medians
+    df['DIA_BP'] = df.groupby('Participant')['DIA_BP'].transform(
+        lambda x: x.fillna(x.median())
+    )
+    
+    return df
+
+def analyze_bp_extraction(df):
+    """Analyze the quality of BP extraction"""
+    print("\nAnalyzing BP extraction...")
+    
+    # Check BP and DIA_BP distributions
+    print("\nBP format examples:")
+    print(df[['Participant', 'BP', 'DIA_BP']].head(10))
+    
+    # Analyze DIA_BP distribution
+    print("\nDIA_BP Statistics:")
+    print(df['DIA_BP'].describe())
+    
+    # Check for unusual values
+    unusual = df[
+        (df['DIA_BP'] < 40) | 
+        (df['DIA_BP'] > 120)
+    ][['Participant', 'BP', 'DIA_BP']]
+    
+    if not unusual.empty:
+        print("\nUnusual DIA_BP values found:")
+        print(unusual)
+    
+    # Group by participant
+    participant_bp = df.groupby('Participant').agg({
+        'DIA_BP': ['mean', 'std', 'count']
+    }).round(2)
+    
+    print("\nParticipant BP Summary:")
+    print(participant_bp)
+    
+    return participant_bp
+
+def analyze_velocity_profiles(velocity_profiles_dict, output_dir):
+    """Analyze the quality of velocity profiles"""
+    print("\nAnalyzing velocity profiles...")
+    
+    # Collect statistics for each profile
+    profile_stats = []
+    for participant, profiles in velocity_profiles_dict.items():
+        stats = {
+            'Participant': participant,
+            'Num_Points': len(profiles),
+            'Pressure_Range': profiles.index.max() - profiles.index.min(),
+            'Max_Velocity': profiles.max().max(),
+            'Has_Up': 'U' in profiles.columns,
+            'Has_Down': 'D' in profiles.columns,
+            'Missing_Values': profiles.isna().sum().sum()
+        }
+        profile_stats.append(stats)
+    
+    profile_df = pd.DataFrame(profile_stats)
+    
+    print("\nVelocity Profile Summary:")
+    print(profile_df.describe())
+    
+    # Plot profile quality metrics
+    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+    
+    # Number of points
+    sns.histplot(data=profile_df, x='Num_Points', ax=axes[0,0])
+    axes[0,0].set_title('Distribution of Profile Points')
+    
+    # Pressure range
+    sns.histplot(data=profile_df, x='Pressure_Range', ax=axes[0,1])
+    axes[0,1].set_title('Distribution of Pressure Ranges')
+    
+    # Max velocity
+    sns.histplot(data=profile_df, x='Max_Velocity', ax=axes[1,0])
+    axes[1,0].set_title('Distribution of Max Velocities')
+    
+    # Missing values
+    sns.histplot(data=profile_df, x='Missing_Values', ax=axes[1,1])
+    axes[1,1].set_title('Distribution of Missing Values')
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'velocity_profile_diagnostics.png'))
+    plt.close()
+    
+    return profile_df
+
+def analyze_health_scores(metrics_df, output_dir):
+    """Analyze the distribution and relationships in health scores"""
+    print("\nAnalyzing health scores...")
+    
+    # Basic statistics
+    print("\nHealth Score Statistics:")
+    print(metrics_df['Health_Score'].describe())
+    
+    # Create correlation matrix for all numeric columns
+    numeric_cols = metrics_df.select_dtypes(include=['float64', 'int64']).columns
+    corr_matrix = metrics_df[numeric_cols].corr()
+    
+    # Plot correlation heatmap
+    plt.figure(figsize=(12, 8))
+    sns.heatmap(corr_matrix, annot=True, fmt='.2f', cmap='coolwarm', center=0)
+    plt.title('Correlation Matrix of Health Metrics')
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'health_score_correlations.png'))
+    plt.close()
+    
+    # Plot health score distribution by SET
+    if 'SET' in metrics_df.columns:
+        plt.figure(figsize=(8, 6))
+        sns.boxplot(data=metrics_df, x='SET', y='Health_Score')
+        sns.swarmplot(data=metrics_df, x='SET', y='Health_Score', color='0.25', alpha=0.5)
+        plt.title('Health Score Distribution by SET')
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, 'health_score_by_set.png'))
+        plt.close()
+    
+    return corr_matrix
+
+def analyze_clustering_results(metrics_df, output_dir):
+    """Analyze the quality of UMAP clustering"""
+    print("\nAnalyzing clustering results...")
+    
+    # Get UMAP columns for different n_neighbors
+    umap_cols = [col for col in metrics_df.columns if col.startswith('UMAP')]
+    n_neighbors_list = sorted(set([int(col.split('_')[1]) for col in umap_cols if col.endswith('1')]))
+    
+    # Check if we have any UMAP results to analyze
+    if not n_neighbors_list:
+        print("Warning: No UMAP results found to analyze")
+        return
+    
+    # Calculate silhouette scores if SET is available
+    if 'SET' in metrics_df.columns:
+        from sklearn.metrics import silhouette_score
+        print("\nSilhouette Scores by n_neighbors:")
+        for n in n_neighbors_list:
+            umap_data = metrics_df[[f'UMAP1_{n}', f'UMAP2_{n}']].values
+            score = silhouette_score(umap_data, metrics_df['SET'])
+            print(f"n_neighbors={n}: {score:.3f}")
+    
+    # Plot stability comparison
+    if len(n_neighbors_list) == 1:
+        # Handle single n_neighbors case
+        plt.figure(figsize=(8, 6))
+        scatter = plt.scatter(
+            metrics_df[f'UMAP1_{n_neighbors_list[0]}'],
+            metrics_df[f'UMAP2_{n_neighbors_list[0]}'],
+            c=metrics_df['Health_Score'] if 'Health_Score' in metrics_df else None,
+            cmap='viridis'
+        )
+        plt.title(f'UMAP Projection (n_neighbors={n_neighbors_list[0]})')
+        plt.colorbar(scatter, label='Health Score')
+        plt.tight_layout()
+    elif len(n_neighbors_list) > 1:
+        # Multiple n_neighbors case
+        fig, axes = plt.subplots(1, len(n_neighbors_list), figsize=(15, 5))
+        for i, n in enumerate(n_neighbors_list):
+            scatter = axes[i].scatter(
+                metrics_df[f'UMAP1_{n}'],
+                metrics_df[f'UMAP2_{n}'],
+                c=metrics_df['Health_Score'] if 'Health_Score' in metrics_df else None,
+                cmap='viridis'
+            )
+            axes[i].set_title(f'n_neighbors={n}')
+            plt.colorbar(scatter, ax=axes[i], label='Health Score')
+        plt.tight_layout()
+    
+    if n_neighbors_list:  # Only save if we created a plot
+        plt.savefig(os.path.join(output_dir, 'umap_stability_comparison.png'))
+        plt.close()
 
 def main():
     start_total = time.time()
     
-    # print("\nStarting data processing...")
+    print("\nStarting data processing...")
     start = time.time()
-    data_filepath = os.path.join(cap_flow_path, 'summary_df_nhp_video_medians.csv')
+    data_filepath = os.path.join(cap_flow_path, 'summary_df_nhp_video_stats.csv')
     output_dir = os.path.join(cap_flow_path, 'results')
     df = pd.read_csv(data_filepath)
     
-    # Drop UpDown column from df if it exists to avoid duplicates
-    if 'UpDown' in df.columns:
-        df = df.drop(columns=['UpDown'])
-    
-    # Load metadata and merge UpDown column
-    metadata_df = load_metadata()
-    df = pd.merge(df, metadata_df, on=['Participant', 'Video'], how='left')
-    
+    # Calculate velocity profiles
     velocity_profiles_dict = calculate_velocity_profiles(df)
     
-    participant_metrics = []
-    skipped_participants = []
+    # Calculate stiffness parameters for each participant
+    stiffness_metrics = []
     plotted_participants = []
     skipped_plots = []
     
-    for participant in df['Participant'].unique():
+    for participant_id, velocity_profiles in velocity_profiles_dict.items():
+        participant_df = df[df['Participant'] == participant_id]
+        
         try:
-            participant_df = df[df['Participant'] == participant]
-            metrics = calculate_participant_stiffness(participant_df, participant, velocity_profiles_dict[participant])
-            participant_metrics.append(metrics)
+            # Calculate stiffness parameters
+            metrics = calculate_participant_stiffness(participant_df, participant_id, velocity_profiles)
+            stiffness_metrics.append(metrics)
             
-            plot_velocity_curves(df, participant, output_dir)
-            plotted_participants.append(participant)
+            # Create velocity curve plots
+            try:
+                plot_velocity_curves(df, participant_id, output_dir)
+                plotted_participants.append(participant_id)
+            except Exception as e:
+                skipped_plots.append((participant_id, str(e)))
+                print(f"\nWarning: Could not plot velocity curves for {participant_id}: {str(e)}")
+                
         except Exception as e:
-            skipped_plots.append((participant, str(e)))
+            print(f"\nError processing participant {participant_id}: {str(e)}")
+            continue
     
-    # Uncomment for diagnostics:
-    # print_diagnostic_summary(df, velocity_profiles_dict, plotted_participants, skipped_plots)
+    # Convert stiffness metrics to DataFrame
+    metrics_df = pd.DataFrame(stiffness_metrics)
     
-    metrics_df = pd.DataFrame(participant_metrics)
+    # Print diagnostic summary
+    print_diagnostic_summary(df, velocity_profiles_dict, plotted_participants, skipped_plots)
+    
+    # Create comparison plots
     plot_participant_comparisons(metrics_df, output_dir)
     
     # Run UMAP analysis
-    run_umap_analysis(metrics_df, output_dir)
+    run_umap_analysis(metrics_df, df, output_dir)
     
-    metrics_df.to_csv(os.path.join(output_dir, 'participant_stiffness_metrics.csv'), index=False)
+    # After calculating metrics
+    print("\nRunning diagnostic analyses...")
+    bp_stats = analyze_bp_extraction(df)
+    profile_stats = analyze_velocity_profiles(velocity_profiles_dict, output_dir)
+    health_correlations = analyze_health_scores(metrics_df, output_dir)
+    analyze_clustering_results(metrics_df, output_dir)
     
-    # print(f"\nTotal execution time: {time.time() - start_total:.2f} seconds")
+    end = time.time()
+    print(f"\nTotal processing time: {end - start_total:.2f} seconds")
+    
+    return df, metrics_df, velocity_profiles_dict
 
 if __name__ == "__main__":
     main()
