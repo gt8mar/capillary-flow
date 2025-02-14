@@ -490,50 +490,48 @@ def main():
     data_filepath = os.path.join(cap_flow_path, 'summary_df_nhp_video_stats.csv')
     df = pd.read_csv(data_filepath)
     
-    # print the first row of the dataframe in full with all columns and the header no ... 
-    for col in df.columns:
-        print(f"{col}: {df.iloc[0][col]}")
+    # print the first row of the dataframe in full with all columns and the header 
+    print(df.iloc[0])
     
-    # # Run healthy vs affected classification
-    # print("\nRunning Healthy vs Affected classification...")
-    # classify_healthy_vs_affected(df)
+    # Run healthy vs affected classification
+    print("\nRunning Healthy vs Affected classification...")
+    classify_healthy_vs_affected(df)
     
-    # # Prepare data for condition-specific classification
-    # processed_df, target_dict = prepare_data()
+    # Prepare data for condition-specific classification
+    processed_df, target_dict = prepare_data()
     
-    # # Print class distribution for each condition
-    # print("\nClass distribution for specific conditions:")
-    # for condition in ['Diabetes', 'Hypertension', 'HeartDisease']:
-    #     class_counts = processed_df[condition].value_counts()
-    #     print(f"\n{condition}:")
-    #     print(class_counts)
+    # Print class distribution for each condition
+    print("\nClass distribution for specific conditions:")
+    for condition in ['Diabetes', 'Hypertension', 'HeartDisease']:
+        class_counts = processed_df[condition].value_counts()
+        print(f"\n{condition}:")
+        print(class_counts)
     
-    # # Analyze each condition
-    # for condition, (X, y) in target_dict.items():
-    #     print(f"\nAnalyzing {condition}...")
+    # Analyze each condition
+    for condition, (X, y) in target_dict.items():
+        print(f"\nAnalyzing {condition}...")
         
-    #     feature_names = [col for col in processed_df.columns 
-    #                     if col not in ['Participant', 'Diabetes', 'Hypertension', 'HeartDisease']]
+        feature_names = [col for col in processed_df.columns 
+                        if col not in ['Participant', 'Diabetes', 'Hypertension', 'HeartDisease']]
         
-    #     # Evaluate classifiers
-    #     results = evaluate_classifiers(X, y, feature_names)
+        # Evaluate classifiers
+        results = evaluate_classifiers(X, y, feature_names)
         
-    #     if results is not None:
-    #         # Plot results including ROC curves
-    #         plot_results(results, condition, output_dir)
-    #         plot_auc_curves(results, condition, output_dir)
+        if results is not None:
+            # Plot results including ROC curves
+            plot_results(results, condition, output_dir)
+            plot_auc_curves(results, condition, output_dir)
             
-    #         # Save classification reports
-    #         report_path = os.path.join(output_dir, condition, 'classification_report.txt')
-    #         with open(report_path, 'w') as f:
-    #             for name, res in results.items():
-    #                 f.write(f"\n{name} Classification Report:\n")
-    #                 f.write(res['classification_report'])
-    #                 f.write("\nCross-validation scores:\n")
-    #                 f.write(f"Mean: {res['cv_scores'].mean():.3f} (+/- {res['cv_scores'].std() * 2:.3f})\n")
+            # Save classification reports
+            report_path = os.path.join(output_dir, condition, 'classification_report.txt')
+            with open(report_path, 'w') as f:
+                for name, res in results.items():
+                    f.write(f"\n{name} Classification Report:\n")
+                    f.write(res['classification_report'])
+                    f.write("\nCross-validation scores:\n")
+                    f.write(f"Mean: {res['cv_scores'].mean():.3f} (+/- {res['cv_scores'].std() * 2:.3f})\n")
     
-    # return processed_df, target_dict
+    return processed_df, target_dict
 
 if __name__ == "__main__":
-    main()
-    # processed_df, target_dict = main() 
+    processed_df, target_dict = main() 
