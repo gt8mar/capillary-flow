@@ -14,6 +14,9 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import cross_val_score, KFold
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, confusion_matrix
 
 # Get the hostname of the computer
 hostname = platform.node()
@@ -233,8 +236,21 @@ def calculate_health_score(participant_df):
     
     return score
 
-def calculate_participant_stiffness(participant_df, participant_id, velocity_profiles):
-    """Calculate stiffness parameters for a single participant"""
+def calculate_participant_stiffness(participant_df, participant_id, velocity_profiles, use_log=False):
+    """
+    Calculate stiffness parameters for a single participant
+    
+    Parameters:
+    -----------
+    participant_df : pandas.DataFrame
+        DataFrame containing participant data
+    participant_id : str
+        Participant identifier
+    velocity_profiles : pandas.DataFrame
+        DataFrame containing velocity profiles
+    use_log : bool, optional
+        Whether to use log-transformed velocity values (default: False)
+    """
     try:
         # Get the SET value and age without binning
         set_value = participant_df['SET'].iloc[0] if 'SET' in participant_df.columns else None
@@ -246,15 +262,22 @@ def calculate_participant_stiffness(participant_df, participant_id, velocity_pro
         # Calculate hysteresis and total area
         hysteresis, total_area, _, _ = calculate_hysteresis(velocity_profiles)
         
+        # Use log-transformed velocity if specified
+        velocity_col = 'Log_Video_Median_Velocity' if use_log else 'Video_Median_Velocity'
+        
+        # Add log-transformed velocity if needed and not already present
+        if use_log and 'Log_Video_Median_Velocity' not in participant_df.columns:
+            participant_df['Log_Video_Median_Velocity'] = np.log(participant_df['Video_Median_Velocity'])
+        
         # Fit linear model with just Pressure
-        model = smf.ols('Video_Median_Velocity ~ Pressure', data=participant_df).fit()
+        model = smf.ols(f'{velocity_col} ~ Pressure', data=participant_df).fit()
         
         # Calculate metrics with error checking
         stiffness_index = -model.params['Pressure']
         baseline_velocity = model.params['Intercept']
         compliance = 1 / stiffness_index if abs(stiffness_index) > 1e-10 else np.nan
         pressure_range = participant_df['Pressure'].max() - participant_df['Pressure'].min()
-        velocity_range = participant_df['Video_Median_Velocity'].max() - participant_df['Video_Median_Velocity'].min()
+        velocity_range = participant_df[velocity_col].max() - participant_df[velocity_col].min()
         sensitivity = velocity_range / pressure_range if pressure_range > 0 else np.nan
         
         # Handle potential division by zero in R-squared calculation
@@ -272,21 +295,25 @@ def calculate_participant_stiffness(participant_df, participant_id, velocity_pro
             'Pressure_Sensitivity': sensitivity,
             'Model_R_Squared': r_squared,
             'N_Observations': len(participant_df),
-            'Velocity_Std': participant_df['Video_Median_Velocity'].std(),
+            'Velocity_Std': participant_df[velocity_col].std(),
             'Pressure_Range': pressure_range,
             'Hysteresis': hysteresis,
-            'Total_Area': total_area
+            'Total_Area': total_area,
+            'Log_Transform_Used': use_log
         }
         
         return metrics
         
     except Exception as e:
         print(f"\nWarning: Could not calculate stiffness for {participant_id}: {str(e)}")
-        return None  # Return None instead of partial metrics
+        return None
 
-def plot_velocity_curves(df, participant_id, output_dir):
+def plot_velocity_curves(df, participant_id, results_dir, use_log=False):
     """Plot velocity vs pressure curves for a single participant"""
-    os.makedirs(output_dir, exist_ok=True)
+    # Save to velocity_profiles directory
+    output_dir = os.path.join(results_dir, 'analytical', 'velocity_profiles')
+    transform_suffix = '_log' if use_log else ''
+    output_path = os.path.join(output_dir, f'velocity_profile_{participant_id}{transform_suffix}.png')
     
     # Set up style and font
     sns.set_style("whitegrid")
@@ -300,10 +327,15 @@ def plot_velocity_curves(df, participant_id, output_dir):
     })
     
     participant_df = df[df['Participant'] == participant_id]
-    velocity_profiles = participant_df.groupby(['Pressure', 'UpDown'])['Video_Median_Velocity'].mean().unstack()
     
-    # Uncomment for diagnostics:
-    # print_diagnostic_plotting(participant_id, velocity_profiles)
+    # Use log-transformed velocity if specified
+    velocity_col = 'Log_Video_Median_Velocity' if use_log else 'Video_Median_Velocity'
+    
+    # Add log-transformed velocity if needed
+    if use_log and 'Log_Video_Median_Velocity' not in participant_df.columns:
+        participant_df['Log_Video_Median_Velocity'] = np.log(participant_df['Video_Median_Velocity'])
+    
+    velocity_profiles = participant_df.groupby(['Pressure', 'UpDown'])[velocity_col].mean().unstack()
     
     hysteresis, _, up_velocities, down_velocities = calculate_hysteresis(velocity_profiles)
     
@@ -315,18 +347,16 @@ def plot_velocity_curves(df, participant_id, output_dir):
         plt.plot(velocity_profiles.index, down_velocities, '.-', color='#ff7f0e', 
                 label='Down', alpha=0.7, markersize=3, linewidth=0.5)
         
+        ylabel = 'Log Velocity (log μm/s)' if use_log else 'Velocity (μm/s)'
         plt.title(f'Velocity Profile: {participant_id}\nHysteresis: {hysteresis:.2f}', 
                  fontproperties=source_sans, fontsize=7)
         plt.xlabel('Pressure (psi)', fontproperties=source_sans, fontsize=7)
-        plt.ylabel('Velocity (μm/s)', fontproperties=source_sans, fontsize=7)
+        plt.ylabel(ylabel, fontproperties=source_sans, fontsize=7)
         plt.legend(prop=source_sans)
         plt.grid(True, alpha=0.3)
         plt.tight_layout()
         
-        output_path = os.path.join(output_dir, f'velocity_profile_{participant_id}.png')
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
-        # Uncomment for diagnostics:
-        # print_diagnostic_plotting(participant_id, velocity_profiles, output_path)
         plt.close()
 
 def plot_participant_comparisons(df, output_dir):
@@ -433,9 +463,10 @@ def load_metadata():
     
     return metadata_df
 
-def run_umap_analysis(metrics_df, df, output_dir):
+def run_umap_analysis(metrics_df, df, results_dir):
     """Run UMAP analysis on the metrics"""
-    print("\nRunning UMAP analysis...")
+    # Save to umap directory
+    output_dir = os.path.join(results_dir, 'stats', 'umap')
     
     # Separate numeric and non-numeric columns
     numeric_cols = metrics_df.select_dtypes(include=['float64', 'int64']).columns
@@ -472,6 +503,10 @@ def run_umap_analysis(metrics_df, df, output_dir):
         metrics_df[f'UMAP1_{n_neighbors}'] = embedding[:, 0]
         metrics_df[f'UMAP2_{n_neighbors}'] = embedding[:, 1]
     
+    # Save UMAP plots
+    plt.savefig(os.path.join(output_dir, 'umap_stability_comparison.png'), dpi=300)
+    plt.savefig(os.path.join(output_dir, 'pca_explained_variance.png'), dpi=300)
+    
     return metrics_df  # Return the updated DataFrame
 
 def impute_height_weight(df):
@@ -495,9 +530,10 @@ def impute_height_weight(df):
     
     return df
 
-def analyze_pressure_importance(df, participant_df, output_dir):
-    """Analyze which pressures are most informative for health scores using PCA"""
-    print("\nAnalyzing pressure importance...")
+def analyze_pressure_importance(df, participant_df, results_dir):
+    """Analyze which pressures are most informative using PCA"""
+    # Save to pca directory
+    output_dir = os.path.join(results_dir, 'stats', 'pca')
     
     # Create pressure-velocity matrix
     pressure_matrix = df.pivot_table(
@@ -991,66 +1027,427 @@ def analyze_clustering_results(metrics_df, output_dir):
         plt.savefig(os.path.join(output_dir, 'umap_stability_comparison.png'))
         plt.close()
 
+def compare_velocity_classifications(df, metrics_df_normal, metrics_df_log, output_dir):
+    """Compare classification performance between normal and log-transformed velocities"""
+    print("\nComparing velocity classification performance...")
+    
+    # Features to use for classification
+    features = ['Stiffness_Index', 'Compliance', 'Baseline_Velocity', 
+                'Pressure_Sensitivity', 'Model_R_Squared', 'Hysteresis', 
+                'Total_Area', 'Velocity_Std']
+    
+    # Target variables to predict
+    targets = ['SET']  # Add more targets if available, e.g., 'Hypertension', 'Diabetes'
+    
+    results = []
+    
+    for target in targets:
+        print(f"\nClassification results for {target}:")
+        
+        # Prepare data for both normal and log versions
+        data_versions = {
+            'Normal': metrics_df_normal,
+            'Log-transformed': metrics_df_log
+        }
+        
+        for version_name, metrics_df in data_versions.items():
+            # Skip if target is not in the data
+            if target not in metrics_df.columns:
+                print(f"Warning: {target} not found in {version_name} data")
+                continue
+                
+            # Prepare features and target
+            X = metrics_df[features].copy()
+            y = metrics_df[target]
+            
+            # Handle missing values
+            X = X.fillna(X.mean())
+            
+            # Scale features
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(X)
+            
+            # Initialize classifier
+            clf = RandomForestClassifier(n_estimators=100, random_state=42)
+            
+            # Perform cross-validation
+            cv_scores = cross_val_score(clf, X_scaled, y, cv=5)
+            
+            print(f"\n{version_name} Velocity Results:")
+            print(f"Cross-validation scores: {cv_scores}")
+            print(f"Mean CV score: {cv_scores.mean():.3f} (±{cv_scores.std()*2:.3f})")
+            
+            # Train on full dataset for feature importance
+            clf.fit(X_scaled, y)
+            
+            # Get feature importance
+            importance = pd.DataFrame({
+                'Feature': features,
+                'Importance': clf.feature_importances_
+            }).sort_values('Importance', ascending=False)
+            
+            print("\nFeature Importance:")
+            print(importance)
+            
+            # Store results
+            results.append({
+                'Target': target,
+                'Version': version_name,
+                'Mean_CV_Score': cv_scores.mean(),
+                'CV_Score_Std': cv_scores.std(),
+                'Feature_Importance': importance
+            })
+            
+            # Plot feature importance
+            plt.figure(figsize=(8, 4))
+            sns.barplot(data=importance, x='Importance', y='Feature')
+            plt.title(f'Feature Importance for {target} Classification\n({version_name} Velocity)')
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, 
+                       f'feature_importance_{target}_{version_name.lower()}.png'),
+                       dpi=300, bbox_inches='tight')
+            plt.close()
+        
+        # Compare versions side by side
+        if len(results) >= 2:
+            comparison_data = pd.DataFrame([
+                {
+                    'Version': r['Version'],
+                    'Mean_CV_Score': r['Mean_CV_Score'],
+                    'CV_Score_Std': r['CV_Score_Std']
+                }
+                for r in results if r['Target'] == target
+            ])
+            
+            plt.figure(figsize=(6, 4))
+            # Modified barplot code to correctly handle error bars
+            bars = plt.bar(comparison_data['Version'], 
+                          comparison_data['Mean_CV_Score'],
+                          yerr=comparison_data['CV_Score_Std']*2,
+                          capsize=5)
+            
+            plt.title(f'Classification Performance Comparison for {target}')
+            plt.ylabel('Mean Cross-Validation Score')
+            plt.ylim(0, 1)
+            
+            # Add value labels on top of bars
+            for bar in bars:
+                height = bar.get_height()
+                plt.text(bar.get_x() + bar.get_width()/2., height,
+                        f'{height:.3f}',
+                        ha='center', va='bottom')
+            
+            plt.tight_layout()
+            plt.savefig(os.path.join(output_dir, f'classification_comparison_{target}.png'),
+                       dpi=300, bbox_inches='tight')
+            plt.close()
+    
+    return results
+
+def compare_health_classifications(df, metrics_df_normal, metrics_df_log, results_dir):
+    """Compare classification performance for health outcomes"""
+    print("\nComparing health classification performance...")
+    
+    # Features to use for classification
+    features = ['Stiffness_Index', 'Compliance', 'Baseline_Velocity', 
+                'Pressure_Sensitivity', 'Model_R_Squared', 'Hysteresis', 
+                'Total_Area', 'Velocity_Std']
+    
+    # Health-related targets to predict
+    targets = ['Hypertension', 'Diabetes', 'HeartDisease']
+    
+    results = []
+    
+    for target in targets:
+        print(f"\nClassification results for {target}:")
+        
+        # Prepare data for both normal and log versions
+        data_versions = {
+            'Normal': metrics_df_normal,
+            'Log-transformed': metrics_df_log
+        }
+        
+        target_results = []
+        
+        for version_name, metrics_df in data_versions.items():
+            # Skip if target is not in the data
+            if target not in df.columns:
+                print(f"Warning: {target} not found in dataset")
+                continue
+            
+            # Get unique participant values for the target
+            participant_targets = df.groupby('Participant')[target].first()
+            
+            # Get target values only for participants in metrics
+            y = participant_targets[metrics_df['Participant']].values
+            
+            # Convert string boolean values if needed
+            if y.dtype == object:
+                y = pd.Series(y).map({'True': True, 'False': False, 'PRE': None}).values
+            
+            # Skip if no valid target values
+            if pd.isna(y).all():
+                print(f"Warning: No valid {target} values found")
+                continue
+                
+            # Prepare features
+            X = metrics_df[features].copy()
+            
+            # Handle missing values
+            X = X.fillna(X.mean())
+            
+            # Scale features
+            scaler = StandardScaler()
+            X_scaled = scaler.fit_transform(X)
+            
+            # Drop rows with NaN target values
+            mask = ~pd.isna(y)
+            X_scaled = X_scaled[mask]
+            y = y[mask]
+            
+            # Skip if not enough samples
+            if len(y) < 5:
+                print(f"Warning: Not enough valid samples for {target}")
+                continue
+            
+            # Initialize classifier
+            clf = RandomForestClassifier(n_estimators=100, random_state=42)
+            
+            try:
+                # Perform cross-validation
+                cv_scores = cross_val_score(clf, X_scaled, y, cv=5, scoring='roc_auc')
+                
+                print(f"\n{version_name} Velocity Results for {target}:")
+                print(f"Cross-validation ROC-AUC scores: {cv_scores}")
+                print(f"Mean ROC-AUC score: {cv_scores.mean():.3f} (±{cv_scores.std()*2:.3f})")
+                
+                # Train on full dataset for feature importance
+                clf.fit(X_scaled, y)
+                
+                # Get feature importance
+                importance = pd.DataFrame({
+                    'Feature': features,
+                    'Importance': clf.feature_importances_
+                }).sort_values('Importance', ascending=False)
+                
+                print("\nFeature Importance:")
+                print(importance)
+                
+                # Store results
+                target_results.append({
+                    'Target': target,
+                    'Version': version_name,
+                    'Mean_ROC_AUC': cv_scores.mean(),
+                    'ROC_AUC_Std': cv_scores.std(),
+                    'Feature_Importance': importance,
+                    'N_Samples': len(y)
+                })
+                
+                # Plot feature importance
+                plt.figure(figsize=(8, 4))
+                sns.barplot(data=importance, x='Importance', y='Feature')
+                plt.title(f'Feature Importance for {target} Classification\n({version_name} Velocity)')
+                plt.tight_layout()
+                plt.savefig(os.path.join(results_dir, 'stats', 'classifier', target.lower(), f'health_importance_{target}_{version_name.lower()}.png'),
+                           dpi=300, bbox_inches='tight')
+                plt.close()
+                
+            except Exception as e:
+                print(f"Warning: Could not perform classification for {target}: {str(e)}")
+                continue
+        
+        # Compare versions side by side if we have results for both
+        if len(target_results) >= 2:
+            comparison_data = pd.DataFrame([
+                {
+                    'Version': r['Version'],
+                    'ROC_AUC_Score': r['Mean_ROC_AUC'],
+                    'Score_Std': r['ROC_AUC_Std']
+                }
+                for r in target_results
+            ])
+            
+            plt.figure(figsize=(6, 4))
+            bars = plt.bar(comparison_data['Version'], 
+                          comparison_data['ROC_AUC_Score'],
+                          yerr=comparison_data['Score_Std']*2,
+                          capsize=5)
+            
+            plt.title(f'Health Classification Performance for {target}')
+            plt.ylabel('Mean ROC-AUC Score')
+            plt.ylim(0, 1)
+            
+            # Add value labels on top of bars
+            for bar in bars:
+                height = bar.get_height()
+                plt.text(bar.get_x() + bar.get_width()/2., height,
+                        f'{height:.3f}',
+                        ha='center', va='bottom')
+            
+            plt.tight_layout()
+            plt.savefig(os.path.join(results_dir, 'stats', 'classifier', target.lower(), f'health_classification_{target}.png'),
+                       dpi=300, bbox_inches='tight')
+            plt.close()
+            
+            results.extend(target_results)
+    
+    return results
+
+def create_output_directories(cap_flow_path):
+    """Create all necessary output subdirectories following coding standards.
+    
+    Args:
+        cap_flow_path: Base path to the capillary-flow directory
+    """
+    results_dir = os.path.join(cap_flow_path, 'results')
+    
+    # Define directory structure based on coding standards
+    directories = {
+        'analytical': [
+            'velocity_profiles',
+            'stiffness_metrics',
+        ],
+        'stats': {
+            'classifier': [
+                'diabetes',
+                'healthy',
+                'heart_disease',
+                'hypertension'
+            ],
+            'pca': [],
+            'umap': []
+        }
+    }
+    
+    # Create directories
+    for main_dir, subdirs in directories.items():
+        base_dir = os.path.join(results_dir, main_dir)
+        
+        if isinstance(subdirs, list):
+            # Create simple subdirectories
+            for subdir in subdirs:
+                full_path = os.path.join(base_dir, subdir)
+                os.makedirs(full_path, exist_ok=True)
+                # print(f"Created directory: {full_path}")
+        elif isinstance(subdirs, dict):
+            # Create nested subdirectories
+            for subdir, nested_dirs in subdirs.items():
+                subdir_path = os.path.join(base_dir, subdir)
+                os.makedirs(subdir_path, exist_ok=True)
+                # print(f"Created directory: {subdir_path}")
+                
+                for nested_dir in nested_dirs:
+                    nested_path = os.path.join(subdir_path, nested_dir)
+                    os.makedirs(nested_path, exist_ok=True)
+                    # print(f"Created directory: {nested_path}")
+
+    return results_dir
+
 def main():
     start_total = time.time()
     
     print("\nStarting data processing...")
     start = time.time()
     data_filepath = os.path.join(cap_flow_path, 'summary_df_nhp_video_stats.csv')
-    output_dir = os.path.join(cap_flow_path, 'results')
+    results_dir = create_output_directories(cap_flow_path)
+    
     df = pd.read_csv(data_filepath)
     
-    # Calculate velocity profiles
-    velocity_profiles_dict = calculate_velocity_profiles(df)
+    # Store metrics DataFrames for both versions
+    metrics_dfs = {}
     
-    # Calculate stiffness parameters for each participant
-    stiffness_metrics = []
-    plotted_participants = []
-    skipped_plots = []
-    
-    for participant_id, velocity_profiles in velocity_profiles_dict.items():
-        participant_df = df[df['Participant'] == participant_id]
+    # Process data with both regular and log-transformed velocities
+    for use_log in [False, True]:
+        transform_suffix = '_log' if use_log else ''
         
-        try:
-            # Calculate stiffness parameters
-            metrics = calculate_participant_stiffness(participant_df, participant_id, velocity_profiles)
-            stiffness_metrics.append(metrics)
+        # Create analytical subdirectories
+        velocity_profiles_dir = os.path.join(results_dir, 'analytical', 'velocity_profiles')
+        os.makedirs(velocity_profiles_dir, exist_ok=True)
+        
+        # Create stats subdirectories
+        stats_subdirs = {
+            'comparisons': '',
+            'umap': '',
+            'pca': '',
+            'classifier': ['diabetes', 'healthy', 'heart_disease', 'hypertension']
+        }
+        
+        for subdir, nested_dirs in stats_subdirs.items():
+            base_dir = os.path.join(results_dir, 'stats', subdir)
+            os.makedirs(base_dir, exist_ok=True)
             
-            # Create velocity curve plots
+            # Create nested directories for classifier
+            if nested_dirs:
+                for nested_dir in nested_dirs:
+                    nested_path = os.path.join(base_dir, nested_dir)
+                    os.makedirs(nested_path, exist_ok=True)
+        
+        # Calculate velocity profiles
+        velocity_profiles_dict = calculate_velocity_profiles(df)
+        
+        # Calculate stiffness parameters for each participant
+        stiffness_metrics = []
+        plotted_participants = []
+        skipped_plots = []
+        
+        for participant_id, velocity_profiles in velocity_profiles_dict.items():
+            participant_df = df[df['Participant'] == participant_id]
+            
             try:
-                plot_velocity_curves(df, participant_id, output_dir)
-                plotted_participants.append(participant_id)
-            except Exception as e:
-                skipped_plots.append((participant_id, str(e)))
-                print(f"\nWarning: Could not plot velocity curves for {participant_id}: {str(e)}")
+                # Calculate stiffness parameters
+                metrics = calculate_participant_stiffness(participant_df, participant_id, 
+                                                        velocity_profiles, use_log=use_log)
+                stiffness_metrics.append(metrics)
                 
-        except Exception as e:
-            print(f"\nError processing participant {participant_id}: {str(e)}")
-            continue
-    
-    # Convert stiffness metrics to DataFrame
-    metrics_df = pd.DataFrame(stiffness_metrics)
-    
-    # Print diagnostic summary
-    print_diagnostic_summary(df, velocity_profiles_dict, plotted_participants, skipped_plots)
-    
-    # Create comparison plots
-    plot_participant_comparisons(metrics_df, output_dir)
-    
-    # Run UMAP analysis
-    run_umap_analysis(metrics_df, df, output_dir)
-    
-    # After calculating metrics
-    print("\nRunning diagnostic analyses...")
-    bp_stats = analyze_bp_extraction(df)
-    profile_stats = analyze_velocity_profiles(velocity_profiles_dict, output_dir)
-    health_correlations = analyze_health_scores(metrics_df, output_dir)
-    analyze_clustering_results(metrics_df, output_dir)
+                # Create velocity curve plots
+                try:
+                    plot_velocity_curves(df, participant_id, results_dir, use_log=use_log)
+                    plotted_participants.append(participant_id)
+                except Exception as e:
+                    skipped_plots.append((participant_id, str(e)))
+                    print(f"\nWarning: Could not plot velocity curves for {participant_id}: {str(e)}")
+                    
+            except Exception as e:
+                print(f"\nError processing participant {participant_id}: {str(e)}")
+                continue
+        
+        # Convert stiffness metrics to DataFrame
+        metrics_df = pd.DataFrame(stiffness_metrics)
+        
+        # Save metrics to CSV with appropriate suffix
+        metrics_output_dir = os.path.join(results_dir, 'analytical', 'stiffness_metrics')
+        metrics_df.to_csv(os.path.join(metrics_output_dir, 
+                         f'stiffness_metrics{transform_suffix}.csv'), index=False)
+        
+        # Print diagnostic summary
+        print(f"\nResults for {'log-transformed' if use_log else 'regular'} velocity:")
+        print_diagnostic_summary(df, velocity_profiles_dict, plotted_participants, skipped_plots)
+        
+        # Create comparison plots
+        plot_participant_comparisons(metrics_df, 
+                                   os.path.join(results_dir, 'stats', 'comparisons'))
+        
+        # Run UMAP analysis
+        run_umap_analysis(metrics_df, df, results_dir)
+        
+        # Run diagnostic analyses
+        print("\nRunning diagnostic analyses...")
+        bp_stats = analyze_bp_extraction(df)
+        profile_stats = analyze_velocity_profiles(velocity_profiles_dict, 
+                                                os.path.join(results_dir, 'analytical', f'velocity_profiles{transform_suffix}'))
+        health_correlations = analyze_health_scores(metrics_df, 
+                                                  os.path.join(results_dir, 'stats'))
+        analyze_clustering_results(metrics_df, 
+                                 os.path.join(results_dir, 'stats'))
+        
+        # Store metrics DataFrame
+        metrics_dfs['log' if use_log else 'normal'] = metrics_df
+        
+        # Run health classification
+        compare_health_classifications(df, metrics_dfs['normal'], metrics_dfs['log'], results_dir)
     
     end = time.time()
     print(f"\nTotal processing time: {end - start_total:.2f} seconds")
-    
-    return df, metrics_df, velocity_profiles_dict
 
 if __name__ == "__main__":
     main()

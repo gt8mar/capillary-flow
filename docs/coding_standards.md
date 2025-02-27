@@ -88,6 +88,62 @@ downloads_path = paths['downloads']
 
 # Set up font
 source_sans = FontProperties(fname=os.path.join(downloads_path, 'Source_Sans_3', 'static', 'SourceSans3-Regular.ttf'))
+
+# Filetree folders
+capillary-flow/
+├── data
+│   └── part00 # example participant
+│   │   └── 240729 # exmaple date
+|   │   │   └── loc01 #example location
+|   |   │   │   ├── centerlines
+|   |   |   │   │   └── coords
+|   |   │   │   ├── segmented
+|   |   |   │   │   └── hasty
+|   |   │   │   ├── vids    
+|   |   |   │   │   └── vid01 # example video
+|   |   |   |   │   │   └── metadata
+|   |   |   |   |   │   │   └── Results.csv
+|   |   |   |   │   │   └── moco # Inside this folder (and mocoslice) are image frames which make a video
+|   |   |   |   │   │   └── mocoslice # only in some shaky videos. 
+├── docs
+├── frog
+│   └── 240729
+│       ├── individual_caps
+│       └── segmented
+├── metadata
+├── results
+│   ├── decay_fits
+│   │   └── participant_fits
+│   ├── analytical
+│   ├── kymographs
+│   ├── segmented
+│   │   └── proj_caps
+│   ├── size
+│   ├── stats
+│   │   ├── comparisons
+│   │   ├── classifier
+│   │   │   ├── diabetes
+│   │   │   ├── healthy
+│   │   │   ├── heart_disease
+│   │   │   └── hypertension
+│   │   ├── pca
+│   │   ├── umap
+│   ├── total
+│   ├── velocities
+│   │   ├── too_fast
+│   │   ├── too_slow
+│   └── velocity_profiles
+├── scripts
+├── src
+│   ├── __pycache__
+│   ├── analysis
+│   │   └── __pycache__
+│   ├── simulation
+│   └── tools
+│       └── __pycache__
+├── src.egg-info
+└── tests
+
 ```
 
 ## Documentation Standards
