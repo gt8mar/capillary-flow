@@ -36,11 +36,11 @@ cap_flow_path = cap_flow_folder_paths.get(hostname, default_folder_path)
 
 
 def plot_CI(df, method='bootstrap', n_iterations=1000, 
-            ci_percentile=99.5, write=True, dimensionless=False, video_median=False, log_scale=False):
+            ci_percentile=99.5, write=True, dimensionless=False, video_median=False, log_scale=False, log_velocity=False):
     """Plots the mean/median and CI for a single dataset."""
     # Set up style and font
     sns.set_style("whitegrid")
-    source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    source_sans = FontProperties(fname='C:\\Users\\gt8ma\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
     
     plt.rcParams.update({
         'pdf.fonttype': 42, 'ps.fonttype': 42,
@@ -78,10 +78,13 @@ def plot_CI(df, method='bootstrap', n_iterations=1000,
         'legend.fontsize': 5, 'lines.linewidth': 0.5
     })
 
-    if dimensionless:
-        y_col = 'Median Dimensionless Velocity' if method == 'bootstrap' else 'Mean Dimensionless Velocity'
+    if log_velocity:
+        y_col = 'Log_Video_Median_Velocity'
     else:
-        y_col = 'Median Velocity' if method == 'bootstrap' else 'Mean Velocity'
+        if dimensionless:
+            y_col = 'Median Dimensionless Velocity' if method == 'bootstrap' else 'Mean Dimensionless Velocity'
+        else:
+            y_col = 'Median Velocity' if method == 'bootstrap' else 'Mean Velocity'
     lower_col = 'CI Lower Bound' if method == 'bootstrap' else 'Lower Bound'
     upper_col = 'CI Upper Bound' if method == 'bootstrap' else 'Upper Bound'
 
@@ -100,7 +103,11 @@ def plot_CI(df, method='bootstrap', n_iterations=1000,
         ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
 
     ax.set_xlabel('Pressure (psi)', fontproperties=source_sans)
-    if dimensionless:
+    if log_velocity:
+        ax.set_ylabel('Log Velocity', fontproperties=source_sans)
+        ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Log Velocity vs. Pressure with {ci_percentile}% CI', 
+                    fontproperties=source_sans, fontsize=8)
+    elif dimensionless:
         ax.set_ylabel('Dimensionless Velocity', fontproperties=source_sans)
         ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Dimensionless Velocity vs. Pressure with {ci_percentile}% CI', 
                     fontproperties=source_sans, fontsize=8)
@@ -178,7 +185,7 @@ def plot_random_intercepts_and_slopes(random_effects_df, participant_column, int
     plt.grid(True)
     plt.show()
 
-def mixed_effects_module(mixed_results):
+def mixed_effects_module(mixed_results, log_velocity=False):
     # Extract random effects
     random_effects = mixed_results.random_effects
     random_effects_list = [
@@ -208,6 +215,10 @@ def mixed_effects_module(mixed_results):
         effect_column="Pressure",
         title="Random Slopes Histogram"
     )
+
+    # Update y-axis label based on log_velocity flag
+    plt.ylabel("Log_Video_Median_Velocity" if log_velocity else "Velocity", fontsize=12)
+    
     return 0
 
 def plot_group_specific_effects(trace):
@@ -275,7 +286,7 @@ def plot_posterior_predictive_checks(idata, model):
 
 
 
-def bayes_module(data):
+def bayes_module(data, log_velocity=False):
     """
     Bayesian mixed-effects model for the capillary flow data.
 
@@ -302,7 +313,10 @@ def bayes_module(data):
         # Likelihood
         mu = group_intercepts[group_idx] + group_slopes[group_idx] * data["Pressure"]
         sigma = pm.HalfNormal("Sigma", sigma=2)
-        y_obs = pm.Normal("y_obs", mu=mu, sigma=sigma, observed=data["Log_Video_Median_Velocity"])
+        
+        # Update observed variable based on log_velocity flag
+        y_column = "Log_Video_Median_Velocity" if log_velocity else "Video_Median_Velocity"
+        y_obs = pm.Normal("y_obs", mu=mu, sigma=sigma, observed=data[y_column])
         
         # Sampling
         trace = pm.sample(2000, return_inferencedata=True)
@@ -322,97 +336,60 @@ def bayes_module(data):
         plot_posterior_predictive_checks(trace, model)
         return 0
     
+def export_to_latex(mixed_results):
+    """
+    Convert mixed effects model results to LaTeX format and return as string.
+    
+    Args:
+        mixed_results: Results from the mixed effects model
+    
+    Returns:
+        str: LaTeX formatted table
+    """
+    # Convert summary DataFrame to LaTeX
+    summary_df = mixed_results.summary().tables[1]
+    latex_table = summary_df.to_latex(
+        column_format='l' + 'c' * (len(summary_df.columns)),
+        caption='Mixed Effects Model Results',
+        label='tab:mixed_effects',
+        float_format=lambda x: '{:.3f}'.format(x) if isinstance(x, (int, float)) else str(x)
+    )
+    
+    # Add LaTeX preamble and document structure
+    latex_document = (
+        "\\documentclass{article}\n"
+        "\\usepackage{booktabs}\n"
+        "\\usepackage{caption}\n"
+        "\\begin{document}\n\n"
+        f"{latex_table}\n\n"
+        "\\end{document}"
+    )
+    
+    print("LaTeX Table:")
+    print(latex_document)
+    return latex_document
+
 def main():
     data_filepath = os.path.join(cap_flow_path, 'summary_df_nhp_video_medians.csv')
     data = pd.read_csv(data_filepath)
     print(data.columns)
-    plot_CI(data, method='bootstrap', n_iterations=1000, ci_percentile=99.5, write=True, dimensionless=False, video_median=True, log_scale=False)
+    
+    # Example using log velocity
+    plot_CI(data, method='bootstrap', n_iterations=1000, ci_percentile=99.5, 
+            write=True, dimensionless=False, video_median=True, 
+            log_scale=False, log_velocity=True)
 
-    mixed_model = smf.mixedlm('Log_Video_Median_Velocity ~ Pressure', data, groups=data['Participant'], re_formula='~Pressure') #re_formula=1  #family=sm.families.Poisson()
+    # Mixed model with log velocity
+    mixed_model = smf.mixedlm('Log_Video_Median_Velocity ~ Pressure', data, 
+                             groups=data['Participant'], re_formula='~Pressure')
     mixed_results = mixed_model.fit()  
     print('Mixed Model Results for Pressure:')
     print(mixed_results.summary())
-
     
+    # Example using Bayes module with log velocity
+    bayes_module(data, log_velocity=True)
 
-    # bayes_module(data)
-    
-
-    
-
-    # normal_group = data[data['SET'] == 'set01']
-    # # print min and max age
-    # print(f"min age: {normal_group['Age'].min()}")
-    # print(f"max age: {normal_group['Age'].max()}")
-    # normal_group_old = normal_group[normal_group['Age']>50]
-
-    # pressure_data = normal_group_old['Pressure']
-    # velocity_data = normal_group_old['Video Median Velocity']
-
-    # # Model List
-    # model_list = ['decay', 'threshold', 'sigmoid', 'piecewise']
-    
-    # # Initial guesses for parameters
-    # Q0_guess_decay = 600
-    # k_guess_decay = 1.5
-    # k_guess_threshold = 1.0
-    # input_params_decay = [Q0_guess_decay, k_guess_decay]
-    # input_params_threshold = [Q0_guess_decay, k_guess_decay, 0.3]
-    # input_params_sigmoid = [Q0_guess_decay, 1.0, 0.5]
-    # input_params_piecewise = [Q0_guess_decay, -300, 0.4, 1.0]
-
-    # # Example: Fit fourth-power decay model
-    # for model in model_list:
-    #     if model == 'decay':
-    #         popt, pcov = curve_fit(flow_decay, pressure_data, velocity_data, p0=input_params_decay)
-    #     elif model == 'threshold':
-    #         popt, pcov = curve_fit(flow_threshold, pressure_data, velocity_data, p0=input_params_threshold)
-    #     elif model == 'sigmoid':
-    #         popt, pcov = curve_fit(flow_sigmoid, pressure_data, velocity_data, p0=input_params_sigmoid, maxfev=5000)
-    #     elif model == 'piecewise':
-    #         popt, pcov = curve_fit(flow_piecewise, pressure_data, velocity_data, p0=input_params_piecewise)
-    #     else:
-    #         print(f"Model {model} not recognized")
-    #         continue
-
-    #     # Extract parameters
-    #     print(f"Model: {model}")
-    #     print(f"Parameters: {popt}")
-    #     print(f"the pcov is {pcov}")
-    # # popt, pcov = curve_fit(flow_decay, pressure_data, velocity_data, p0=[Q0_guess, k_guess])
-    # # print(popt) # Generate predictions
-    #     P_vals = np.linspace(0, max(pressure_data), 100)
-
-    #     # Extract parameters
-    #     if model == 'decay':
-    #         Q0, k = popt
-    #         Q_vals = flow_decay(P_vals, Q0, k)
-    #     elif model == 'threshold':
-    #         Q0, k, P_th = popt
-    #         Q_vals = flow_threshold(P_vals, Q0, k, P_th)
-    #     elif model == 'sigmoid':
-    #         Q0, alpha, P0 = popt
-    #         Q_vals = flow_sigmoid(P_vals, Q0, alpha, P0)
-    #     elif model == 'piecewise':
-    #         Q0, beta, P_static, P_plateau = popt
-    #         Q_vals = flow_piecewise(P_vals, Q0, beta, P_static, P_plateau)
-    #     else:
-    #         print(f"Model {model} not recognized")
-    #         continue
-
-       
-
-    #     # Plot
-    #     plt.figure(figsize=(10, 6))
-    #     # plt.scatter(pressure_data, velocity_data, label='Observed')
-    #     # sns.violinplot(x=pressure_data, y=velocity_data)
-    #     sns.boxplot(x=pressure_data, y=velocity_data)
-    #     plt.plot(P_vals, Q_vals, label=f'Model Fit {model}', color='red')
-    #     plt.xlabel('Pressure (psi)')
-    #     plt.ylabel('Velocity (um/s)')
-    #     plt.legend()
-    #     plt.show()
-    return 0
+    # ... rest of existing code ...
 
 if __name__ == '__main__':
     main()
