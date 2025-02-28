@@ -53,6 +53,8 @@ for participant in participant_list: #os.listdir(base_directory):
                         shutil.copy(source_file, destination_file)
                     else:
                         print(f'{file} already exists in {result_directory}')
+        else:
+            print(f'{source_path} does not exist')
 
 
 print("Files copied successfully.")
