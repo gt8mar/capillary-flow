@@ -27,8 +27,8 @@ else:
     result_directory = '/hpc/projects/capillary-flow/results/segmented/individual_caps_original'
     os.makedirs(result_directory, exist_ok=True)
 
-# Loop through the file tree
-participant_list = ['part28', 'part29', 'part30', 'part31']
+# Loop through the file tree for participants part09 through part81
+participant_list = [f'part{str(i).zfill(2)}' for i in range(9, 82)]
 for participant in participant_list: #os.listdir(base_directory):
     participant_path = os.path.join(base_directory, participant)
     date = find_earliest_date_dir(participant_path)
