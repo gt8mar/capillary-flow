@@ -4290,8 +4290,41 @@ def calculate_video_statistics(df):
     
     return df
 
-
-
+def check_missing_diameters(summary_df):
+    """
+    Check for rows without 'Diameter' values and report statistics.
+    
+    Args:
+        summary_df (DataFrame): The dataframe to check
+        
+    Returns:
+        None: Prints statistics about missing diameter values
+    """
+    # Count total missing diameter values
+    missing_count = summary_df['Diameter'].isna().sum()
+    total_count = len(summary_df)
+    missing_percentage = (missing_count / total_count) * 100
+    
+    print(f"Missing Diameter Values: {missing_count} out of {total_count} rows ({missing_percentage:.2f}%)")
+    
+    # Count missing values by participant
+    missing_by_participant = summary_df[summary_df['Diameter'].isna()].groupby('Participant').size().reset_index()
+    missing_by_participant.columns = ['Participant', 'Missing_Count']
+    
+    # Calculate percentage of missing values for each participant
+    participant_totals = summary_df.groupby('Participant').size().reset_index()
+    participant_totals.columns = ['Participant', 'Total_Count']
+    
+    missing_by_participant = missing_by_participant.merge(participant_totals, on='Participant', how='left')
+    missing_by_participant['Missing_Percentage'] = (missing_by_participant['Missing_Count'] / missing_by_participant['Total_Count']) * 100
+    
+    # Sort by missing count in descending order and get top 20
+    top_missing = missing_by_participant.sort_values('Missing_Count', ascending=False).head(20)
+    
+    print("\nTop 20 Participants with Most Missing Diameter Values:")
+    print(top_missing[['Participant', 'Missing_Count', 'Missing_Percentage']])
+    
+    return None
 
 def main(verbose = False):
     if platform.system() == 'Windows':
@@ -4619,9 +4652,16 @@ def main(verbose = False):
 
     summary_df_video_stats = calculate_video_statistics(summary_df_no_high_pressure)
     summary_df_video_stats['Video Median Velocity'] = summary_df_video_stats['Video_Median_Velocity']
-    # Calculate video median velocity 
-    # Calculate other video statistics
+
+    # Check for missing diameter values before calculating video statistics
+    print("\n----- Checking for Missing Diameter Values -----")
+    check_missing_diameters(summary_df_video_stats)
+    print("----- End of Missing Diameter Check -----\n")
     
+    summary_df_video_stats = calculate_video_statistics(summary_df_no_high_pressure)
+    summary_df_video_stats['Video Median Velocity'] = summary_df_video_stats['Video_Median_Velocity']
+    
+    # Calculate other video statistics
     # Drop duplicates to get a collapsed DataFrame with unique participant-video pairs
     summary_df_nhp_video_medians = summary_df_video_stats.drop_duplicates(subset=['Participant', 'Video'])
 
