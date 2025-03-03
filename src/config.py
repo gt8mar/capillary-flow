@@ -29,11 +29,16 @@ def get_paths():
     paths = computer_paths.get(hostname, default_paths)
     
     # Add derived paths
-    paths['frog_analysis'] = os.path.join(paths['cap_flow'], "frog", "radial-analysis")
+    paths['frog_dir'] = os.path.join(paths['cap_flow'], "frog")
+    paths['frog_analysis'] = os.path.join(paths['frog_dir'], "radial-analysis")
+    paths['frog_segmented'] = os.path.join(paths['frog_dir'], "segmented")
     
     # Create directories if they don't exist
     for path_name, path in paths.items():
-        if path_name.endswith('_analysis'):  # Only create analysis directories
+        if path_name.endswith('_analysis') or path_name.endswith('_segmented'):
             os.makedirs(path, exist_ok=True)
     
-    return paths 
+    return paths
+
+# Export paths directly for easier imports
+PATHS = get_paths() 
