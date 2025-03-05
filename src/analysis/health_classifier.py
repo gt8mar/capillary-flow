@@ -108,8 +108,8 @@ def prepare_data() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray, np.ndarray
             
             # Basic demographic info (as control variables)
             'Age': participant_df['Age'].iloc[0],
-            'SYS_BP': participant_df['SYS_BP'].iloc[0] if 'SYS_BP' in participant_df else None,
-            'DIA_BP': participant_df['DIA_BP'].iloc[0] if 'DIA_BP' in participant_df else None,
+            # 'SYS_BP': participant_df['SYS_BP'].iloc[0] if 'SYS_BP' in participant_df else None,
+            # 'DIA_BP': participant_df['DIA_BP'].iloc[0] if 'DIA_BP' in participant_df else None,
             
             # Target variables
             'Diabetes': str(participant_df['Diabetes'].iloc[0]).upper() == 'TRUE',
@@ -160,6 +160,126 @@ def prepare_data() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray, np.ndarray
     
     return processed_df, target_dict
 
+def prepare_data_log() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray, np.ndarray]]]:
+    """Load and prepare data for classification, focusing on velocity measurements.
+    
+    Returns:
+        Tuple containing:
+            - DataFrame with all features
+            - Dictionary with target variables and their X, y arrays
+    """
+    # Load data
+    data_filepath = os.path.join(cap_flow_path, 'summary_df_nhp_video_stats.csv')
+    df = pd.read_csv(data_filepath)
+    
+    # Debug print
+    print("\nUnique diabetes values in dataset:")
+    print(df['Diabetes'].unique())
+    print("\nValue counts for Diabetes:")
+    print(df['Diabetes'].value_counts())
+    
+    # After loading df
+    print("\nRaw data condition counts:")
+    print("\nDiabetes values:")
+    print(df['Diabetes'].value_counts(dropna=False))
+    print("\nHypertension values:")
+    print(df['Hypertension'].value_counts(dropna=False))
+    print("\nHeartDisease values:")
+    print(df['HeartDisease'].value_counts(dropna=False))
+    
+    # Create features for each participant
+    participant_data = []
+    for participant in df['Participant'].unique():
+        participant_df = df[df['Participant'] == participant]
+        
+        # Basic velocity statistics for each pressure
+        pressure_stats = participant_df.pivot_table(
+            index='Participant',
+            columns='Pressure',
+            values='Log_Video_Median_Velocity',
+            aggfunc=['mean']  # Simplified to just mean velocity
+        ).fillna(0)  # Fill NaN with 0 for missing pressures
+        
+        # Flatten multi-index columns
+        pressure_stats.columns = [f'log_velocity_at_{pressure}psi' 
+                                for (_, pressure) in pressure_stats.columns]
+        
+        # Calculate velocity response characteristics
+        velocity_values = participant_df.groupby('Pressure')['Log_Video_Median_Velocity'].mean().values
+        
+        # Calculate up/down velocity differences
+        up_velocities = participant_df[participant_df['UpDown'] == 'U']['Log_Video_Median_Velocity']
+        down_velocities = participant_df[participant_df['UpDown'] == 'D']['Log_Video_Median_Velocity']
+        
+        # Basic statistics
+        stats = {
+            'Participant': participant,
+            
+            # # Key velocity features
+            # 'baseline_velocity': velocity_values[0] if len(velocity_values) > 0 else 0,
+            # 'max_velocity': np.max(velocity_values) if len(velocity_values) > 0 else 0,
+            # 'velocity_range': (np.max(velocity_values) - np.min(velocity_values)) if len(velocity_values) > 0 else 0,
+            # 'mean_velocity': np.mean(velocity_values) if len(velocity_values) > 0 else 0,
+            # 'velocity_std': np.std(velocity_values) if len(velocity_values) > 0 else 0,
+            
+            # Up/Down differences
+            'up_down_diff': np.mean(up_velocities) - np.mean(down_velocities) if len(up_velocities) > 0 and len(down_velocities) > 0 else 0,
+            
+            # Basic demographic info (as control variables)
+            # 'Age': participant_df['Age'].iloc[0],
+            # 'SYS_BP': participant_df['SYS_BP'].iloc[0] if 'SYS_BP' in participant_df else None,
+            # 'DIA_BP': participant_df['DIA_BP'].iloc[0] if 'DIA_BP' in participant_df else None,
+            
+            # Target variables
+            'Diabetes': str(participant_df['Diabetes'].iloc[0]).upper() == 'TRUE',
+            'Hypertension': participant_df['Hypertension'].iloc[0] == True,
+            'HeartDisease': participant_df['HeartDisease'].iloc[0] == True
+        }
+        
+        # Add pressure-specific velocity features
+        stats.update(pressure_stats.iloc[0].to_dict())
+        
+        participant_data.append(stats)
+    
+    processed_df = pd.DataFrame(participant_data)
+    
+    # Handle missing values
+    numeric_cols = processed_df.select_dtypes(include=['float64', 'int64']).columns
+    processed_df[numeric_cols] = processed_df[numeric_cols].fillna(processed_df[numeric_cols].mean())
+    
+    # Print feature names for verification
+    feature_cols = [col for col in processed_df.columns 
+                   if col not in ['Participant', 'Diabetes', 'Hypertension', 'HeartDisease']]
+    print("\nFeatures being used:")
+    for col in feature_cols:
+        print(f"- {col}")
+    
+    # Prepare X and y for each condition
+    target_dict = {}
+    for condition in ['Diabetes', 'Hypertension', 'HeartDisease']:
+        X = processed_df[feature_cols].values
+        y = processed_df[condition].values
+        target_dict[condition] = (X, y)
+    
+    # Print data shape and feature info
+    print(f"\nTotal samples: {len(processed_df)}")
+    print("\nFeature value ranges:")
+    for col in processed_df.columns:
+        if col not in ['Participant', 'Diabetes', 'Hypertension', 'HeartDisease']:
+            print(f"{col}:")
+            print(f"  Range: {processed_df[col].min():.2f} to {processed_df[col].max():.2f}")
+            print(f"  Mean: {processed_df[col].mean():.2f}")
+            print(f"  Null values: {processed_df[col].isnull().sum()}")
+
+    # Print correlation with target variables
+    for condition in ['Diabetes', 'Hypertension', 'HeartDisease']:
+        print(f"\nTop 5 correlations with {condition}:")
+        correlations = processed_df.drop(['Participant'], axis=1).corr()[condition]
+        print(correlations.sort_values(ascending=False)[:5])
+    
+    return processed_df, target_dict
+
+
 def plot_auc_curves(results: Dict, condition: str, output_dir: str):
     """Plot ROC curves with AUC for all classifiers.
     
@@ -171,7 +291,13 @@ def plot_auc_curves(results: Dict, condition: str, output_dir: str):
     plt.close()
     # Set up style and font
     sns.set_style("whitegrid")
-    source_sans = FontProperties(fname='C:\\Users\\gt8ma\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    
+    # Try to use Source Sans font if available, otherwise use default
+    try:
+        source_sans = FontProperties(fname='C:\\Users\\gt8ma\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    except:
+        print("Source Sans font not found, using default font")
+        source_sans = None
     
     plt.rcParams.update({
         'pdf.fonttype': 42, 'ps.fonttype': 42,
@@ -186,19 +312,23 @@ def plot_auc_curves(results: Dict, condition: str, output_dir: str):
     
     # Plot ROC curve for each classifier
     for (name, res), color in zip(results.items(), colors):
-        # Get predictions for test set
-        if hasattr(res['classifier'], 'predict_proba'):
-            y_pred = res['classifier'].predict_proba(res['X_test'])[:, 1]
-        else:
-            y_pred = res['classifier'].predict(res['X_test'])
-        
-        # Calculate ROC curve
-        fpr, tpr, _ = roc_curve(res['y_test'], y_pred)
-        roc_auc = auc(fpr, tpr)
-        
-        # Plot ROC curve
-        plt.plot(fpr, tpr, color=color, lw=2,
-                label=f'{name} (AUC = {roc_auc:.2f})')
+        try:
+            # Get predictions for test set
+            if hasattr(res['classifier'], 'predict_proba'):
+                y_pred = res['classifier'].predict_proba(res['X_test'])[:, 1]
+            else:
+                y_pred = res['classifier'].predict(res['X_test'])
+            
+            # Calculate ROC curve
+            fpr, tpr, _ = roc_curve(res['y_test'], y_pred)
+            roc_auc = auc(fpr, tpr)
+            
+            # Plot ROC curve
+            plt.plot(fpr, tpr, color=color, lw=2,
+                    label=f'{name} (AUC = {roc_auc:.2f})')
+        except Exception as e:
+            print(f"Warning: Could not plot ROC curve for {name}: {str(e)}")
+            continue
     
     # Plot random guess line
     plt.plot([0, 1], [0, 1], color='gray', linestyle='--')
@@ -206,14 +336,17 @@ def plot_auc_curves(results: Dict, condition: str, output_dir: str):
     # Customize plot
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate', fontproperties=source_sans)
-    plt.ylabel('True Positive Rate', fontproperties=source_sans)
-    plt.title(f'ROC Curves for {condition} Classification', fontproperties=source_sans)
-    plt.legend(loc="lower right", prop=source_sans)
+    plt.xlabel('False Positive Rate', fontproperties=source_sans if source_sans else None)
+    plt.ylabel('True Positive Rate', fontproperties=source_sans if source_sans else None)
+    plt.title(f'ROC Curves for {condition} Classification', fontproperties=source_sans if source_sans else None)
+    plt.legend(loc="lower right", prop=source_sans if source_sans else None)
     
-    # Save plot
+    # Save plot directly to output_dir
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, condition, 'roc_curves.png'), dpi=400, bbox_inches='tight')
+    try:
+        plt.savefig(os.path.join(output_dir, 'roc_curves.png'), dpi=400, bbox_inches='tight')
+    except Exception as e:
+        print(f"Warning: Could not save ROC curve plot: {str(e)}")
     plt.close()
 
 def apply_smote(X: np.ndarray, y: np.ndarray, random_state: int = 42) -> Tuple[np.ndarray, np.ndarray]:
@@ -278,21 +411,29 @@ def evaluate_classifiers(X: np.ndarray, y: np.ndarray, feature_names: List[str])
     # Apply SMOTE to training data only
     X_train_resampled, y_train_resampled = apply_smote(X_train, y_train)
     
-    # Feature selection using Random Forest on resampled data
-    selector = RandomForestClassifier(n_estimators=100, random_state=42)
-    selector.fit(X_train_resampled, y_train_resampled)
-    
-    # Get feature importance scores
-    importance_scores = pd.Series(selector.feature_importances_, index=feature_names)
-    selected_features = importance_scores[importance_scores > importance_scores.mean()].index
-    print("\nSelected features:", selected_features.tolist())
-    
-    # Get indices of selected features
-    selected_indices = [feature_names.index(feature) for feature in selected_features]
-    
-    # Filter X to only include selected features
-    X_train_selected = X_train_resampled[:, selected_indices]
-    X_test_selected = X_test[:, selected_indices]
+    # Skip feature selection if there's only one feature
+    if len(feature_names) == 1:
+        print(f"Only one feature ({feature_names[0]}), skipping feature selection")
+        selected_features = feature_names
+        selected_indices = [0]  # Only one feature at index 0
+        X_train_selected = X_train_resampled
+        X_test_selected = X_test
+    else:
+        # Feature selection using Random Forest on resampled data
+        selector = RandomForestClassifier(n_estimators=100, random_state=42)
+        selector.fit(X_train_resampled, y_train_resampled)
+        
+        # Get feature importance scores
+        importance_scores = pd.Series(selector.feature_importances_, index=feature_names)
+        selected_features = importance_scores[importance_scores > importance_scores.mean()].index
+        print("\nSelected features:", selected_features.tolist())
+        
+        # Get indices of selected features
+        selected_indices = [feature_names.index(feature) for feature in selected_features]
+        
+        # Filter X to only include selected features
+        X_train_selected = X_train_resampled[:, selected_indices]
+        X_test_selected = X_test[:, selected_indices]
     
     classifiers = {
         'Random Forest': RandomForestClassifier(n_estimators=100, random_state=42),
@@ -308,10 +449,47 @@ def evaluate_classifiers(X: np.ndarray, y: np.ndarray, feature_names: List[str])
             clf.fit(X_train_selected, y_train_resampled)
             
             # Cross-validation on original data to get unbiased performance estimate
-            cv_scores = cross_val_score(clf, X_scaled[:, selected_indices], y, cv=5)
+            cv_scores = cross_val_score(clf, X_scaled[:, selected_indices] if len(selected_indices) > 0 else X_scaled, y, cv=5)
             
             # Predict on test set
             y_pred = clf.predict(X_test_selected)
+            
+            # Extract feature importance if available
+            feature_importance = None
+            if hasattr(clf, 'feature_importances_'):
+                # For tree-based models like Random Forest and XGBoost
+                feature_importance = pd.Series(
+                    clf.feature_importances_,
+                    index=selected_features
+                ).sort_values(ascending=False)
+            elif name == 'Logistic Regression':
+                # For Logistic Regression
+                if len(selected_features) > 1:
+                    # For multivariate models
+                    coef = clf.coef_[0] if clf.coef_.ndim > 1 else clf.coef_
+                    feature_importance = pd.Series(
+                        np.abs(coef),  # Use absolute values for importance
+                        index=selected_features
+                    ).sort_values(ascending=False)
+                else:
+                    # For univariate models
+                    coef = clf.coef_[0][0] if clf.coef_.ndim > 1 else clf.coef_[0]
+                    feature_importance = pd.Series(
+                        [np.abs(coef)],  # Use absolute value for importance
+                        index=selected_features
+                    )
+            elif name == 'SVM' and clf.kernel == 'linear':
+                # For linear SVM
+                if len(selected_features) > 1:
+                    feature_importance = pd.Series(
+                        np.abs(clf.coef_[0]),
+                        index=selected_features
+                    ).sort_values(ascending=False)
+                else:
+                    feature_importance = pd.Series(
+                        [np.abs(clf.coef_[0][0])],
+                        index=selected_features
+                    )
             
             # Store results
             results[name] = {
@@ -319,12 +497,10 @@ def evaluate_classifiers(X: np.ndarray, y: np.ndarray, feature_names: List[str])
                 'cv_scores': cv_scores,
                 'confusion_matrix': confusion_matrix(y_test, y_pred),
                 'classification_report': classification_report(y_test, y_pred),
-                'feature_importance': pd.Series(
-                    clf.feature_importances_,
-                    index=selected_features
-                ).sort_values(ascending=False) if hasattr(clf, 'feature_importances_') else None,
+                'feature_importance': feature_importance,
                 'X_test': X_test_selected,
-                'y_test': y_test
+                'y_test': y_test,
+                'selected_features': selected_features
             }
         except Exception as e:
             print(f"Warning: {name} classifier failed: {str(e)}")
@@ -337,47 +513,50 @@ def plot_results(results: Dict, condition: str, output_dir: str):
     if results is None:
         print(f"No results to plot for {condition}")
         return
+    
+    try:
+        # Plot CV scores comparison
+        plt.figure(figsize=(10, 6))
+        # Convert to DataFrame with explicit index for newer pandas version
+        cv_scores_df = pd.DataFrame.from_dict(
+            {name: pd.Series(res['cv_scores']) for name, res in results.items()}
+        )
         
-    # Create condition-specific directory
-    condition_dir = os.path.join(output_dir, condition)
-    os.makedirs(condition_dir, exist_ok=True)
-    
-    # Plot CV scores comparison
-    plt.figure(figsize=(10, 6))
-    # Convert to DataFrame with explicit index for newer pandas version
-    cv_scores_df = pd.DataFrame.from_dict(
-        {name: pd.Series(res['cv_scores']) for name, res in results.items()}
-    )
-    
-    # Use newer pandas groupby syntax
-    sns.boxplot(data=cv_scores_df.melt(), x='variable', y='value')
-    plt.title(f'Cross-validation Scores - {condition}')
-    plt.xticks(rotation=45)
-    plt.xlabel('Classifier')
-    plt.ylabel('Score')
-    plt.tight_layout()
-    plt.savefig(os.path.join(condition_dir, 'cv_scores.png'))
-    plt.close()
+        # Use newer pandas groupby syntax
+        sns.boxplot(data=cv_scores_df.melt(), x='variable', y='value')
+        plt.title(f'Cross-validation Scores - {condition}')
+        plt.xticks(rotation=45)
+        plt.xlabel('Classifier')
+        plt.ylabel('Score')
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, 'cv_scores.png'))
+        plt.close()
+    except Exception as e:
+        print(f"Warning: Could not plot CV scores: {str(e)}")
     
     # Plot feature importance for each applicable classifier
     for name, res in results.items():
         if res['feature_importance'] is not None:
-            plt.figure(figsize=(12, 6))
-            importance_df = res['feature_importance'].head(10).reset_index()
-            importance_df.columns = ['Feature', 'Importance']
-            
-            # Use newer pandas plotting syntax
-            sns.barplot(data=importance_df, x='Importance', y='Feature')
-            plt.title(f'Top 10 Feature Importance - {name} - {condition}')
-            plt.tight_layout()
-            plt.savefig(os.path.join(condition_dir, f'feature_importance_{name}.png'))
-            plt.close()
+            try:
+                plt.figure(figsize=(12, 6))
+                importance_df = res['feature_importance'].reset_index()
+                importance_df.columns = ['Feature', 'Importance']
+                
+                # Use newer pandas plotting syntax
+                sns.barplot(data=importance_df, x='Importance', y='Feature')
+                plt.title(f'Feature Importance - {name} - {condition}')
+                plt.tight_layout()
+                plt.savefig(os.path.join(output_dir, f'feature_importance_{name}.png'))
+                plt.close()
+            except Exception as e:
+                print(f"Warning: Could not plot feature importance for {name}: {str(e)}")
 
-def classify_healthy_vs_affected(df: pd.DataFrame) -> None:
+def classify_healthy_vs_affected(df: pd.DataFrame, output_dir: str = None) -> None:
     """Classify between Set01 (Healthy) and other sets (Affected).
     
     Args:
         df: DataFrame containing participant data
+        output_dir: Directory to save results (default: None, will create a directory)
     """
     # Create binary labels (Set01 = Healthy, others = Affected)
     healthy_mask = df['SET'].str.startswith('set01')
@@ -422,8 +601,8 @@ def classify_healthy_vs_affected(df: pd.DataFrame) -> None:
             
             # Basic demographic info (as control variables)
             'Age': participant_df['Age'].iloc[0],
-            'SYS_BP': participant_df['SYS_BP'].iloc[0] if 'SYS_BP' in participant_df else None,
-            'DIA_BP': participant_df['DIA_BP'].iloc[0] if 'DIA_BP' in participant_df else None,
+            # 'SYS_BP': participant_df['SYS_BP'].iloc[0] if 'SYS_BP' in participant_df else None,
+            # 'DIA_BP': participant_df['DIA_BP'].iloc[0] if 'DIA_BP' in participant_df else None,
         }
         
         # Add pressure-specific velocity features
@@ -457,15 +636,16 @@ def classify_healthy_vs_affected(df: pd.DataFrame) -> None:
     correlations = processed_df[feature_cols + ['is_healthy']].corr()['is_healthy']
     print(correlations.sort_values(ascending=False)[:5])
     
-    # Create output directory
-    output_dir = os.path.join(cap_flow_path, 'results', 'Classifier', 'Healthy')
-    os.makedirs(output_dir, exist_ok=True)
+    # Create output directory if not provided
+    if output_dir is None:
+        output_dir = os.path.join(cap_flow_path, 'results', 'Classifier', 'Healthy')
+        os.makedirs(output_dir, exist_ok=True)
     
     # Evaluate classifiers
     results = evaluate_classifiers(X, y, feature_cols)
     
     if results is not None:
-        # Plot results
+        # Plot results directly in the Healthy directory
         plot_results(results, 'Healthy_vs_Affected', output_dir)
         plot_auc_curves(results, 'Healthy_vs_Affected', output_dir)
         
@@ -477,28 +657,576 @@ def classify_healthy_vs_affected(df: pd.DataFrame) -> None:
                 f.write(res['classification_report'])
                 f.write("\nCross-validation scores:\n")
                 f.write(f"Mean: {res['cv_scores'].mean():.3f} (+/- {res['cv_scores'].std() * 2:.3f})\n")
+    return 0
+
+def classify_healthy_vs_affected_log(df: pd.DataFrame, output_dir: str = None) -> None:
+    """Classify between Set01 (Healthy) and other sets (Affected).
+    
+    Args:
+        df: DataFrame containing participant data
+        output_dir: Directory to save results (default: None, will create a directory)
+    """
+    # Create binary labels (Set01 = Healthy, others = Affected)
+    healthy_mask = df['SET'].str.startswith('set01')
+    
+    participant_data = []
+    for participant in df['Participant'].unique():
+        participant_df = df[df['Participant'] == participant]
+        
+        # Basic velocity statistics for each pressure
+        pressure_stats = participant_df.pivot_table(
+            index='Participant',
+            columns='Pressure',
+            values='Log_Video_Median_Velocity',
+            aggfunc=['mean']
+        ).fillna(0)
+        
+        # Flatten multi-index columns
+        pressure_stats.columns = [f'log_velocity_at_{pressure}psi' 
+                                for (_, pressure) in pressure_stats.columns]
+        
+        # Calculate velocity response characteristics
+        velocity_values = participant_df.groupby('Pressure')['Log_Video_Median_Velocity'].mean().values
+        
+        # Calculate up/down velocity differences
+        up_velocities = participant_df[participant_df['UpDown'] == 'U']['Log_Video_Median_Velocity']
+        down_velocities = participant_df[participant_df['UpDown'] == 'D']['Log_Video_Median_Velocity']
+        
+        # Basic statistics
+        stats = {
+            'Participant': participant,
+            'is_healthy': participant_df['SET'].iloc[0].startswith('set01'),
+            
+            # Key velocity features
+            # 'baseline_velocity': velocity_values[0] if len(velocity_values) > 0 else 0,
+            # 'max_velocity': np.max(velocity_values) if len(velocity_values) > 0 else 0,       # this value might be somewhat helpful but makes it slightly worse
+            # 'velocity_range': (np.max(velocity_values) - np.min(velocity_values)) if len(velocity_values) > 0 else 0, # this variable makes the auc way worse
+            # 'mean_velocity': np.mean(velocity_values) if len(velocity_values) > 0 else 0,
+            # 'velocity_std': np.std(velocity_values) if len(velocity_values) > 0 else 0,       # this variable makes the auc way worse
+            
+            # Up/Down differences
+            'up_down_diff': np.mean(up_velocities) - np.mean(down_velocities) if len(up_velocities) > 0 and len(down_velocities) > 0 else 0,
+            
+            # Basic demographic info (as control variables)
+            # 'Age': participant_df['Age'].iloc[0],
+            # 'SYS_BP': participant_df['SYS_BP'].iloc[0] if 'SYS_BP' in participant_df else None,
+            # 'DIA_BP': participant_df['DIA_BP'].iloc[0] if 'DIA_BP' in participant_df else None,
+        }
+        
+        # Add pressure-specific velocity features
+        stats.update(pressure_stats.iloc[0].to_dict())
+        
+        participant_data.append(stats)
+    
+    processed_df = pd.DataFrame(participant_data)
+    
+    # Handle missing values
+    numeric_cols = processed_df.select_dtypes(include=['float64', 'int64']).columns
+    processed_df[numeric_cols] = processed_df[numeric_cols].fillna(processed_df[numeric_cols].mean())
+    
+    # Print class distribution
+    print("\nClass distribution:")
+    print(processed_df['is_healthy'].value_counts())
+    
+    # Prepare features and target
+    feature_cols = [col for col in processed_df.columns 
+                   if col not in ['Participant', 'is_healthy', 'Diabetes', 'Hypertension', 'HeartDisease']]
+    
+    X = processed_df[feature_cols].values
+    y = processed_df['is_healthy'].values
+    
+    print("\nFeatures being used:")
+    for col in feature_cols:
+        print(f"- {col}")
+    
+    # Print correlations with healthy status
+    print("\nTop 5 correlations with healthy status:")
+    correlations = processed_df[feature_cols + ['is_healthy']].corr()['is_healthy']
+    print(correlations.sort_values(ascending=False)[:5])
+    
+    # Create output directory if not provided
+    if output_dir is None:
+        output_dir = os.path.join(cap_flow_path, 'results', 'Classifier', 'Healthy')
+        os.makedirs(output_dir, exist_ok=True)
+    
+    # Evaluate classifiers
+    results = evaluate_classifiers(X, y, feature_cols)
+    
+    if results is not None:
+        # Plot results directly in the Healthy directory
+        plot_results(results, 'Healthy_vs_Affected', output_dir)
+        plot_auc_curves(results, 'Healthy_vs_Affected', output_dir)
+        
+        # Save classification reports with descriptive filename
+        report_path = os.path.join(output_dir, 'log_velocity_based_healthy_vs_affected_classification_report.txt')
+        with open(report_path, 'w') as f:
+            f.write("Classification Report for Healthy vs. Affected using Log Velocity Features\n")
+            f.write("=" * 70 + "\n\n")
+            
+            # Add overall summary section
+            f.write("SUMMARY OF CLASSIFIER PERFORMANCE\n")
+            f.write("-" * 30 + "\n")
+            f.write(f"{'Classifier':<20} {'CV Score (mean)':<15} {'AUC':<10}\n")
+            
+            # Calculate AUC for each classifier for the summary table
+            for name, res in results.items():
+                # Calculate AUC
+                if hasattr(res['classifier'], 'predict_proba'):
+                    y_pred = res['classifier'].predict_proba(res['X_test'])[:, 1]
+                else:
+                    y_pred = res['classifier'].predict(res['X_test'])
+                
+                fpr, tpr, _ = roc_curve(res['y_test'], y_pred)
+                roc_auc = auc(fpr, tpr)
+                
+                # Write summary line
+                f.write(f"{name:<20} {res['cv_scores'].mean():.3f} ± {res['cv_scores'].std():.3f} {roc_auc:.3f}\n")
+            
+            f.write("\n\n")
+            
+            # Add feature importance summary section
+            f.write("TOP FEATURES BY IMPORTANCE\n")
+            f.write("-" * 30 + "\n")
+            for name, res in results.items():
+                f.write(f"\n{name}:\n")
+                if res['feature_importance'] is not None:
+                    # Get top 5 features or all if less than 5
+                    top_features = res['feature_importance'].head(min(5, len(res['feature_importance'])))
+                    for feature, importance in top_features.items():
+                        f.write(f"  {feature:<30} {importance:.4f}\n")
+                else:
+                    f.write("  Feature importance not available for this model\n")
+            
+            f.write("\n\n")
+            
+            # Detailed results for each classifier
+            for name, res in results.items():
+                f.write(f"\n{'=' * 20} {name} {'=' * 20}\n\n")
+                
+                # Add AUC value
+                if hasattr(res['classifier'], 'predict_proba'):
+                    y_pred_prob = res['classifier'].predict_proba(res['X_test'])[:, 1]
+                else:
+                    y_pred_prob = res['classifier'].predict(res['X_test'])
+                
+                fpr, tpr, _ = roc_curve(res['y_test'], y_pred_prob)
+                roc_auc = auc(fpr, tpr)
+                f.write(f"AUC: {roc_auc:.3f}\n\n")
+                
+                # Add feature importance details
+                if res['feature_importance'] is not None:
+                    f.write("Feature Importance:\n")
+                    for feature, importance in res['feature_importance'].items():
+                        f.write(f"  {feature:<30} {importance:.4f}\n")
+                    f.write("\n")
+                
+                # Add confusion matrix with labels
+                f.write("Confusion Matrix:\n")
+                cm = res['confusion_matrix']
+                f.write(f"{'':>10}Predicted Negative  Predicted Positive\n")
+                f.write(f"Actual Negative{cm[0][0]:>10}{cm[0][1]:>20}\n")
+                f.write(f"Actual Positive{cm[1][0]:>10}{cm[1][1]:>20}\n\n")
+                
+                # Add standard classification report
+                f.write("Classification Report:\n")
+                f.write(res['classification_report'])
+                
+                # Add cross-validation scores
+                f.write("\nCross-validation scores:\n")
+                f.write(f"Mean: {res['cv_scores'].mean():.3f} (±{res['cv_scores'].std():.3f})\n")
+                f.write(f"Individual scores: {', '.join([f'{score:.3f}' for score in res['cv_scores']])}\n\n")
+
+def prepare_demographic_data() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray, np.ndarray]]]:
+    """Load and prepare data for classification using only demographic features.
+    
+    Returns:
+        Tuple containing:
+            - DataFrame with demographic features
+            - Dictionary with target variables and their X, y arrays
+    """
+    # Load data
+    data_filepath = os.path.join(cap_flow_path, 'summary_df_nhp_video_stats.csv')
+    df = pd.read_csv(data_filepath)
+    
+    # Create features for each participant
+    participant_data = []
+    for participant in df['Participant'].unique():
+        participant_df = df[df['Participant'] == participant]
+        
+        # Basic statistics
+        stats = {
+            'Participant': participant,
+            
+            # Demographic features only
+            'Age': participant_df['Age'].iloc[0],
+            'SYS_BP': participant_df['SYS_BP'].iloc[0] if 'SYS_BP' in participant_df.columns else np.nan,
+            'DIA_BP': participant_df['DIA_BP'].iloc[0] if 'DIA_BP' in participant_df.columns else np.nan,
+            
+            # Target variables
+            'Diabetes': str(participant_df['Diabetes'].iloc[0]).upper() == 'TRUE',
+            'Hypertension': participant_df['Hypertension'].iloc[0] == True,
+            'HeartDisease': participant_df['HeartDisease'].iloc[0] == True,
+            'is_healthy': participant_df['SET'].iloc[0].startswith('set01') if 'SET' in participant_df.columns else False
+        }
+        
+        participant_data.append(stats)
+    
+    processed_df = pd.DataFrame(participant_data)
+    
+    # Handle missing values
+    numeric_cols = ['Age', 'SYS_BP', 'DIA_BP']
+    processed_df[numeric_cols] = processed_df[numeric_cols].fillna(processed_df[numeric_cols].mean())
+    
+    # Print feature names for verification
+    feature_cols = ['Age', 'SYS_BP', 'DIA_BP']
+    print("\nDemographic features being used:")
+    for col in feature_cols:
+        print(f"- {col}")
+    
+    # Prepare X and y for each condition
+    target_dict = {}
+    for condition in ['Diabetes', 'Hypertension', 'HeartDisease', 'is_healthy']:
+        X = processed_df[feature_cols].values
+        y = processed_df[condition].values
+        target_dict[condition] = (X, y)
+    
+    # Print data shape and feature info
+    print(f"\nTotal samples: {len(processed_df)}")
+    print("\nFeature value ranges:")
+    for col in feature_cols:
+        print(f"{col}:")
+        print(f"  Range: {processed_df[col].min():.2f} to {processed_df[col].max():.2f}")
+        print(f"  Mean: {processed_df[col].mean():.2f}")
+        print(f"  Null values: {processed_df[col].isnull().sum()}")
+
+    # Print correlation with target variables
+    for condition in ['Diabetes', 'Hypertension', 'HeartDisease', 'is_healthy']:
+        print(f"\nCorrelations with {condition}:")
+        correlations = processed_df[feature_cols + [condition]].corr()[condition]
+        print(correlations)
+    
+    return processed_df, target_dict
+
+def prepare_individual_demographic_data(feature: str) -> Dict[str, Tuple[np.ndarray, np.ndarray]]:
+    """Load and prepare data for classification using a single demographic feature.
+    
+    Args:
+        feature: The demographic feature to use ('Age', 'SYS_BP', or 'DIA_BP')
+        
+    Returns:
+        Dictionary with target variables and their X, y arrays
+    """
+    # Load data
+    data_filepath = os.path.join(cap_flow_path, 'summary_df_nhp_video_stats.csv')
+    df = pd.read_csv(data_filepath)
+    
+    # Create features for each participant
+    participant_data = []
+    for participant in df['Participant'].unique():
+        participant_df = df[df['Participant'] == participant]
+        
+        # Check if feature exists in the dataframe
+        if feature not in participant_df.columns:
+            print(f"Warning: Feature '{feature}' not found in dataframe. Available columns: {participant_df.columns.tolist()}")
+            continue
+        
+        # Basic statistics
+        stats = {
+            'Participant': participant,
+            
+            # Single demographic feature
+            feature: participant_df[feature].iloc[0] if not pd.isna(participant_df[feature].iloc[0]) else np.nan,
+            
+            # Target variables
+            'Diabetes': str(participant_df['Diabetes'].iloc[0]).upper() == 'TRUE',
+            'Hypertension': participant_df['Hypertension'].iloc[0] == True,
+            'HeartDisease': participant_df['HeartDisease'].iloc[0] == True,
+            'is_healthy': participant_df['SET'].iloc[0].startswith('set01') if 'SET' in participant_df.columns else False
+        }
+        
+        participant_data.append(stats)
+    
+    processed_df = pd.DataFrame(participant_data)
+    
+    # Check if we have any data
+    if processed_df.empty:
+        print(f"Error: No data available for feature '{feature}'")
+        return {}
+    
+    # Handle missing values
+    processed_df[feature] = processed_df[feature].fillna(processed_df[feature].mean())
+    
+    print(f"\nUsing single demographic feature: {feature}")
+    print(f"Shape of processed dataframe: {processed_df.shape}")
+    
+    # Prepare X and y for each condition
+    target_dict = {}
+    for condition in ['Diabetes', 'Hypertension', 'HeartDisease', 'is_healthy']:
+        X = processed_df[[feature]].values
+        y = processed_df[condition].values
+        
+        # Print class distribution
+        print(f"\nClass distribution for {condition}:")
+        print(pd.Series(y).value_counts())
+        
+        target_dict[condition] = (X, y)
+    
+    # Print data shape and feature info
+    print(f"\nTotal samples: {len(processed_df)}")
+    print(f"\nFeature value range for {feature}:")
+    print(f"  Range: {processed_df[feature].min():.2f} to {processed_df[feature].max():.2f}")
+    print(f"  Mean: {processed_df[feature].mean():.2f}")
+    print(f"  Null values: {processed_df[feature].isnull().sum()}")
+
+    # Print correlation with target variables
+    for condition in ['Diabetes', 'Hypertension', 'HeartDisease', 'is_healthy']:
+        print(f"\nCorrelation of {feature} with {condition}:")
+        correlation = processed_df[[feature, condition]].corr().iloc[0, 1]
+        print(f"  {correlation:.4f}")
+    
+    return target_dict
+
+def analyze_demographic_features():
+    """Analyze how well demographic features predict health conditions.
+
+    Saves results to:
+        - os.path.join(cap_flow_path, 'results', 'Classifier', 'Demographics')
+    """
+    print("\nStarting demographic feature analysis...")
+    
+    # Create output directory
+    output_dir = os.path.join(cap_flow_path, 'results', 'Classifier', 'Demographics')
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # 1. Analyze all demographic features together
+    processed_df, target_dict = prepare_demographic_data()
+    
+    # Print class distribution for each condition
+    print("\nClass distribution for conditions:")
+    for condition in ['Diabetes', 'Hypertension', 'HeartDisease', 'is_healthy']:
+        class_counts = processed_df[condition].value_counts()
+        print(f"\n{condition}:")
+        print(class_counts)
+    
+    # Create directory for all demographics
+    all_demographics_dir = os.path.join(output_dir, 'All_Demographics')
+    os.makedirs(all_demographics_dir, exist_ok=True)
+    
+    # Analyze each condition with all demographic features
+    feature_names = ['Age', 'SYS_BP', 'DIA_BP']
+    for condition, (X, y) in target_dict.items():
+        print(f"\nAnalyzing {condition} with all demographic features...")
+        
+        # Evaluate classifiers
+        results = evaluate_classifiers(X, y, feature_names)
+        
+        if results is not None:
+            # Plot results including ROC curves
+            plot_results(results, condition, all_demographics_dir)
+            plot_auc_curves(results, condition, all_demographics_dir)
+            
+            # Save classification reports with descriptive filenames
+            condition_name = 'healthy_vs_affected' if condition == 'is_healthy' else condition.lower()
+            report_path = os.path.join(all_demographics_dir, f'all_demographics_{condition_name}_classification_report.txt')
+            with open(report_path, 'w') as f:
+                f.write(f"Classification Report for {condition} using All Demographic Features (Age, SYS_BP, DIA_BP)\n")
+                f.write("=" * 80 + "\n\n")
+                
+                # Add overall summary section
+                f.write("SUMMARY OF CLASSIFIER PERFORMANCE\n")
+                f.write("-" * 30 + "\n")
+                f.write(f"{'Classifier':<20} {'CV Score (mean)':<15} {'AUC':<10}\n")
+                
+                # Calculate AUC for each classifier for the summary table
+                for name, res in results.items():
+                    # Calculate AUC
+                    if hasattr(res['classifier'], 'predict_proba'):
+                        y_pred = res['classifier'].predict_proba(res['X_test'])[:, 1]
+                    else:
+                        y_pred = res['classifier'].predict(res['X_test'])
+                    
+                    fpr, tpr, _ = roc_curve(res['y_test'], y_pred)
+                    roc_auc = auc(fpr, tpr)
+                    
+                    # Write summary line
+                    f.write(f"{name:<20} {res['cv_scores'].mean():.3f} ± {res['cv_scores'].std():.3f} {roc_auc:.3f}\n")
+                
+                f.write("\n\n")
+                
+                # Add feature importance summary section
+                f.write("TOP FEATURES BY IMPORTANCE\n")
+                f.write("-" * 30 + "\n")
+                for name, res in results.items():
+                    f.write(f"\n{name}:\n")
+                    if res['feature_importance'] is not None:
+                        # Get top 5 features or all if less than 5
+                        top_features = res['feature_importance'].head(min(5, len(res['feature_importance'])))
+                        for feature, importance in top_features.items():
+                            f.write(f"  {feature:<30} {importance:.4f}\n")
+                    else:
+                        f.write("  Feature importance not available for this model\n")
+                
+                f.write("\n\n")
+                
+                # Detailed results for each classifier
+                for name, res in results.items():
+                    f.write(f"\n{'=' * 20} {name} {'=' * 20}\n\n")
+                    
+                    # Add AUC value
+                    if hasattr(res['classifier'], 'predict_proba'):
+                        y_pred_prob = res['classifier'].predict_proba(res['X_test'])[:, 1]
+                    else:
+                        y_pred_prob = res['classifier'].predict(res['X_test'])
+                    
+                    fpr, tpr, _ = roc_curve(res['y_test'], y_pred_prob)
+                    roc_auc = auc(fpr, tpr)
+                    f.write(f"AUC: {roc_auc:.3f}\n\n")
+                    
+                    # Add feature importance details
+                    if res['feature_importance'] is not None:
+                        f.write("Feature Importance:\n")
+                        for feature, importance in res['feature_importance'].items():
+                            f.write(f"  {feature:<30} {importance:.4f}\n")
+                        f.write("\n")
+                    
+                    # Add confusion matrix with labels
+                    f.write("Confusion Matrix:\n")
+                    cm = res['confusion_matrix']
+                    f.write(f"{'':>10}Predicted Negative  Predicted Positive\n")
+                    f.write(f"Actual Negative{cm[0][0]:>10}{cm[0][1]:>20}\n")
+                    f.write(f"Actual Positive{cm[1][0]:>10}{cm[1][1]:>20}\n\n")
+                    
+                    # Add standard classification report
+                    f.write("Classification Report:\n")
+                    f.write(res['classification_report'])
+                    
+                    # Add cross-validation scores
+                    f.write("\nCross-validation scores:\n")
+                    f.write(f"Mean: {res['cv_scores'].mean():.3f} (±{res['cv_scores'].std():.3f})\n")
+                    f.write(f"Individual scores: {', '.join([f'{score:.3f}' for score in res['cv_scores']])}\n\n")
+    
+    # 2. Analyze each demographic feature individually
+    for feature in ['Age', 'SYS_BP', 'DIA_BP']:
+        print(f"\nAnalyzing individual feature: {feature}")
+        
+        # Create feature-specific directory
+        feature_dir = os.path.join(output_dir, feature)
+        os.makedirs(feature_dir, exist_ok=True)
+        
+        # Prepare data for this feature
+        target_dict = prepare_individual_demographic_data(feature)
+        
+        # Analyze each condition with this feature
+        for condition, (X, y) in target_dict.items():
+            print(f"\nAnalyzing {condition} with {feature}...")
+            
+            # Evaluate classifiers
+            results = evaluate_classifiers(X, y, [feature])
+            
+            if results is not None:
+                # Plot results including ROC curves
+                plot_results(results, condition, feature_dir)
+                plot_auc_curves(results, condition, feature_dir)
+                
+                # Save classification reports with descriptive filenames
+                condition_name = 'healthy_vs_affected' if condition == 'is_healthy' else condition.lower()
+                report_path = os.path.join(feature_dir, f'{feature.lower()}_{condition_name}_classification_report.txt')
+                with open(report_path, 'w') as f:
+                    f.write(f"Classification Report for {condition} using only {feature}\n")
+                    f.write("=" * 60 + "\n\n")
+                    
+                    # Add overall summary section
+                    f.write("SUMMARY OF CLASSIFIER PERFORMANCE\n")
+                    f.write("-" * 30 + "\n")
+                    f.write(f"{'Classifier':<20} {'CV Score (mean)':<15} {'AUC':<10}\n")
+                    
+                    # Calculate AUC for each classifier for the summary table
+                    for name, res in results.items():
+                        # Calculate AUC
+                        if hasattr(res['classifier'], 'predict_proba'):
+                            y_pred = res['classifier'].predict_proba(res['X_test'])[:, 1]
+                        else:
+                            y_pred = res['classifier'].predict(res['X_test'])
+                        
+                        fpr, tpr, _ = roc_curve(res['y_test'], y_pred)
+                        roc_auc = auc(fpr, tpr)
+                        
+                        # Write summary line
+                        f.write(f"{name:<20} {res['cv_scores'].mean():.3f} ± {res['cv_scores'].std():.3f} {roc_auc:.3f}\n")
+                    
+                    f.write("\n\n")
+                    
+                    # Add feature importance summary section - for single feature this is simple
+                    f.write("FEATURE IMPORTANCE\n")
+                    f.write("-" * 30 + "\n")
+                    f.write(f"Using single feature: {feature}\n\n")
+                    
+                    # Detailed results for each classifier
+                    for name, res in results.items():
+                        f.write(f"\n{'=' * 20} {name} {'=' * 20}\n\n")
+                        
+                        # Add AUC value
+                        if hasattr(res['classifier'], 'predict_proba'):
+                            y_pred_prob = res['classifier'].predict_proba(res['X_test'])[:, 1]
+                        else:
+                            y_pred_prob = res['classifier'].predict(res['X_test'])
+                        
+                        fpr, tpr, _ = roc_curve(res['y_test'], y_pred_prob)
+                        roc_auc = auc(fpr, tpr)
+                        f.write(f"AUC: {roc_auc:.3f}\n\n")
+                        
+                        # Add confusion matrix with labels
+                        f.write("Confusion Matrix:\n")
+                        cm = res['confusion_matrix']
+                        f.write(f"{'':>10}Predicted Negative  Predicted Positive\n")
+                        f.write(f"Actual Negative{cm[0][0]:>10}{cm[0][1]:>20}\n")
+                        f.write(f"Actual Positive{cm[1][0]:>10}{cm[1][1]:>20}\n\n")
+                        
+                        # Add standard classification report
+                        f.write("Classification Report:\n")
+                        f.write(res['classification_report'])
+                        
+                        # Add cross-validation scores
+                        f.write("\nCross-validation scores:\n")
+                        f.write(f"Mean: {res['cv_scores'].mean():.3f} (±{res['cv_scores'].std():.3f})\n")
+                        f.write(f"Individual scores: {', '.join([f'{score:.3f}' for score in res['cv_scores']])}\n\n")
+    
+    print("\nDemographic feature analysis complete.")
 
 def main():
     """Main function to run the classification analysis."""
     print("\nStarting health condition classification analysis...")
     
-    # Create output directory
+    # Create main output directory
     output_dir = os.path.join(cap_flow_path, 'results', 'Classifier')
     os.makedirs(output_dir, exist_ok=True)
+    
+    # Create Velocity umbrella folder for health condition classifications
+    velocity_dir = os.path.join(output_dir, 'Velocity')
+    os.makedirs(velocity_dir, exist_ok=True)
     
     # Load raw data
     data_filepath = os.path.join(cap_flow_path, 'summary_df_nhp_video_stats.csv')
     df = pd.read_csv(data_filepath)
-    
+
     # print the first row of the dataframe in full with all columns and the header 
     print(df.iloc[0])
     
+    # Run demographic feature analysis
+    print("\nRunning demographic feature analysis...")
+    analyze_demographic_features()
+    
     # Run healthy vs affected classification
     print("\nRunning Healthy vs Affected classification...")
-    classify_healthy_vs_affected(df)
+    # Create Healthy directory inside Velocity folder
+    healthy_dir = os.path.join(velocity_dir, 'Healthy')
+    os.makedirs(healthy_dir, exist_ok=True)
+    
+    # Update classify_healthy_vs_affected_log to use the new directory
+    classify_healthy_vs_affected_log(df, output_dir=healthy_dir)
     
     # Prepare data for condition-specific classification
-    processed_df, target_dict = prepare_data()
+    processed_df, target_dict = prepare_data_log()
     
     # Print class distribution for each condition
     print("\nClass distribution for specific conditions:")
@@ -514,22 +1242,96 @@ def main():
         feature_names = [col for col in processed_df.columns 
                         if col not in ['Participant', 'Diabetes', 'Hypertension', 'HeartDisease']]
         
+        # Create condition-specific directory inside Velocity folder
+        condition_dir = os.path.join(velocity_dir, condition)
+        os.makedirs(condition_dir, exist_ok=True)
+        
         # Evaluate classifiers
         results = evaluate_classifiers(X, y, feature_names)
         
         if results is not None:
-            # Plot results including ROC curves
-            plot_results(results, condition, output_dir)
-            plot_auc_curves(results, condition, output_dir)
+            # Plot results directly in the condition directory
+            plot_results(results, condition, condition_dir)
+            plot_auc_curves(results, condition, condition_dir)
             
-            # Save classification reports
-            report_path = os.path.join(output_dir, condition, 'classification_report.txt')
+            # Save classification reports with descriptive filenames
+            report_path = os.path.join(condition_dir, f'velocity_based_{condition}_classification_report.txt')
             with open(report_path, 'w') as f:
+                f.write(f"Classification Report for {condition} using Velocity Features\n")
+                f.write("=" * 50 + "\n\n")
+                
+                # Add overall summary section
+                f.write("SUMMARY OF CLASSIFIER PERFORMANCE\n")
+                f.write("-" * 30 + "\n")
+                f.write(f"{'Classifier':<20} {'CV Score (mean)':<15} {'AUC':<10}\n")
+                
+                # Calculate AUC for each classifier for the summary table
                 for name, res in results.items():
-                    f.write(f"\n{name} Classification Report:\n")
+                    # Calculate AUC
+                    if hasattr(res['classifier'], 'predict_proba'):
+                        y_pred = res['classifier'].predict_proba(res['X_test'])[:, 1]
+                    else:
+                        y_pred = res['classifier'].predict(res['X_test'])
+                    
+                    fpr, tpr, _ = roc_curve(res['y_test'], y_pred)
+                    roc_auc = auc(fpr, tpr)
+                    
+                    # Write summary line
+                    f.write(f"{name:<20} {res['cv_scores'].mean():.3f} ± {res['cv_scores'].std():.3f} {roc_auc:.3f}\n")
+                
+                f.write("\n\n")
+                
+                # Add feature importance summary section
+                f.write("TOP FEATURES BY IMPORTANCE\n")
+                f.write("-" * 30 + "\n")
+                for name, res in results.items():
+                    f.write(f"\n{name}:\n")
+                    if res['feature_importance'] is not None:
+                        # Get top 5 features or all if less than 5
+                        top_features = res['feature_importance'].head(min(5, len(res['feature_importance'])))
+                        for feature, importance in top_features.items():
+                            f.write(f"  {feature:<30} {importance:.4f}\n")
+                    else:
+                        f.write("  Feature importance not available for this model\n")
+                
+                f.write("\n\n")
+                
+                # Detailed results for each classifier
+                for name, res in results.items():
+                    f.write(f"\n{'=' * 20} {name} {'=' * 20}\n\n")
+                    
+                    # Add AUC value
+                    if hasattr(res['classifier'], 'predict_proba'):
+                        y_pred_prob = res['classifier'].predict_proba(res['X_test'])[:, 1]
+                    else:
+                        y_pred_prob = res['classifier'].predict(res['X_test'])
+                    
+                    fpr, tpr, _ = roc_curve(res['y_test'], y_pred_prob)
+                    roc_auc = auc(fpr, tpr)
+                    f.write(f"AUC: {roc_auc:.3f}\n\n")
+                    
+                    # Add feature importance details
+                    if res['feature_importance'] is not None:
+                        f.write("Feature Importance:\n")
+                        for feature, importance in res['feature_importance'].items():
+                            f.write(f"  {feature:<30} {importance:.4f}\n")
+                        f.write("\n")
+                    
+                    # Add confusion matrix with labels
+                    f.write("Confusion Matrix:\n")
+                    cm = res['confusion_matrix']
+                    f.write(f"{'':>10}Predicted Negative  Predicted Positive\n")
+                    f.write(f"Actual Negative{cm[0][0]:>10}{cm[0][1]:>20}\n")
+                    f.write(f"Actual Positive{cm[1][0]:>10}{cm[1][1]:>20}\n\n")
+                    
+                    # Add standard classification report
+                    f.write("Classification Report:\n")
                     f.write(res['classification_report'])
+                    
+                    # Add cross-validation scores
                     f.write("\nCross-validation scores:\n")
-                    f.write(f"Mean: {res['cv_scores'].mean():.3f} (+/- {res['cv_scores'].std() * 2:.3f})\n")
+                    f.write(f"Mean: {res['cv_scores'].mean():.3f} (±{res['cv_scores'].std():.3f})\n")
+                    f.write(f"Individual scores: {', '.join([f'{score:.3f}' for score in res['cv_scores']])}\n\n")
     
     return processed_df, target_dict
 
