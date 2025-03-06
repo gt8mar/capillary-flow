@@ -264,7 +264,7 @@ def main(write = True):
     if platform.system() == 'Windows':
         # Define the directory
         centerlines_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\centerlines'
-        area_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\segmented\\individual_caps_original'
+        area_folder = 'C:\\Users\\gt8mar\\capillary-flow\\results\\segmented\\renamed_individual_caps_original'
     
     # Start timing the execution
     start_time = time.time()
@@ -302,7 +302,7 @@ def main(write = True):
     
     # Save the DataFrame if write is True
     if write:
-        summary_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\results\\cap_diameters_areas.csv', index=False)
+        summary_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\results\\cap_diameters_areas_renamed.csv', index=False)
      # Calculate and print total execution time
     end_time = time.time()
     print(f"Total processing completed in {end_time - start_time:.2f} seconds")
