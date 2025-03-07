@@ -1,0 +1,9 @@
+---
+description: Use coding standards from coding_standards.md
+globs: 
+alwaysApply: true
+---
+
+# Your rule content
+
+- Follow [coding_standards.md](mdc:docs/coding_standards.md)

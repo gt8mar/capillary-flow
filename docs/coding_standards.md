@@ -146,6 +146,9 @@ capillary-flow/
 
 ```
 
+### Optical System constants
+PIX_UM = 2.44 #1.74 for old camera
+
 ## Documentation Standards
 
 ### Function Docstrings
