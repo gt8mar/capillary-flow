@@ -111,7 +111,8 @@ def main():
     # set the ylim to be the max of Mean_Diameter
     plt.ylim(0, merged_df['Mean_Diameter'].max())
     plt.title('Mean_Diameter vs Bulk_Diameter')
-    plt.show()
+    # plt.show()
+    plt.close()
     
     velocity_file = pd.read_csv(velocity_file_path)
     
@@ -154,34 +155,34 @@ def main():
     #     plt.title(f'{participant} - Corrected_Velocity vs Mean_Diameter')
     #     plt.show()
 
-    # For each pressure, plot the 'Corrected_Velocity' vs 'Mean_Diameter'. Color by 'Age' and then make another plot that colors by 'SET'
-    # Plot colored by Age
-    for pressure in test_df['Pressure'].unique():
-        plt.figure(figsize=(10, 6))
-        scatter = plt.scatter(test_df[test_df['Pressure'] == pressure]['Mean_Diameter'], 
-                            test_df[test_df['Pressure'] == pressure]['Corrected_Velocity'],
-                            c=test_df[test_df['Pressure'] == pressure]['Age'],
-                            alpha=0.5)
-        plt.colorbar(scatter, label='Age')
-        plt.xlabel('Mean_Diameter')
-        plt.ylabel('Corrected_Velocity') 
-        plt.title(f'{pressure} - Corrected_Velocity vs Mean_Diameter (colored by Age)')
-        plt.show()
+    # # For each pressure, plot the 'Corrected_Velocity' vs 'Mean_Diameter'. Color by 'Age' and then make another plot that colors by 'SET'
+    # # Plot colored by Age
+    # for pressure in test_df['Pressure'].unique():
+    #     plt.figure(figsize=(10, 6))
+    #     scatter = plt.scatter(test_df[test_df['Pressure'] == pressure]['Mean_Diameter'], 
+    #                         test_df[test_df['Pressure'] == pressure]['Corrected_Velocity'],
+    #                         c=test_df[test_df['Pressure'] == pressure]['Age'],
+    #                         alpha=0.5)
+    #     plt.colorbar(scatter, label='Age')
+    #     plt.xlabel('Mean_Diameter')
+    #     plt.ylabel('Corrected_Velocity') 
+    #     plt.title(f'{pressure} - Corrected_Velocity vs Mean_Diameter (colored by Age)')
+    #     plt.show()
 
-    # Plot colored by SET
-    for pressure in test_df['Pressure'].unique():
-        plt.figure(figsize=(10, 6))
-        # Convert SET strings to numbers by extracting digits
-        set_numbers = test_df[test_df['Pressure'] == pressure]['SET'].str.extract('(\d+)').astype(float)
-        scatter = plt.scatter(test_df[test_df['Pressure'] == pressure]['Mean_Diameter'],
-                            test_df[test_df['Pressure'] == pressure]['Corrected_Velocity'], 
-                            c=set_numbers,
-                            alpha=0.5)
-        plt.colorbar(scatter, label='SET')
-        plt.xlabel('Mean_Diameter')
-        plt.ylabel('Corrected_Velocity')
-        plt.title(f'{pressure} - Corrected_Velocity vs Mean_Diameter (colored by SET)')
-        plt.show()
+    # # Plot colored by SET
+    # for pressure in test_df['Pressure'].unique():
+    #     plt.figure(figsize=(10, 6))
+    #     # Convert SET strings to numbers by extracting digits
+    #     set_numbers = test_df[test_df['Pressure'] == pressure]['SET'].str.extract('(\d+)').astype(float)
+    #     scatter = plt.scatter(test_df[test_df['Pressure'] == pressure]['Mean_Diameter'],
+    #                         test_df[test_df['Pressure'] == pressure]['Corrected_Velocity'], 
+    #                         c=set_numbers,
+    #                         alpha=0.5)
+    #     plt.colorbar(scatter, label='SET')
+    #     plt.xlabel('Mean_Diameter')
+    #     plt.ylabel('Corrected_Velocity')
+    #     plt.title(f'{pressure} - Corrected_Velocity vs Mean_Diameter (colored by SET)')
+    #     plt.show()
     
     # Mixed Effects Model Analysis
     print("\nPerforming Mixed Effects Model Analysis...")
@@ -328,6 +329,7 @@ def main():
             
             plt.tight_layout()
             plt.show()
+            plt.close()
         except Exception as e:
             print(f"Could not create 3D visualization: {e}")
         
@@ -336,6 +338,159 @@ def main():
         print("Install it using: pip install statsmodels")
     except Exception as e:
         print(f"Error in mixed effects modeling: {e}")
+    
+    
+    # Create CDF plots for Mean Diameter split by age groups
+    print("\nCreating CDF plots for Mean Diameter by age groups...")
+    
+    # Ensure we have age data
+    if 'Age' not in test_df.columns or test_df['Age'].isna().all():
+        print("Error: Age data is missing or all null. Cannot create age-based CDF plots.")
+    else:
+        # Create a copy of the dataframe for age analysis
+        age_df = test_df.dropna(subset=['Mean_Diameter', 'Age']).copy()
+        
+        # Print age statistics
+        print(f"Age range in data: {age_df['Age'].min()} to {age_df['Age'].max()} years")
+        print(f"Mean age: {age_df['Age'].mean():.2f} years")
+        print(f"Median age: {age_df['Age'].median():.2f} years")
+        
+        # Test different age thresholds
+        age_min = int(np.floor(age_df['Age'].min()))
+        age_max = int(np.ceil(age_df['Age'].max()))
+        
+        # Create a range of thresholds to test
+        # If we have a wide age range, test every 5 years
+        if age_max - age_min > 20:
+            thresholds = list(range(age_min + 5, age_max - 5, 5))
+        # Otherwise test every 2 years
+        else:
+            thresholds = list(range(age_min + 2, age_max - 2, 2))
+        
+        # Ensure we have at least some thresholds
+        if len(thresholds) == 0:
+            # If age range is very narrow, just use the median
+            thresholds = [int(age_df['Age'].median())]
+        
+        print(f"Testing age thresholds: {thresholds}")
+        
+        # Create individual plots for each threshold
+        ks_results = {}
+        for threshold in thresholds:
+            plt.close()
+            # plt.figure(figsize=(10, 6))
+            ks_stat = create_age_cdf_plot(age_df, threshold)
+            if ks_stat is not None:
+                ks_results[threshold] = ks_stat
+            # plt.tight_layout()
+            # plt.show()
+            # Explicitly close the figure to prevent memory issues
+            plt.close()
+        
+        # Find the threshold with the maximum KS statistic (most different distributions)
+        if ks_results:
+            best_threshold = max(ks_results, key=ks_results.get)
+            print(f"\nThreshold with most distinct distributions: {best_threshold} years")
+            print(f"KS statistic: {ks_results[best_threshold]:.3f}")
+            
+        # Create a plot showing KS statistic vs threshold
+        if len(ks_results) > 1:
+            plt.figure(figsize=(10, 6))
+            thresholds_list = list(ks_results.keys())
+            ks_stats = list(ks_results.values())
+            
+            plt.plot(thresholds_list, ks_stats, 'o-', linewidth=2)
+            plt.axvline(x=best_threshold, color='red', linestyle='--', 
+                       label=f'Best threshold: {best_threshold} years')
+            
+            plt.xlabel('Age Threshold (years)')
+            plt.ylabel('Kolmogorov-Smirnov Statistic')
+            plt.title('KS Statistic vs Age Threshold')
+            plt.grid(True, alpha=0.3)
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+            plt.close()
+    
+    return 0
+
+# Function to create CDF plot for a specific age threshold
+def create_age_cdf_plot(age_df, age_threshold, ax=None):
+    """
+    Create a CDF plot for Mean Diameter split by age groups based on the given threshold.
+    
+    Args:
+        age_df: DataFrame containing Age and Mean_Diameter columns
+        age_threshold: Age value to use as threshold for grouping
+        ax: Matplotlib axis to plot on (optional)
+        
+    Returns:
+        KS statistic if two groups are created, None otherwise
+    """
+    plt.close()
+    # Create age groups
+    age_df['Age_Group'] = np.where(age_df['Age'] <= age_threshold, 
+                                    f'≤{age_threshold} years', 
+                                    f'>{age_threshold} years')
+    
+    # Count samples in each group
+    group_counts = age_df['Age_Group'].value_counts()
+    
+    # Calculate CDFs for each group
+    groups = []
+    for group_name, group_data in age_df.groupby('Age_Group'):
+        # Sort the data
+        sorted_data = np.sort(group_data['Mean_Diameter'])
+        # Calculate the CDF values (0 to 1)
+        cdf = np.arange(1, len(sorted_data) + 1) / len(sorted_data)
+        groups.append((group_name, sorted_data, cdf, len(sorted_data)))
+    
+    # Create the plot
+    if ax is None:
+        fig, ax = plt.subplots(figsize=(10, 6))
+    
+    # Plot each group
+    for group_name, sorted_data, cdf, count in groups:
+        ax.plot(sorted_data, cdf, '-', linewidth=2, 
+                label=f'{group_name} (n={count})')
+    
+    # Add reference line
+    ax.axhline(y=0.5, color='gray', linestyle='--', alpha=0.5)
+    
+    # Calculate median for each group for annotation
+    medians = age_df.groupby('Age_Group')['Mean_Diameter'].median()
+    
+    # Add median lines and annotations
+    colors = ['C0', 'C1']  # Default matplotlib colors
+    for i, (group, median) in enumerate(medians.items()):
+        ax.axvline(x=median, color=colors[i], linestyle=':', alpha=0.7)
+        ax.text(median, 0.52, f'Median: {median:.2f}', 
+                color=colors[i], ha='center', va='bottom')
+    
+    # Calculate Kolmogorov-Smirnov statistic
+    ks_stat = None
+    if len(groups) == 2:
+        from scipy import stats
+        group1_data = age_df[age_df['Age_Group'] == groups[0][0]]['Mean_Diameter']
+        group2_data = age_df[age_df['Age_Group'] == groups[1][0]]['Mean_Diameter']
+        ks_stat, p_value = stats.ks_2samp(group1_data, group2_data)
+        
+        # Add KS test results to the plot
+        ax.text(0.05, 0.05, 
+                f'KS test: D={ks_stat:.3f}, p={p_value:.4f}',
+                transform=ax.transAxes, bbox=dict(facecolor='white', alpha=0.8))
+    
+    # Add labels and title
+    ax.set_xlabel('Mean Diameter')
+    ax.set_ylabel('Cumulative Probability')
+    ax.set_title(f'CDF of Mean Diameter by Age Group (Threshold: {age_threshold} years)')
+    ax.grid(True, alpha=0.3)
+    ax.legend(loc='lower right')
+    plt.tight_layout()
+    plt.show()
+    plt.close()
+    
+    return ks_stat
 
 def check_duplicate_areas(merged_df: pd.DataFrame):
     """
