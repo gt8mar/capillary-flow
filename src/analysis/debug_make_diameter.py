@@ -17,6 +17,8 @@ from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
+from matplotlib.font_manager import FontProperties
 
 # Local imports
 from src.tools.parse_filename import parse_filename
@@ -40,6 +42,21 @@ def main():
         segmentation_folder = os.path.join(cap_flow_path, 'results', 'segmented', 'individual_caps_original')
         segmentation_folder_renamed = os.path.join(cap_flow_path, 'results', 'segmented', 'renamed_individual_caps_original')
     print(f"Loading diameter data from: {diameters_file}")
+
+    # plotting parameters
+    plt.rcParams.update({
+        'pdf.fonttype': 42,
+        'ps.fonttype': 42,
+        'font.size': 7,
+        'axes.labelsize': 7,
+    })
+
+    # Set up font
+    try:
+        source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+    except Exception as e:
+        print(f"Warning: Could not set up font: {e}")
+        source_sans = None
     
     # Load the diameter data
     try:
@@ -103,15 +120,28 @@ def main():
         print("No missing area calculations found. Exiting.")
         # return
     
-    # plot Mean_Diameter vs Bulk_Diameter
-    plt.figure(figsize=(10, 6))
+    # Plot comparison of mean diameter vs bulk diameter
+    plt.figure(figsize=(2.4, 2.0))
     plt.scatter(merged_df['Mean_Diameter'], merged_df['Bulk_Diameter'], alpha=0.5)
-    plt.xlabel('Mean_Diameter')
-    plt.ylabel('Bulk_Diameter')
-    # set the ylim to be the max of Mean_Diameter
+    plt.xlabel('Mean Diameter (μm)')
+    plt.ylabel('Bulk Diameter (μm)') 
     plt.ylim(0, merged_df['Mean_Diameter'].max())
-    plt.title('Mean_Diameter vs Bulk_Diameter')
-    # plt.show()
+    plt.title('Mean vs Bulk Diameter')
+    
+    # Update plot styling
+    plt.rcParams.update({
+        'pdf.fonttype': 42,
+        'ps.fonttype': 42,
+        'font.size': 7,
+        'axes.labelsize': 7,
+        'xtick.labelsize': 6,
+        'ytick.labelsize': 6,
+        'legend.fontsize': 5,
+        'lines.linewidth': 0.5
+    })
+    
+    plt.savefig(os.path.join(cap_flow_path, 'results', 'mean_diameter_vs_bulk_diameter.png'), 
+                dpi=600, bbox_inches='tight')
     plt.close()
     
     velocity_file = pd.read_csv(velocity_file_path)
@@ -142,48 +172,215 @@ def main():
     rows_with_area_x_but_no_corrected_velocity.to_csv(os.path.join(cap_flow_path, 'results', 'rows_with_area_x_but_no_corrected_velocity.csv'), index=False)
     
     # make a test dataframe where we only include rows where 'Corrected_Velocity' is not null and 'Area' is not null
-    test_df = big_merged_df[big_merged_df['Corrected_Velocity'].notna() & big_merged_df['Area_x'].notna()]
+    diameter_analysis_df = big_merged_df[big_merged_df['Corrected_Velocity'].notna() & big_merged_df['Area_x'].notna()]
     # rename the 'Area_x' column to 'Area'
-    test_df = test_df.rename(columns={'Area_x': 'Area'})
+    diameter_analysis_df = diameter_analysis_df.rename(columns={'Area_x': 'Area'})
+    # save test_df to a csv file
+    diameter_analysis_df.to_csv(os.path.join(cap_flow_path, 'results', 'diameter_analysis_df.csv'), index=False)
     
-    # # for each participant, plot the 'Corrected_Velocity' vs 'Mean_Diameter'
-    # for participant in test_df['Participant'].unique():
-    #     plt.figure(figsize=(10, 6))
-    #     plt.scatter(test_df[test_df['Participant'] == participant]['Mean_Diameter'], test_df[test_df['Participant'] == participant]['Corrected_Velocity'], alpha=0.5)
-    #     plt.xlabel('Mean_Diameter')
-    #     plt.ylabel('Corrected_Velocity')
-    #     plt.title(f'{participant} - Corrected_Velocity vs Mean_Diameter')
-    #     plt.show()
+    # Create diameter plots directory if it doesn't exist
+    diameter_plots_dir = os.path.join(cap_flow_path, 'results', 'diameter_plots')
+    os.makedirs(diameter_plots_dir, exist_ok=True)
 
-    # # For each pressure, plot the 'Corrected_Velocity' vs 'Mean_Diameter'. Color by 'Age' and then make another plot that colors by 'SET'
-    # # Plot colored by Age
-    # for pressure in test_df['Pressure'].unique():
-    #     plt.figure(figsize=(10, 6))
-    #     scatter = plt.scatter(test_df[test_df['Pressure'] == pressure]['Mean_Diameter'], 
-    #                         test_df[test_df['Pressure'] == pressure]['Corrected_Velocity'],
-    #                         c=test_df[test_df['Pressure'] == pressure]['Age'],
-    #                         alpha=0.5)
-    #     plt.colorbar(scatter, label='Age')
-    #     plt.xlabel('Mean_Diameter')
-    #     plt.ylabel('Corrected_Velocity') 
-    #     plt.title(f'{pressure} - Corrected_Velocity vs Mean_Diameter (colored by Age)')
-    #     plt.show()
-
-    # # Plot colored by SET
-    # for pressure in test_df['Pressure'].unique():
-    #     plt.figure(figsize=(10, 6))
-    #     # Convert SET strings to numbers by extracting digits
-    #     set_numbers = test_df[test_df['Pressure'] == pressure]['SET'].str.extract('(\d+)').astype(float)
-    #     scatter = plt.scatter(test_df[test_df['Pressure'] == pressure]['Mean_Diameter'],
-    #                         test_df[test_df['Pressure'] == pressure]['Corrected_Velocity'], 
-    #                         c=set_numbers,
-    #                         alpha=0.5)
-    #     plt.colorbar(scatter, label='SET')
-    #     plt.xlabel('Mean_Diameter')
-    #     plt.ylabel('Corrected_Velocity')
-    #     plt.title(f'{pressure} - Corrected_Velocity vs Mean_Diameter (colored by SET)')
-    #     plt.show()
+    # threshold_analysis(diameter_analysis_df, diameter_plots_dir, cap_flow_path)
+    # plot_velocity_vs_diameter_by_age(diameter_analysis_df, diameter_plots_dir)
+    # plot_velocity_vs_diameter_by_participant(diameter_analysis_df, diameter_plots_dir)
+    # plot_velocity_vs_diameter_by_set(diameter_analysis_df)
     
+    # make_mixed_effect_model(diameter_analysis_df)
+    # threshold_analysis(diameter_analysis_df)  
+    # plot_velocity_vs_diameter_theory()
+
+    plot_pressure_drop_per_length(diameter_analysis_df)
+    return 0
+
+
+def threshold_analysis(diameter_analysis_df, diameter_plots_dir, cap_flow_path):
+    # Create CDF plots for Mean Diameter split by age groups
+    print("\nCreating CDF plots for Mean Diameter by age groups...")
+    
+    # Ensure we have age data
+    if 'Age' not in diameter_analysis_df.columns or diameter_analysis_df['Age'].isna().all():
+        print("Error: Age data is missing or all null. Cannot create age-based CDF plots.")
+    else:
+        # Create a copy of the dataframe for age analysis
+        age_df = diameter_analysis_df.dropna(subset=['Mean_Diameter', 'Age']).copy()
+        
+        # Print age statistics
+        print(f"Age range in data: {age_df['Age'].min()} to {age_df['Age'].max()} years")
+        print(f"Mean age: {age_df['Age'].mean():.2f} years")
+        print(f"Median age: {age_df['Age'].median():.2f} years")
+        
+        # Test different age thresholds
+        age_min = int(np.floor(age_df['Age'].min()))
+        age_max = int(np.ceil(age_df['Age'].max()))
+        
+        # Create a range of thresholds to test
+        # If we have a wide age range, test every 5 years
+        if age_max - age_min > 20:
+            thresholds = list(range(age_min + 5, age_max - 5, 5))
+        # Otherwise test every 2 years
+        else:
+            thresholds = list(range(age_min + 2, age_max - 2, 2))
+        
+        # Ensure we have at least some thresholds
+        if len(thresholds) == 0:
+            # If age range is very narrow, just use the median
+            thresholds = [int(age_df['Age'].median())]
+        
+        print(f"Testing age thresholds: {thresholds}")
+        
+        # Create individual plots for each threshold
+        ks_results = {}
+        for threshold in thresholds:
+            plt.close()
+            # Set up style and font
+            sns.set_style("whitegrid")
+            source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+            
+            plt.rcParams.update({
+                'pdf.fonttype': 42, 'ps.fonttype': 42,
+                'font.size': 7, 'axes.labelsize': 7,
+                'xtick.labelsize': 6, 'ytick.labelsize': 6,
+                'legend.fontsize': 5, 'lines.linewidth': 0.5
+            })
+            
+            fig, ax = plt.subplots(figsize=(2.4, 2.0))
+            ks_stat = create_age_cdf_plot(age_df, threshold, cap_flow_path, ax)
+            if ks_stat is not None:
+                ks_results[threshold] = ks_stat
+            
+            plt.tight_layout()
+            plt.savefig(os.path.join(diameter_plots_dir, f'age_cdf_threshold_{threshold}.png'), dpi=600, bbox_inches='tight')
+            plt.close()
+        
+        # Find the threshold with the maximum KS statistic (most different distributions)
+        if ks_results:
+            best_threshold = max(ks_results, key=ks_results.get)
+            print(f"\nThreshold with most distinct distributions: {best_threshold} years")
+            print(f"KS statistic: {ks_results[best_threshold]:.3f}")
+            
+        # Create a plot showing KS statistic vs threshold
+        if len(ks_results) > 1:
+            plt.close()
+            # Set up style and font
+            sns.set_style("whitegrid")
+            source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+            
+            plt.rcParams.update({
+                'pdf.fonttype': 42, 'ps.fonttype': 42,
+                'font.size': 7, 'axes.labelsize': 7,
+                'xtick.labelsize': 6, 'ytick.labelsize': 6,
+                'legend.fontsize': 5, 'lines.linewidth': 0.5
+            })
+            
+            fig, ax = plt.subplots(figsize=(2.4, 2.0))
+            thresholds_list = list(ks_results.keys())
+            ks_stats = list(ks_results.values())
+            
+            ax.plot(thresholds_list, ks_stats, 'o-', linewidth=0.5)
+            ax.axvline(x=best_threshold, color='red', linestyle='--', 
+                      label=f'Best threshold: {best_threshold} years')
+            
+            ax.set_xlabel('Age Threshold (years)', fontproperties=source_sans)
+            ax.set_ylabel('KS Statistic', fontproperties=source_sans)
+            ax.set_title('KS Statistic vs Age Threshold', fontproperties=source_sans)
+            ax.grid(True, alpha=0.3)
+            ax.legend()
+            plt.tight_layout()
+            plt.savefig('ks_statistic_vs_threshold.png', dpi=600, bbox_inches='tight')
+            plt.close()
+    return 0
+
+def plot_velocity_vs_diameter_by_age(diameter_analysis_df, diameter_plots_dir):
+    """
+    For each pressure, plot the Corrected_Velocity vs Mean_Diameter, colored by Age.
+    
+    Args:
+        diameter_analysis_df: DataFrame containing the data to plot
+        diameter_plots_dir: Directory to save the plots
+    """
+    for pressure in diameter_analysis_df['Pressure'].unique():
+        plt.figure(figsize=(2.4, 2.0))
+        scatter = plt.scatter(diameter_analysis_df[diameter_analysis_df['Pressure'] == pressure]['Mean_Diameter'], 
+                            diameter_analysis_df[diameter_analysis_df['Pressure'] == pressure]['Corrected_Velocity'],
+                            c=diameter_analysis_df[diameter_analysis_df['Pressure'] == pressure]['Age'],
+                            alpha=0.5,
+                            s=10)
+        plt.colorbar(scatter, label='Age')
+        plt.xlabel('Mean Diameter (μm)')
+        plt.ylabel('Corrected Velocity (μm/s)')
+        plt.title(f'P={pressure} PSI')
+
+        # Update plot styling
+        plt.rcParams.update({
+            'pdf.fonttype': 42,
+            'ps.fonttype': 42,
+            'font.size': 7, 
+            'axes.labelsize': 7,
+            'xtick.labelsize': 6,
+            'ytick.labelsize': 6,
+            'legend.fontsize': 5,
+            'lines.linewidth': 0.5
+        })
+
+        plt.savefig(os.path.join(diameter_plots_dir, f'pressure_{pressure}_velocity_vs_diameter_age.png'),
+                    dpi=600, bbox_inches='tight')
+        plt.close()
+def plot_velocity_vs_diameter_by_participant(diameter_analysis_df, diameter_plots_dir):
+    """
+    Plot velocity vs diameter scatter plots for each participant.
+    
+    Args:
+        diameter_analysis_df: DataFrame containing participant data with Mean_Diameter and Corrected_Velocity
+        diameter_plots_dir: Directory path to save the plots
+    """
+    # for each participant, plot the 'Corrected_Velocity' vs 'Mean_Diameter'
+    for participant in diameter_analysis_df['Participant'].unique():
+        plt.figure(figsize=(2.4, 2.0))
+        plt.scatter(diameter_analysis_df[diameter_analysis_df['Participant'] == participant]['Mean_Diameter'], 
+                   diameter_analysis_df[diameter_analysis_df['Participant'] == participant]['Corrected_Velocity'], 
+                   alpha=0.5)
+        plt.xlabel('Mean Diameter (μm)')
+        plt.ylabel('Corrected Velocity (μm/s)')
+        plt.title(f'{participant} - Velocity vs Diameter')
+        
+        # Update plot styling
+        plt.rcParams.update({
+            'pdf.fonttype': 42,
+            'ps.fonttype': 42, 
+            'font.size': 7,
+            'axes.labelsize': 7,
+            'xtick.labelsize': 6,
+            'ytick.labelsize': 6,
+            'legend.fontsize': 5,
+            'lines.linewidth': 0.5
+        })
+
+        plt.savefig(os.path.join(diameter_plots_dir, f'{participant}_velocity_vs_diameter.png'),
+                    dpi=600, bbox_inches='tight')
+        plt.close()
+def plot_velocity_vs_diameter_by_set(diameter_analysis_df):
+    """
+    Plot velocity vs diameter colored by SET number for each pressure level.
+    
+    Args:
+        diameter_analysis_df: DataFrame containing Mean_Diameter, Corrected_Velocity, Pressure and SET columns
+    """
+    for pressure in diameter_analysis_df['Pressure'].unique():
+        plt.figure(figsize=(10, 6))
+        # Convert SET strings to numbers by extracting digits
+        set_numbers = diameter_analysis_df[diameter_analysis_df['Pressure'] == pressure]['SET'].str.extract('(\d+)').astype(float)
+        scatter = plt.scatter(diameter_analysis_df[diameter_analysis_df['Pressure'] == pressure]['Mean_Diameter'],
+                            diameter_analysis_df[diameter_analysis_df['Pressure'] == pressure]['Corrected_Velocity'], 
+                            c=set_numbers,
+                            alpha=0.5)
+        plt.colorbar(scatter, label='SET')
+        plt.xlabel('Mean_Diameter')
+        plt.ylabel('Corrected_Velocity')
+        plt.title(f'{pressure} - Corrected_Velocity vs Mean_Diameter (colored by SET)')
+        plt.show()
+def make_mixed_effect_model(diameter_analysis_df):
     # Mixed Effects Model Analysis
     print("\nPerforming Mixed Effects Model Analysis...")
     try:
@@ -192,7 +389,7 @@ def main():
         from statsmodels.regression.mixed_linear_model import MixedLM
         
         # Prepare data for mixed effects model
-        model_df = test_df.dropna(subset=['Corrected_Velocity', 'Mean_Diameter', 'Participant', 'Pressure'])
+        model_df = diameter_analysis_df.dropna(subset=['Corrected_Velocity', 'Mean_Diameter', 'Participant', 'Pressure'])
         
         # Ensure Pressure is treated as a numeric variable
         model_df['Pressure'] = pd.to_numeric(model_df['Pressure'], errors='coerce')
@@ -286,7 +483,8 @@ def main():
         plt.title('Mixed Effects Model: Diameter vs Velocity by Pressure')
         plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
         plt.tight_layout()
-        plt.show()
+        # plt.show()
+        plt.close() 
         
         # Create a 3D visualization to better show the relationship
         try:
@@ -321,9 +519,9 @@ def main():
             surf = ax.plot_surface(X, Y, Z, cmap='viridis', alpha=0.5, linewidth=0)
             
             # Add labels and colorbar
-            ax.set_xlabel('Mean Diameter')
-            ax.set_ylabel('Pressure')
-            ax.set_zlabel('Corrected Velocity')
+            ax.set_xlabel('Mean Diameter (μm)')
+            ax.set_ylabel('Pressure (PSI)')
+            ax.set_zlabel('Corrected Velocity (μm/s)')
             ax.set_title('3D Visualization of Mixed Effects Model')
             fig.colorbar(scatter, ax=ax, label='Pressure')
             
@@ -338,84 +536,9 @@ def main():
         print("Install it using: pip install statsmodels")
     except Exception as e:
         print(f"Error in mixed effects modeling: {e}")
-    
-    
-    # Create CDF plots for Mean Diameter split by age groups
-    print("\nCreating CDF plots for Mean Diameter by age groups...")
-    
-    # Ensure we have age data
-    if 'Age' not in test_df.columns or test_df['Age'].isna().all():
-        print("Error: Age data is missing or all null. Cannot create age-based CDF plots.")
-    else:
-        # Create a copy of the dataframe for age analysis
-        age_df = test_df.dropna(subset=['Mean_Diameter', 'Age']).copy()
-        
-        # Print age statistics
-        print(f"Age range in data: {age_df['Age'].min()} to {age_df['Age'].max()} years")
-        print(f"Mean age: {age_df['Age'].mean():.2f} years")
-        print(f"Median age: {age_df['Age'].median():.2f} years")
-        
-        # Test different age thresholds
-        age_min = int(np.floor(age_df['Age'].min()))
-        age_max = int(np.ceil(age_df['Age'].max()))
-        
-        # Create a range of thresholds to test
-        # If we have a wide age range, test every 5 years
-        if age_max - age_min > 20:
-            thresholds = list(range(age_min + 5, age_max - 5, 5))
-        # Otherwise test every 2 years
-        else:
-            thresholds = list(range(age_min + 2, age_max - 2, 2))
-        
-        # Ensure we have at least some thresholds
-        if len(thresholds) == 0:
-            # If age range is very narrow, just use the median
-            thresholds = [int(age_df['Age'].median())]
-        
-        print(f"Testing age thresholds: {thresholds}")
-        
-        # Create individual plots for each threshold
-        ks_results = {}
-        for threshold in thresholds:
-            plt.close()
-            # plt.figure(figsize=(10, 6))
-            ks_stat = create_age_cdf_plot(age_df, threshold)
-            if ks_stat is not None:
-                ks_results[threshold] = ks_stat
-            # plt.tight_layout()
-            # plt.show()
-            # Explicitly close the figure to prevent memory issues
-            plt.close()
-        
-        # Find the threshold with the maximum KS statistic (most different distributions)
-        if ks_results:
-            best_threshold = max(ks_results, key=ks_results.get)
-            print(f"\nThreshold with most distinct distributions: {best_threshold} years")
-            print(f"KS statistic: {ks_results[best_threshold]:.3f}")
-            
-        # Create a plot showing KS statistic vs threshold
-        if len(ks_results) > 1:
-            plt.figure(figsize=(10, 6))
-            thresholds_list = list(ks_results.keys())
-            ks_stats = list(ks_results.values())
-            
-            plt.plot(thresholds_list, ks_stats, 'o-', linewidth=2)
-            plt.axvline(x=best_threshold, color='red', linestyle='--', 
-                       label=f'Best threshold: {best_threshold} years')
-            
-            plt.xlabel('Age Threshold (years)')
-            plt.ylabel('Kolmogorov-Smirnov Statistic')
-            plt.title('KS Statistic vs Age Threshold')
-            plt.grid(True, alpha=0.3)
-            plt.legend()
-            plt.tight_layout()
-            plt.show()
-            plt.close()
-    
-    return 0
 
 # Function to create CDF plot for a specific age threshold
-def create_age_cdf_plot(age_df, age_threshold, ax=None):
+def create_age_cdf_plot(age_df, age_threshold, cap_flow_path, ax=None):
     """
     Create a CDF plot for Mean Diameter split by age groups based on the given threshold.
     
@@ -428,6 +551,9 @@ def create_age_cdf_plot(age_df, age_threshold, ax=None):
         KS statistic if two groups are created, None otherwise
     """
     plt.close()
+
+    diameter_plots_dir = os.path.join(cap_flow_path, 'results', 'diameter_plots')
+
     # Create age groups
     age_df['Age_Group'] = np.where(age_df['Age'] <= age_threshold, 
                                     f'≤{age_threshold} years', 
@@ -487,7 +613,9 @@ def create_age_cdf_plot(age_df, age_threshold, ax=None):
     ax.grid(True, alpha=0.3)
     ax.legend(loc='lower right')
     plt.tight_layout()
-    plt.show()
+    # plt.show()
+    plt.savefig(os.path.join(diameter_plots_dir, f'age_threshold_{age_threshold}_cdf_plot.png'),
+                dpi=600, bbox_inches='tight')
     plt.close()
     
     return ks_stat
@@ -618,6 +746,157 @@ def merge_diameter_dataframes(original_df: pd.DataFrame, renamed_df: pd.DataFram
     result_df = result_df.drop(columns=['source'])
     
     return result_df
+
+def secomb_viscocity_fn_vitro(diameter, H_discharge = 0.45, constant = 0.1):
+    """
+    Calculate the secomb viscosity based on the given parameters.
+    
+    Args:
+        diameter: float, diameter of the capillary in um
+        hematocrit: float, hematocrit of the capillary in percentage
+        
+    Returns:
+        float, secomb viscosity in cp
+    """
+    visc_star = 6 * np.exp(-0.085*diameter) + 3.2 - 2.44 * np.exp(-0.06*(diameter)**0.645)
+    denom = (1+((10**(-11))*diameter**(12)))
+    average_viscosity = 2 # cp
+    constant = (0.8 + np.exp(-0.075*diameter)) * (-1+((1)/denom)) + ((1)/denom)
+    scaler = ((diameter)/(diameter-1.1))**2
+    # viscosity = average_viscosity*(1 + (visc_star -1)*((((1-H_discharge)**constant)-1)/(((1-0.45)**constant)-1))*scaler)*scaler
+    viscosity_45 = 220 * np.exp(-1.3*diameter) + 3.2 - 2.44 * np.exp(-0.06*(diameter)**0.645)
+    viscosity = 1 + (viscosity_45 - 1)*(((1-H_discharge)**constant)-1)/(((1-0.45)**constant)-1)
+    return viscosity # in cp
+
+def secomb_viscocity_fn(diameter, H_discharge = 0.45, constant = 0.1):
+    """
+    Calculate the secomb viscosity based on the given parameters.
+    
+    Args:
+        diameter: float, diameter of the capillary in um
+        hematocrit: float, hematocrit of the capillary in percentage
+        
+    Returns:
+        float, secomb viscosity in cp
+    """
+    visc_star = 6 * np.exp(-0.085*diameter) + 3.2 - 2.44 * np.exp(-0.06*(diameter)**0.645)
+    denom = (1+((10**(-11))*diameter**(12)))
+    average_viscosity = 1 # cp
+    constant = (0.8 + np.exp(-0.075*diameter)) * (-1+((1)/denom)) + ((1)/denom)
+    scaler = ((diameter)/(diameter-1.1))**2
+    viscosity = average_viscosity*(1 + (visc_star -1)*((((1-H_discharge)**constant)-1)/(((1-0.45)**constant)-1))*scaler)*scaler
+    return viscosity # in cp
+
+def viscosity_to_velocity(viscosity, diameter, MAP = 93.0):
+    """
+    Calculate the velocity of the capillary based on the given parameters.
+
+    Args:
+        viscosity: float, viscosity of the capillary in Pascals*seconds
+        diameter: float, diameter of the capillary in um
+        pressure_drop: float, pressure drop of the capillary in mmHg
+        
+    Returns:
+        float, velocity of the capillary in um/s
+    """
+    # Scale capillary pressure: baseline 20 mmHg at MAP of 93 mmHg
+    # For every 10 mmHg change in MAP, capillary pressure changes by ~2 mmHg
+    baseline_map = 93.0 # mmHg
+    pressure_drop = 20.0 + 0.2 * (MAP - baseline_map) # mmHg
+    pressure_drop_pascals = pressure_drop * 133.322 # Pa
+    viscosity_pascals_s = viscosity * 1e-3 # Pa*s
+    diameter_m = diameter * 1e-6 # m
+    velocity_m = ((diameter_m/2)**2)/(8 * viscosity_pascals_s) * (pressure_drop_pascals/100)*(10**6) # m/s
+    velocity_um_s = velocity_m * 1e6 # um/s
+    return velocity_um_s
+
+def pressure_drop_per_length(diameter, velocity, viscosity):
+    """
+    Calculate the pressure drop of the capillary based on the given parameters.
+
+    Args:
+        diameter: float, diameter of the capillary in um
+        velocity: float, velocity of the capillary in um/s
+        viscosity: float, viscosity of the capillary in cp
+        
+    Returns:
+        float, pressure drop of the capillary in mmHg/um
+    """
+    viscosity_pascals_s = viscosity * 1e-3 # Pa*s
+    diameter_m = diameter * 1e-6 # m
+    velocity_m = velocity * 1e-6 # m/s
+    pressure_drop_per_length = (8 * viscosity_pascals_s * velocity_m) / ((diameter_m/2)**2) # Pa/m
+    pressure_drop_per_length_mmHg = pressure_drop_per_length * 760 / 101325 # mmHg/m
+    pressure_drop_per_length_mmHg_um = pressure_drop_per_length_mmHg * 1e6 # mmHg/um
+    return pressure_drop_per_length_mmHg_um
+
+def plot_velocity_vs_diameter_theory():
+    """
+    Plot the velocity vs diameter based on the theory of secomb viscosity.
+    """
+
+
+    diameters = np.linspace(1.5, 1000, 1000) # um
+    viscosities = secomb_viscocity_fn(diameters) # cp
+    plt.plot(diameters, viscosities)
+    # plt.scatter(fig_csv[:, 0], fig_csv[:, 1], color='red')
+    plt.xlabel('Diameter (um)')
+    # make the x axis on a log scale
+    plt.xscale('log')
+    plt.ylabel('Viscosity (cp)')
+    plt.ylim(1, 7)
+    plt.title('Viscosity vs Diameter based on Secomb Viscosity')
+    plt.show()
+
+
+
+    velocities = viscosity_to_velocity(viscosities, diameters) # um/s
+    plt.plot(diameters, velocities)
+    plt.xlabel('Diameter (um)')
+    plt.xlim(1, 60)
+    plt.ylabel('Velocity (um/s)')
+    plt.ylim(0, 7000)
+    plt.title('Velocity vs Diameter based on Secomb Viscosity')
+    plt.show()
+
+
+def plot_pressure_drop_per_length(diameter_analysis_df):
+    """
+    Plot the pressure drop per length of the capillary based on the given parameters.
+    """
+    diameter_analysis_df = diameter_analysis_df[diameter_analysis_df['Pressure'] == 0.2]
+    diameters = diameter_analysis_df['Mean_Diameter']
+    velocities = diameter_analysis_df['Corrected_Velocity']
+    viscosities = secomb_viscocity_fn(diameters)
+    pressures = diameter_analysis_df['Pressure']
+    pressure_drop_per_lengths = pressure_drop_per_length(diameters, velocities, viscosities)
+
+    # now calculate what the pressure drop per length would be if the velocity was the average velocity, the 25th percentile velocity, and the 75th percentile velocity
+    average_velocity = np.mean(velocities)
+    diameter_range = np.linspace(1.5, np.max(diameters), 1000)
+    viscosities_range = secomb_viscocity_fn(diameter_range)
+    pressure_drop_per_length_average_velocity = pressure_drop_per_length(diameter_range, np.ones_like(diameter_range) * average_velocity, viscosities_range)
+    pressure_drop_per_length_25th_percentile_velocity = pressure_drop_per_length(diameter_range, np.ones_like(diameter_range) * np.percentile(velocities, 25), viscosities_range)
+    pressure_drop_per_length_75th_percentile_velocity = pressure_drop_per_length(diameter_range, np.ones_like(diameter_range) * np.percentile(velocities, 75), viscosities_range)
+
+    plt.scatter(diameters, pressure_drop_per_lengths, c=velocities, cmap='magma')
+    plt.scatter(diameter_range, pressure_drop_per_length_average_velocity, color='red')
+    plt.scatter(diameter_range, pressure_drop_per_length_25th_percentile_velocity, color='blue')
+    plt.scatter(diameter_range, pressure_drop_per_length_75th_percentile_velocity, color='green')
+    plt.xlabel('Diameter (um)')
+    plt.ylabel('Pressure Drop per Length (mmHg/um)')
+    plt.ylim(0, np.max(pressure_drop_per_lengths))
+    plt.title('Pressure Drop per Length vs Diameter')
+    plt.legend()
+    plt.show()
+
+    # plot the pressure drop per length vs the velocity
+    plt.scatter(velocities, pressure_drop_per_lengths)
+    plt.xlabel('Velocity (um/s)')
+    plt.ylabel('Pressure Drop per Length (mmHg/um)')
+    plt.title('Pressure Drop per Length vs Velocity')
+    plt.show()
+
 
 if __name__ == '__main__':
     main()

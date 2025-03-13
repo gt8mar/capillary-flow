@@ -134,6 +134,7 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
     control_df = df[df['SET']=='set01']
     hypertensive_df = df[df['SET']=='set02']
     diabetic_df = df[df['SET']=='set03']
+    affected_df = df[df['Set_affected']=='set04']
 
     # Set color palette based on variable
     if variable == 'Age':
@@ -164,6 +165,10 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
         # ]
         conditions = [df['SET'] == 'set01', df['SET'] == 'set02']
         choices = ['Control', 'Hypertensive']
+    elif variable == 'Set_affected':
+        base_color = '#00CED1' # sky blue
+        conditions = [df['SET'] == 'set01', df['Set_affected'] == 'set04']
+        choices = ['Control', 'Affected']
     else:
         raise ValueError(f"Unsupported variable: {variable}")
 
@@ -188,7 +193,6 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
     # df = df[df[group_col] != 'Unknown']
     
     # Print unique values for debugging
-    print(f"Unique values in {variable}: {df[variable].unique()}")
     print(f"Unique values in {group_col}: {df[group_col].unique()}")
 
     # Calculate stats
@@ -471,7 +475,7 @@ def plot_CI_twosets(dataset1, dataset2, variable='Age', method='bootstrap', n_it
 
     # Save or display the plot
     if write:
-        filename = f'{variable}_CI_comparison'
+        filename = f'{variable}_CI_comparison_{labels[0]}_vs_{labels[1]}'
         if video_median:
             filename += '_videomedians'
         plt.savefig(os.path.join(cap_flow_path, 'results', f'{filename}.png'), dpi=600)
@@ -536,7 +540,10 @@ def plot_CI_test(df, variable='Age', method='bootstrap', n_iterations=1000,
     df[group_col] = np.select(conditions, choices, default='Unknown')
     
     # Print unique values for debugging
-    print(f"Unique values in {variable}: {df[variable].unique()}")
+    if variable in df.columns:
+        print(f"Unique values in {variable}: {df[variable].unique()}")
+    else:
+        print(f"Note: '{variable}' is not a column in the dataframe, it's a derived category")
     print(f"Unique values in {group_col}: {df[group_col].unique()}")
 
     # Calculate stats
@@ -3366,14 +3373,6 @@ def run_regression(df, plot = False):
 #     # Generate a linear space from the min to max velocity in the range of interest
 #     x = np.linspace(start, end, num=500)
     
-#     # Calculate the CDF using the empirical data
-#     cdf = np.interp(x, np.sort(data), np.linspace(0, 1, len(data)))
-    
-#     # Calculate the area under the CDF curve using Simpson's rule
-#     area = simps(cdf, x)
-#     return area
-
-# def calculate_distance_score(data):
 #     # Calculate the CDF area for the entire dataset
 #     entire_dataset_area = calculate_cdf_area(data)
 
@@ -4450,12 +4449,12 @@ def main(verbose = False):
 
         
     # Save or display the resulting dataframe
-    # merged_df.to_csv('C:\\Users\\gt8ma\\capillary-flow\\merged_csv.csv', index=False)
+    # merged_df.to_csv(os.path.join(cap_flow_path, 'merged_csv.csv'), index=False)
 
     # If there is a value in "Classified Velocity" overwrite the value in "Corrected Velocity" with that value:
     summary_df['Corrected Velocity'] = np.where(summary_df['Classified_Velocity'].notnull(), summary_df['Classified_Velocity'], summary_df['Corrected Velocity'])
 
-    # summary_df.to_csv('C:\\Users\\gt8mar\\capillary-flow\\merged_csv2.csv', index=False)
+    # summary_df.to_csv(os.path.join(cap_flow_path, 'merged_csv2.csv'), index=False)
 
     # if row has no "Capillary_new" value, copy the "Capillary" value to "Capillary_new"
     summary_df['Capillary_new'] = np.where(summary_df['Capillary_new'].isnull(), summary_df['Capillary'], summary_df['Capillary_new'])
@@ -4729,6 +4728,9 @@ def main(verbose = False):
     summary_df_nhp_video_medians.to_csv(os.path.join(cap_flow_path, 'summary_df_nhp_video_stats.csv'), index=False)
 
     normal_group = summary_df_nhp_video_medians[summary_df_nhp_video_medians['SET'] == 'set01']
+     # Create a new column 'Set_affected' that is 'set01' if SET is 'set01', otherwise 'set04'
+    summary_df_nhp_video_medians['Set_affected'] = np.where(summary_df_nhp_video_medians['SET'] == 'set01', 'set01', 'set04')
+    affected_group = summary_df_nhp_video_medians[summary_df_nhp_video_medians['Set_affected'] == 'set04']
 
     # Perform GEE and Mixed Model Analysis for set01
     gee_model = smf.gee('Log_Video_Median_Velocity ~ Age * Pressure', groups=normal_group['Participant'], data=normal_group, cov_struct=sm.cov_struct.Autoregressive() )   #family=sm.families.Poisson()
@@ -4767,6 +4769,8 @@ def main(verbose = False):
     normal_group_old = normal_group[normal_group['Age'] > 50]
     old_nhp_video_medians = summary_df_nhp_video_medians[summary_df_nhp_video_medians['Age'] > 50]
 
+    # make a new column called Set_affected that checks if 'SET' is set01, and then sets all other values to set04
+   
     plot_area_score_disease(summary_df_no_high_pressure, log = True, plot=False, write=True)
 
 
@@ -4790,6 +4794,9 @@ def main(verbose = False):
     # compare diabetes group to hypertension group using CIs
     # plot_CI(summary_df_nhp_video_medians, variable='SET', ci_percentile=95, video_median=True)
 
+   
+    plot_CI(summary_df_nhp_video_medians, variable='Set_affected', ci_percentile=95, video_median=True)
+
     # make groups based on 'UpDown'
     normal_group_up = normal_group[normal_group['UpDown'].isin(['U','T'])]
     normal_group_down = normal_group[normal_group['UpDown'].isin(['D','T'])] 
@@ -4802,10 +4809,10 @@ def main(verbose = False):
     hypertension_group_down = hypertension_group[hypertension_group['UpDown'].isin(['D','T'])]
 
     # compare up and down groups using CIs
-    plot_CI_twosets(normal_group_up, normal_group_down, variable='UpDown', ci_percentile=95, video_median=True, plot = True)
-    plot_CI_twosets(normal_group_up_old, normal_group_down_old, variable='UpDown', ci_percentile=95, video_median=True, plot = True)
-    plot_CI_twosets(diabetes_group_up, diabetes_group_down, variable='UpDown', ci_percentile=95, video_median=True, plot = True)
-    plot_CI_twosets(hypertension_group_up, hypertension_group_down, variable='UpDown', ci_percentile=95, video_median=True, plot = True)
+    plot_CI_twosets(normal_group_up, normal_group_down, variable='UpDown', ci_percentile=95, video_median=True, plot = False)
+    plot_CI_twosets(normal_group_up_old, normal_group_down_old, variable='UpDown', ci_percentile=95, video_median=True, plot = False)
+    plot_CI_twosets(diabetes_group_up, diabetes_group_down, variable='UpDown', ci_percentile=95, video_median=True, plot = False)
+    plot_CI_twosets(hypertension_group_up, hypertension_group_down, variable='UpDown', ci_percentile=95, video_median=True, plot = False)
 
     # plot_cdf_comp_pressure(summary_df_nhp_video_medians)
 
