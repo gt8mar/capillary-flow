@@ -465,7 +465,7 @@ def plot_CI_twosets(dataset1, dataset2, variable='Age', method='bootstrap', n_it
                     fontproperties=source_sans, fontsize=8)
     else:
         ax.set_ylabel('Velocity (um/s)', fontproperties=source_sans)
-        ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Velocity vs. Pressure with {ci_percentile}% CI',
+        ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Velocity vs. Pressure with {ci_percentile}% CI and {variable} {labels[0]} vs {labels[1]}',
                     fontproperties=source_sans, fontsize=8)
 
     ax.legend(handles=legend_handles, prop=source_sans)
@@ -864,11 +864,11 @@ def calculate_median_ci(group, n_iterations=1000, ci_percentile=95, dimensionles
         
     else:
         for _ in range(n_iterations):
-            sample = resample(group['Corrected Velocity'])
+            sample = resample(group['Corrected_Velocity'])
             medians.append(np.median(sample))
         lower = np.percentile(medians, (100 - ci_percentile) / 2)
         upper = np.percentile(medians, 100 - (100 - ci_percentile) / 2)
-        median = np.median(group['Corrected Velocity'])
+        median = np.median(group['Corrected_Velocity'])
     if dimensionless:
         return pd.Series({'Median Dimensionless Velocity': median_dimless, 'CI Lower Bound': lower, 'CI Upper Bound': upper})
     else:
