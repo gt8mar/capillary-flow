@@ -153,8 +153,10 @@ def estimate_counts(kymograph_dir, model_dir, output_dir=None, target_size=(100,
     if output_dir is None:
         output_dir = kymograph_dir
     
-    # Create output directory if it doesn't exist
+    # Create output directory and results subfolder if they don't exist
     os.makedirs(output_dir, exist_ok=True)
+    results_dir = os.path.join(output_dir, 'results')
+    os.makedirs(results_dir, exist_ok=True)
     
     # Load models
     rf_model, cnn_model = load_models(model_dir)
@@ -229,8 +231,8 @@ def estimate_counts(kymograph_dir, model_dir, output_dir=None, target_size=(100,
     # Generate timestamp for unique filenames
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    # Save results
-    csv_path = os.path.join(output_dir, f'kymograph_count_predictions_{timestamp}.csv')
+    # Save results to results subfolder
+    csv_path = os.path.join(results_dir, f'kymograph_count_predictions_{timestamp}.csv')
     results_df.to_csv(csv_path, index=False)
     print(f"Saved predictions for {len(results_df)} kymographs to {csv_path}")
     
@@ -238,7 +240,7 @@ def estimate_counts(kymograph_dir, model_dir, output_dir=None, target_size=(100,
     simple_results = results_df[['Filename', 'Ensemble_Prediction_Rounded']].copy()
     simple_results.rename(columns={'Ensemble_Prediction_Rounded': 'Estimated_Count'}, inplace=True)
     
-    simple_csv_path = os.path.join(output_dir, f'kymograph_counts_simple_{timestamp}.csv')
+    simple_csv_path = os.path.join(results_dir, f'kymograph_counts_simple_{timestamp}.csv')
     simple_results.to_csv(simple_csv_path, index=False)
     print(f"Saved simplified predictions to {simple_csv_path}")
     
@@ -257,8 +259,8 @@ def estimate_counts(kymograph_dir, model_dir, output_dir=None, target_size=(100,
         plt.legend()
         plt.grid(True, alpha=0.3)
         
-        # Save plot
-        plot_path = os.path.join(output_dir, f'prediction_histogram_{timestamp}.png')
+        # Save plot to results subfolder
+        plot_path = os.path.join(results_dir, f'prediction_histogram_{timestamp}.png')
         plt.savefig(plot_path, dpi=300)
         print(f"Saved prediction histogram to {plot_path}")
         
@@ -279,8 +281,8 @@ def estimate_counts(kymograph_dir, model_dir, output_dir=None, target_size=(100,
                     xycoords='axes fraction',
                     bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.8))
         
-        # Save correlation plot
-        corr_plot_path = os.path.join(output_dir, f'model_correlation_{timestamp}.png')
+        # Save correlation plot to results subfolder
+        corr_plot_path = os.path.join(results_dir, f'model_correlation_{timestamp}.png')
         plt.savefig(corr_plot_path, dpi=300)
         print(f"Saved model correlation plot to {corr_plot_path}")
     
