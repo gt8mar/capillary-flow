@@ -52,7 +52,7 @@ def overlay_x_values_on_kymograph(image, x_values, color='r', linewidth=1):
     
     # Overlay vertical lines at each detected RBC position
     for x in x_values:
-        plt.axhline(y=x, color=color, linewidth=linewidth)
+        plt.axhline(y=x, color=color, linewidth=linewidth, linestyle='--', alpha=0.5)
     
     plt.title("Rotated Kymograph with Detected RBC Positions")
     plt.xlabel("X Position (pixels)")
@@ -111,18 +111,27 @@ def analyze_kymograph(path_to_kymograph, counts_df, prominence_threshold=0.05):
     # Calculate expected distance between peaks based on estimated count
     expected_distance = rotated.shape[0] / max(1, rbc_count_est)  # Avoid division by zero
 
-    # Initial peak detection with adaptive parameters
+    # Calculate a dynamic height threshold based on the intensity distribution
+    # This will disallow peaks that are too close to the background level
+    background_level = np.percentile(inverted, 25)  # Approximate background level (25th percentile)
+    peak_level = np.percentile(inverted, 95)       # Approximate peak level (95th percentile)
+    
+    # Set minimum height as a percentage above the background level
+    # Adjust this percentage (0.2 = 20%) based on your specific data characteristics
+    height_threshold = background_level + 0.2 * (peak_level - background_level)
+    
+    # Initial peak detection with adaptive parameters and height threshold
     peaks, properties = find_peaks(inverted, 
                                   prominence=prominence_threshold,
-                                  distance=max(1, expected_distance * 0.7),  # Minimum expected spacing
-                                  height=None)
+                                  distance=max(0.5, expected_distance * 0.7),  # Minimum expected spacing
+                                  height=height_threshold)  # Dynamic height threshold
     
     initial_count = len(peaks)
     
     # Final RBC count
     rbc_count = len(peaks)
 
-    return rbc_count, rotated, profile, peaks, inverted, rbc_count_est
+    return rbc_count, rotated, profile, peaks, inverted, rbc_count_est, height_threshold  # Return height threshold for debugging
 
 class RBCCounterGUI:
     def __init__(self, kymograph_dir, counts_df_path):
@@ -133,6 +142,7 @@ class RBCCounterGUI:
         self.manual_count_mode = False
         self.manual_count_value = ""
         self.prominence_threshold = 0.05
+        self.height_threshold = None  # Store current height threshold
         
         # Create output dataframe with additional columns
         self.output_df = self.counts_df.copy()
@@ -189,8 +199,11 @@ class RBCCounterGUI:
         self.count_label = tk.Label(self.info_frame, text="Counts: ", font=("Arial", 12))
         self.count_label.grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
         
+        self.threshold_label = tk.Label(self.info_frame, text="Thresholds: ", font=("Arial", 12))
+        self.threshold_label.grid(row=2, column=0, sticky=tk.W, padx=5, pady=5)
+        
         self.status_label = tk.Label(self.info_frame, text="Status: Ready", font=("Arial", 12))
-        self.status_label.grid(row=2, column=0, sticky=tk.W, padx=5, pady=5)
+        self.status_label.grid(row=3, column=0, sticky=tk.W, padx=5, pady=5)
         
         # Manual count entry
         self.manual_entry_label = tk.Label(self.info_frame, text="Manual count: ", font=("Arial", 12))
@@ -257,7 +270,7 @@ class RBCCounterGUI:
         self.file_label.config(text=f"File: {filename} ({self.current_index + 1}/{len(self.kymograph_files)})")
         
         # Analyze the kymograph
-        rbc_count, rotated, profile, peaks, inverted, rbc_count_est = analyze_kymograph(
+        rbc_count, rotated, profile, peaks, inverted, rbc_count_est, height_threshold = analyze_kymograph(
             current_file, self.counts_df, self.prominence_threshold
         )
         
@@ -267,9 +280,13 @@ class RBCCounterGUI:
         self.current_inverted = inverted
         self.current_count = rbc_count
         self.current_est_count = rbc_count_est
+        self.height_threshold = height_threshold
         
         # Update count label
         self.count_label.config(text=f"Estimated: {rbc_count_est}, Measured: {rbc_count}")
+        
+        # Update threshold label
+        self.threshold_label.config(text=f"Prominence: {self.prominence_threshold:.3f}, Height: {self.height_threshold:.3f}")
         
         # Update plots
         self.update_plots()
@@ -290,8 +307,14 @@ class RBCCounterGUI:
         self.kymo_ax.clear()
         
         # Plot profile with peaks
-        self.profile_ax.plot(self.current_profile, label='Intensity Profile')
-        self.profile_ax.plot(self.current_peaks, self.current_profile[self.current_peaks], 'rx', label='Detected RBCs')
+        self.profile_ax.plot(-self.current_profile, label='Intensity Profile')
+        self.profile_ax.plot(self.current_peaks, -self.current_profile[self.current_peaks], 'rx', label='Detected RBCs')
+        
+        # Add height threshold line to the plot
+        if self.height_threshold is not None:
+            self.profile_ax.axhline(y=self.height_threshold, color='g', linestyle='--', 
+                                   label=f'Height Threshold ({self.height_threshold:.3f})')
+        
         self.profile_ax.set_title(f'Vertical Intensity Profile (Detected: {self.current_count}, Estimated: {self.current_est_count})')
         self.profile_ax.set_xlabel('Row Index')
         self.profile_ax.set_ylabel('Intensity')
@@ -300,7 +323,7 @@ class RBCCounterGUI:
         # Plot kymograph with overlaid peaks
         self.kymo_ax.imshow(self.current_rotated, cmap='gray', aspect='auto')
         for x in self.current_peaks:
-            self.kymo_ax.axhline(y=x, color='r', linewidth=1)
+            self.kymo_ax.axhline(y=x, color='r', linewidth=1, linestyle='--', alpha=0.5)
         self.kymo_ax.set_title("Rotated Kymograph with Detected RBC Positions")
         self.kymo_ax.set_xlabel("X Position (pixels)")
         self.kymo_ax.set_ylabel("Y Position (pixels)")
@@ -415,7 +438,7 @@ class RBCCounterGUI:
 
 def main(path_to_kymograph, counts_df):
     # This function is kept for backward compatibility
-    rbc_count, rotated, profile, peaks, inverted, rbc_count_est = analyze_kymograph(path_to_kymograph, counts_df)
+    rbc_count, rotated, profile, peaks, inverted, rbc_count_est, height_threshold = analyze_kymograph(path_to_kymograph, counts_df)
     
     # -----------------------------
     # Step 7: Visual Inspection
@@ -425,6 +448,7 @@ def main(path_to_kymograph, counts_df):
     plt.figure(figsize=(2.4,2))
     plt.plot(profile, label='Smoothed Profile')
     plt.plot(peaks, profile[peaks], 'rx', label='Detected RBCs')
+    plt.axhline(y=-height_threshold, color='g', linestyle='--', label=f'Height Threshold')
     plt.xlabel('Row Index', fontproperties=source_sans)
     plt.ylabel('Intensity', fontproperties=source_sans)
     plt.title(f'Vertical Intensity Profile After Rotation (Detected: {rbc_count}, Estimated: {rbc_count_est})', fontproperties=source_sans)

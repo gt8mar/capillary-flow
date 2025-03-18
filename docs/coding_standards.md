@@ -75,6 +75,10 @@ computer_paths = {
         'cap_flow': "C:\\Users\\gt8mar\\capillary-flow",
         'downloads': 'C:\\Users\\gt8mar\\Downloads'
     },
+    "Clark-": {
+        'cap_flow': "C:\\Users\\ejerison\\capillary-flow",
+        'downloads': "C:\\Users\\ejerison\\Downloads"
+    }
 }
 default_paths = {
     'cap_flow': "/hpc/projects/capillary-flow",
@@ -148,6 +152,7 @@ capillary-flow/
 
 ### Optical System constants
 PIX_UM = 2.44 #1.74 for old camera
+standard_fps = 227.8 #113.9 for old camera
 
 ## Documentation Standards
 
