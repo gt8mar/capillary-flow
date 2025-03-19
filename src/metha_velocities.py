@@ -364,7 +364,7 @@ def main(filename, plot = False, write = False, marcus = True):
     min_zvals = np.zeros(len(loopPix))
 
     # Add before the chunk processing:
-    max_search_radius = 5  # pixels
+    max_search_radius = 4  # pixels
     print(f"\nInitializing with max search radius of {max_search_radius} pixels")
 
     # Process in chunks
