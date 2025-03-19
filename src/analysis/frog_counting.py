@@ -75,8 +75,8 @@ def analyze_kymograph(path_to_kymograph, counts_df, prominence_threshold=0.05):
     # get other data from counts_df based on the filename
     counts_row = counts_df[counts_df['Image_Path'] == os.path.basename(path_to_kymograph)]
     image_name = os.path.basename(path_to_kymograph)
-    rbc_velocity_um_s = counts_row['Classified_Velocity'].values[0]
-    rbc_count_est = counts_row['Counts'].values[0]
+    rbc_velocity_um_s = counts_row['Velocity (um/s)'].values[0]
+    rbc_count_est = counts_row['Estimated_Counts'].values[0]
 
     # -----------------------------
     # Step 2: Determine Rotation Angle
@@ -136,32 +136,74 @@ def analyze_kymograph(path_to_kymograph, counts_df, prominence_threshold=0.05):
 class RBCCounterGUI:
     def __init__(self, kymograph_dir, counts_df_path):
         self.kymograph_dir = kymograph_dir
-        self.counts_df = pd.read_csv(counts_df_path)
-        self.current_index = 0
-        self.kymograph_files = self.get_kymograph_files()
-        self.manual_count_mode = False
-        self.manual_count_value = ""
-        self.prominence_threshold = 0.05
-        self.height_threshold = None  # Store current height threshold
         
-        # Create output dataframe with additional columns
-        self.output_df = self.counts_df.copy()
-        if 'Measured_Counts' not in self.output_df.columns:
-            self.output_df['Measured_Counts'] = None
-        if 'Final_Counts' not in self.output_df.columns:
-            self.output_df['Final_Counts'] = None
-        if 'Adjustment_Type' not in self.output_df.columns:
-            self.output_df['Adjustment_Type'] = None
-        
-        # Save path for output
+        # Check if output file already exists
         output_filename = counts_df_path.replace('counts', 'final_counts')
         if output_filename == counts_df_path:
             output_filename = os.path.splitext(counts_df_path)[0] + '_final' + os.path.splitext(counts_df_path)[1]
         self.output_path = output_filename
         
+        # If output file exists, load it; otherwise, create from the counts file
+        if os.path.exists(self.output_path):
+            self.output_df = pd.read_csv(self.output_path)
+            self.counts_df = pd.read_csv(counts_df_path)
+        else:
+            self.counts_df = pd.read_csv(counts_df_path)
+            self.output_df = self.counts_df.copy()
+            # Initialize additional columns if they don't exist
+            if 'Measured_Counts' not in self.output_df.columns:
+                self.output_df['Measured_Counts'] = None
+            if 'Final_Counts' not in self.output_df.columns:
+                self.output_df['Final_Counts'] = None
+            if 'Adjustment_Type' not in self.output_df.columns:
+                self.output_df['Adjustment_Type'] = None
+            if 'Classified_Velocity' not in self.output_df.columns:
+                self.output_df['Classified_Velocity'] = None
+            if 'Modified_Estimated_Counts' not in self.output_df.columns:
+                self.output_df['Modified_Estimated_Counts'] = None
+        
+        # Get all kymograph files
+        self.kymograph_files = self.get_kymograph_files()
+        
+        # Find the first kymograph that doesn't have a final count
+        self.current_index = self.find_first_unprocessed_kymograph()
+        
+        self.manual_count_mode = False
+        self.manual_count_value = ""
+        self.prominence_threshold = 0.05
+        self.height_threshold = None  # Store current height threshold
+        
+        # Add velocity adjustment mode variables
+        self.velocity_adjustment_mode = False
+        self.high_velocities = [10, 420, 500, 600, 750, 1000, 1500, 2000, 3000, 4000]
+        self.additional_velocities = [10, 20, 35, 50, 75, 110, 160, 220, 290, 360]
+        self.use_additional_velocities = False
+        self.current_velocity_index = 0
+        self.original_velocity = None
+        self.inverted_velocity = False
+        
+        # Add estimated counts adjustment mode variables
+        self.estimated_counts_mode = False
+        self.estimated_count_values = [5, 10, 20, 30, 40, 50, 75, 100, 150, 200]
+        self.current_est_count_index = 0
+        self.original_est_count = None
+        
         self.setup_gui()
         self.analyze_current_kymograph()
+    
+    def find_first_unprocessed_kymograph(self):
+        """Find the index of the first kymograph without a final count"""
+        for i, file_path in enumerate(self.kymograph_files):
+            filename = os.path.basename(file_path)
+            # Check if this file exists in the output_df and has no Final_Counts
+            if filename in self.output_df['Image_Path'].values:
+                idx = self.output_df[self.output_df['Image_Path'] == filename].index[0]
+                if pd.isna(self.output_df.at[idx, 'Adjustment_Type']):
+                    return i
         
+        # If all kymographs have been processed, start at the beginning
+        return 0
+    
     def get_kymograph_files(self):
         """Get list of kymograph files that match entries in the counts dataframe"""
         all_files = glob.glob(os.path.join(self.kymograph_dir, '*.tiff'))
@@ -182,77 +224,135 @@ class RBCCounterGUI:
         self.root.title("RBC Counter GUI")
         self.root.geometry("1200x800")
         
-        # Create frames
+        # Add mode indicator at the top
+        self.mode_frame = tk.Frame(self.root, bg="#e0e0e0")
+        self.mode_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=5)
+        
+        self.mode_label = tk.Label(self.mode_frame, text="COUNTING MODE", font=("Arial", 14, "bold"), bg="#e0e0e0")
+        self.mode_label.pack(pady=5)
+        
+        # Create frames with improved layout
         self.info_frame = tk.Frame(self.root)
-        self.info_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=10)
+        self.info_frame.pack(side=tk.TOP, fill=tk.X, padx=10, pady=5)
         
         self.plot_frame = tk.Frame(self.root)
-        self.plot_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=10, pady=10)
+        self.plot_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=10, pady=5)
         
         self.control_frame = tk.Frame(self.root)
-        self.control_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=10)
+        self.control_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=5)
         
-        # Info labels
-        self.file_label = tk.Label(self.info_frame, text="File: ", font=("Arial", 12))
-        self.file_label.grid(row=0, column=0, sticky=tk.W, padx=5, pady=5)
+        # Create left and right info columns
+        self.info_left_frame = tk.Frame(self.info_frame)
+        self.info_left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
         
-        self.count_label = tk.Label(self.info_frame, text="Counts: ", font=("Arial", 12))
-        self.count_label.grid(row=1, column=0, sticky=tk.W, padx=5, pady=5)
+        self.info_right_frame = tk.Frame(self.info_frame)
+        self.info_right_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=5)
         
-        self.threshold_label = tk.Label(self.info_frame, text="Thresholds: ", font=("Arial", 12))
-        self.threshold_label.grid(row=2, column=0, sticky=tk.W, padx=5, pady=5)
+        # Left column info labels
+        self.file_label = tk.Label(self.info_left_frame, text="File: ", font=("Arial", 12))
+        self.file_label.pack(anchor=tk.W, pady=2)
         
-        self.status_label = tk.Label(self.info_frame, text="Status: Ready", font=("Arial", 12))
-        self.status_label.grid(row=3, column=0, sticky=tk.W, padx=5, pady=5)
+        self.count_label = tk.Label(self.info_left_frame, text="Counts: ", font=("Arial", 12))
+        self.count_label.pack(anchor=tk.W, pady=2)
         
-        # Manual count entry
-        self.manual_entry_label = tk.Label(self.info_frame, text="Manual count: ", font=("Arial", 12))
-        self.manual_entry_label.grid(row=1, column=1, sticky=tk.W, padx=5, pady=5)
-        self.manual_entry_value = tk.Label(self.info_frame, text="", font=("Arial", 12))
-        self.manual_entry_value.grid(row=1, column=2, sticky=tk.W, padx=5, pady=5)
+        self.threshold_label = tk.Label(self.info_left_frame, text="Thresholds: ", font=("Arial", 12))
+        self.threshold_label.pack(anchor=tk.W, pady=2)
         
-        # Create matplotlib figures
+        # Right column info labels
+        self.velocity_label = tk.Label(self.info_right_frame, text="Velocity: ", font=("Arial", 12))
+        self.velocity_label.pack(anchor=tk.W, pady=2)
+        
+        self.original_est_count_label = tk.Label(self.info_right_frame, text="Original Est. Count: ", font=("Arial", 12))
+        self.original_est_count_label.pack(anchor=tk.W, pady=2)
+        
+        self.est_count_label = tk.Label(self.info_right_frame, text="New Est. Count: ", font=("Arial", 12))
+        self.est_count_label.pack(anchor=tk.W, pady=2)
+        
+        # Manual count entry in right frame
+        self.manual_entry_frame = tk.Frame(self.info_right_frame)
+        self.manual_entry_frame.pack(anchor=tk.W, pady=2, fill=tk.X)
+        
+        self.manual_entry_label = tk.Label(self.manual_entry_frame, text="Manual count: ", font=("Arial", 12))
+        self.manual_entry_label.pack(side=tk.LEFT)
+        
+        self.manual_entry_value = tk.Label(self.manual_entry_frame, text="", font=("Arial", 12))
+        self.manual_entry_value.pack(side=tk.LEFT)
+        
+        # Status label (not visible in GUI but kept for function calls)
+        self.status_label = tk.Label(self.root)
+        
+        # Create matplotlib figures with improved sizing
         self.setup_plots()
         
-        # Key bindings
+        # Key bindings for counting mode
         self.root.bind('c', self.mark_as_correct)
         self.root.bind('n', self.next_kymograph)
         self.root.bind('b', self.previous_kymograph)
-        self.root.bind('m', self.mark_as_too_many)
+        self.root.bind('m', self.mark_as_manual)  # Now behaves like 'f'
         self.root.bind('f', self.mark_as_too_few)
+        self.root.bind('r', self.refresh_analysis)  # Added refresh key
         
-        # Number key bindings for manual count
+        # Key bindings for velocity adjustment mode
+        self.root.bind('v', self.toggle_velocity_mode)
+        self.root.bind('p', self.toggle_velocity_sign)
+        self.root.bind('z', self.handle_velocity_key)
+        self.root.bind('s', self.handle_velocity_key)
+        self.root.bind('<Shift_L>', self.toggle_velocity_set)
+        self.root.bind('<Shift_R>', self.toggle_velocity_set)
+        
+        # Key binding for estimated counts mode
+        self.root.bind('e', self.toggle_estimated_counts_mode)
+        
+        # Number key bindings for manual count, velocity selection, or estimated count selection
         for i in range(10):
-            self.root.bind(str(i), self.add_digit)
+            self.root.bind(str(i), self.handle_number_key)
         
         # Backspace for manual count
         self.root.bind('<BackSpace>', self.remove_digit)
         
         # Instructions
         instructions = """
-        Keyboard Controls:
+        Counting Mode:
         c - Mark as correct
         n - Next kymograph
         b - Previous kymograph
-        m - Too many (increase prominence)
+        m - Too many (enter manual count)
         f - Too few (enter manual count)
+        r - Refresh analysis with current settings
         0-9 - Enter digits for manual count
         Backspace - Remove last digit
+        v - Toggle velocity adjustment mode
+        e - Toggle estimated counts mode
+        
+        Velocity Mode (press v to toggle):
+        z - Set velocity to zero
+        f - Too fast (adjust velocity)
+        s - Too slow (adjust velocity)
+        v - Return to counting mode
+        p - Toggle velocity sign
+        0-9 - Select velocity
+        Shift - Toggle velocity sets
+        r - Refresh analysis
+        
+        Estimated Counts Mode (press e to toggle):
+        0-9 - Select estimated counts value
+        e - Return to counting mode
+        r - Refresh analysis
         """
         
         self.instructions_label = tk.Label(self.control_frame, text=instructions, font=("Arial", 10), justify=tk.LEFT)
-        self.instructions_label.pack(side=tk.LEFT, padx=10, pady=10)
+        self.instructions_label.pack(side=tk.LEFT, padx=10, pady=5)
     
     def setup_plots(self):
-        """Set up the matplotlib plots"""
-        # Create figure for profile plot
-        self.profile_fig = mpl_fig.Figure(figsize=(6, 3), dpi=100)
+        """Set up the matplotlib plots with improved sizing"""
+        # Create figure for profile plot - taller than before
+        self.profile_fig = mpl_fig.Figure(figsize=(8, 6), dpi=100)
         self.profile_ax = self.profile_fig.add_subplot(111)
         self.profile_canvas = FigureCanvasTkAgg(self.profile_fig, master=self.plot_frame)
         self.profile_canvas.get_tk_widget().pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
-        # Create figure for kymograph
-        self.kymo_fig = mpl_fig.Figure(figsize=(6, 3), dpi=100)
+        # Create figure for kymograph - taller than before
+        self.kymo_fig = mpl_fig.Figure(figsize=(8, 6), dpi=100)
         self.kymo_ax = self.kymo_fig.add_subplot(111)
         self.kymo_canvas = FigureCanvasTkAgg(self.kymo_fig, master=self.plot_frame)
         self.kymo_canvas.get_tk_widget().pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
@@ -269,9 +369,41 @@ class RBCCounterGUI:
         # Update file label
         self.file_label.config(text=f"File: {filename} ({self.current_index + 1}/{len(self.kymograph_files)})")
         
-        # Analyze the kymograph
+        # Get current velocity from dataframe or use previously set velocity
+        if 'Classified_Velocity' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Image_Path'] == filename, 'Classified_Velocity'].values[0]):
+            current_velocity = self.output_df.loc[self.output_df['Image_Path'] == filename, 'Classified_Velocity'].values[0]
+        else:
+            current_velocity = self.counts_df.loc[self.counts_df['Image_Path'] == filename, 'Velocity (um/s)'].values[0]
+        
+        self.original_velocity = current_velocity
+        
+        # Store the original estimated count from the input file
+        original_est_count = self.counts_df.loc[self.counts_df['Image_Path'] == filename, 'Estimated_Counts'].values[0]
+        
+        # Get current estimated counts from dataframe or use previously set value
+        if 'Modified_Estimated_Counts' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Image_Path'] == filename, 'Modified_Estimated_Counts'].values[0]):
+            current_est_count = self.output_df.loc[self.output_df['Image_Path'] == filename, 'Modified_Estimated_Counts'].values[0]
+        else:
+            current_est_count = original_est_count
+        
+        self.original_est_count = original_est_count
+        
+        # Update velocity label
+        self.velocity_label.config(text=f"Velocity: {current_velocity} um/s")
+        
+        # Update estimated count labels - now showing both original and new
+        self.original_est_count_label.config(text=f"Original Est. Count: {original_est_count}")
+        self.est_count_label.config(text=f"New Est. Count: {current_est_count}")
+        
+        # Create a temporary dataframe for analysis
+        temp_df = self.counts_df.copy()
+        idx = temp_df[temp_df['Image_Path'] == filename].index[0]
+        temp_df.at[idx, 'Velocity (um/s)'] = current_velocity
+        temp_df.at[idx, 'Estimated_Counts'] = current_est_count
+        
+        # Analyze the kymograph with potentially modified values
         rbc_count, rotated, profile, peaks, inverted, rbc_count_est, height_threshold = analyze_kymograph(
-            current_file, self.counts_df, self.prominence_threshold
+            current_file, temp_df, self.prominence_threshold
         )
         
         self.current_rotated = rotated
@@ -315,7 +447,7 @@ class RBCCounterGUI:
             self.profile_ax.axhline(y=self.height_threshold, color='g', linestyle='--', 
                                    label=f'Height Threshold ({self.height_threshold:.3f})')
         
-        self.profile_ax.set_title(f'Vertical Intensity Profile (Detected: {self.current_count}, Estimated: {self.current_est_count})')
+        self.profile_ax.set_title(f'Vertical Intensity Profile After Rotation (Detected: {self.current_count}, Estimated: {self.current_est_count})')
         self.profile_ax.set_xlabel('Row Index')
         self.profile_ax.set_ylabel('Intensity')
         self.profile_ax.legend()
@@ -335,8 +467,19 @@ class RBCCounterGUI:
         self.kymo_canvas.draw()
     
     def mark_as_correct(self, event=None):
-        """Mark the current kymograph count as correct"""
-        if self.manual_count_mode:
+        """Mark the current kymograph count as correct or confirm velocity in velocity mode"""
+        if self.velocity_adjustment_mode:
+            # We no longer use this path - removed functionality that was previously here
+            # Just toggle back to counting mode
+            self.velocity_adjustment_mode = False
+            self.status_label.config(text="Counting Mode - Use c/m/f keys")
+            self.mode_label.config(text="COUNTING MODE", bg="#e0e0e0")  # Default gray background
+        elif self.estimated_counts_mode:
+            # Toggle back to counting mode
+            self.estimated_counts_mode = False
+            self.status_label.config(text="Counting Mode - Use c/m/f keys")
+            self.mode_label.config(text="COUNTING MODE", bg="#e0e0e0")  # Default gray background
+        elif self.manual_count_mode:
             # If in manual count mode, use the manual count value
             if self.manual_count_value:
                 try:
@@ -351,6 +494,10 @@ class RBCCounterGUI:
                     self.manual_count_mode = False
                     self.manual_count_value = ""
                     self.manual_entry_value.config(text="")
+                    self.mode_label.config(text="COUNTING MODE", bg="#e0e0e0")  # Default gray background
+                    
+                    # Save the output dataframe
+                    self.output_df.to_csv(self.output_path, index=False)
                     
                     # Move to next kymograph
                     self.next_kymograph()
@@ -398,24 +545,6 @@ class RBCCounterGUI:
         else:
             self.status_label.config(text="Already at the first kymograph")
     
-    def mark_as_too_many(self, event=None):
-        """Mark as too many RBCs detected and increase prominence threshold"""
-        if self.manual_count_mode:
-            self.status_label.config(text="Please complete manual count first")
-            return
-            
-        # Increase prominence threshold
-        self.prominence_threshold += 0.02
-        self.status_label.config(text=f"Increased prominence to {self.prominence_threshold:.2f}")
-        
-        # Re-analyze with new threshold
-        self.analyze_current_kymograph()
-        
-        # Update adjustment type
-        filename = os.path.basename(self.kymograph_files[self.current_index])
-        idx = self.counts_df[self.counts_df['Image_Path'] == filename].index[0]
-        self.output_df.at[idx, 'Adjustment_Type'] = f'Increased prominence to {self.prominence_threshold:.2f}'
-    
     def mark_as_too_few(self, event=None):
         """Enter manual count mode for too few RBCs"""
         if not self.manual_count_mode:
@@ -423,6 +552,21 @@ class RBCCounterGUI:
             self.manual_count_value = ""
             self.manual_entry_value.config(text="")
             self.status_label.config(text="Enter manual count and press 'c' to confirm")
+            self.mode_label.config(text="MANUAL COUNT MODE", bg="#e0e0ff")  # Light blue background
+    
+    def mark_as_manual(self, event=None):
+        """Enter manual count mode for too many RBCs - behaves like too_few"""
+        self.mark_as_too_few(event)
+        self.status_label.config(text="Enter manual count and press 'c' to confirm (too many detected)")
+    
+    def handle_number_key(self, event=None):
+        """Handle number key press in manual count, velocity, or estimated counts mode"""
+        if self.manual_count_mode:
+            self.add_digit(event)
+        elif self.velocity_adjustment_mode:
+            self.set_velocity(event)
+        elif self.estimated_counts_mode:
+            self.set_estimated_count(event)
     
     def add_digit(self, event=None):
         """Add a digit to the manual count value"""
@@ -435,6 +579,357 @@ class RBCCounterGUI:
         if self.manual_count_mode and self.manual_count_value:
             self.manual_count_value = self.manual_count_value[:-1]
             self.manual_entry_value.config(text=self.manual_count_value)
+    
+    def toggle_velocity_mode(self, event=None):
+        """Toggle between velocity adjustment mode and counting mode"""
+        # Exit estimated counts mode if active
+        if self.estimated_counts_mode:
+            self.estimated_counts_mode = False
+            
+        self.velocity_adjustment_mode = not self.velocity_adjustment_mode
+        self.manual_count_mode = False  # Exit manual count mode if active
+        self.manual_count_value = ""
+        self.manual_entry_value.config(text="")
+        
+        if self.velocity_adjustment_mode:
+            self.status_label.config(text="Velocity Adjustment Mode - Use z/f/s/v keys")
+            self.mode_label.config(text="VELOCITY ADJUSTMENT MODE", bg="#ffe0e0")  # Light red background
+            # Initialize velocity values
+            filename = os.path.basename(self.kymograph_files[self.current_index])
+            if 'Classified_Velocity' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Image_Path'] == filename, 'Classified_Velocity'].values[0]):
+                self.original_velocity = self.output_df.loc[self.output_df['Image_Path'] == filename, 'Classified_Velocity'].values[0]
+            else:
+                self.original_velocity = self.counts_df.loc[self.counts_df['Image_Path'] == filename, 'Velocity (um/s)'].values[0]
+            
+            self.current_velocity_index = 0
+            self.inverted_velocity = self.original_velocity < 0
+        else:
+            self.status_label.config(text="Counting Mode - Use c/m/f keys")
+            self.mode_label.config(text="COUNTING MODE", bg="#e0e0e0")  # Default gray background
+            
+    def toggle_velocity_sign(self, event=None):
+        """Toggle velocity sign while in velocity adjustment mode"""
+        if self.velocity_adjustment_mode:
+            self.inverted_velocity = not self.inverted_velocity
+            
+            # Get current velocity value
+            if self.current_velocity_index == 0:
+                current_velocity = self.original_velocity
+            else:
+                velocities = self.additional_velocities if self.use_additional_velocities else self.high_velocities
+                current_velocity = velocities[self.current_velocity_index]
+            
+            # Invert sign
+            if self.inverted_velocity:
+                current_velocity = -abs(current_velocity)
+            else:
+                current_velocity = abs(current_velocity)
+            
+            # Update status
+            self.status_label.config(text=f"Toggled velocity sign: {current_velocity} um/s")
+            
+            # Update the classified velocity
+            filename = os.path.basename(self.kymograph_files[self.current_index])
+            idx = self.counts_df[self.counts_df['Image_Path'] == filename].index[0]
+            self.output_df.at[idx, 'Classified_Velocity'] = current_velocity
+            
+            # Update velocity label
+            self.velocity_label.config(text=f"Velocity: {current_velocity} um/s")
+            
+            # Reanalyze kymograph with new velocity
+            self.reanalyze_with_new_velocity(current_velocity)
+            
+    def toggle_estimated_counts_mode(self, event=None):
+        """Toggle between estimated counts adjustment mode and counting mode"""
+        # Exit velocity mode if active
+        if self.velocity_adjustment_mode:
+            self.velocity_adjustment_mode = False
+            
+        self.estimated_counts_mode = not self.estimated_counts_mode
+        self.manual_count_mode = False  # Exit manual count mode if active
+        self.manual_count_value = ""
+        self.manual_entry_value.config(text="")
+        
+        if self.estimated_counts_mode:
+            self.status_label.config(text="Estimated Counts Mode - Use number keys to select count, e to return")
+            self.mode_label.config(text="ESTIMATED COUNTS MODE", bg="#e0ffe0")  # Light green background
+            # Initialize estimated count values
+            filename = os.path.basename(self.kymograph_files[self.current_index])
+            if 'Modified_Estimated_Counts' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Image_Path'] == filename, 'Modified_Estimated_Counts'].values[0]):
+                self.original_est_count = self.output_df.loc[self.output_df['Image_Path'] == filename, 'Modified_Estimated_Counts'].values[0]
+            else:
+                self.original_est_count = self.counts_df.loc[self.counts_df['Image_Path'] == filename, 'Estimated_Counts'].values[0]
+            
+            self.current_est_count_index = 0
+        else:
+            self.status_label.config(text="Counting Mode - Use c/m/f keys")
+            self.mode_label.config(text="COUNTING MODE", bg="#e0e0e0")  # Default gray background
+    
+    def set_estimated_count(self, event=None):
+        """Set estimated count based on number key press"""
+        if self.estimated_counts_mode and event and event.char.isdigit():
+            idx = int(event.char)
+            if idx == 0:
+                # Use original estimated count from input file
+                current_est_count = self.counts_df.loc[self.counts_df['Image_Path'] == os.path.basename(self.kymograph_files[self.current_index]), 'Estimated_Counts'].values[0]
+                self.current_est_count_index = 0
+            else:
+                # Use selected estimated count
+                self.current_est_count_index = idx
+                current_est_count = self.estimated_count_values[idx]
+            
+            # Update the modified estimated count in output dataframe
+            filename = os.path.basename(self.kymograph_files[self.current_index])
+            df_idx = self.counts_df[self.counts_df['Image_Path'] == filename].index[0]
+            self.output_df.at[df_idx, 'Modified_Estimated_Counts'] = current_est_count
+            
+            # Update estimated count label (for new est count only)
+            self.est_count_label.config(text=f"New Est. Count: {current_est_count}")
+            self.status_label.config(text=f"Estimated count set to {current_est_count} - press e to return to counting mode")
+            
+            # Reanalyze kymograph with new estimated count and save changes
+            self.reanalyze_with_new_estimated_count(current_est_count)
+            self.output_df.to_csv(self.output_path, index=False)
+            
+    def reanalyze_with_new_estimated_count(self, new_est_count):
+        """Reanalyze kymograph with the new estimated count"""
+        # Temporarily update the estimated count in the dataframe
+        filename = os.path.basename(self.kymograph_files[self.current_index])
+        idx = self.counts_df[self.counts_df['Image_Path'] == filename].index[0]
+        old_est_count = self.counts_df.at[idx, 'Estimated_Counts']
+        self.counts_df.at[idx, 'Estimated_Counts'] = new_est_count
+        
+        # Get current velocity (use classified if available)
+        if 'Classified_Velocity' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Image_Path'] == filename, 'Classified_Velocity'].values[0]):
+            current_velocity = self.output_df.loc[self.output_df['Image_Path'] == filename, 'Classified_Velocity'].values[0]
+            # Also update velocity temporarily
+            old_velocity = self.counts_df.at[idx, 'Velocity (um/s)']
+            self.counts_df.at[idx, 'Velocity (um/s)'] = current_velocity
+        else:
+            current_velocity = None
+            old_velocity = None
+        
+        # Reanalyze
+        try:
+            rbc_count, rotated, profile, peaks, inverted, rbc_count_est, height_threshold = analyze_kymograph(
+                self.kymograph_files[self.current_index], self.counts_df, self.prominence_threshold
+            )
+            
+            # Update stored values
+            self.current_rotated = rotated
+            self.current_profile = profile
+            self.current_peaks = peaks
+            self.current_inverted = inverted
+            self.current_count = rbc_count
+            self.current_est_count = rbc_count_est
+            self.height_threshold = height_threshold
+            
+            # Update count label
+            self.count_label.config(text=f"Estimated: {rbc_count_est}, Measured: {rbc_count}")
+            
+            # Update plots
+            self.update_plots()
+            
+            # Update output df
+            self.output_df.at[idx, 'Measured_Counts'] = rbc_count
+            if pd.isna(self.output_df.at[idx, 'Final_Counts']):
+                self.output_df.at[idx, 'Final_Counts'] = rbc_count
+        finally:
+            # Restore original estimated count in counts_df (we keep the new one in output_df)
+            self.counts_df.at[idx, 'Estimated_Counts'] = old_est_count
+            # Restore original velocity if it was changed
+            if old_velocity is not None:
+                self.counts_df.at[idx, 'Velocity (um/s)'] = old_velocity
+    
+    def handle_velocity_key(self, event):
+        """Handle velocity-related key presses in velocity adjustment mode"""
+        if not self.velocity_adjustment_mode:
+            return
+            
+        key = event.char.lower()
+        filename = os.path.basename(self.kymograph_files[self.current_index])
+        idx = self.counts_df[self.counts_df['Image_Path'] == filename].index[0]
+        
+        if key == 'z':  # Zero velocity
+            self.output_df.at[idx, 'Classified_Velocity'] = 0
+            self.status_label.config(text="Velocity set to zero")
+            self.velocity_label.config(text="Velocity: 0 um/s")
+            self.reanalyze_with_new_velocity(0)
+            
+            # Save the output dataframe
+            self.output_df.to_csv(self.output_path, index=False)
+            
+        elif key == 'f':  # Too fast
+            self.status_label.config(text="Too fast - Select velocity using number keys")
+            
+        elif key == 's':  # Too slow
+            self.status_label.config(text="Too slow - Select velocity using number keys")
+    
+    def set_velocity(self, event=None):
+        """Set velocity based on number key press"""
+        if self.velocity_adjustment_mode and event and event.char.isdigit():
+            idx = int(event.char)
+            if idx == 0:
+                # Use original velocity
+                current_velocity = self.original_velocity
+                self.current_velocity_index = 0
+            else:
+                # Use selected velocity
+                self.current_velocity_index = idx
+                velocities = self.additional_velocities if self.use_additional_velocities else self.high_velocities
+                current_velocity = velocities[idx]
+                
+                if self.inverted_velocity:
+                    current_velocity = -current_velocity
+            
+            # Update the classified velocity in output dataframe
+            filename = os.path.basename(self.kymograph_files[self.current_index])
+            df_idx = self.counts_df[self.counts_df['Image_Path'] == filename].index[0]
+            self.output_df.at[df_idx, 'Classified_Velocity'] = current_velocity
+            
+            # Update velocity label
+            self.velocity_label.config(text=f"Velocity: {current_velocity} um/s")
+            self.status_label.config(text=f"Velocity set to {current_velocity} um/s - press v to return to counting mode")
+            
+            # Reanalyze kymograph with new velocity and save changes
+            self.reanalyze_with_new_velocity(current_velocity)
+            self.output_df.to_csv(self.output_path, index=False)
+
+    def reanalyze_with_new_velocity(self, new_velocity):
+        """Reanalyze kymograph with the new velocity"""
+        # Temporarily update the velocity in the dataframe
+        filename = os.path.basename(self.kymograph_files[self.current_index])
+        idx = self.counts_df[self.counts_df['Image_Path'] == filename].index[0]
+        old_velocity = self.counts_df.at[idx, 'Velocity (um/s)']
+        self.counts_df.at[idx, 'Velocity (um/s)'] = new_velocity
+        
+        # Get current estimated count if available
+        if 'Modified_Estimated_Counts' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Image_Path'] == filename, 'Modified_Estimated_Counts'].values[0]):
+            current_est_count = self.output_df.loc[self.output_df['Image_Path'] == filename, 'Modified_Estimated_Counts'].values[0]
+            # Also update estimated count temporarily
+            old_est_count = self.counts_df.at[idx, 'Estimated_Counts']
+            self.counts_df.at[idx, 'Estimated_Counts'] = current_est_count
+        else:
+            current_est_count = None
+            old_est_count = None
+        
+        # Reanalyze
+        try:
+            rbc_count, rotated, profile, peaks, inverted, rbc_count_est, height_threshold = analyze_kymograph(
+                self.kymograph_files[self.current_index], self.counts_df, self.prominence_threshold
+            )
+            
+            # Update stored values
+            self.current_rotated = rotated
+            self.current_profile = profile
+            self.current_peaks = peaks
+            self.current_inverted = inverted
+            self.current_count = rbc_count
+            self.current_est_count = rbc_count_est
+            self.height_threshold = height_threshold
+            
+            # Update count label
+            self.count_label.config(text=f"Estimated: {rbc_count_est}, Measured: {rbc_count}")
+            
+            # Update threshold label
+            self.threshold_label.config(text=f"Prominence: {self.prominence_threshold:.3f}, Height: {self.height_threshold:.3f}")
+            
+            # Update plots
+            self.update_plots()
+            
+            # Update output df
+            self.output_df.at[idx, 'Measured_Counts'] = rbc_count
+            if pd.isna(self.output_df.at[idx, 'Final_Counts']):
+                self.output_df.at[idx, 'Final_Counts'] = rbc_count
+        finally:
+            # Restore original velocity in counts_df
+            self.counts_df.at[idx, 'Velocity (um/s)'] = old_velocity
+            # Restore original est count if it was changed
+            if old_est_count is not None:
+                self.counts_df.at[idx, 'Estimated_Counts'] = old_est_count
+
+    def toggle_velocity_set(self, event=None):
+        """Toggle between high and additional velocity sets"""
+        if self.velocity_adjustment_mode:
+            self.use_additional_velocities = not self.use_additional_velocities
+            self.status_label.config(text=f"Using {'additional' if self.use_additional_velocities else 'high'} velocities")
+            
+            # If a velocity is selected, update to the corresponding value in the new set
+            if self.current_velocity_index > 0:
+                velocities = self.additional_velocities if self.use_additional_velocities else self.high_velocities
+                current_velocity = velocities[self.current_velocity_index]
+                
+                if self.inverted_velocity:
+                    current_velocity = -current_velocity
+                
+                # Update the classified velocity
+                filename = os.path.basename(self.kymograph_files[self.current_index])
+                idx = self.counts_df[self.counts_df['Image_Path'] == filename].index[0]
+                self.output_df.at[idx, 'Classified_Velocity'] = current_velocity
+                
+                # Update velocity label
+                self.velocity_label.config(text=f"Velocity: {current_velocity} um/s")
+                
+                # Reanalyze kymograph with new velocity
+                self.reanalyze_with_new_velocity(current_velocity)
+
+    def refresh_analysis(self, event=None):
+        """Refresh the analysis with current velocity and estimated count values"""
+        filename = os.path.basename(self.kymograph_files[self.current_index])
+        idx = self.counts_df[self.counts_df['Image_Path'] == filename].index[0]
+        
+        # Get current velocity
+        if 'Classified_Velocity' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Image_Path'] == filename, 'Classified_Velocity'].values[0]):
+            current_velocity = self.output_df.loc[self.output_df['Image_Path'] == filename, 'Classified_Velocity'].values[0]
+        else:
+            current_velocity = self.counts_df.loc[self.counts_df['Image_Path'] == filename, 'Velocity (um/s)'].values[0]
+        
+        # Get current estimated count
+        if 'Modified_Estimated_Counts' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Image_Path'] == filename, 'Modified_Estimated_Counts'].values[0]):
+            current_est_count = self.output_df.loc[self.output_df['Image_Path'] == filename, 'Modified_Estimated_Counts'].values[0]
+        else:
+            current_est_count = self.counts_df.loc[self.counts_df['Image_Path'] == filename, 'Estimated_Counts'].values[0]
+        
+        # Create temporary df for analysis
+        temp_df = self.counts_df.copy()
+        temp_df.at[idx, 'Velocity (um/s)'] = current_velocity
+        temp_df.at[idx, 'Estimated_Counts'] = current_est_count
+        
+        # Reanalyze with current settings
+        try:
+            rbc_count, rotated, profile, peaks, inverted, rbc_count_est, height_threshold = analyze_kymograph(
+                self.kymograph_files[self.current_index], temp_df, self.prominence_threshold
+            )
+            
+            # Update stored values
+            self.current_rotated = rotated
+            self.current_profile = profile
+            self.current_peaks = peaks
+            self.current_inverted = inverted
+            self.current_count = rbc_count
+            self.current_est_count = rbc_count_est
+            self.height_threshold = height_threshold
+            
+            # Update count label
+            self.count_label.config(text=f"Estimated: {rbc_count_est}, Measured: {rbc_count}")
+            
+            # Update threshold label
+            self.threshold_label.config(text=f"Prominence: {self.prominence_threshold:.3f}, Height: {self.height_threshold:.3f}")
+            
+            # Update plots
+            self.update_plots()
+            
+            # Update measured counts in output df
+            self.output_df.at[idx, 'Measured_Counts'] = rbc_count
+            
+            # Status update
+            self.status_label.config(text="Analysis refreshed with current settings")
+            
+            # Save the output dataframe
+            self.output_df.to_csv(self.output_path, index=False)
+            
+        except Exception as e:
+            self.status_label.config(text=f"Error refreshing analysis: {str(e)}")
 
 def main(path_to_kymograph, counts_df):
     # This function is kept for backward compatibility
@@ -475,4 +970,4 @@ if __name__ == '__main__':
     #     main(path, counts_df)
     
     # Run the GUI instead
-    run_gui('D:\\frog\\kymographs', 'D:\\frog\\counted_kymos_CalFrog4.csv')
+    run_gui('D:\\frog\\results\\kymographs', 'D:\\frog\\results\\kymograph_counts_velocities_20250317_203720.csv')
