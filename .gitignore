@@ -137,3 +137,15 @@ metadata_*
 frog/results/stdevs/*
 set01*
 frog/result*
+frog/
+scripts/*.out
+scripts/*.err
+scripts/*.log
+scripts/*.txt
+scripts/*.csv
+scripts/*.json
+src/_pycache_/
+src/__pycache__/
+src/tools/__pycache__/
+src/analysis/__pycache__/
+
