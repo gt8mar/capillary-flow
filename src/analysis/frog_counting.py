@@ -238,9 +238,6 @@ class RBCCounterGUI:
         self.plot_frame = tk.Frame(self.root)
         self.plot_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True, padx=10, pady=5)
         
-        self.control_frame = tk.Frame(self.root)
-        self.control_frame.pack(side=tk.BOTTOM, fill=tk.X, padx=10, pady=5)
-        
         # Create left and right info columns
         self.info_left_frame = tk.Frame(self.info_frame)
         self.info_left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
@@ -278,6 +275,11 @@ class RBCCounterGUI:
         self.manual_entry_value = tk.Label(self.manual_entry_frame, text="", font=("Arial", 12))
         self.manual_entry_value.pack(side=tk.LEFT)
         
+        # Add a Help button to open instructions window
+        self.help_button = tk.Button(self.info_right_frame, text="Show Instructions", 
+                                   command=self.show_instructions_window)
+        self.help_button.pack(anchor=tk.E, pady=10)
+        
         # Status label (not visible in GUI but kept for function calls)
         self.status_label = tk.Label(self.root)
         
@@ -310,8 +312,8 @@ class RBCCounterGUI:
         # Backspace for manual count
         self.root.bind('<BackSpace>', self.remove_digit)
         
-        # Instructions
-        instructions = """
+        # Create instructions but don't add them to the main window
+        self.instructions_text = """
         Counting Mode:
         c - Mark as correct
         n - Next kymograph
@@ -340,8 +342,40 @@ class RBCCounterGUI:
         r - Refresh analysis
         """
         
-        self.instructions_label = tk.Label(self.control_frame, text=instructions, font=("Arial", 10), justify=tk.LEFT)
-        self.instructions_label.pack(side=tk.LEFT, padx=10, pady=5)
+        # Initial instructions window state
+        self.instructions_window = None
+    
+    def show_instructions_window(self):
+        """Opens a new window with the instructions"""
+        # Close existing window if open
+        if self.instructions_window is not None and self.instructions_window.winfo_exists():
+            self.instructions_window.focus_force()  # Just bring to front if already open
+            return
+        
+        # Create new window
+        self.instructions_window = tk.Toplevel(self.root)
+        self.instructions_window.title("RBC Counter Instructions")
+        self.instructions_window.geometry("500x500")
+        
+        # Add instructions text
+        instructions_label = tk.Label(
+            self.instructions_window, 
+            text=self.instructions_text, 
+            font=("Arial", 12),
+            justify=tk.LEFT,
+            padx=20, 
+            pady=20
+        )
+        instructions_label.pack(fill=tk.BOTH, expand=True)
+        
+        # Add a close button
+        close_button = tk.Button(
+            self.instructions_window, 
+            text="Close", 
+            command=self.instructions_window.destroy,
+            font=("Arial", 12)
+        )
+        close_button.pack(pady=10)
     
     def setup_plots(self):
         """Set up the matplotlib plots with improved sizing"""
