@@ -3,7 +3,7 @@ Filename: debug_make_diameter.py
 ------------------------------------------------------
 This script helps debug missing area calculations in the capillary diameter data.
 It identifies which capillaries have missing area calculations, checks if the 
-segmentation files exist, and compares with entries in merged_csv4.csv.
+segmentation files exist, and compares with entries in merged_csv4.csv. 
 
 By: Marcus Forst
 """
@@ -22,7 +22,8 @@ from matplotlib.font_manager import FontProperties
 
 # Local imports
 from src.tools.parse_filename import parse_filename
-from src.tools.plotting_utils import plot_CI
+from src.tools.plotting_utils import plot_CI, create_monochromatic_palette, adjust_brightness_of_colors, plot_PCA
+from src.config import PATHS
 
 # Get the hostname and set paths
 hostname = platform.node()
@@ -48,15 +49,22 @@ default_paths = {
 source_sans = FontProperties(fname='C:\\Users\\ejerison\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
 
 def main():
-    """Main function to debug missing area calculations."""
-    # Set paths based on platform
-    cap_flow_path = computer_paths[hostname]['cap_flow']
-    data_file_path = os.path.join(cap_flow_path, 'results','diameter_analysis_df.csv')
+    """Main function to analyze shear rates in capillary flow data."""
+    # Import paths from config
+    from src.config import PATHS
+    
+    # Set paths using the config
+    cap_flow_path = PATHS['cap_flow']
+    data_file_path = os.path.join(cap_flow_path, 'results', 'diameter_analysis_df.csv')
 
-
-    # Set up font
+    # Set up font safely
     try:
-        source_sans = FontProperties(fname='C:\\Users\\ejerison\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+        font_path = os.path.join(PATHS['downloads'], 'Source_Sans_3', 'static', 'SourceSans3-Regular.ttf')
+        if os.path.exists(font_path):
+            source_sans = FontProperties(fname=font_path)
+        else:
+            print(f"Warning: Font file not found at {font_path}, using default font")
+            source_sans = None
     except Exception as e:
         print(f"Warning: Could not set up font: {e}")
         source_sans = None
@@ -69,9 +77,94 @@ def main():
     diameter_analysis_df['set_number'] = diameter_analysis_df['SET'].str.split('set').str[1].replace('_', '').astype(int)
     diameter_analysis_df['Set_affected'] = np.where(diameter_analysis_df['SET'] == 'set01', 'set01', 'set04')
 
+    # plot histogram of diameters at 0.2, 0.4, and 1.2 psi for age groups and set groups
+    diameter_analysis_df = diameter_analysis_df[diameter_analysis_df['SET'] == 'set01']
+    print("Creating diameter histograms...")
+    plot_histogram(diameter_analysis_df, 'Mean_Diameter', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_histogram(diameter_analysis_df, 'Mean_Diameter', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_histogram(diameter_analysis_df, 'Mean_Diameter', pressure=1.2, age_groups=['≤50', '>50'])
+    
+    # plot histograms of velocity, shear rate, and pressure drop
+    print("Creating velocity histograms...")
+    plot_histogram(diameter_analysis_df, 'Corrected_Velocity', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_histogram(diameter_analysis_df, 'Corrected_Velocity', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_histogram(diameter_analysis_df, 'Corrected_Velocity', pressure=1.2, age_groups=['≤50', '>50'])
+    
+    print("Creating shear rate histograms...")
+    plot_histogram(diameter_analysis_df, 'Shear_Rate', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_histogram(diameter_analysis_df, 'Shear_Rate', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_histogram(diameter_analysis_df, 'Shear_Rate', pressure=1.2, age_groups=['≤50', '>50'])
+    
+    print("Creating pressure drop histograms...")
+    plot_histogram(diameter_analysis_df, 'Pressure_Drop', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_histogram(diameter_analysis_df, 'Pressure_Drop', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_histogram(diameter_analysis_df, 'Pressure_Drop', pressure=1.2, age_groups=['≤50', '>50'])
+
+    # plot CDF of diameters, velocity, shear rate, and pressure drop
+    print("Creating diameter CDFs...")
+    plot_cdf(diameter_analysis_df, 'Mean_Diameter', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_cdf(diameter_analysis_df, 'Mean_Diameter', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_cdf(diameter_analysis_df, 'Mean_Diameter', pressure=1.2, age_groups=['≤50', '>50'])
+    
+    print("Creating velocity CDFs...")
+    plot_cdf(diameter_analysis_df, 'Corrected_Velocity', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_cdf(diameter_analysis_df, 'Corrected_Velocity', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_cdf(diameter_analysis_df, 'Corrected_Velocity', pressure=1.2, age_groups=['≤50', '>50'])
+    
+    print("Creating shear rate CDFs...")
+    plot_cdf(diameter_analysis_df, 'Shear_Rate', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_cdf(diameter_analysis_df, 'Shear_Rate', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_cdf(diameter_analysis_df, 'Shear_Rate', pressure=1.2, age_groups=['≤50', '>50'])
+    
+    print("Creating pressure drop CDFs...")
+    plot_cdf(diameter_analysis_df, 'Pressure_Drop', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_cdf(diameter_analysis_df, 'Pressure_Drop', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_cdf(diameter_analysis_df, 'Pressure_Drop', pressure=1.2, age_groups=['≤50', '>50'])
+    
+    # plot violin plots of diameters, velocity, shear rate, and pressure drop
+    print("Creating diameter violin plots...")
+    plot_violin(diameter_analysis_df, 'Mean_Diameter', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_violin(diameter_analysis_df, 'Mean_Diameter', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_violin(diameter_analysis_df, 'Mean_Diameter', pressure=1.2, age_groups=['≤50', '>50'])
+    
+    print("Creating velocity violin plots...")
+    plot_violin(diameter_analysis_df, 'Corrected_Velocity', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_violin(diameter_analysis_df, 'Corrected_Velocity', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_violin(diameter_analysis_df, 'Corrected_Velocity', pressure=1.2, age_groups=['≤50', '>50'])
+    
+    print("Creating shear rate violin plots...")
+    plot_violin(diameter_analysis_df, 'Shear_Rate', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_violin(diameter_analysis_df, 'Shear_Rate', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_violin(diameter_analysis_df, 'Shear_Rate', pressure=1.2, age_groups=['≤50', '>50'])
+    
+    print("Creating pressure drop violin plots...")
+    plot_violin(diameter_analysis_df, 'Pressure_Drop', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_violin(diameter_analysis_df, 'Pressure_Drop', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_violin(diameter_analysis_df, 'Pressure_Drop', pressure=1.2, age_groups=['≤50', '>50'])
+
+    # plot box and whisker plots of diameters, velocity, shear rate, and pressure drop
+    print("Creating diameter box plots...")
+    plot_boxnwhisker(diameter_analysis_df, 'Mean_Diameter', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_boxnwhisker(diameter_analysis_df, 'Mean_Diameter', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_boxnwhisker(diameter_analysis_df, 'Mean_Diameter', pressure=1.2, age_groups=['≤50', '>50'])
+    
+    print("Creating velocity box plots...")
+    plot_boxnwhisker(diameter_analysis_df, 'Corrected_Velocity', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_boxnwhisker(diameter_analysis_df, 'Corrected_Velocity', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_boxnwhisker(diameter_analysis_df, 'Corrected_Velocity', pressure=1.2, age_groups=['≤50', '>50'])
+    
+    print("Creating shear rate box plots...")
+    plot_boxnwhisker(diameter_analysis_df, 'Shear_Rate', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_boxnwhisker(diameter_analysis_df, 'Shear_Rate', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_boxnwhisker(diameter_analysis_df, 'Shear_Rate', pressure=1.2, age_groups=['≤50', '>50'])
+    
+    print("Creating pressure drop box plots...")
+    plot_boxnwhisker(diameter_analysis_df, 'Pressure_Drop', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_boxnwhisker(diameter_analysis_df, 'Pressure_Drop', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_boxnwhisker(diameter_analysis_df, 'Pressure_Drop', pressure=1.2, age_groups=['≤50', '>50'])
+
     # calculate median shear rate for each participant video. 
     diameter_analysis_df = calculate_representative_diameters(diameter_analysis_df)
-
 
     # Create diameter plots directory if it doesn't exist
     diameter_plots_dir = os.path.join(cap_flow_path, 'results', 'diameter_plots')
@@ -79,27 +172,86 @@ def main():
     shear_rate_plots_dir = os.path.join(cap_flow_path, 'results', 'shear')
     os.makedirs(shear_rate_plots_dir, exist_ok=True)
 
-    # threshold_analysis(diameter_analysis_df, diameter_plots_dir, cap_flow_path)
-    # plot_velocity_vs_diameter_by_age(diameter_analysis_df, diameter_plots_dir)
-    # plot_velocity_vs_diameter_by_participant(diameter_analysis_df, diameter_plots_dir)
-    # plot_velocity_vs_diameter_by_set(diameter_analysis_df)
-    
-    # make_mixed_effect_model(diameter_analysis_df)
-    # threshold_analysis(diameter_analysis_df)  
-    # plot_velocity_vs_diameter_theory()
+    # Create animations directory
+    animations_dir = os.path.join(shear_rate_plots_dir, 'animations')
+    os.makedirs(animations_dir, exist_ok=True)
 
-    # plot_pressure_drop_per_length(diameter_analysis_df)
+    # Animated 3D plots - generate one at a time to avoid memory issues
+    # First generate the main shear rate vs diameter and pressure plot
+    plot_shear_rate_3d(diameter_analysis_df, animate=True, fps=20)
     
-    # Call the new 3D shear rate visualization function
-    # plot_shear_rate_3d(diameter_analysis_df)
-    plot_shear_rate_3d_pressure_age(diameter_analysis_df)
-    plot_pressure_drop_per_length_shear_rate(diameter_analysis_df, pressure = 0.2)
-    plot_pressure_drop_per_length_shear_rate(diameter_analysis_df, pressure = 0.4)
-    plot_pressure_drop_per_length_shear_rate(diameter_analysis_df, pressure = 1.2)
-
-    plot_CI(diameter_analysis_df, variable = 'Age', method = 'bootstrap', n_iterations = 1000, ci_percentile = 99.5, write = True, dimensionless = False, video_median = False, log_scale = False, old = False, velocity_variable = 'Shear_Rate')
-    plot_CI(diameter_analysis_df, variable = 'Diabetes', method = 'bootstrap', n_iterations = 1000, ci_percentile = 99.5, write = True, dimensionless = False, video_median = False, log_scale = False, old = False, velocity_variable = 'Shear_Rate')
+    # Then generate pressure-specific age plots one at a time
+    plot_shear_rate_3d_pressure_age(diameter_analysis_df, pressure=0.2, animate=True, fps=20)
+    plot_shear_rate_3d_pressure_age(diameter_analysis_df, pressure=0.4, animate=True, fps=20)
+    plot_shear_rate_3d_pressure_age(diameter_analysis_df, pressure=1.2, animate=True, fps=20)
+    
+    # Calculate and plot CI results
+    shear_rate_medians_df = calculate_shear_rate_medians(diameter_analysis_df)
+    shear_rate_medians_nhp = shear_rate_medians_df[shear_rate_medians_df['Pressure'] <= 1.2]
+    shear_rate_medians_nhp_age = shear_rate_medians_nhp[shear_rate_medians_nhp['SET'] == 'set01']
+    print(f'the number of participants in the nhp set01 is {shear_rate_medians_nhp_age["Participant"].nunique()}')
+    
+    plot_CI(shear_rate_medians_nhp_age, variable = 'Age', method = 'bootstrap', n_iterations = 1000, ci_percentile = 95, write = True, dimensionless = False, video_median = False, log_scale = False, old = False, velocity_variable = 'Shear_Rate')
+    plot_CI(shear_rate_medians_nhp, variable = 'Diabetes', method = 'bootstrap', n_iterations = 1000, ci_percentile = 95, write = True, dimensionless = False, video_median = False, log_scale = False, old = False, velocity_variable = 'Shear_Rate')
+    
+    participant_medians = calculate_participant_medians(diameter_analysis_df)
+    plot_PCA(participant_medians)
     return 0
+
+def calculate_participant_medians(diameter_analysis_df):
+    """
+    Calculate the median shear rate, velocity, pressure drop per length, and diameter for each participant.
+    
+    Args:
+        diameter_analysis_df: DataFrame containing the data to calculate the median
+
+    Returns:
+        df: DataFrame containing the median shear rate, velocity, pressure drop per length, and diameter for each participant. Also includes metadata like participant number, age, set and sex.
+    """
+    df = diameter_analysis_df.copy()
+    df_nhp = df[df['Pressure'] <= 1.2]
+    
+    # Calculate medians of key variables for each participant
+    median_values = df_nhp.groupby('Participant').agg({
+        'Shear_Rate': 'median',
+        'Corrected_Velocity': 'median',
+        'Pressure_Drop': 'median',
+        'Mean_Diameter': 'median'
+    })
+    
+    # Get participant metadata (using first occurrence for each participant)
+    metadata = df_nhp.groupby('Participant').first().reset_index()
+    
+    # Select only the metadata columns we want
+    metadata_cols = ['Participant']
+    
+    # Add demographic columns if they exist
+    for col in ['Age', 'SET', 'Sex', 'set_number', 'Diabetes', 'Set_affected']:
+        if col in df_nhp.columns:
+            metadata_cols.append(col)
+    
+    metadata = metadata[metadata_cols].set_index('Participant')
+    
+    # Combine metadata with median values
+    participant_medians = median_values.join(metadata)
+    
+    # Reset index to make Participant a regular column
+    participant_medians = participant_medians.reset_index()
+    
+    print(f'Participant medians dataframe shape: {participant_medians.shape}')
+    print(f'Participant medians columns: {participant_medians.columns.tolist()}')
+    
+    # Optionally save to CSV
+    try:
+        from src.config import PATHS
+        results_dir = os.path.join(PATHS.get('cap_flow', '.'), 'results')
+        os.makedirs(results_dir, exist_ok=True)
+        participant_medians.to_csv(os.path.join(results_dir, 'participant_medians.csv'), index=False)
+        print(f"Participant medians saved to {os.path.join(results_dir, 'participant_medians.csv')}")
+    except Exception as e:
+        print(f"Warning: Could not save participant medians to CSV: {e}")
+    
+    return participant_medians
 
 
 def threshold_analysis(diameter_analysis_df, diameter_plots_dir, cap_flow_path):
@@ -158,7 +310,7 @@ def threshold_analysis(diameter_analysis_df, diameter_plots_dir, cap_flow_path):
                 ks_results[threshold] = ks_stat
             
             plt.tight_layout()
-            plt.savefig(os.path.join(diameter_plots_dir, f'age_cdf_threshold_{threshold}.png'), dpi=600, bbox_inches='tight')
+            plt.savefig(os.path.join(diameter_plots_dir, f'age_threshold_{threshold}_cdf_plot.png'), dpi=600, bbox_inches='tight')
             plt.close()
         
         # Find the threshold with the maximum KS statistic (most different distributions)
@@ -212,6 +364,46 @@ def setup_plotting_style():
         'lines.linewidth': 0.5,
         'figure.figsize': (12, 10)
     })
+
+def calculate_shear_rate_medians(diameter_analysis_df):
+    """
+    Calculate the median shear rate for each participant, video, and capillary and drop redundant rows.
+
+    Args:
+        diameter_analysis_df: DataFrame containing the data to calculate the median shear rate
+
+    Returns:
+        df: DataFrame containing the median shear rate for each participant, video, and capillary
+    """
+    # print("\nDEBUG - In calculate_shear_rate_medians")
+    # print(f"DEBUG - Input dataframe shape: {diameter_analysis_df.shape}")
+    # print(f"DEBUG - Input dataframe columns: {diameter_analysis_df.columns.tolist()}")
+    
+    # Check if 'Shear_Rate' is in the columns
+    if 'Shear_Rate' not in diameter_analysis_df.columns:
+        print("ERROR - 'Shear_Rate' column not found in dataframe!")
+        # Check for similar columns
+        similar_cols = [col for col in diameter_analysis_df.columns if 'shear' in col.lower()]
+        if similar_cols:
+            # print(f"DEBUG - Found similar columns: {similar_cols}")
+            pass
+    
+    df = diameter_analysis_df.copy()
+    
+    # Calculate the Video Median Shear Rate
+    df['Video_Median_Shear_Rate'] = df.groupby(['Participant', 'Video', 'Capillary'])['Shear_Rate'].transform('median')
+    
+    print(f'df.shape: {df.shape}')
+    # drop redundant rows
+    df = df.drop_duplicates(subset=['Participant', 'Video'])
+    print(f'df.shape after dropping duplicates: {df.shape}')
+    
+    # print(f"DEBUG - Output dataframe shape: {df.shape}")
+    # print(f"DEBUG - Output dataframe columns: {df.columns.tolist()}")
+    # print(f"DEBUG - Sample of first 5 Shear_Rate values: {df['Shear_Rate'].head().tolist()}")
+    # print(f"DEBUG - Sample of first 5 Video_Median_Shear_Rate values: {df['Video_Median_Shear_Rate'].head().tolist()}")
+    
+    return df
 
 def plot_velocity_vs_diameter_by_age(diameter_analysis_df, diameter_plots_dir):
     """
@@ -268,6 +460,7 @@ def plot_velocity_vs_diameter_by_participant(diameter_analysis_df, diameter_plot
         plt.savefig(os.path.join(diameter_plots_dir, f'{participant}_velocity_vs_diameter.png'),
                     dpi=600, bbox_inches='tight')
         plt.close()
+
 def plot_velocity_vs_diameter_by_set(diameter_analysis_df, output_dir):
     """
     Plot velocity vs diameter colored by SET number for each pressure level.
@@ -295,6 +488,632 @@ def plot_velocity_vs_diameter_by_set(diameter_analysis_df, output_dir):
         plt.close()
         return 0
     
+def plot_histogram(diameter_analysis_df, variable, pressure, age_groups, cutoff_percentile=95):
+    """
+    Plot a histogram of the specified variable for a given pressure, showing multiple age groups 
+    on the same plot with median lines and a legend.
+    
+    Args:
+        diameter_analysis_df: DataFrame containing the data to plot
+        variable: String specifying which variable to plot ('Mean_Diameter', 'Pressure_Drop', 
+                 'Corrected_Velocity', or 'Shear_Rate')
+        pressure: Pressure value to plot
+        age_groups: List of age groups to plot
+        cutoff_percentile: Percentile value to use as upper cutoff for outliers (except Mean_Diameter)
+    """
+    setup_plotting_style()  
+    output_dir = os.path.join(PATHS['cap_flow'], 'results', 'histograms')
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    # Create a copy of the dataframe
+    df = diameter_analysis_df.copy()
+    
+    # Define variable-specific settings
+    variable_settings = {
+        'Mean_Diameter': {
+            'color': '#1f77b4',  # Blue
+            'label': 'Mean Diameter (μm)',
+            'title_prefix': 'Mean Diameter',
+            'unit': 'μm',
+            'apply_cutoff': False
+        },
+        'Pressure_Drop': {
+            'color': '#d62728',  # Red
+            'label': 'Pressure Drop per Length (mmHg/μm)',
+            'title_prefix': 'Pressure Drop',
+            'unit': 'mmHg/μm',
+            'apply_cutoff': True
+        },
+        'Corrected_Velocity': {
+            'color': '#2ca02c',  # Green
+            'label': 'Corrected Velocity (μm/s)',
+            'title_prefix': 'Velocity',
+            'unit': 'μm/s',
+            'apply_cutoff': True
+        },
+        'Shear_Rate': {
+            'color': '#9467bd',  # Purple
+            'label': 'Shear Rate (s⁻¹)',
+            'title_prefix': 'Shear Rate',
+            'unit': 's⁻¹',
+            'apply_cutoff': True
+        }
+    }
+    
+    # Check if the variable is valid
+    if variable not in variable_settings:
+        raise ValueError(f"Invalid variable: {variable}. Valid options are: {list(variable_settings.keys())}")
+    
+    # Get settings for the specified variable
+    settings = variable_settings[variable]
+    
+    # Calculate pressure drop if plotting Pressure_Drop
+    if variable == 'Pressure_Drop':
+        diameters = df['Mean_Diameter']
+        velocities = df['Corrected_Velocity']
+        viscosities = secomb_viscocity_fn(diameters)
+        df['Pressure_Drop'] = pressure_drop_per_length(diameters, velocities, viscosities)
+    
+    
+    
+    # Apply cutoff if needed
+    if settings['apply_cutoff']:
+        upper_cutoff = df[variable].quantile(cutoff_percentile/100)
+        df[variable] = df[variable].where(df[variable] <= upper_cutoff, upper_cutoff)
+    else:
+        upper_cutoff = df[variable].max()
+
+    # Filter by pressure
+    df = df[df['Pressure'] == pressure]
+    
+    # Create color palette
+    color_palette = create_monochromatic_palette(base_color=settings['color'], n_colors=5)
+    color_palette = adjust_brightness_of_colors(color_palette, brightness_scale=0.1)
+    color_palette = [color_palette[4], color_palette[1]]
+    
+    # Create a single figure for both age groups
+    plt.figure(figsize=(2.4, 2.0))
+    
+    # Process each age group
+    for i, age_group in enumerate(age_groups):
+        if age_group == '≤50':
+            age_group_df = df[df['Age'] <= 50]
+            display_name = '≤50 years'
+        elif age_group == '>50':
+            age_group_df = df[df['Age'] > 50]
+            display_name = '>50 years'
+        
+        # Calculate median for this group
+        median_value = age_group_df[variable].median()
+        
+        # Plot histogram with transparency
+        plt.hist(age_group_df[variable], bins=20, density=True, alpha=0.5, color=color_palette[i], 
+                label=f'{display_name} (n={len(age_group_df)})')
+        
+        # Add vertical line for median
+        plt.axvline(x=median_value, color=color_palette[i], linestyle='--', 
+                   label=f'Median {display_name}: {median_value:.2f} {settings["unit"]}')
+    
+    # Add labels and title
+    plt.xlabel(settings['label'], fontproperties=source_sans)
+    plt.ylabel('Frequency', fontproperties=source_sans)
+    plt.title(f'{pressure} PSI - {settings["title_prefix"]} Histogram', fontproperties=source_sans)
+    plt.xlim(0, upper_cutoff)
+    
+    # Add legend with smaller font size
+    plt.legend(prop={'size': 5})
+    
+    plt.tight_layout()
+    
+    # Save the plot with a name that includes the variable
+    safe_variable = variable.lower().replace('_', '')
+    plt.savefig(os.path.join(output_dir, f'pressure_{pressure}_{safe_variable}_histogram_by_age.png'),
+                dpi=600, bbox_inches='tight')
+    plt.close()
+    return 0
+
+def plot_cdf(diameter_analysis_df, variable, pressure, age_groups, cutoff_percentile=95):
+    """
+    Plot a cumulative distribution function (CDF) of the specified variable for a given pressure,
+    showing multiple age groups on the same plot with median lines and a legend.
+    
+    Args:
+        diameter_analysis_df: DataFrame containing the data to plot
+        variable: String specifying which variable to plot ('Mean_Diameter', 'Pressure_Drop', 
+                 'Corrected_Velocity', or 'Shear_Rate')
+        pressure: Pressure value to plot
+        age_groups: List of age groups to plot
+        cutoff_percentile: Percentile value to use as upper cutoff for outliers (except Mean_Diameter)
+    """
+    setup_plotting_style()  
+    output_dir = os.path.join(PATHS['cap_flow'], 'results', 'cdf_plots')
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    # Create a copy of the dataframe
+    df = diameter_analysis_df.copy()
+    
+    # Define variable-specific settings (same as in plot_histogram)
+    variable_settings = {
+        'Mean_Diameter': {
+            'color': '#1f77b4',  # Blue
+            'label': 'Mean Diameter (μm)',
+            'title_prefix': 'Mean Diameter',
+            'unit': 'μm',
+            'apply_cutoff': False
+        },
+        'Pressure_Drop': {
+            'color': '#d62728',  # Red
+            'label': 'Pressure Drop per Length (mmHg/μm)',
+            'title_prefix': 'Pressure Drop',
+            'unit': 'mmHg/μm',
+            'apply_cutoff': True
+        },
+        'Corrected_Velocity': {
+            'color': '#2ca02c',  # Green
+            'label': 'Corrected Velocity (μm/s)',
+            'title_prefix': 'Velocity',
+            'unit': 'μm/s',
+            'apply_cutoff': True
+        },
+        'Shear_Rate': {
+            'color': '#9467bd',  # Purple
+            'label': 'Shear Rate (s⁻¹)',
+            'title_prefix': 'Shear Rate',
+            'unit': 's⁻¹',
+            'apply_cutoff': True
+        }
+    }
+    
+    # Check if the variable is valid
+    if variable not in variable_settings:
+        raise ValueError(f"Invalid variable: {variable}. Valid options are: {list(variable_settings.keys())}")
+    
+    # Get settings for the specified variable
+    settings = variable_settings[variable]
+    
+    # Calculate pressure drop if plotting Pressure_Drop
+    if variable == 'Pressure_Drop':
+        diameters = df['Mean_Diameter']
+        velocities = df['Corrected_Velocity']
+        viscosities = secomb_viscocity_fn(diameters)
+        df['Pressure_Drop'] = pressure_drop_per_length(diameters, velocities, viscosities)
+    
+    # Apply cutoff if needed
+    if settings['apply_cutoff']:
+        upper_cutoff = df[variable].quantile(cutoff_percentile/100)
+        df[variable] = df[variable].where(df[variable] <= upper_cutoff, upper_cutoff)
+    else:
+        upper_cutoff = df[variable].max()
+
+    # Filter by pressure
+    df = df[df['Pressure'] == pressure]
+    
+    # Create color palette (same as in plot_histogram)
+    color_palette = create_monochromatic_palette(base_color=settings['color'], n_colors=5)
+    color_palette = adjust_brightness_of_colors(color_palette, brightness_scale=0.1)
+    color_palette = [color_palette[4], color_palette[1]]
+    
+    # Create a single figure for both age groups
+    plt.figure(figsize=(2.4, 2.0))
+    
+    # Process each age group
+    for i, age_group in enumerate(age_groups):
+        if age_group == '≤50':
+            age_group_df = df[df['Age'] <= 50]
+            display_name = '≤50 years'
+        elif age_group == '>50':
+            age_group_df = df[df['Age'] > 50]
+            display_name = '>50 years'
+        
+        # Calculate median for this group
+        median_value = age_group_df[variable].median()
+        
+        # Calculate CDF
+        sorted_data = np.sort(age_group_df[variable])
+        cdf = np.arange(1, len(sorted_data) + 1) / len(sorted_data)
+        
+        # Plot CDF
+        plt.plot(sorted_data, cdf, '-', linewidth=1, color=color_palette[i], 
+                label=f'{display_name} (n={len(age_group_df)})')
+        
+        # Add vertical line for median
+        plt.axvline(x=median_value, color=color_palette[i], linestyle='--', 
+                  label=f'Median {display_name}: {median_value:.2f} {settings["unit"]}')
+    
+    # Add reference line at 0.5 probability
+    plt.axhline(y=0.5, color='gray', linestyle='--', alpha=0.5)
+    
+    # Add labels and title
+    plt.xlabel(settings['label'], fontproperties=source_sans)
+    plt.ylabel('Cumulative Probability', fontproperties=source_sans)
+    plt.title(f'{pressure} PSI - {settings["title_prefix"]} CDF', fontproperties=source_sans)
+    plt.xlim(0, upper_cutoff)
+    plt.ylim(0, 1)
+    
+    # Add legend with smaller font size
+    plt.legend(prop={'size': 5})
+    
+    plt.tight_layout()
+    
+    # Save the plot with a name that includes the variable
+    safe_variable = variable.lower().replace('_', '')
+    plt.savefig(os.path.join(output_dir, f'pressure_{pressure}_{safe_variable}_cdf_by_age.png'),
+                dpi=600, bbox_inches='tight')
+    plt.close()
+    return 0
+
+def plot_violin(diameter_analysis_df, variable, pressure, age_groups, cutoff_percentile=95):
+    """
+    Plot a violin plot of the specified variable for a given pressure,
+    showing multiple age groups side by side with median markers.
+    
+    Args:
+        diameter_analysis_df: DataFrame containing the data to plot
+        variable: String specifying which variable to plot ('Mean_Diameter', 'Pressure_Drop', 
+                 'Corrected_Velocity', or 'Shear_Rate')
+        pressure: Pressure value to plot
+        age_groups: List of age groups to plot
+        cutoff_percentile: Percentile value to use as upper cutoff for outliers (except Mean_Diameter)
+    """
+    setup_plotting_style()  
+    output_dir = os.path.join(PATHS['cap_flow'], 'results', 'violin_plots')
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    # Create a copy of the dataframe
+    df = diameter_analysis_df.copy()
+    
+    # Define variable-specific settings (same as in plot_histogram)
+    variable_settings = {
+        'Mean_Diameter': {
+            'color': '#1f77b4',  # Blue
+            'label': 'Mean Diameter (μm)',
+            'title_prefix': 'Mean Diameter',
+            'unit': 'μm',
+            'apply_cutoff': False
+        },
+        'Pressure_Drop': {
+            'color': '#d62728',  # Red
+            'label': 'Pressure Drop per Length (mmHg/μm)',
+            'title_prefix': 'Pressure Drop',
+            'unit': 'mmHg/μm',
+            'apply_cutoff': True
+        },
+        'Corrected_Velocity': {
+            'color': '#2ca02c',  # Green
+            'label': 'Corrected Velocity (μm/s)',
+            'title_prefix': 'Velocity',
+            'unit': 'μm/s',
+            'apply_cutoff': True
+        },
+        'Shear_Rate': {
+            'color': '#9467bd',  # Purple
+            'label': 'Shear Rate (s⁻¹)',
+            'title_prefix': 'Shear Rate',
+            'unit': 's⁻¹',
+            'apply_cutoff': True
+        }
+    }
+    
+    # Check if the variable is valid
+    if variable not in variable_settings:
+        raise ValueError(f"Invalid variable: {variable}. Valid options are: {list(variable_settings.keys())}")
+    
+    # Get settings for the specified variable
+    settings = variable_settings[variable]
+    
+    # Calculate pressure drop if plotting Pressure_Drop
+    if variable == 'Pressure_Drop':
+        diameters = df['Mean_Diameter']
+        velocities = df['Corrected_Velocity']
+        viscosities = secomb_viscocity_fn(diameters)
+        df['Pressure_Drop'] = pressure_drop_per_length(diameters, velocities, viscosities)
+    
+    # Apply cutoff if needed
+    if settings['apply_cutoff']:
+        upper_cutoff = df[variable].quantile(cutoff_percentile/100)
+        df[variable] = df[variable].where(df[variable] <= upper_cutoff, upper_cutoff)
+    else:
+        upper_cutoff = df[variable].max()
+
+    # Filter by pressure
+    df = df[df['Pressure'] == pressure]
+    
+    # Create color palette (same as in plot_histogram)
+    color_palette = create_monochromatic_palette(base_color=settings['color'], n_colors=5)
+    color_palette = adjust_brightness_of_colors(color_palette, brightness_scale=0.1)
+    color_palette = [color_palette[4], color_palette[1]]
+    
+    # Create a figure 
+    plt.figure(figsize=(2.4, 2.0))
+    
+    # Prepare data for violin plot
+    plot_data = []
+    labels = []
+    colors = []
+    positions = []
+    
+    # Process each age group
+    for i, age_group in enumerate(age_groups):
+        if age_group == '≤50':
+            age_group_df = df[df['Age'] <= 50]
+            display_name = '≤50 years'
+        elif age_group == '>50':
+            age_group_df = df[df['Age'] > 50]
+            display_name = '>50 years'
+        
+        # Add data to lists
+        if not age_group_df.empty:
+            plot_data.append(age_group_df[variable])
+            labels.append(f'{display_name}\n(n={len(age_group_df)})')
+            colors.append(color_palette[i])
+            positions.append(i+1)
+    
+    # Create violin plot
+    violins = plt.violinplot(plot_data, positions=positions, showmeans=False, 
+                          showmedians=True, showextrema=True)
+    
+    # Customize violins
+    for i, pc in enumerate(violins['bodies']):
+        pc.set_facecolor(colors[i])
+        pc.set_edgecolor('black')
+        pc.set_alpha(0.7)
+    
+    # Customize median lines
+    violins['cmedians'].set_color('black')
+    
+    # Add individual data points
+    for i, age_group in enumerate(age_groups):
+        if age_group == '≤50':
+            age_group_df = df[df['Age'] <= 50]
+        elif age_group == '>50':
+            age_group_df = df[df['Age'] > 50]
+        
+        # Add jittered data points
+        if not age_group_df.empty:
+            x = np.random.normal(i+1, 0.05, size=len(age_group_df))
+            plt.scatter(x, age_group_df[variable], alpha=0.2, s=1, color=colors[i])
+    
+    # Customize plot
+    plt.xticks(positions, labels, fontproperties=source_sans)
+    plt.ylabel(settings['label'], fontproperties=source_sans)
+    plt.title(f'{pressure} PSI - {settings["title_prefix"]} Distribution', fontproperties=source_sans)
+    plt.ylim(0, upper_cutoff)
+    
+    # Add statistics table
+    stats_text = []
+    for i, age_group in enumerate(age_groups):
+        if age_group == '≤50':
+            age_group_df = df[df['Age'] <= 50]
+            display_name = '≤50'
+        elif age_group == '>50':
+            age_group_df = df[df['Age'] > 50]
+            display_name = '>50'
+        
+        if not age_group_df.empty:
+            median_val = age_group_df[variable].median()
+            mean_val = age_group_df[variable].mean()
+            stats_text.append(f"{display_name}: median={median_val:.1f}, mean={mean_val:.1f}")
+    
+    # Try to do statistical comparison if we have two groups
+    if len(plot_data) == 2 and len(plot_data[0]) > 0 and len(plot_data[1]) > 0:
+        try:
+            from scipy import stats
+            # Mann-Whitney U test (non-parametric)
+            u_stat, p_value = stats.mannwhitneyu(plot_data[0], plot_data[1])
+            stats_text.append(f"p-value: {p_value:.3f}")
+        except:
+            pass
+    
+    # # Add stats as annotation
+    # plt.annotate('\n'.join(stats_text), xy=(0.5, 0.02), xycoords='axes fraction',
+    #            bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.8),
+    #            ha='center', va='bottom', fontsize=5)
+    
+    plt.tight_layout()
+    
+    # Save the plot
+    safe_variable = variable.lower().replace('_', '')
+    plt.savefig(os.path.join(output_dir, f'pressure_{pressure}_{safe_variable}_violin_by_age.png'),
+                dpi=600, bbox_inches='tight')
+    plt.close()
+    return 0
+
+def plot_boxnwhisker(diameter_analysis_df, variable, pressure, age_groups, cutoff_percentile=95):
+    """
+    Plot a box and whisker plot of the specified variable for a given pressure,
+    showing multiple age groups side by side with statistical annotations.
+    
+    Args:
+        diameter_analysis_df: DataFrame containing the data to plot
+        variable: String specifying which variable to plot ('Mean_Diameter', 'Pressure_Drop', 
+                 'Corrected_Velocity', or 'Shear_Rate')
+        pressure: Pressure value to plot
+        age_groups: List of age groups to plot
+        cutoff_percentile: Percentile value to use as upper cutoff for outliers (except Mean_Diameter)
+    """
+    setup_plotting_style()  
+    output_dir = os.path.join(PATHS['cap_flow'], 'results', 'boxplot_plots')
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    # Create a copy of the dataframe
+    df = diameter_analysis_df.copy()
+    
+    # Define variable-specific settings (same as in plot_histogram)
+    variable_settings = {
+        'Mean_Diameter': {
+            'color': '#1f77b4',  # Blue
+            'label': 'Mean Diameter (μm)',
+            'title_prefix': 'Mean Diameter',
+            'unit': 'μm',
+            'apply_cutoff': False
+        },
+        'Pressure_Drop': {
+            'color': '#d62728',  # Red
+            'label': 'Pressure Drop per Length (mmHg/μm)',
+            'title_prefix': 'Pressure Drop',
+            'unit': 'mmHg/μm',
+            'apply_cutoff': True
+        },
+        'Corrected_Velocity': {
+            'color': '#2ca02c',  # Green
+            'label': 'Corrected Velocity (μm/s)',
+            'title_prefix': 'Velocity',
+            'unit': 'μm/s',
+            'apply_cutoff': True
+        },
+        'Shear_Rate': {
+            'color': '#9467bd',  # Purple
+            'label': 'Shear Rate (s⁻¹)',
+            'title_prefix': 'Shear Rate',
+            'unit': 's⁻¹',
+            'apply_cutoff': True
+        }
+    }
+    
+    # Check if the variable is valid
+    if variable not in variable_settings:
+        raise ValueError(f"Invalid variable: {variable}. Valid options are: {list(variable_settings.keys())}")
+    
+    # Get settings for the specified variable
+    settings = variable_settings[variable]
+    
+    # Calculate pressure drop if plotting Pressure_Drop
+    if variable == 'Pressure_Drop':
+        diameters = df['Mean_Diameter']
+        velocities = df['Corrected_Velocity']
+        viscosities = secomb_viscocity_fn(diameters)
+        df['Pressure_Drop'] = pressure_drop_per_length(diameters, velocities, viscosities)
+    
+    # Apply cutoff if needed
+    if settings['apply_cutoff']:
+        upper_cutoff = df[variable].quantile(cutoff_percentile/100)
+        df[variable] = df[variable].where(df[variable] <= upper_cutoff, upper_cutoff)
+    else:
+        upper_cutoff = df[variable].max()
+
+    # Filter by pressure
+    df = df[df['Pressure'] == pressure]
+    
+    # Create color palette (same as in other plotting functions)
+    color_palette = create_monochromatic_palette(base_color=settings['color'], n_colors=5)
+    color_palette = adjust_brightness_of_colors(color_palette, brightness_scale=0.1)
+    color_palette = [color_palette[4], color_palette[1]]
+    
+    # Create a figure 
+    plt.figure(figsize=(2.4, 2.0))
+    
+    # Prepare data for box plot
+    plot_data = []
+    labels = []
+    colors = []
+    group_stats = []
+    
+    # Process each age group
+    for i, age_group in enumerate(age_groups):
+        if age_group == '≤50':
+            age_group_df = df[df['Age'] <= 50]
+            display_name = '≤50 years'
+        elif age_group == '>50':
+            age_group_df = df[df['Age'] > 50]
+            display_name = '>50 years'
+        
+        # Add data to lists
+        if not age_group_df.empty:
+            plot_data.append(age_group_df[variable])
+            labels.append(f'{display_name}\n(n={len(age_group_df)})')
+            colors.append(color_palette[i])
+            
+            # Calculate statistics for this group
+            group_stats.append({
+                'median': age_group_df[variable].median(),
+                'mean': age_group_df[variable].mean(),
+                'q1': age_group_df[variable].quantile(0.25),
+                'q3': age_group_df[variable].quantile(0.75),
+                'n': len(age_group_df),
+                'display_name': display_name.split(' ')[0]  # Just the age part
+            })
+    
+    # Create box plot
+    box_props = dict(linestyle='-', linewidth=0.8, color='black')
+    whisker_props = dict(linestyle='-', linewidth=0.8, color='black')
+    median_props = dict(linestyle='-', linewidth=1.5, color='black')
+    cap_props = dict(linestyle='-', linewidth=0.8, color='black')
+    flier_props = dict(marker='o', markerfacecolor='none', markeredgecolor='black', 
+                    markersize=2, alpha=0.5, linewidth=0.5)
+                    
+    # Create the boxplot with custom properties
+    bp = plt.boxplot(plot_data, labels=labels, patch_artist=True,
+                  boxprops=box_props, whiskerprops=whisker_props,
+                  medianprops=median_props, capprops=cap_props,
+                  flierprops=flier_props, showfliers=True)
+                  
+    # Customize box colors
+    for i, box in enumerate(bp['boxes']):
+        box.set_facecolor(colors[i])
+        box.set_alpha(0.7)
+        
+    # Add individual data points with jitter
+    for i, data in enumerate(plot_data):
+        # Add jittered points around position i+1
+        x = np.random.normal(i+1, 0.05, size=len(data))
+        plt.scatter(x, data, alpha=0.2, s=1, color=colors[i])
+    
+    # Add labels and title
+    plt.ylabel(settings['label'], fontproperties=source_sans)
+    plt.title(f'{pressure} PSI - {settings["title_prefix"]} Box Plot', fontproperties=source_sans)
+    plt.ylim(0, upper_cutoff)
+    
+    # Add statistics table
+    stats_text = []
+    for stat in group_stats:
+        stats_text.append(f"{stat['display_name']}: median={stat['median']:.1f}, IQR=[{stat['q1']:.1f}, {stat['q3']:.1f}]")
+    
+    # Try to do statistical comparison if we have two groups
+    if len(plot_data) == 2 and len(plot_data[0]) > 0 and len(plot_data[1]) > 0:
+        try:
+            from scipy import stats
+            # Mann-Whitney U test (non-parametric)
+            u_stat, p_value = stats.mannwhitneyu(plot_data[0], plot_data[1])
+            # Add significance markers on the plot
+            significance_level = "ns"
+            if p_value < 0.001:
+                significance_level = "***"
+            elif p_value < 0.01:
+                significance_level = "**"
+            elif p_value < 0.05:
+                significance_level = "*"
+                
+            # Add the p-value to the stats text
+            stats_text.append(f"p-value: {p_value:.3f} {significance_level}")
+            
+            # Draw a line with significance indicator if significant
+            if p_value < 0.05:
+                y_max = max([max(data) for data in plot_data])
+                y_pos = upper_cutoff * 0.95
+                plt.plot([1, 2], [y_pos, y_pos], 'k-', linewidth=0.8)
+                plt.text(1.5, y_pos * 1.02, significance_level, ha='center', va='bottom', fontsize=8)
+        except Exception as e:
+            print(f"Error performing statistical test: {e}")
+            pass
+    
+    # # Add stats as annotation
+    # plt.annotate('\n'.join(stats_text), xy=(0.5, 0.02), xycoords='axes fraction',
+    #            bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.8),
+    #            ha='center', va='bottom', fontsize=5)
+    
+    plt.tight_layout()
+    
+    # Save the plot
+    safe_variable = variable.lower().replace('_', '')
+    plt.savefig(os.path.join(output_dir, f'pressure_{pressure}_{safe_variable}_boxplot_by_age.png'),
+                dpi=600, bbox_inches='tight')
+    plt.close()
+    return 0
+
 def make_mixed_effect_model(diameter_analysis_df):
     """
     Creates a mixed effects model to analyze the relationship between velocity, diameter, and pressure.
@@ -577,7 +1396,7 @@ def secomb_viscocity_fn_vitro(diameter, H_discharge = 0.45, constant = 0.1):
     average_viscosity = 2 # cp
     constant = (0.8 + np.exp(-0.075*diameter)) * (-1+((1)/denom)) + ((1)/denom)
     scaler = ((diameter)/(diameter-1.1))**2
-    # viscosity = average_viscosity*(1 + (visc_star -1)*((((1-H_discharge)**constant)-1)/(((1-0.45)**constant)-1))*scaler)*scaler
+    # viscosity = average_viscosity*(1 + (visc_star -1)*((((1-H_discharge)**constant)-1)/(((1-0.45)**constant)-1)
     viscosity_45 = 220 * np.exp(-1.3*diameter) + 3.2 - 2.44 * np.exp(-0.06*(diameter)**0.645)
     viscosity = 1 + (viscosity_45 - 1)*(((1-H_discharge)**constant)-1)/(((1-0.45)**constant)-1)
     return viscosity # in cp
@@ -706,7 +1525,7 @@ def plot_pressure_drop_per_length_shear_rate(diameter_analysis_df, color_by = 's
     pressure_drop_per_lengths = pressure_drop_per_length(diameters, velocities, viscosities)
     set_numbers = diameter_analysis_df['set_number']
 
-    plt.scatter(shear_rates, pressure_drop_per_lengths, c=diameter_analysis_df['set_number'], cmap='viridis')
+    plt.scatter(shear_rates, pressure_drop_per_lengths, c=diameter_analysis_df[color_by], cmap='viridis')
     plt.xlabel('Shear Rate (s⁻¹)', fontproperties=source_sans)
     plt.ylabel('Pressure Drop per Length (mmHg/um)', fontproperties=source_sans)
     plt.title(f'Pressure Drop per Length vs Shear Rate at {pressure} psi', fontproperties=source_sans)
@@ -754,8 +1573,8 @@ def plot_pressure_drop_per_length(diameter_analysis_df):
     plt.title('Pressure Drop per Length vs Velocity')
     plt.show()
 
-
-def plot_shear_rate_3d(diameter_analysis_df: pd.DataFrame) -> int:
+def plot_shear_rate_3d(diameter_analysis_df: pd.DataFrame, animate: bool = False, 
+                      animation_format: str = 'gif', fps: int = 15, dpi: int = 150) -> int:
     """Creates a 3D visualization of shear rate vs diameter and pressure.
     
     Generates a 3D scatter plot showing the relationship between capillary diameter,
@@ -764,6 +1583,10 @@ def plot_shear_rate_3d(diameter_analysis_df: pd.DataFrame) -> int:
     
     Args:
         diameter_analysis_df: DataFrame containing Mean_Diameter, Pressure, and Shear_Rate columns
+        animate: If True, creates a rotating animation of the 3D plot
+        animation_format: Format to save animation ('gif' or 'mp4')
+        fps: Frames per second for the animation
+        dpi: DPI (dots per inch) for the animation
         
     Returns:
         0 if successful, 1 if error occurred
@@ -803,35 +1626,124 @@ def plot_shear_rate_3d(diameter_analysis_df: pd.DataFrame) -> int:
             'lines.linewidth': 0.5
         })
         
-        
-        
-        # Create the 3D visualization
+        # Import the required modules for 3D plotting and animation
         from mpl_toolkits.mplot3d import Axes3D
         
-        # Create figure with appropriate size per coding standards
-        fig = plt.figure(figsize=(2.4, 2.0))
+        if animate:
+            try:
+                from matplotlib.animation import FuncAnimation
+                import matplotlib.animation as animation
+                
+                # Check if we have the appropriate encoder available for mp4 output
+                if animation_format == 'mp4':
+                    try:
+                        import matplotlib.animation as animation
+                        # Check for ffmpeg writer
+                        writers = animation.writers.list()
+                        if 'ffmpeg' not in writers:
+                            print("Warning: ffmpeg writer not available for MP4 export. Falling back to GIF.")
+                            print(f"Available writers: {writers}")
+                            animation_format = 'gif'
+                    except ImportError:
+                        print("Warning: matplotlib.animation not properly configured for MP4. Falling back to GIF.")
+                        animation_format = 'gif'
+            except ImportError as e:
+                print(f"Warning: Animation dependencies not available: {e}. Creating static plot instead.")
+                animate = False
+        
+        # For animation, we need to use a figure with proper sizing
+        if animate:
+            # Use a larger figure size for animation
+            fig = plt.figure(figsize=(6, 5))
+        else:
+            # Use the standard figure size for static plots
+            fig = plt.figure(figsize=(2.4, 2.0))
+        
         ax = fig.add_subplot(111, projection='3d')
         
         # Plot the actual data points
         scatter = ax.scatter(model_df['Mean_Diameter'], 
-                            model_df['Pressure'], 
-                            model_df['Shear_Rate'],
-                            c=model_df['Pressure'],
-                            cmap='viridis',
-                            alpha=0.6,
-                            s=5)  # Smaller point size per coding standards
+                          model_df['Pressure'], 
+                          model_df['Shear_Rate'],
+                          c=model_df['Pressure'],
+                          cmap='viridis',
+                          alpha=0.6,
+                          s=5)  # Smaller point size per coding standards
         
-        
-        # Add labels and colorbar
+        # Add labels
         ax.set_xlabel('Mean Diameter (μm)')
         ax.set_ylabel('Pressure (PSI)')
         ax.set_zlabel('Shear Rate (s⁻¹)')
         ax.set_title('3D Visualization of Shear Rate')
-        fig.colorbar(scatter, ax=ax, label='Pressure')
+        
+        # Add a colorbar
+        cbar = fig.colorbar(scatter, ax=ax, label='Pressure')
+        
+        # For static plot, just save and return
+        if not animate:
+            plt.tight_layout()
+            # Save the static plot
+            static_output_path = os.path.join(PATHS.get('cap_flow', '.'), 'results', 'shear', 'shear_rate_3d.png')
+            os.makedirs(os.path.dirname(static_output_path), exist_ok=True)
+            plt.savefig(static_output_path, dpi=600, bbox_inches='tight')
+            print(f"Static plot saved to: {static_output_path}")
+            plt.close()
+            return 0
+        
+        # For animation, set up rotation parameters
+        def init():
+            ax.view_init(elev=30, azim=0)
+            return [ax]
+            
+        def update(frame):
+            # Rotate the view
+            ax.view_init(elev=20 + 10*np.sin(frame/30), azim=frame)
+            # Ensure tight layout is maintained during animation
+            fig.tight_layout()
+            return [ax]
+        
+        # Calculate the number of frames needed for a full 360° rotation
+        n_frames = fps * 10  # 10 seconds for a full rotation
+        
+        # Create the animation - note blit=False to ensure proper rendering
+        ani = FuncAnimation(
+            fig, update, frames=np.linspace(0, 360, n_frames, endpoint=False),
+            init_func=init, blit=False, interval=1000/fps
+        )
+        
+        # Determine output directory and create if needed
+        output_dir = os.path.join(PATHS.get('cap_flow', '.'), 'results', 'shear', 'animations')
+        os.makedirs(output_dir, exist_ok=True)
         
         plt.tight_layout()
-        plt.savefig(os.path.join(computer_paths[hostname]['cap_flow'], 'results', 'shear', 'shear_rate_3d.png'), dpi=600, bbox_inches='tight')
-        plt.show()
+        
+        # Save the animation
+        if animation_format == 'mp4':
+            output_path = os.path.join(output_dir, 'shear_rate_3d_animation.mp4')
+            writer = animation.FFMpegWriter(fps=fps)
+            ani.save(output_path, writer=writer, dpi=dpi)
+        else:  # Default to GIF
+            output_path = os.path.join(output_dir, 'shear_rate_3d_animation.gif')
+            try:
+                # First try using pillow for GIF
+                ani.save(output_path, writer='pillow', fps=fps, dpi=dpi)
+            except Exception as e:
+                print(f"Error saving with pillow: {e}. Trying with imagemagick...")
+                try:
+                    # Try with imagemagick if pillow fails
+                    ani.save(output_path, writer='imagemagick', fps=fps, dpi=dpi)
+                except Exception as e:
+                    print(f"Error saving with imagemagick: {e}")
+                    # Last resort - save as PNG sequence
+                    print("Saving as PNG sequence instead...")
+                    png_dir = os.path.join(output_dir, 'shear_rate_3d_frames')
+                    os.makedirs(png_dir, exist_ok=True)
+                    for i in range(0, n_frames, max(1, n_frames // 36)):  # Save ~36 frames
+                        update(i)
+                        plt.savefig(os.path.join(png_dir, f'frame_{i:03d}.png'), dpi=dpi)
+                    print(f"PNG frames saved to: {png_dir}")
+        
+        print(f"Animation saved to: {output_path}")
         plt.close()
         
         return 0
@@ -841,24 +1753,29 @@ def plot_shear_rate_3d(diameter_analysis_df: pd.DataFrame) -> int:
         import traceback
         traceback.print_exc()
         return 1
-    
-def plot_shear_rate_3d_pressure_age(diameter_analysis_df: pd.DataFrame) -> int:
-    """Creates a 3D visualization of shear rate vs diameter and pressure.
+
+def plot_shear_rate_3d_pressure_age(diameter_analysis_df: pd.DataFrame, pressure = 0.2, animate: bool = False, 
+                                  animation_format: str = 'gif', fps: int = 15, dpi: int = 150) -> int:
+    """Creates a 3D visualization of shear rate vs diameter and age at a specific pressure.
     
     Generates a 3D scatter plot showing the relationship between capillary diameter,
-    pressure, and shear rate. Also creates a prediction surface based on a mixed
-    effects model if statsmodels is available.
+    age, and shear rate for a single pressure value.
     
     Args:
-        diameter_analysis_df: DataFrame containing Mean_Diameter, Pressure, and Shear_Rate columns
+        diameter_analysis_df: DataFrame containing Mean_Diameter, Age, and Shear_Rate columns
+        pressure: The pressure value to filter by
+        animate: If True, creates a rotating animation of the 3D plot
+        animation_format: Format to save animation ('gif' or 'mp4')
+        fps: Frames per second for the animation
+        dpi: DPI (dots per inch) for the animation
         
     Returns:
         0 if successful, 1 if error occurred
     """
-    print("\nCreating 3D visualization of shear rate...")
+    print(f"\nCreating 3D visualization of shear rate at pressure {pressure}...")
 
-    # select only the pressure of 0.2
-    diameter_analysis_df = diameter_analysis_df[diameter_analysis_df['Pressure'] == 1.2]
+    # select only the specified pressure
+    diameter_analysis_df = diameter_analysis_df[diameter_analysis_df['Pressure'] == pressure]
 
     try:
         # Ensure we have the required columns
@@ -872,7 +1789,7 @@ def plot_shear_rate_3d_pressure_age(diameter_analysis_df: pd.DataFrame) -> int:
         # Prepare data for visualization
         model_df = diameter_analysis_df.dropna(subset=required_cols)
         
-        # Ensure Pressure is treated as a numeric variable
+        # Ensure Age is treated as a numeric variable
         model_df['Age'] = pd.to_numeric(model_df['Age'], errors='coerce')
         
         # Print basic statistics
@@ -893,35 +1810,123 @@ def plot_shear_rate_3d_pressure_age(diameter_analysis_df: pd.DataFrame) -> int:
             'lines.linewidth': 0.5
         })
         
-        
-        
-        # Create the 3D visualization
+        # Import 3D plotting and animation tools
         from mpl_toolkits.mplot3d import Axes3D
         
-        # Create figure with appropriate size per coding standards
-        fig = plt.figure(figsize=(10, 10))
+        if animate:
+            try:
+                from matplotlib.animation import FuncAnimation
+                import matplotlib.animation as animation
+                
+                # Check if we have the appropriate encoder available for mp4 output
+                if animation_format == 'mp4':
+                    try:
+                        import matplotlib.animation as animation
+                        # Check for ffmpeg writer
+                        writers = animation.writers.list()
+                        if 'ffmpeg' not in writers:
+                            print("Warning: ffmpeg writer not available for MP4 export. Falling back to GIF.")
+                            print(f"Available writers: {writers}")
+                            animation_format = 'gif'
+                    except ImportError:
+                        print("Warning: matplotlib.animation not properly configured for MP4. Falling back to GIF.")
+                        animation_format = 'gif'
+            except ImportError as e:
+                print(f"Warning: Animation dependencies not available: {e}. Creating static plot instead.")
+                animate = False
+                
+        # Create figure with appropriate sizing
+        if animate:
+            # Use a larger figure size for animation
+            fig = plt.figure(figsize=(6, 5))
+        else:
+            # For standard static plotting
+            fig = plt.figure(figsize=(2.4, 2.0))
+            
         ax = fig.add_subplot(111, projection='3d')
         
         # Plot the actual data points
         scatter = ax.scatter(model_df['Mean_Diameter'], 
-                            model_df['Age'], 
-                            model_df['Shear_Rate'],
-                            c=model_df['set_number'],
-                            cmap='viridis',
-                            alpha=0.6,
-                            s=5)  # Smaller point size per coding standards
-        
+                          model_df['Age'], 
+                          model_df['Shear_Rate'],
+                          c=model_df['set_number'],
+                          cmap='viridis',
+                          alpha=0.6,
+                          s=5)  # Smaller point size per coding standards
         
         # Add labels and colorbar
         ax.set_xlabel('Mean Diameter (μm)')
         ax.set_ylabel('Age (years)')
         ax.set_zlabel('Shear Rate (s⁻¹)')
-        ax.set_title('3D Visualization of Shear Rate')
+        ax.set_title(f'3D Visualization of Shear Rate at {pressure} PSI')
         fig.colorbar(scatter, ax=ax, label='Set Number')
         
+        # For static plot, just save and return
+        if not animate:
+            plt.tight_layout()
+            # Save the static plot
+            static_output_path = os.path.join(PATHS.get('cap_flow', '.'), 'results', 'shear', f'shear_rate_3d_pressure_{pressure}_age.png')
+            os.makedirs(os.path.dirname(static_output_path), exist_ok=True)
+            plt.savefig(static_output_path, dpi=600, bbox_inches='tight')
+            print(f"Static plot saved to: {static_output_path}")
+            plt.close()
+            return 0
+        
+        # For animation, set up initialization and update functions
+        def init():
+            ax.view_init(elev=30, azim=0)
+            return [ax]
+        
+        def update(frame):
+            # Rotate the view with some vertical motion for better visualization
+            ax.view_init(elev=20 + 10*np.sin(frame/30), azim=frame)
+            # Ensure tight layout is maintained during animation
+            fig.tight_layout()
+            return [ax]
+        
+        # Calculate the number of frames needed for a full 360° rotation
+        n_frames = fps * 10  # 10 seconds for a full rotation
+        
+        # Apply tight layout before animation to ensure proper sizing
         plt.tight_layout()
-        plt.savefig(os.path.join(computer_paths[hostname]['cap_flow'], 'results', 'shear', 'shear_rate_3d_pressure_age.png'), dpi=600, bbox_inches='tight')
-        plt.show()
+        
+        # Create the animation - disable blit for more reliable rendering
+        ani = FuncAnimation(
+            fig, update, frames=np.linspace(0, 360, n_frames, endpoint=False),
+            init_func=init, blit=False, interval=1000/fps
+        )
+        
+        # Determine output directory and create if needed
+        output_dir = os.path.join(PATHS.get('cap_flow', '.'), 'results', 'shear', 'animations')
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Save the animation
+        if animation_format == 'mp4':
+            output_path = os.path.join(output_dir, f'shear_rate_3d_pressure_{pressure}_age_animation.mp4')
+            writer = animation.FFMpegWriter(fps=fps)
+            ani.save(output_path, writer=writer, dpi=dpi)
+        else:  # Default to GIF
+            output_path = os.path.join(output_dir, f'shear_rate_3d_pressure_{pressure}_age_animation.gif')
+            try:
+                # First try using pillow for GIF
+                ani.save(output_path, writer='pillow', fps=fps, dpi=dpi)
+            except Exception as e:
+                print(f"Error saving with pillow: {e}. Trying with imagemagick...")
+                try:
+                    # Try with imagemagick if pillow fails
+                    ani.save(output_path, writer='imagemagick', fps=fps, dpi=dpi)
+                except Exception as e:
+                    print(f"Error saving with imagemagick: {e}")
+                    # Last resort - save as PNG sequence
+                    print("Saving as PNG sequence instead...")
+                    png_dir = os.path.join(output_dir, f'shear_rate_3d_pressure_{pressure}_age_frames')
+                    os.makedirs(png_dir, exist_ok=True)
+                    for i in range(0, n_frames, max(1, n_frames // 36)):  # Save ~36 frames
+                        update(i)
+                        plt.savefig(os.path.join(png_dir, f'frame_{i:03d}.png'), dpi=dpi)
+                    print(f"PNG frames saved to: {png_dir}")
+        
+        print(f"Animation saved to: {output_path}")
         plt.close()
         
         return 0
@@ -948,6 +1953,9 @@ def calculate_representative_diameters(df):
         DataFrame with added columns for Representative_Diameter and Representative_Shear_Rate
     """
     print("\nCalculating representative diameters and median shear rates...")
+    
+    # Import paths from config
+    from src.config import PATHS
     
     # Make a copy to avoid modifying the original dataframe
     df_copy = df.copy()
@@ -978,7 +1986,7 @@ def calculate_representative_diameters(df):
     
     # Process each participant-location group
     for (participant, location), group in df_copy.groupby(['Participant', 'Location']):
-        print(f"Processing {participant}, location {location}...")
+        # print(f"Processing {participant}, location {location}...")
         
         # Process each capillary name within this location
         for capillary_name, cap_group in group.groupby('Capillary'):
@@ -1060,14 +2068,14 @@ def calculate_representative_diameters(df):
         df_copy.loc[mask, 'Video_Median_Shear_Rate'] = row['Median_Shear_Rate']
         df_copy.loc[mask, 'Video_Median_Representative_Shear_Rate'] = row['Median_Representative_Shear_Rate']
     
-    # Save the results to a CSV file
-    results_path = os.path.join(computer_paths.get(hostname, default_paths)['cap_flow'], 
-                               'results', 'shear_rate_analysis.csv')
+    # Save the results to a CSV file using config paths
+    results_path = os.path.join(PATHS['cap_flow'], 'results', 'shear_rate_analysis.csv')
     df_copy.to_csv(results_path, index=False)
     print(f"Results saved to {results_path}")
     
     # Return the modified dataframe
     return df_copy
+
 
 if __name__ == '__main__':
     main()

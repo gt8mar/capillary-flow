@@ -21,6 +21,47 @@ plt.rcParams.update({
 })
 ```
 
+### Standard Plot Configuration
+```python
+# Import paths from config
+from src.config import PATHS
+
+# Standard plot configuration with robust font loading
+sns.set_style("whitegrid")
+
+# Safely get the font
+def get_source_sans_font():
+    """Safely load the SourceSans font with fallback to default font."""
+    try:
+        font_path = os.path.join(PATHS['downloads'], 'Source_Sans_3', 'static', 'SourceSans3-Regular.ttf')
+        if os.path.exists(font_path):
+            return FontProperties(fname=font_path)
+        print("Warning: SourceSans3-Regular.ttf not found, using default font")
+        return None
+    except Exception as e:
+        print(f"Warning: Error loading font: {e}")
+        return None
+
+source_sans = get_source_sans_font()
+
+plt.rcParams.update({
+    'pdf.fonttype': 42,  # For editable text in PDFs
+    'ps.fonttype': 42,   # For editable text in PostScript
+    'font.size': 7,
+    'axes.labelsize': 7,
+    'xtick.labelsize': 6,
+    'ytick.labelsize': 6,
+    'legend.fontsize': 5,
+    'lines.linewidth': 0.5
+})
+
+# When applying font to plot elements, handle the case when font is not available
+if source_sans:
+    ax.set_xlabel('X Label', fontproperties=source_sans)
+else:
+    ax.set_xlabel('X Label')  # Fall back to default font
+```
+
 ### Standard Figure Dimensions
 - Default figure size: `figsize=(2.4, 2.0)`
 - Adjust as needed but maintain aspect ratio when possible
@@ -62,38 +103,24 @@ from sklearn.metrics import classification_report
 from src.tools.parse_filename import parse_filename
 ```
 
-### Path Management
+### Path Management with Config
 ```python
-# Get the hostname and set paths
+# AVOID THIS APPROACH - Using hostname directly in each file
 hostname = platform.node()
 computer_paths = {
-    "LAPTOP-I5KTBOR3": {
-        'cap_flow': 'C:\\Users\\gt8ma\\capillary-flow',
-        'downloads': 'C:\\Users\\gt8ma\\Downloads'
-    },
-    "Quake-Blood": {
-        'cap_flow': "C:\\Users\\gt8mar\\capillary-flow",
-        'downloads': 'C:\\Users\\gt8mar\\Downloads'
-    },
-    "Clark-": {
-        'cap_flow': "C:\\Users\\ejerison\\capillary-flow",
-        'downloads': "C:\\Users\\ejerison\\Downloads"
-    }
+    "LAPTOP-I5KTBOR3": {'cap_flow': 'C:\\Users\\gt8ma\\capillary-flow'},
+    "Quake-Blood": {'cap_flow': "C:\\Users\\gt8mar\\capillary-flow"},
+    "Clark-": {'cap_flow': "C:\\Users\\ejerison\\capillary-flow"}
 }
-default_paths = {
-    'cap_flow': "/hpc/projects/capillary-flow",
-    'downloads': "/home/downloads"  # Adjust default downloads path as needed
-}
+cap_flow_path = computer_paths.get(hostname, default_paths)['cap_flow']
 
-# Determine paths based on hostname
-paths = computer_paths.get(hostname, default_paths)
-cap_flow_path = paths['cap_flow']
-downloads_path = paths['downloads']
+# RECOMMENDED APPROACH - Using the config module
+from src.config import PATHS
 
-# Set up font
-source_sans = FontProperties(fname=os.path.join(downloads_path, 'Source_Sans_3', 'static', 'SourceSans3-Regular.ttf'))
+cap_flow_path = PATHS['cap_flow']
+downloads_path = PATHS['downloads']
 
-# Filetree folders
+# Capillary Flow folders
 capillary-flow/
 ├── data
 │   └── part00 # example participant

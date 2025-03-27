@@ -24,11 +24,10 @@ import matplotlib as mpl
 from matplotlib.font_manager import FontProperties
 from matplotlib.colors import to_rgb, LinearSegmentedColormap
 import matplotlib.ticker as ticker
-import colorsys
 import matplotlib.patches as mpatches
 import datetime
 import statsmodels.formula.api as smf
-
+from src.tools.plotting_utils import adjust_brightness_of_colors, create_monochromatic_palette, to_rgb, calculate_median_ci, calculate_mean_ci
 # Get the hostname of the computer
 hostname = platform.node()
 
@@ -36,7 +35,7 @@ hostname = platform.node()
 cap_flow_folder_paths = {
     "LAPTOP-I5KTBOR3": 'C:\\Users\\gt8ma\\capillary-flow',
     "Quake-Blood": "C:\\Users\\gt8mar\\capillary-flow",
-    "ComputerName3": "C:\\Users\\ejerison\\capillary-flow",
+    "Clark-": "C:\\Users\\ejerison\\capillary-flow",
     # Add more computers as needed
 }
 default_folder_path = "/hpc/projects/capillary-flow"
@@ -60,63 +59,6 @@ cap_flow_path = cap_flow_folder_paths.get(hostname, default_folder_path)
 # sns.set_theme(style="whitegrid", palette="pastel", color_codes=True)
 
 
-def to_rgb(hex_color):
-    """Converts a hex color to an RGB tuple."""
-    hex_color = hex_color.lstrip('#')
-    lv = len(hex_color)
-    return tuple(int(hex_color[i:i + lv // 3], 16) / 255.0 for i in range(0, lv, lv // 3))
-
-def create_monochromatic_palette(base_color, n_colors=5):
-    """Creates a monochromatic palette based on the given color."""
-    rgb = to_rgb(base_color)
-    h, l, s = colorsys.rgb_to_hls(*rgb)
-    
-    colors = []
-    # Increasing the spread for more distinct colors
-    lightness_increment = 0.4 / (n_colors - 1)  # Adjust the 0.4 value to increase or decrease contrast
-    for i in range(n_colors):
-        l_new = max(0, min(1, l + (i - n_colors / 2) * lightness_increment))
-        rgb_new = colorsys.hls_to_rgb(h, l_new, s)
-        colors.append(rgb_new)
-    # plot all the colors in the set:
-    # for color in colors:
-    #     plt.axhspan(0, 1, color=color)
-    #     plt.show()
-    return colors
-
-def adjust_saturation_of_colors(color_list, saturation_scale=10):
-    """Adjusts the saturation of a list of RGB colors."""
-    adjusted_colors = []
-    for color in color_list:
-        h, l, s = colorsys.rgb_to_hls(*color)
-        s_new = max(0, min(1, s + saturation_scale))
-        rgb_new = colorsys.hls_to_rgb(h, l, s_new)
-        adjusted_colors.append(rgb_new)
-    return adjusted_colors
-
-def adjust_brightness_of_colors(color_list, brightness_scale=0.1):
-    """Adjusts the brightness (lightness) of a list of RGB colors."""
-    adjusted_colors = []
-    for color in color_list:
-        h, l, s = colorsys.rgb_to_hls(*color)
-        l_new = max(0, min(1, l + brightness_scale))
-        rgb_new = colorsys.hls_to_rgb(h, l_new, s)
-        adjusted_colors.append(rgb_new)
-    return adjusted_colors
-
-
-# Function to calculate mean, standard error, and 95% CI
-def calculate_stats(group, ci_percentile = 95, dimensionless = False):
-    if dimensionless:
-        mean = group['Dimensionless Velocity'].mean()
-        sem = stats.sem(group['Dimensionless Velocity'])
-        ci = 1.96 * sem
-        return pd.Series({'Mean Dimensionless Velocity': mean, 'Lower Bound': mean - ci, 'Upper Bound': mean + ci})
-    else:
-        mean = group['Corrected Velocity'].mean()
-        sem = stats.sem(group['Corrected Velocity'])
-        ci = 1.96 * sem
-        return pd.Series({'Mean Velocity': mean, 'Lower Bound': mean - ci, 'Upper Bound': mean + ci})
 
 def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000, 
             ci_percentile=99.5, write=True, dimensionless=False, video_median=False, log_scale=False, old = False):
@@ -196,7 +138,7 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
     print(f"Unique values in {group_col}: {df[group_col].unique()}")
 
     # Calculate stats
-    stats_func = calculate_median_ci if method == 'bootstrap' else calculate_stats
+    stats_func = calculate_median_ci if method == 'bootstrap' else calculate_mean_ci
     stats_df = df.groupby([group_col, 'Pressure']).apply(stats_func, ci_percentile=ci_percentile, dimensionless=dimensionless).reset_index()
 
     # Calculate KS statistic
@@ -376,7 +318,7 @@ def plot_CI_twosets(dataset1, dataset2, variable='Age', method='bootstrap', n_it
         labels = ('Group 1', 'Group 2')
 
     # Calculate stats for both datasets
-    stats_func = calculate_median_ci if method == 'bootstrap' else calculate_stats
+    stats_func = calculate_mean_ci if method == 'bootstrap' else calculate_mean_ci
     
     stats_1 = (dataset1.groupby('Pressure')
                .apply(stats_func, ci_percentile=ci_percentile, dimensionless=dimensionless)
@@ -547,7 +489,7 @@ def plot_CI_test(df, variable='Age', method='bootstrap', n_iterations=1000,
     print(f"Unique values in {group_col}: {df[group_col].unique()}")
 
     # Calculate stats
-    stats_func = calculate_median_ci if method == 'bootstrap' else calculate_stats
+    stats_func = calculate_mean_ci if method == 'bootstrap' else calculate_mean_ci
     stats_df = df.groupby([group_col, 'Pressure']).apply(stats_func, ci_percentile=ci_percentile, dimensionless=dimensionless).reset_index()
 
     # Calculate KS statistic
@@ -692,7 +634,7 @@ def plot_CI_old(df, variable='Age', method='bootstrap', n_iterations=1000,
         '>50' if variable == 'Age' else '≥120' if variable == 'SYS_BP' else 'Female'])
 
     # Calculate stats
-    stats_func = calculate_median_ci if method == 'bootstrap' else calculate_stats
+    stats_func = calculate_mean_ci if method == 'bootstrap' else calculate_mean_ci
     stats_df = df.groupby([group_col, 'Pressure']).apply(stats_func, ci_percentile=ci_percentile, dimensionless=dimensionless).reset_index()
 
     # Calculate KS statistic
