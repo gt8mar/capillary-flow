@@ -822,3 +822,629 @@ def adjust_saturation_of_colors(color_list, saturation_scale=10):
         rgb_new = colorsys.hls_to_rgb(h, l, s_new)
         adjusted_colors.append(rgb_new)
     return adjusted_colors
+
+def plot_histogram(diameter_analysis_df, variable, pressure, age_groups, cutoff_percentile=95):
+    """
+    Plot a histogram of the specified variable for a given pressure, showing multiple age groups 
+    on the same plot with median lines and a legend.
+    
+    Args:
+        diameter_analysis_df: DataFrame containing the data to plot
+        variable: String specifying which variable to plot ('Mean_Diameter', 'Pressure_Drop', 
+                 'Corrected_Velocity', or 'Shear_Rate')
+        pressure: Pressure value to plot
+        age_groups: List of age groups to plot
+        cutoff_percentile: Percentile value to use as upper cutoff for outliers (except Mean_Diameter)
+    """
+    setup_plotting_style()  
+    output_dir = os.path.join(PATHS['cap_flow'], 'results', 'histograms')
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    # Create a copy of the dataframe
+    df = diameter_analysis_df.copy()
+    
+    # Define variable-specific settings
+    variable_settings = {
+        'Mean_Diameter': {
+            'color': '#1f77b4',  # Blue
+            'label': 'Mean Diameter (μm)',
+            'title_prefix': 'Mean Diameter',
+            'unit': 'μm',
+            'apply_cutoff': False
+        },
+        'Pressure_Drop': {
+            'color': '#d62728',  # Red
+            'label': 'Pressure Drop per Length (mmHg/μm)',
+            'title_prefix': 'Pressure Drop',
+            'unit': 'mmHg/μm',
+            'apply_cutoff': True
+        },
+        'Corrected_Velocity': {
+            'color': '#2ca02c',  # Green
+            'label': 'Corrected Velocity (μm/s)',
+            'title_prefix': 'Velocity',
+            'unit': 'μm/s',
+            'apply_cutoff': True
+        },
+        'Shear_Rate': {
+            'color': '#9467bd',  # Purple
+            'label': 'Shear Rate (s⁻¹)',
+            'title_prefix': 'Shear Rate',
+            'unit': 's⁻¹',
+            'apply_cutoff': True
+        }
+    }
+    
+    # Check if the variable is valid
+    if variable not in variable_settings:
+        raise ValueError(f"Invalid variable: {variable}. Valid options are: {list(variable_settings.keys())}")
+    
+    # Get settings for the specified variable
+    settings = variable_settings[variable]
+    
+    # Calculate pressure drop if plotting Pressure_Drop
+    if variable == 'Pressure_Drop':
+        diameters = df['Mean_Diameter']
+        velocities = df['Corrected_Velocity']
+        viscosities = secomb_viscocity_fn(diameters)
+        df['Pressure_Drop'] = pressure_drop_per_length(diameters, velocities, viscosities)
+    
+    
+    
+    # Apply cutoff if needed
+    if settings['apply_cutoff']:
+        upper_cutoff = df[variable].quantile(cutoff_percentile/100)
+        df[variable] = df[variable].where(df[variable] <= upper_cutoff, upper_cutoff)
+    else:
+        upper_cutoff = df[variable].max()
+
+    # Filter by pressure
+    df = df[df['Pressure'] == pressure]
+    
+    # Create color palette
+    color_palette = create_monochromatic_palette(base_color=settings['color'], n_colors=5)
+    color_palette = adjust_brightness_of_colors(color_palette, brightness_scale=0.1)
+    color_palette = [color_palette[4], color_palette[1]]
+    
+    # Create a single figure for both age groups
+    plt.figure(figsize=(2.4, 2.0))
+    
+    # Process each age group
+    for i, age_group in enumerate(age_groups):
+        if age_group == '≤50':
+            age_group_df = df[df['Age'] <= 50]
+            display_name = '≤50 years'
+        elif age_group == '>50':
+            age_group_df = df[df['Age'] > 50]
+            display_name = '>50 years'
+        
+        # Calculate median for this group
+        median_value = age_group_df[variable].median()
+        
+        # Plot histogram with transparency
+        plt.hist(age_group_df[variable], bins=20, density=True, alpha=0.5, color=color_palette[i], 
+                label=f'{display_name} (n={len(age_group_df)})')
+        
+        # Add vertical line for median
+        plt.axvline(x=median_value, color=color_palette[i], linestyle='--', 
+                   label=f'Median {display_name}: {median_value:.2f} {settings["unit"]}')
+    
+    # Add labels and title
+    plt.xlabel(settings['label'], fontproperties=source_sans)
+    plt.ylabel('Frequency', fontproperties=source_sans)
+    plt.title(f'{pressure} PSI - {settings["title_prefix"]} Histogram', fontproperties=source_sans)
+    plt.xlim(0, upper_cutoff)
+    
+    # Add legend with smaller font size
+    plt.legend(prop={'size': 5})
+    
+    plt.tight_layout()
+    
+    # Save the plot with a name that includes the variable
+    safe_variable = variable.lower().replace('_', '')
+    plt.savefig(os.path.join(output_dir, f'pressure_{pressure}_{safe_variable}_histogram_by_age.png'),
+                dpi=600, bbox_inches='tight')
+    plt.close()
+    return 0
+
+def plot_violin(diameter_analysis_df, variable, pressure, age_groups, cutoff_percentile=95):
+    """
+    Plot a violin plot of the specified variable for a given pressure,
+    showing multiple age groups side by side with median markers.
+    
+    Args:
+        diameter_analysis_df: DataFrame containing the data to plot
+        variable: String specifying which variable to plot ('Mean_Diameter', 'Pressure_Drop', 
+                 'Corrected_Velocity', or 'Shear_Rate')
+        pressure: Pressure value to plot
+        age_groups: List of age groups to plot
+        cutoff_percentile: Percentile value to use as upper cutoff for outliers (except Mean_Diameter)
+    """
+    setup_plotting_style()  
+    output_dir = os.path.join(PATHS['cap_flow'], 'results', 'violin_plots')
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    # Create a copy of the dataframe
+    df = diameter_analysis_df.copy()
+    
+    # Define variable-specific settings (same as in plot_histogram)
+    variable_settings = {
+        'Mean_Diameter': {
+            'color': '#1f77b4',  # Blue
+            'label': 'Mean Diameter (μm)',
+            'title_prefix': 'Mean Diameter',
+            'unit': 'μm',
+            'apply_cutoff': False
+        },
+        'Pressure_Drop': {
+            'color': '#d62728',  # Red
+            'label': 'Pressure Drop per Length (mmHg/μm)',
+            'title_prefix': 'Pressure Drop',
+            'unit': 'mmHg/μm',
+            'apply_cutoff': True
+        },
+        'Corrected_Velocity': {
+            'color': '#2ca02c',  # Green
+            'label': 'Corrected Velocity (μm/s)',
+            'title_prefix': 'Velocity',
+            'unit': 'μm/s',
+            'apply_cutoff': True
+        },
+        'Shear_Rate': {
+            'color': '#9467bd',  # Purple
+            'label': 'Shear Rate (s⁻¹)',
+            'title_prefix': 'Shear Rate',
+            'unit': 's⁻¹',
+            'apply_cutoff': True
+        }
+    }
+    
+    # Check if the variable is valid
+    if variable not in variable_settings:
+        raise ValueError(f"Invalid variable: {variable}. Valid options are: {list(variable_settings.keys())}")
+    
+    # Get settings for the specified variable
+    settings = variable_settings[variable]
+    
+    # Calculate pressure drop if plotting Pressure_Drop
+    if variable == 'Pressure_Drop':
+        diameters = df['Mean_Diameter']
+        velocities = df['Corrected_Velocity']
+        viscosities = secomb_viscocity_fn(diameters)
+        df['Pressure_Drop'] = pressure_drop_per_length(diameters, velocities, viscosities)
+    
+    # Apply cutoff if needed
+    if settings['apply_cutoff']:
+        upper_cutoff = df[variable].quantile(cutoff_percentile/100)
+        df[variable] = df[variable].where(df[variable] <= upper_cutoff, upper_cutoff)
+    else:
+        upper_cutoff = df[variable].max()
+
+    # Filter by pressure
+    df = df[df['Pressure'] == pressure]
+    
+    # Create color palette (same as in plot_histogram)
+    color_palette = create_monochromatic_palette(base_color=settings['color'], n_colors=5)
+    color_palette = adjust_brightness_of_colors(color_palette, brightness_scale=0.1)
+    color_palette = [color_palette[4], color_palette[1]]
+    
+    # Create a figure 
+    plt.figure(figsize=(2.4, 2.0))
+    
+    # Prepare data for violin plot
+    plot_data = []
+    labels = []
+    colors = []
+    positions = []
+    
+    # Process each age group
+    for i, age_group in enumerate(age_groups):
+        if age_group == '≤50':
+            age_group_df = df[df['Age'] <= 50]
+            display_name = '≤50 years'
+        elif age_group == '>50':
+            age_group_df = df[df['Age'] > 50]
+            display_name = '>50 years'
+        
+        # Add data to lists
+        if not age_group_df.empty:
+            plot_data.append(age_group_df[variable])
+            labels.append(f'{display_name}\n(n={len(age_group_df)})')
+            colors.append(color_palette[i])
+            positions.append(i+1)
+    
+    # Create violin plot
+    violins = plt.violinplot(plot_data, positions=positions, showmeans=False, 
+                          showmedians=True, showextrema=True)
+    
+    # Customize violins
+    for i, pc in enumerate(violins['bodies']):
+        pc.set_facecolor(colors[i])
+        pc.set_edgecolor('black')
+        pc.set_alpha(0.7)
+    
+    # Customize median lines
+    violins['cmedians'].set_color('black')
+    
+    # Add individual data points
+    for i, age_group in enumerate(age_groups):
+        if age_group == '≤50':
+            age_group_df = df[df['Age'] <= 50]
+        elif age_group == '>50':
+            age_group_df = df[df['Age'] > 50]
+        
+        # Add jittered data points
+        if not age_group_df.empty:
+            x = np.random.normal(i+1, 0.05, size=len(age_group_df))
+            plt.scatter(x, age_group_df[variable], alpha=0.2, s=1, color=colors[i])
+    
+    # Customize plot
+    plt.xticks(positions, labels, fontproperties=source_sans)
+    plt.ylabel(settings['label'], fontproperties=source_sans)
+    plt.title(f'{pressure} PSI - {settings["title_prefix"]} Distribution', fontproperties=source_sans)
+    plt.ylim(0, upper_cutoff)
+    
+    # Add statistics table
+    stats_text = []
+    for i, age_group in enumerate(age_groups):
+        if age_group == '≤50':
+            age_group_df = df[df['Age'] <= 50]
+            display_name = '≤50'
+        elif age_group == '>50':
+            age_group_df = df[df['Age'] > 50]
+            display_name = '>50'
+        
+        if not age_group_df.empty:
+            median_val = age_group_df[variable].median()
+            mean_val = age_group_df[variable].mean()
+            stats_text.append(f"{display_name}: median={median_val:.1f}, mean={mean_val:.1f}")
+    
+    # Try to do statistical comparison if we have two groups
+    if len(plot_data) == 2 and len(plot_data[0]) > 0 and len(plot_data[1]) > 0:
+        try:
+            from scipy import stats
+            # Mann-Whitney U test (non-parametric)
+            u_stat, p_value = stats.mannwhitneyu(plot_data[0], plot_data[1])
+            stats_text.append(f"p-value: {p_value:.3f}")
+        except:
+            pass
+    
+    # # Add stats as annotation
+    # plt.annotate('\n'.join(stats_text), xy=(0.5, 0.02), xycoords='axes fraction',
+    #            bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.8),
+    #            ha='center', va='bottom', fontsize=5)
+    
+    plt.tight_layout()
+    
+    # Save the plot
+    safe_variable = variable.lower().replace('_', '')
+    plt.savefig(os.path.join(output_dir, f'pressure_{pressure}_{safe_variable}_violin_by_age.png'),
+                dpi=600, bbox_inches='tight')
+    plt.close()
+    return 0
+
+def plot_boxnwhisker(diameter_analysis_df, variable, pressure, age_groups, cutoff_percentile=95):
+    """
+    Plot a box and whisker plot of the specified variable for a given pressure,
+    showing multiple age groups side by side with statistical annotations.
+    
+    Args:
+        diameter_analysis_df: DataFrame containing the data to plot
+        variable: String specifying which variable to plot ('Mean_Diameter', 'Pressure_Drop', 
+                 'Corrected_Velocity', or 'Shear_Rate')
+        pressure: Pressure value to plot
+        age_groups: List of age groups to plot
+        cutoff_percentile: Percentile value to use as upper cutoff for outliers (except Mean_Diameter)
+    """
+    setup_plotting_style()  
+    output_dir = os.path.join(PATHS['cap_flow'], 'results', 'boxplot_plots')
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    # Create a copy of the dataframe
+    df = diameter_analysis_df.copy()
+    
+    # Define variable-specific settings (same as in plot_histogram)
+    variable_settings = {
+        'Mean_Diameter': {
+            'color': '#1f77b4',  # Blue
+            'label': 'Mean Diameter (μm)',
+            'title_prefix': 'Mean Diameter',
+            'unit': 'μm',
+            'apply_cutoff': False
+        },
+        'Pressure_Drop': {
+            'color': '#d62728',  # Red
+            'label': 'Pressure Drop per Length (mmHg/μm)',
+            'title_prefix': 'Pressure Drop',
+            'unit': 'mmHg/μm',
+            'apply_cutoff': True
+        },
+        'Corrected_Velocity': {
+            'color': '#2ca02c',  # Green
+            'label': 'Corrected Velocity (μm/s)',
+            'title_prefix': 'Velocity',
+            'unit': 'μm/s',
+            'apply_cutoff': True
+        },
+        'Shear_Rate': {
+            'color': '#9467bd',  # Purple
+            'label': 'Shear Rate (s⁻¹)',
+            'title_prefix': 'Shear Rate',
+            'unit': 's⁻¹',
+            'apply_cutoff': True
+        }
+    }
+    
+    # Check if the variable is valid
+    if variable not in variable_settings:
+        raise ValueError(f"Invalid variable: {variable}. Valid options are: {list(variable_settings.keys())}")
+    
+    # Get settings for the specified variable
+    settings = variable_settings[variable]
+    
+    # Calculate pressure drop if plotting Pressure_Drop
+    if variable == 'Pressure_Drop':
+        diameters = df['Mean_Diameter']
+        velocities = df['Corrected_Velocity']
+        viscosities = secomb_viscocity_fn(diameters)
+        df['Pressure_Drop'] = pressure_drop_per_length(diameters, velocities, viscosities)
+    
+    # Apply cutoff if needed
+    if settings['apply_cutoff']:
+        upper_cutoff = df[variable].quantile(cutoff_percentile/100)
+        df[variable] = df[variable].where(df[variable] <= upper_cutoff, upper_cutoff)
+    else:
+        upper_cutoff = df[variable].max()
+
+    # Filter by pressure
+    df = df[df['Pressure'] == pressure]
+    
+    # Create color palette (same as in other plotting functions)
+    color_palette = create_monochromatic_palette(base_color=settings['color'], n_colors=5)
+    color_palette = adjust_brightness_of_colors(color_palette, brightness_scale=0.1)
+    color_palette = [color_palette[4], color_palette[1]]
+    
+    # Create a figure 
+    plt.figure(figsize=(2.4, 2.0))
+    
+    # Prepare data for box plot
+    plot_data = []
+    labels = []
+    colors = []
+    group_stats = []
+    
+    # Process each age group
+    for i, age_group in enumerate(age_groups):
+        if age_group == '≤50':
+            age_group_df = df[df['Age'] <= 50]
+            display_name = '≤50 years'
+        elif age_group == '>50':
+            age_group_df = df[df['Age'] > 50]
+            display_name = '>50 years'
+        
+        # Add data to lists
+        if not age_group_df.empty:
+            plot_data.append(age_group_df[variable])
+            labels.append(f'{display_name}\n(n={len(age_group_df)})')
+            colors.append(color_palette[i])
+            
+            # Calculate statistics for this group
+            group_stats.append({
+                'median': age_group_df[variable].median(),
+                'mean': age_group_df[variable].mean(),
+                'q1': age_group_df[variable].quantile(0.25),
+                'q3': age_group_df[variable].quantile(0.75),
+                'n': len(age_group_df),
+                'display_name': display_name.split(' ')[0]  # Just the age part
+            })
+    
+    # Create box plot
+    box_props = dict(linestyle='-', linewidth=0.8, color='black')
+    whisker_props = dict(linestyle='-', linewidth=0.8, color='black')
+    median_props = dict(linestyle='-', linewidth=1.5, color='black')
+    cap_props = dict(linestyle='-', linewidth=0.8, color='black')
+    flier_props = dict(marker='o', markerfacecolor='none', markeredgecolor='black', 
+                    markersize=2, alpha=0.5, linewidth=0.5)
+                    
+    # Create the boxplot with custom properties
+    bp = plt.boxplot(plot_data, labels=labels, patch_artist=True,
+                  boxprops=box_props, whiskerprops=whisker_props,
+                  medianprops=median_props, capprops=cap_props,
+                  flierprops=flier_props, showfliers=True)
+                  
+    # Customize box colors
+    for i, box in enumerate(bp['boxes']):
+        box.set_facecolor(colors[i])
+        box.set_alpha(0.7)
+        
+    # Add individual data points with jitter
+    for i, data in enumerate(plot_data):
+        # Add jittered points around position i+1
+        x = np.random.normal(i+1, 0.05, size=len(data))
+        plt.scatter(x, data, alpha=0.2, s=1, color=colors[i])
+    
+    # Add labels and title
+    plt.ylabel(settings['label'], fontproperties=source_sans)
+    plt.title(f'{pressure} PSI - {settings["title_prefix"]} Box Plot', fontproperties=source_sans)
+    plt.ylim(0, upper_cutoff)
+    
+    # Add statistics table
+    stats_text = []
+    for stat in group_stats:
+        stats_text.append(f"{stat['display_name']}: median={stat['median']:.1f}, IQR=[{stat['q1']:.1f}, {stat['q3']:.1f}]")
+    
+    # Try to do statistical comparison if we have two groups
+    if len(plot_data) == 2 and len(plot_data[0]) > 0 and len(plot_data[1]) > 0:
+        try:
+            from scipy import stats
+            # Mann-Whitney U test (non-parametric)
+            u_stat, p_value = stats.mannwhitneyu(plot_data[0], plot_data[1])
+            # Add significance markers on the plot
+            significance_level = "ns"
+            if p_value < 0.001:
+                significance_level = "***"
+            elif p_value < 0.01:
+                significance_level = "**"
+            elif p_value < 0.05:
+                significance_level = "*"
+                
+            # Add the p-value to the stats text
+            stats_text.append(f"p-value: {p_value:.3f} {significance_level}")
+            
+            # Draw a line with significance indicator if significant
+            if p_value < 0.05:
+                y_max = max([max(data) for data in plot_data])
+                y_pos = upper_cutoff * 0.95
+                plt.plot([1, 2], [y_pos, y_pos], 'k-', linewidth=0.8)
+                plt.text(1.5, y_pos * 1.02, significance_level, ha='center', va='bottom', fontsize=8)
+        except Exception as e:
+            print(f"Error performing statistical test: {e}")
+            pass
+    
+    # # Add stats as annotation
+    # plt.annotate('\n'.join(stats_text), xy=(0.5, 0.02), xycoords='axes fraction',
+    #            bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="gray", alpha=0.8),
+    #            ha='center', va='bottom', fontsize=5)
+    
+    plt.tight_layout()
+    
+    # Save the plot
+    safe_variable = variable.lower().replace('_', '')
+    plt.savefig(os.path.join(output_dir, f'pressure_{pressure}_{safe_variable}_boxplot_by_age.png'),
+                dpi=600, bbox_inches='tight')
+    plt.close()
+    return 0
+
+def plot_cdf(diameter_analysis_df, variable, pressure, age_groups, cutoff_percentile=95):
+    """
+    Plot a cumulative distribution function (CDF) of the specified variable for a given pressure,
+    showing multiple age groups on the same plot with median lines and a legend.
+    
+    Args:
+        diameter_analysis_df: DataFrame containing the data to plot
+        variable: String specifying which variable to plot ('Mean_Diameter', 'Pressure_Drop', 
+                 'Corrected_Velocity', or 'Shear_Rate')
+        pressure: Pressure value to plot
+        age_groups: List of age groups to plot
+        cutoff_percentile: Percentile value to use as upper cutoff for outliers (except Mean_Diameter)
+    """
+    setup_plotting_style()  
+    output_dir = os.path.join(PATHS['cap_flow'], 'results', 'cdf_plots')
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    # Create a copy of the dataframe
+    df = diameter_analysis_df.copy()
+    
+    # Define variable-specific settings (same as in plot_histogram)
+    variable_settings = {
+        'Mean_Diameter': {
+            'color': '#1f77b4',  # Blue
+            'label': 'Mean Diameter (μm)',
+            'title_prefix': 'Mean Diameter',
+            'unit': 'μm',
+            'apply_cutoff': False
+        },
+        'Pressure_Drop': {
+            'color': '#d62728',  # Red
+            'label': 'Pressure Drop per Length (mmHg/μm)',
+            'title_prefix': 'Pressure Drop',
+            'unit': 'mmHg/μm',
+            'apply_cutoff': True
+        },
+        'Corrected_Velocity': {
+            'color': '#2ca02c',  # Green
+            'label': 'Corrected Velocity (μm/s)',
+            'title_prefix': 'Velocity',
+            'unit': 'μm/s',
+            'apply_cutoff': True
+        },
+        'Shear_Rate': {
+            'color': '#9467bd',  # Purple
+            'label': 'Shear Rate (s⁻¹)',
+            'title_prefix': 'Shear Rate',
+            'unit': 's⁻¹',
+            'apply_cutoff': True
+        }
+    }
+    
+    # Check if the variable is valid
+    if variable not in variable_settings:
+        raise ValueError(f"Invalid variable: {variable}. Valid options are: {list(variable_settings.keys())}")
+    
+    # Get settings for the specified variable
+    settings = variable_settings[variable]
+    
+    # Calculate pressure drop if plotting Pressure_Drop
+    if variable == 'Pressure_Drop':
+        diameters = df['Mean_Diameter']
+        velocities = df['Corrected_Velocity']
+        viscosities = secomb_viscocity_fn(diameters)
+        df['Pressure_Drop'] = pressure_drop_per_length(diameters, velocities, viscosities)
+    
+    # Apply cutoff if needed
+    if settings['apply_cutoff']:
+        upper_cutoff = df[variable].quantile(cutoff_percentile/100)
+        df[variable] = df[variable].where(df[variable] <= upper_cutoff, upper_cutoff)
+    else:
+        upper_cutoff = df[variable].max()
+
+    # Filter by pressure
+    df = df[df['Pressure'] == pressure]
+    
+    # Create color palette (same as in plot_histogram)
+    color_palette = create_monochromatic_palette(base_color=settings['color'], n_colors=5)
+    color_palette = adjust_brightness_of_colors(color_palette, brightness_scale=0.1)
+    color_palette = [color_palette[4], color_palette[1]]
+    
+    # Create a single figure for both age groups
+    plt.figure(figsize=(2.4, 2.0))
+    
+    # Process each age group
+    for i, age_group in enumerate(age_groups):
+        if age_group == '≤50':
+            age_group_df = df[df['Age'] <= 50]
+            display_name = '≤50 years'
+        elif age_group == '>50':
+            age_group_df = df[df['Age'] > 50]
+            display_name = '>50 years'
+        
+        # Calculate median for this group
+        median_value = age_group_df[variable].median()
+        
+        # Calculate CDF
+        sorted_data = np.sort(age_group_df[variable])
+        cdf = np.arange(1, len(sorted_data) + 1) / len(sorted_data)
+        
+        # Plot CDF
+        plt.plot(sorted_data, cdf, '-', linewidth=1, color=color_palette[i], 
+                label=f'{display_name} (n={len(age_group_df)})')
+        
+        # Add vertical line for median
+        plt.axvline(x=median_value, color=color_palette[i], linestyle='--', 
+                  label=f'Median {display_name}: {median_value:.2f} {settings["unit"]}')
+    
+    # Add reference line at 0.5 probability
+    plt.axhline(y=0.5, color='gray', linestyle='--', alpha=0.5)
+    
+    # Add labels and title
+    plt.xlabel(settings['label'], fontproperties=source_sans)
+    plt.ylabel('Cumulative Probability', fontproperties=source_sans)
+    plt.title(f'{pressure} PSI - {settings["title_prefix"]} CDF', fontproperties=source_sans)
+    plt.xlim(0, upper_cutoff)
+    plt.ylim(0, 1)
+    
+    # Add legend with smaller font size
+    plt.legend(prop={'size': 5})
+    
+    plt.tight_layout()
+    
+    # Save the plot with a name that includes the variable
+    safe_variable = variable.lower().replace('_', '')
+    plt.savefig(os.path.join(output_dir, f'pressure_{pressure}_{safe_variable}_cdf_by_age.png'),
+                dpi=600, bbox_inches='tight')
+    plt.close()
+    return 0
