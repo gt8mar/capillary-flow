@@ -444,53 +444,18 @@ def evaluate_classifiers(X: np.ndarray, y: np.ndarray, feature_names: List[str])
             # Predict on test set
             y_pred = clf.predict(X_test_selected)
             
-            # Extract feature importance if available
-            feature_importance = None
-            if hasattr(clf, 'feature_importances_'):
-                # For tree-based models like Random Forest and XGBoost
-                feature_importance = pd.Series(
-                    clf.feature_importances_,
-                    index=selected_features
-                ).sort_values(ascending=False)
-            elif name == 'Logistic Regression':
-                # For Logistic Regression
-                if len(selected_features) > 1:
-                    # For multivariate models
-                    coef = clf.coef_[0] if clf.coef_.ndim > 1 else clf.coef_
-                    feature_importance = pd.Series(
-                        np.abs(coef),  # Use absolute values for importance
-                        index=selected_features
-                    ).sort_values(ascending=False)
-                else:
-                    # For univariate models
-                    coef = clf.coef_[0][0] if clf.coef_.ndim > 1 else clf.coef_[0]
-                    feature_importance = pd.Series(
-                        [np.abs(coef)],  # Use absolute value for importance
-                        index=selected_features
-                    )
-            elif name == 'SVM' and clf.kernel == 'linear':
-                # For linear SVM
-                if len(selected_features) > 1:
-                    feature_importance = pd.Series(
-                        np.abs(clf.coef_[0]),
-                        index=selected_features
-                    ).sort_values(ascending=False)
-                else:
-                    feature_importance = pd.Series(
-                        [np.abs(clf.coef_[0][0])],
-                        index=selected_features
-                    )
-            
             # Store results
             results[name] = {
                 'classifier': clf,
                 'cv_scores': cv_scores,
                 'confusion_matrix': confusion_matrix(y_test, y_pred),
                 'classification_report': classification_report(y_test, y_pred),
-                'feature_importance': feature_importance,
+                'feature_importance': pd.Series(
+                    clf.feature_importances_,
+                    index=selected_features
+                ).sort_values(ascending=False) if hasattr(clf, 'feature_importances_') else None,
                 'X_test': X_test_selected,
-                'y_test': y_test,
-                'selected_features': selected_features
+                'y_test': y_test
             }
         except Exception as e:
             print(f"Warning: {name} classifier failed: {str(e)}")
@@ -774,21 +739,6 @@ def classify_healthy_vs_affected_log(df: pd.DataFrame, output_dir: str = None) -
             
             f.write("\n\n")
             
-            # Add feature importance summary section
-            f.write("TOP FEATURES BY IMPORTANCE\n")
-            f.write("-" * 30 + "\n")
-            for name, res in results.items():
-                f.write(f"\n{name}:\n")
-                if res['feature_importance'] is not None:
-                    # Get top 5 features or all if less than 5
-                    top_features = res['feature_importance'].head(min(5, len(res['feature_importance'])))
-                    for feature, importance in top_features.items():
-                        f.write(f"  {feature:<30} {importance:.4f}\n")
-                else:
-                    f.write("  Feature importance not available for this model\n")
-            
-            f.write("\n\n")
-            
             # Detailed results for each classifier
             for name, res in results.items():
                 f.write(f"\n{'=' * 20} {name} {'=' * 20}\n\n")
@@ -802,13 +752,6 @@ def classify_healthy_vs_affected_log(df: pd.DataFrame, output_dir: str = None) -
                 fpr, tpr, _ = roc_curve(res['y_test'], y_pred_prob)
                 roc_auc = auc(fpr, tpr)
                 f.write(f"AUC: {roc_auc:.3f}\n\n")
-                
-                # Add feature importance details
-                if res['feature_importance'] is not None:
-                    f.write("Feature Importance:\n")
-                    for feature, importance in res['feature_importance'].items():
-                        f.write(f"  {feature:<30} {importance:.4f}\n")
-                    f.write("\n")
                 
                 # Add confusion matrix with labels
                 f.write("Confusion Matrix:\n")
@@ -1043,21 +986,6 @@ def analyze_demographic_features():
                 
                 f.write("\n\n")
                 
-                # Add feature importance summary section
-                f.write("TOP FEATURES BY IMPORTANCE\n")
-                f.write("-" * 30 + "\n")
-                for name, res in results.items():
-                    f.write(f"\n{name}:\n")
-                    if res['feature_importance'] is not None:
-                        # Get top 5 features or all if less than 5
-                        top_features = res['feature_importance'].head(min(5, len(res['feature_importance'])))
-                        for feature, importance in top_features.items():
-                            f.write(f"  {feature:<30} {importance:.4f}\n")
-                    else:
-                        f.write("  Feature importance not available for this model\n")
-                
-                f.write("\n\n")
-                
                 # Detailed results for each classifier
                 for name, res in results.items():
                     f.write(f"\n{'=' * 20} {name} {'=' * 20}\n\n")
@@ -1071,13 +999,6 @@ def analyze_demographic_features():
                     fpr, tpr, _ = roc_curve(res['y_test'], y_pred_prob)
                     roc_auc = auc(fpr, tpr)
                     f.write(f"AUC: {roc_auc:.3f}\n\n")
-                    
-                    # Add feature importance details
-                    if res['feature_importance'] is not None:
-                        f.write("Feature Importance:\n")
-                        for feature, importance in res['feature_importance'].items():
-                            f.write(f"  {feature:<30} {importance:.4f}\n")
-                        f.write("\n")
                     
                     # Add confusion matrix with labels
                     f.write("Confusion Matrix:\n")
@@ -1145,11 +1066,6 @@ def analyze_demographic_features():
                         f.write(f"{name:<20} {res['cv_scores'].mean():.3f} ± {res['cv_scores'].std():.3f} {roc_auc:.3f}\n")
                     
                     f.write("\n\n")
-                    
-                    # Add feature importance summary section - for single feature this is simple
-                    f.write("FEATURE IMPORTANCE\n")
-                    f.write("-" * 30 + "\n")
-                    f.write(f"Using single feature: {feature}\n\n")
                     
                     # Detailed results for each classifier
                     for name, res in results.items():
@@ -1271,21 +1187,6 @@ def main():
                 
                 f.write("\n\n")
                 
-                # Add feature importance summary section
-                f.write("TOP FEATURES BY IMPORTANCE\n")
-                f.write("-" * 30 + "\n")
-                for name, res in results.items():
-                    f.write(f"\n{name}:\n")
-                    if res['feature_importance'] is not None:
-                        # Get top 5 features or all if less than 5
-                        top_features = res['feature_importance'].head(min(5, len(res['feature_importance'])))
-                        for feature, importance in top_features.items():
-                            f.write(f"  {feature:<30} {importance:.4f}\n")
-                    else:
-                        f.write("  Feature importance not available for this model\n")
-                
-                f.write("\n\n")
-                
                 # Detailed results for each classifier
                 for name, res in results.items():
                     f.write(f"\n{'=' * 20} {name} {'=' * 20}\n\n")
@@ -1299,13 +1200,6 @@ def main():
                     fpr, tpr, _ = roc_curve(res['y_test'], y_pred_prob)
                     roc_auc = auc(fpr, tpr)
                     f.write(f"AUC: {roc_auc:.3f}\n\n")
-                    
-                    # Add feature importance details
-                    if res['feature_importance'] is not None:
-                        f.write("Feature Importance:\n")
-                        for feature, importance in res['feature_importance'].items():
-                            f.write(f"  {feature:<30} {importance:.4f}\n")
-                        f.write("\n")
                     
                     # Add confusion matrix with labels
                     f.write("Confusion Matrix:\n")
