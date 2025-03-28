@@ -27,19 +27,9 @@ from matplotlib.font_manager import FontProperties
 from imblearn.over_sampling import SMOTE
 from collections import Counter
 
-# Get the hostname and set paths like in fit_comparison.py
-hostname = platform.node()
-computer_paths = {
-    "LAPTOP-I5KTBOR3": {
-        'cap_flow': 'C:\\Users\\gt8ma\\capillary-flow',
-    },
-    "Quake-Blood": {
-        'cap_flow': "C:\\Users\\gt8mar\\capillary-flow",
-    },
-}
-default_paths = {'cap_flow': "/hpc/projects/capillary-flow"}
-paths = computer_paths.get(hostname, default_paths)
-cap_flow_path = paths['cap_flow']
+# Import paths from config instead of defining computer paths locally
+from src.config import PATHS
+cap_flow_path = PATHS['cap_flow']
 
 def prepare_data() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray, np.ndarray]]]:
     """Load and prepare data for classification, focusing on velocity measurements.
@@ -294,7 +284,7 @@ def plot_auc_curves(results: Dict, condition: str, output_dir: str):
     
     # Try to use Source Sans font if available, otherwise use default
     try:
-        source_sans = FontProperties(fname='C:\\Users\\gt8ma\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+        source_sans = FontProperties(fname=os.path.join(PATHS['downloads'], 'Source_Sans_3\\static\\SourceSans3-Regular.ttf'))
     except:
         print("Source Sans font not found, using default font")
         source_sans = None
