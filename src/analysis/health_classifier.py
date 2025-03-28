@@ -55,8 +55,8 @@ def prepare_data() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray, np.ndarray
     print(df['Diabetes'].value_counts(dropna=False))
     print("\nHypertension values:")
     print(df['Hypertension'].value_counts(dropna=False))
-    print("\nHeartDisease values:")
-    print(df['HeartDisease'].value_counts(dropna=False))
+    # print("\nHeartDisease values:")
+    # print(df['HeartDisease'].value_counts(dropna=False))
     
     # Create features for each participant
     participant_data = []
@@ -104,7 +104,7 @@ def prepare_data() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray, np.ndarray
             # Target variables
             'Diabetes': str(participant_df['Diabetes'].iloc[0]).upper() == 'TRUE',
             'Hypertension': participant_df['Hypertension'].iloc[0] == True,
-            'HeartDisease': participant_df['HeartDisease'].iloc[0] == True
+            # 'HeartDisease': participant_df['HeartDisease'].iloc[0] == True
         }
         
         # Add pressure-specific velocity features
@@ -120,14 +120,14 @@ def prepare_data() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray, np.ndarray
     
     # Print feature names for verification
     feature_cols = [col for col in processed_df.columns 
-                   if col not in ['Participant', 'Diabetes', 'Hypertension', 'HeartDisease']]
+                   if col not in ['Participant', 'Diabetes', 'Hypertension']] # 'HeartDisease'
     print("\nFeatures being used:")
     for col in feature_cols:
         print(f"- {col}")
     
     # Prepare X and y for each condition
     target_dict = {}
-    for condition in ['Diabetes', 'Hypertension', 'HeartDisease']:
+    for condition in ['Diabetes', 'Hypertension']: # 'HeartDisease'
         X = processed_df[feature_cols].values
         y = processed_df[condition].values
         target_dict[condition] = (X, y)
@@ -136,14 +136,14 @@ def prepare_data() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray, np.ndarray
     print(f"\nTotal samples: {len(processed_df)}")
     print("\nFeature value ranges:")
     for col in processed_df.columns:
-        if col not in ['Participant', 'Diabetes', 'Hypertension', 'HeartDisease']:
+        if col not in ['Participant', 'Diabetes', 'Hypertension']: # 'HeartDisease'
             print(f"{col}:")
             print(f"  Range: {processed_df[col].min():.2f} to {processed_df[col].max():.2f}")
             print(f"  Mean: {processed_df[col].mean():.2f}")
             print(f"  Null values: {processed_df[col].isnull().sum()}")
 
     # Print correlation with target variables
-    for condition in ['Diabetes', 'Hypertension', 'HeartDisease']:
+    for condition in ['Diabetes', 'Hypertension']: # 'HeartDisease'
         print(f"\nTop 5 correlations with {condition}:")
         correlations = processed_df.drop(['Participant'], axis=1).corr()[condition]
         print(correlations.sort_values(ascending=False)[:5])
@@ -174,8 +174,8 @@ def prepare_data_log() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray, np.nda
     print(df['Diabetes'].value_counts(dropna=False))
     print("\nHypertension values:")
     print(df['Hypertension'].value_counts(dropna=False))
-    print("\nHeartDisease values:")
-    print(df['HeartDisease'].value_counts(dropna=False))
+    # print("\nHeartDisease values:")
+    # print(df['HeartDisease'].value_counts(dropna=False))
     
     # Create features for each participant
     participant_data = []
@@ -222,8 +222,8 @@ def prepare_data_log() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray, np.nda
             
             # Target variables
             'Diabetes': str(participant_df['Diabetes'].iloc[0]).upper() == 'TRUE',
-            'Hypertension': participant_df['Hypertension'].iloc[0] == True,
-            'HeartDisease': participant_df['HeartDisease'].iloc[0] == True
+            'Hypertension': participant_df['Hypertension'].iloc[0] == True
+            # 'HeartDisease': participant_df['HeartDisease'].iloc[0] == True
         }
         
         # Add pressure-specific velocity features
@@ -239,14 +239,14 @@ def prepare_data_log() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray, np.nda
     
     # Print feature names for verification
     feature_cols = [col for col in processed_df.columns 
-                   if col not in ['Participant', 'Diabetes', 'Hypertension', 'HeartDisease']]
+                   if col not in ['Participant', 'Diabetes', 'Hypertension']] # 'HeartDisease'
     print("\nFeatures being used:")
     for col in feature_cols:
         print(f"- {col}")
     
     # Prepare X and y for each condition
     target_dict = {}
-    for condition in ['Diabetes', 'Hypertension', 'HeartDisease']:
+    for condition in ['Diabetes', 'Hypertension']: # 'HeartDisease'
         X = processed_df[feature_cols].values
         y = processed_df[condition].values
         target_dict[condition] = (X, y)
@@ -255,14 +255,14 @@ def prepare_data_log() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray, np.nda
     print(f"\nTotal samples: {len(processed_df)}")
     print("\nFeature value ranges:")
     for col in processed_df.columns:
-        if col not in ['Participant', 'Diabetes', 'Hypertension', 'HeartDisease']:
+        if col not in ['Participant', 'Diabetes', 'Hypertension']: # 'HeartDisease'
             print(f"{col}:")
             print(f"  Range: {processed_df[col].min():.2f} to {processed_df[col].max():.2f}")
             print(f"  Mean: {processed_df[col].mean():.2f}")
             print(f"  Null values: {processed_df[col].isnull().sum()}")
 
     # Print correlation with target variables
-    for condition in ['Diabetes', 'Hypertension', 'HeartDisease']:
+    for condition in ['Diabetes', 'Hypertension']: # 'HeartDisease'
         print(f"\nTop 5 correlations with {condition}:")
         correlations = processed_df.drop(['Participant'], axis=1).corr()[condition]
         print(correlations.sort_values(ascending=False)[:5])
@@ -577,7 +577,7 @@ def classify_healthy_vs_affected(df: pd.DataFrame, output_dir: str = None) -> No
     
     # Prepare features and target
     feature_cols = [col for col in processed_df.columns 
-                   if col not in ['Participant', 'is_healthy', 'Diabetes', 'Hypertension', 'HeartDisease']]
+                   if col not in ['Participant', 'is_healthy', 'Diabetes', 'Hypertension']]  # 'HeartDisease'
     
     X = processed_df[feature_cols].values
     y = processed_df['is_healthy'].values
@@ -685,7 +685,7 @@ def classify_healthy_vs_affected_log(df: pd.DataFrame, output_dir: str = None) -
     
     # Prepare features and target
     feature_cols = [col for col in processed_df.columns 
-                   if col not in ['Participant', 'is_healthy', 'Diabetes', 'Hypertension', 'HeartDisease']]
+                   if col not in ['Participant', 'is_healthy', 'Diabetes', 'Hypertension']]  # 'HeartDisease'
     
     X = processed_df[feature_cols].values
     y = processed_df['is_healthy'].values
@@ -798,7 +798,7 @@ def prepare_demographic_data() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray
             # Target variables
             'Diabetes': str(participant_df['Diabetes'].iloc[0]).upper() == 'TRUE',
             'Hypertension': participant_df['Hypertension'].iloc[0] == True,
-            'HeartDisease': participant_df['HeartDisease'].iloc[0] == True,
+            # 'HeartDisease': participant_df['HeartDisease'].iloc[0] == True,
             'is_healthy': participant_df['SET'].iloc[0].startswith('set01') if 'SET' in participant_df.columns else False
         }
         
@@ -818,7 +818,7 @@ def prepare_demographic_data() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray
     
     # Prepare X and y for each condition
     target_dict = {}
-    for condition in ['Diabetes', 'Hypertension', 'HeartDisease', 'is_healthy']:
+    for condition in ['Diabetes', 'Hypertension', 'is_healthy']: # 'HeartDisease'
         X = processed_df[feature_cols].values
         y = processed_df[condition].values
         target_dict[condition] = (X, y)
@@ -833,7 +833,7 @@ def prepare_demographic_data() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray
         print(f"  Null values: {processed_df[col].isnull().sum()}")
 
     # Print correlation with target variables
-    for condition in ['Diabetes', 'Hypertension', 'HeartDisease', 'is_healthy']:
+    for condition in ['Diabetes', 'Hypertension', 'is_healthy']:  # 'HeartDisease'
         print(f"\nCorrelations with {condition}:")
         correlations = processed_df[feature_cols + [condition]].corr()[condition]
         print(correlations)
@@ -873,7 +873,7 @@ def prepare_individual_demographic_data(feature: str) -> Dict[str, Tuple[np.ndar
             # Target variables
             'Diabetes': str(participant_df['Diabetes'].iloc[0]).upper() == 'TRUE',
             'Hypertension': participant_df['Hypertension'].iloc[0] == True,
-            'HeartDisease': participant_df['HeartDisease'].iloc[0] == True,
+            #'HeartDisease': participant_df['HeartDisease'].iloc[0] == True,
             'is_healthy': participant_df['SET'].iloc[0].startswith('set01') if 'SET' in participant_df.columns else False
         }
         
@@ -894,7 +894,7 @@ def prepare_individual_demographic_data(feature: str) -> Dict[str, Tuple[np.ndar
     
     # Prepare X and y for each condition
     target_dict = {}
-    for condition in ['Diabetes', 'Hypertension', 'HeartDisease', 'is_healthy']:
+    for condition in ['Diabetes', 'Hypertension', 'is_healthy']: # 'HeartDisease',
         X = processed_df[[feature]].values
         y = processed_df[condition].values
         
@@ -912,7 +912,7 @@ def prepare_individual_demographic_data(feature: str) -> Dict[str, Tuple[np.ndar
     print(f"  Null values: {processed_df[feature].isnull().sum()}")
 
     # Print correlation with target variables
-    for condition in ['Diabetes', 'Hypertension', 'HeartDisease', 'is_healthy']:
+    for condition in ['Diabetes', 'Hypertension', 'is_healthy']: #'HeartDisease',
         print(f"\nCorrelation of {feature} with {condition}:")
         correlation = processed_df[[feature, condition]].corr().iloc[0, 1]
         print(f"  {correlation:.4f}")
@@ -936,7 +936,7 @@ def analyze_demographic_features():
     
     # Print class distribution for each condition
     print("\nClass distribution for conditions:")
-    for condition in ['Diabetes', 'Hypertension', 'HeartDisease', 'is_healthy']:
+    for condition in ['Diabetes', 'Hypertension', 'is_healthy']:  # 'HeartDisease'
         class_counts = processed_df[condition].value_counts()
         print(f"\n{condition}:")
         print(class_counts)
@@ -1136,17 +1136,22 @@ def main():
     
     # Print class distribution for each condition
     print("\nClass distribution for specific conditions:")
-    for condition in ['Diabetes', 'Hypertension', 'HeartDisease']:
+    for condition in ['Diabetes', 'Hypertension']: # 'HeartDisease'
         class_counts = processed_df[condition].value_counts()
         print(f"\n{condition}:")
         print(class_counts)
     
-    # Analyze each condition
+    # Analyze each condition (excluding HeartDisease)
     for condition, (X, y) in target_dict.items():
+        # Skip HeartDisease condition
+        if condition == 'HeartDisease':
+            print(f"\nSkipping {condition} analysis")
+            continue
+            
         print(f"\nAnalyzing {condition}...")
         
         feature_names = [col for col in processed_df.columns 
-                        if col not in ['Participant', 'Diabetes', 'Hypertension', 'HeartDisease']]
+                        if col not in ['Participant', 'Diabetes', 'Hypertension']] # , 'HeartDisease'
         
         # Create condition-specific directory inside Velocity folder
         condition_dir = os.path.join(velocity_dir, condition)
