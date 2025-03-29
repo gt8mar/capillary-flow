@@ -26,6 +26,8 @@ from sklearn.utils.class_weight import compute_class_weight
 from matplotlib.font_manager import FontProperties
 from imblearn.over_sampling import SMOTE
 from collections import Counter
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.colors import ListedColormap
 
 # Import paths from config instead of defining computer paths locally
 from src.config import PATHS
@@ -207,10 +209,10 @@ def prepare_data_log() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray, np.nda
             
             # # Key velocity features
             # 'baseline_velocity': velocity_values[0] if len(velocity_values) > 0 else 0,
-            # 'max_velocity': np.max(velocity_values) if len(velocity_values) > 0 else 0,
-            # 'velocity_range': (np.max(velocity_values) - np.min(velocity_values)) if len(velocity_values) > 0 else 0,
+            # 'max_velocity': np.max(velocity_values) if len(velocity_values) > 0 else 0,       # this value might be somewhat helpful but makes it slightly worse
+            # 'velocity_range': (np.max(velocity_values) - np.min(velocity_values)) if len(velocity_values) > 0 else 0, # this variable makes the auc way worse
             # 'mean_velocity': np.mean(velocity_values) if len(velocity_values) > 0 else 0,
-            # 'velocity_std': np.std(velocity_values) if len(velocity_values) > 0 else 0,
+            # 'velocity_std': np.std(velocity_values) if len(velocity_values) > 0 else 0,       # this variable makes the auc way worse
             
             # Up/Down differences
             'up_down_diff': np.mean(up_velocities) - np.mean(down_velocities) if len(up_velocities) > 0 and len(down_velocities) > 0 else 0,
@@ -338,6 +340,289 @@ def plot_auc_curves(results: Dict, condition: str, output_dir: str):
     except Exception as e:
         print(f"Warning: Could not save ROC curve plot: {str(e)}")
     plt.close()
+    return 0
+
+def plot_3D_features(processed_df, results, feature_cols, condition, output_dir):
+    """
+    Create 3D visualization of the top 3 important features with predictions
+    for both training and test data to evaluate model performance.
+    
+    Args:
+        processed_df: DataFrame containing participant data
+        results: Dictionary containing classifier results
+        feature_cols: List of feature names
+        condition: Name of health condition being classified
+        output_dir: Directory to save the visualization
+
+    Returns:
+        0 if run correctly
+    """
+    plt.close()
+    # Set up style and font
+    sns.set_style("whitegrid")
+    
+    # Try to use Source Sans font if available, otherwise use default
+    try:
+        source_sans = FontProperties(fname=os.path.join(PATHS['downloads'], 'Source_Sans_3\\static\\SourceSans3-Regular.ttf'))
+    except:
+        print("Source Sans font not found, using default font")
+        source_sans = None  
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 5, 'lines.linewidth': 0.5
+    })
+    
+    # For this visualization we need both test and training data
+    # Get the Random Forest classifier and its results
+    rf_results = results['Random Forest']
+    classifier = rf_results['classifier']
+    X_test = rf_results['X_test']
+    y_test = rf_results['y_test']
+    
+    # We need to extract the training data that was used to train the model
+    # First get the original feature matrix and target vector
+    original_X = processed_df[[col for col in processed_df.columns 
+                   if col not in ['Participant', 'Diabetes', 'Hypertension', 'is_healthy']]].values
+    original_y = processed_df[condition if condition != 'Healthy_vs_Affected' else 'is_healthy'].values
+    
+    # Scale the features as done in evaluate_classifiers
+    scaler = StandardScaler()
+    original_X_scaled = scaler.fit_transform(original_X)
+    
+    # Split using the same random state as in evaluate_classifiers
+    X_train_full, X_test_full, y_train, y_test_full = train_test_split(
+        original_X_scaled, original_y, test_size=0.2, random_state=42, stratify=original_y
+    )
+    
+    # Apply SMOTE to training data as done in evaluate_classifiers
+    X_train_resampled, y_train_resampled = apply_smote(X_train_full, y_train)
+    
+    # Get feature importances from trained Random Forest
+    importances = classifier.feature_importances_
+    
+    # Get selected features from feature importance
+    if len(feature_cols) == 1:
+        selected_features = feature_cols
+        X_train = X_train_resampled  # No feature selection needed
+    else:
+        # Get selected features (the ones with importance > mean)
+        feature_importance = pd.Series(
+            classifier.feature_importances_,
+            index=rf_results['feature_importance'].index
+        )
+        selected_features = feature_importance.index.tolist()
+        
+        # Get indices of selected features in original feature space
+        selected_indices = [feature_cols.index(feature) for feature in selected_features 
+                          if feature in feature_cols]
+        
+        # Extract selected features from training data
+        X_train = X_train_resampled[:, selected_indices] if selected_indices else X_train_resampled
+    
+    # Get top 3 features for visualization
+    top_features = rf_results['feature_importance'].index[:3].tolist()
+    print(f"Top 3 features for visualization: {top_features}")
+    
+    # Create a figure with two subplots side by side
+    fig = plt.figure(figsize=(20, 10))
+    
+    # ==================== Plot Test Data ====================
+    ax1 = fig.add_subplot(121, projection='3d')
+    
+    # Predict on test data
+    if hasattr(classifier, 'predict_proba'):
+        y_test_prob = classifier.predict_proba(X_test)[:, 1]
+        y_test_pred = (y_test_prob >= 0.5).astype(int)
+    else:
+        y_test_pred = classifier.predict(X_test)
+    
+    # Create confusion matrix categories for test data
+    test_categories = np.zeros(len(y_test), dtype=int)
+    test_categories[np.logical_and(y_test == 0, y_test_pred == 0)] = 0  # True Negative
+    test_categories[np.logical_and(y_test == 0, y_test_pred == 1)] = 1  # False Positive
+    test_categories[np.logical_and(y_test == 1, y_test_pred == 0)] = 2  # False Negative
+    test_categories[np.logical_and(y_test == 1, y_test_pred == 1)] = 3  # True Positive
+    
+    # Define colors and labels for confusion matrix categories
+    colors = ['#2ca02c', '#ff7f0e', '#d62728', '#1f77b4']  # TN, FP, FN, TP
+    color_labels = ['True Negative', 'False Positive', 'False Negative', 'True Positive']
+    
+    # Plot each category for test data
+    for i, label in enumerate(color_labels):
+        mask = test_categories == i
+        if np.any(mask):
+            ax1.scatter(
+                X_test[mask, 0], 
+                X_test[mask, 1], 
+                X_test[mask, 2] if X_test.shape[1] > 2 else np.zeros(np.sum(mask)),
+                c=[colors[i]],
+                label=label,
+                s=70,
+                alpha=0.7,
+                edgecolors='w',
+                linewidth=0.5
+            )
+    
+    # Add labels and title for test data plot
+    if len(top_features) >= 3:
+        ax1.set_xlabel(top_features[0], fontsize=10)
+        ax1.set_ylabel(top_features[1], fontsize=10)
+        ax1.set_zlabel(top_features[2], fontsize=10)
+    else:
+        ax1.set_xlabel(top_features[0] if len(top_features) > 0 else "Feature 1", fontsize=10)
+        ax1.set_ylabel(top_features[1] if len(top_features) > 1 else "Feature 2", fontsize=10)
+        ax1.set_zlabel("Feature 3", fontsize=10)
+        
+    ax1.set_title(f'Test Data - {condition} Classification', fontsize=14)
+    ax1.legend(loc='upper right', fontsize=10)
+    ax1.grid(True, alpha=0.3)
+    
+    # Calculate metrics for test data
+    tn_test = np.sum(test_categories == 0)
+    fp_test = np.sum(test_categories == 1)
+    fn_test = np.sum(test_categories == 2)
+    tp_test = np.sum(test_categories == 3)
+    
+    test_accuracy = (tp_test + tn_test) / (tp_test + tn_test + fp_test + fn_test) if (tp_test + tn_test + fp_test + fn_test) > 0 else 0
+    test_precision = tp_test / (tp_test + fp_test) if (tp_test + fp_test) > 0 else 0
+    test_recall = tp_test / (tp_test + fn_test) if (tp_test + fn_test) > 0 else 0
+    test_f1 = 2 * test_precision * test_recall / (test_precision + test_recall) if (test_precision + test_recall) > 0 else 0
+    
+    # Add test metrics as text on the plot
+    ax1.text2D(0.05, 0.05, 
+               f"Test Data Performance:\n"
+               f"Accuracy: {test_accuracy:.3f}\n"
+               f"Precision: {test_precision:.3f}\n"
+               f"Recall: {test_recall:.3f}\n"
+               f"F1 Score: {test_f1:.3f}\n"
+               f"Samples: {len(y_test)}",
+               fontsize=10, transform=ax1.transAxes,
+               bbox=dict(facecolor='white', alpha=0.8))
+    
+    # ==================== Plot Training Data ====================
+    ax2 = fig.add_subplot(122, projection='3d')
+    
+    # Predict on training data (to check for overfitting)
+    if hasattr(classifier, 'predict_proba'):
+        y_train_prob = classifier.predict_proba(X_train)[:, 1]
+        y_train_pred = (y_train_prob >= 0.5).astype(int)
+    else:
+        y_train_pred = classifier.predict(X_train)
+    
+    # Create confusion matrix categories for training data
+    train_categories = np.zeros(len(y_train_resampled), dtype=int)
+    train_categories[np.logical_and(y_train_resampled == 0, y_train_pred == 0)] = 0  # True Negative
+    train_categories[np.logical_and(y_train_resampled == 0, y_train_pred == 1)] = 1  # False Positive
+    train_categories[np.logical_and(y_train_resampled == 1, y_train_pred == 0)] = 2  # False Negative
+    train_categories[np.logical_and(y_train_resampled == 1, y_train_pred == 1)] = 3  # True Positive
+    
+    # Plot each category for training data
+    for i, label in enumerate(color_labels):
+        mask = train_categories == i
+        if np.any(mask):
+            ax2.scatter(
+                X_train[mask, 0], 
+                X_train[mask, 1], 
+                X_train[mask, 2] if X_train.shape[1] > 2 else np.zeros(np.sum(mask)),
+                c=[colors[i]],
+                label=label,
+                s=70,
+                alpha=0.7,
+                edgecolors='w',
+                linewidth=0.5
+            )
+    
+    # Add labels and title for training data plot
+    if len(top_features) >= 3:
+        ax2.set_xlabel(top_features[0], fontsize=10)
+        ax2.set_ylabel(top_features[1], fontsize=10)
+        ax2.set_zlabel(top_features[2], fontsize=10)
+    else:
+        ax2.set_xlabel(top_features[0] if len(top_features) > 0 else "Feature 1", fontsize=10)
+        ax2.set_ylabel(top_features[1] if len(top_features) > 1 else "Feature 2", fontsize=10)
+        ax2.set_zlabel("Feature 3", fontsize=10)
+        
+    ax2.set_title(f'Training Data (with SMOTE) - {condition} Classification', fontsize=14)
+    ax2.legend(loc='upper right', fontsize=10)
+    ax2.grid(True, alpha=0.3)
+    
+    # Calculate metrics for training data
+    tn_train = np.sum(train_categories == 0)
+    fp_train = np.sum(train_categories == 1)
+    fn_train = np.sum(train_categories == 2)
+    tp_train = np.sum(train_categories == 3)
+    
+    train_accuracy = (tp_train + tn_train) / (tp_train + tn_train + fp_train + fn_train) if (tp_train + tn_train + fp_train + fn_train) > 0 else 0
+    train_precision = tp_train / (tp_train + fp_train) if (tp_train + fp_train) > 0 else 0
+    train_recall = tp_train / (tp_train + fn_train) if (tp_train + fn_train) > 0 else 0
+    train_f1 = 2 * train_precision * train_recall / (train_precision + train_recall) if (train_precision + train_recall) > 0 else 0
+    
+    # Add training metrics as text on the plot
+    ax2.text2D(0.05, 0.05, 
+               f"Training Data Performance:\n"
+               f"Accuracy: {train_accuracy:.3f}\n"
+               f"Precision: {train_precision:.3f}\n"
+               f"Recall: {train_recall:.3f}\n"
+               f"F1 Score: {train_f1:.3f}\n"
+               f"Samples: {len(y_train_resampled)} (after SMOTE)",
+               fontsize=10, transform=ax2.transAxes,
+               bbox=dict(facecolor='white', alpha=0.8))
+    
+    # Add an overall title comparing train vs test performance
+    plt.suptitle(f"Model Performance Comparison - {condition}\n" +
+                f"Train Accuracy: {train_accuracy:.3f}  vs  Test Accuracy: {test_accuracy:.3f}",
+                fontsize=16)
+    
+    # Save plot with descriptive filename
+    plot_filename = f'3d_feature_plot_train_test_comparison_{condition.lower().replace(" ", "_")}.png'
+    plt.tight_layout(rect=[0, 0, 1, 0.96])  # Make room for suptitle
+    plt.savefig(os.path.join(output_dir, plot_filename), dpi=300, bbox_inches='tight')
+    plt.show()
+    plt.close()
+    
+    # Create a summary of overfitting analysis
+    overfitting_report_path = os.path.join(output_dir, f'overfitting_analysis_{condition.lower().replace(" ", "_")}.txt')
+    with open(overfitting_report_path, 'w') as f:
+        f.write(f"Overfitting Analysis for {condition} Classification\n")
+        f.write("=" * 60 + "\n\n")
+        
+        f.write("Random Forest Performance Comparison\n")
+        f.write("-" * 40 + "\n\n")
+        
+        f.write(f"{'Metric':<15} {'Training':<15} {'Test':<15} {'Difference':<15}\n")
+        f.write(f"{'Accuracy':<15} {train_accuracy:.3f}{'':<15} {test_accuracy:.3f}{'':<15} {train_accuracy-test_accuracy:.3f}\n")
+        f.write(f"{'Precision':<15} {train_precision:.3f}{'':<15} {test_precision:.3f}{'':<15} {train_precision-test_precision:.3f}\n")
+        f.write(f"{'Recall':<15} {train_recall:.3f}{'':<15} {test_recall:.3f}{'':<15} {train_recall-test_recall:.3f}\n")
+        f.write(f"{'F1 Score':<15} {train_f1:.3f}{'':<15} {test_f1:.3f}{'':<15} {train_f1-test_f1:.3f}\n\n")
+        
+        # Add interpretation
+        f.write("Interpretation:\n")
+        if train_accuracy - test_accuracy > 0.2:
+            f.write("- STRONG EVIDENCE OF OVERFITTING: The model performs significantly better on training data.\n")
+        elif train_accuracy - test_accuracy > 0.1:
+            f.write("- MODERATE OVERFITTING: There is a notable gap between training and test performance.\n")
+        elif train_accuracy - test_accuracy > 0.05:
+            f.write("- SLIGHT OVERFITTING: There is a small gap between training and test performance.\n")
+        else:
+            f.write("- GOOD GENERALIZATION: The model performs similarly on training and test data.\n")
+            
+        if test_accuracy < 0.6:
+            f.write("- LOW TEST ACCURACY: The model struggles to generalize to unseen data.\n")
+        
+        # Add recommendations
+        f.write("\nRecommendations:\n")
+        if train_accuracy - test_accuracy > 0.1:
+            f.write("- Consider regularization techniques to reduce overfitting\n")
+            f.write("- Simplify the model (reduce max_depth, min_samples_leaf, etc.)\n")
+            f.write("- Collect more diverse training data if possible\n")
+        if test_accuracy < 0.6:
+            f.write("- The feature set may not be predictive enough for this classification task\n")
+            f.write("- Try feature engineering to create more informative features\n")
+            f.write("- Consider different algorithms or ensemble methods\n")
+        
+    return 0
 
 def apply_smote(X: np.ndarray, y: np.ndarray, random_state: int = 42) -> Tuple[np.ndarray, np.ndarray]:
     """Apply SMOTE to balance classes in the training data.
@@ -711,6 +996,7 @@ def classify_healthy_vs_affected_log(df: pd.DataFrame, output_dir: str = None) -
         # Plot results directly in the Healthy directory
         plot_results(results, 'Healthy_vs_Affected', output_dir)
         plot_auc_curves(results, 'Healthy_vs_Affected', output_dir)
+        plot_3D_features(processed_df, results, feature_cols,'Healthy_vs_Affected', output_dir)
         
         # Save classification reports with descriptive filename
         report_path = os.path.join(output_dir, 'log_velocity_based_healthy_vs_affected_classification_report.txt')
@@ -1129,7 +1415,7 @@ def main():
     os.makedirs(healthy_dir, exist_ok=True)
     
     # Update classify_healthy_vs_affected_log to use the new directory
-    classify_healthy_vs_affected_log(df, output_dir=healthy_dir)
+    healthy_results = classify_healthy_vs_affected_log(df, output_dir=healthy_dir)
     
     # Prepare data for condition-specific classification
     processed_df, target_dict = prepare_data_log()
@@ -1222,6 +1508,48 @@ def main():
                     f.write(f"Mean: {res['cv_scores'].mean():.3f} (±{res['cv_scores'].std():.3f})\n")
                     f.write(f"Individual scores: {', '.join([f'{score:.3f}' for score in res['cv_scores']])}\n\n")
     
+    # Generate 3D visualization for Healthy vs Affected classification
+    # Get the log velocity-based healthy classification data
+    healthy_df = pd.DataFrame([])
+    
+    # Need to run again to get the processed dataframe for healthy vs affected
+    data_filepath = os.path.join(cap_flow_path, 'summary_df_nhp_video_stats.csv')
+    df = pd.read_csv(data_filepath)
+    
+    # Extract healthy classification data
+    participant_data = []
+    for participant in df['Participant'].unique():
+        participant_df = df[df['Participant'] == participant]
+        
+        # Basic velocity statistics for each pressure
+        pressure_stats = participant_df.pivot_table(
+            index='Participant',
+            columns='Pressure',
+            values='Log_Video_Median_Velocity',
+            aggfunc=['mean']
+        ).fillna(0)
+        
+        # Flatten multi-index columns
+        pressure_stats.columns = [f'log_velocity_at_{pressure}psi' 
+                                for (_, pressure) in pressure_stats.columns]
+        
+        # Calculate up/down velocity differences
+        up_velocities = participant_df[participant_df['UpDown'] == 'U']['Log_Video_Median_Velocity']
+        down_velocities = participant_df[participant_df['UpDown'] == 'D']['Log_Video_Median_Velocity']
+        
+        # Basic statistics
+        stats = {
+            'Participant': participant,
+            'is_healthy': participant_df['SET'].iloc[0].startswith('set01'),
+            'up_down_diff': np.mean(up_velocities) - np.mean(down_velocities) if len(up_velocities) > 0 and len(down_velocities) > 0 else 0,
+        }
+        
+        # Add pressure-specific velocity features
+        stats.update(pressure_stats.iloc[0].to_dict())
+        
+        participant_data.append(stats)
+    
+      
     return processed_df, target_dict
 
 if __name__ == "__main__":
