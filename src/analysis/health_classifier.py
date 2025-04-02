@@ -152,18 +152,14 @@ def prepare_data() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray, np.ndarray
     
     return processed_df, target_dict
 
-def prepare_data_log() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray, np.ndarray]]]:
+def prepare_data_log(df) -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray, np.ndarray]]]:
     """Load and prepare data for classification, focusing on velocity measurements.
     
     Returns:
         Tuple containing:
             - DataFrame with all features
             - Dictionary with target variables and their X, y arrays
-    """
-    # Load data
-    data_filepath = os.path.join(cap_flow_path, 'summary_df_nhp_video_stats.csv')
-    df = pd.read_csv(data_filepath)
-    
+    """    
     # Debug print
     print("\nUnique diabetes values in dataset:")
     print(df['Diabetes'].unique())
@@ -200,8 +196,8 @@ def prepare_data_log() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray, np.nda
         velocity_values = participant_df.groupby('Pressure')['Log_Video_Median_Velocity'].mean().values
         
         # Calculate up/down velocity differences
-        up_velocities = participant_df[participant_df['UpDown'] == 'U']['Log_Video_Median_Velocity']
-        down_velocities = participant_df[participant_df['UpDown'] == 'D']['Log_Video_Median_Velocity']
+        up_velocities = participant_df[participant_df['UpDown'] == 'U']['Video_Median_Velocity']
+        down_velocities = participant_df[participant_df['UpDown'] == 'D']['Video_Median_Velocity']
         
         # Basic statistics
         stats = {
@@ -929,8 +925,8 @@ def classify_healthy_vs_affected_log(df: pd.DataFrame, output_dir: str = None) -
         velocity_values = participant_df.groupby('Pressure')['Log_Video_Median_Velocity'].mean().values
         
         # Calculate up/down velocity differences
-        up_velocities = participant_df[participant_df['UpDown'] == 'U']['Log_Video_Median_Velocity']
-        down_velocities = participant_df[participant_df['UpDown'] == 'D']['Log_Video_Median_Velocity']
+        up_velocities = participant_df[participant_df['UpDown'] == 'U']['Video_Median_Velocity']
+        down_velocities = participant_df[participant_df['UpDown'] == 'D']['Video_Median_Velocity']
         
         # Basic statistics
         stats = {
@@ -945,10 +941,10 @@ def classify_healthy_vs_affected_log(df: pd.DataFrame, output_dir: str = None) -
             # 'velocity_std': np.std(velocity_values) if len(velocity_values) > 0 else 0,       # this variable makes the auc way worse
             
             # Up/Down differences
-            'up_down_diff': np.mean(up_velocities) - np.mean(down_velocities) if len(up_velocities) > 0 and len(down_velocities) > 0 else 0,
+            'up_down_diff': np.abs(np.mean(up_velocities) - np.mean(down_velocities)) if len(up_velocities) > 0 and len(down_velocities) > 0 else 0,
             
             # Basic demographic info (as control variables)
-            # 'Age': participant_df['Age'].iloc[0],
+            'Age': participant_df['Age'].iloc[0],
             # 'SYS_BP': participant_df['SYS_BP'].iloc[0] if 'SYS_BP' in participant_df else None,
             # 'DIA_BP': participant_df['DIA_BP'].iloc[0] if 'DIA_BP' in participant_df else None,
         }
@@ -1401,6 +1397,9 @@ def main():
     data_filepath = os.path.join(cap_flow_path, 'summary_df_nhp_video_stats.csv')
     df = pd.read_csv(data_filepath)
 
+    # set all values for Log_Video_Median_Velocity that are lower than 0 to 0
+    df['Log_Video_Median_Velocity'] = df['Log_Video_Median_Velocity'].apply(lambda x: 0 if x < 0 else x)
+
     # print the first row of the dataframe in full with all columns and the header 
     print(df.iloc[0])
     
@@ -1418,7 +1417,7 @@ def main():
     healthy_results = classify_healthy_vs_affected_log(df, output_dir=healthy_dir)
     
     # Prepare data for condition-specific classification
-    processed_df, target_dict = prepare_data_log()
+    processed_df, target_dict = prepare_data_log(df)
     
     # Print class distribution for each condition
     print("\nClass distribution for specific conditions:")
@@ -1534,8 +1533,8 @@ def main():
                                 for (_, pressure) in pressure_stats.columns]
         
         # Calculate up/down velocity differences
-        up_velocities = participant_df[participant_df['UpDown'] == 'U']['Log_Video_Median_Velocity']
-        down_velocities = participant_df[participant_df['UpDown'] == 'D']['Log_Video_Median_Velocity']
+        up_velocities = participant_df[participant_df['UpDown'] == 'U']['Video_Median_Velocity']
+        down_velocities = participant_df[participant_df['UpDown'] == 'D']['Video_Median_Velocity']
         
         # Basic statistics
         stats = {
