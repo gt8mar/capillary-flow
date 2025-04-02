@@ -1,6 +1,6 @@
 import os
 import platform
-
+from matplotlib.font_manager import FontProperties
 def get_paths():
     """Get system-specific paths based on hostname.
     
@@ -50,3 +50,18 @@ def get_paths():
 
 # Export paths directly for easier imports
 PATHS = get_paths() 
+
+# source sans loader:
+def load_source_sans():
+    """Load Source Sans font from downloads directory.
+    
+    Returns:
+        FontProperties: Font properties for Source Sans
+"""
+ # Try to use Source Sans font if available, otherwise use default
+    try:
+        source_sans = FontProperties(fname=os.path.join(PATHS['downloads'], 'Source_Sans_3\\static\\SourceSans3-Regular.ttf'))
+    except:
+        print("Source Sans font not found, using default font")
+        source_sans = None
+    return source_sans

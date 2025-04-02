@@ -31,8 +31,9 @@ from matplotlib.colors import ListedColormap
 import scipy.stats as stats
 
 # Import paths from config instead of defining computer paths locally
-from src.config import PATHS
+from src.config import PATHS, load_source_sans
 cap_flow_path = PATHS['cap_flow']
+source_sans = load_source_sans()    
 
 def prepare_data() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray, np.ndarray]]]:
     """Load and prepare data for classification, focusing on velocity measurements.

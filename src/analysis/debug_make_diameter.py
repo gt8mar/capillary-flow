@@ -22,25 +22,47 @@ from matplotlib.font_manager import FontProperties
 
 # Local imports
 from src.tools.parse_filename import parse_filename
+from src.config import PATHS  # Import PATHS from config module
+
+# Use paths from config instead of platform-specific checks
+cap_flow_path = PATHS['cap_flow']
+downloads_path = PATHS['downloads']
 
 def main():
-    """Main function to debug missing area calculations."""
-    # Set paths based on platform
-    if platform.system() == 'Windows':
-        cap_flow_path = 'C:\\Users\\gt8mar\\capillary-flow'
-        diameters_file = os.path.join(cap_flow_path, 'results', 'cap_diameters_areas.csv')
-        diameters_file_renamed = os.path.join(cap_flow_path, 'results', 'cap_diameters_areas_renamed.csv')
-        velocity_file_path = os.path.join(cap_flow_path, 'merged_csv4.csv')
-        segmentation_folder = os.path.join(cap_flow_path, 'results', 'segmented', 'individual_caps_original')
-        segmentation_folder_renamed = os.path.join(cap_flow_path, 'results', 'segmented', 'renamed_individual_caps_original')
-    else:
-        # Default paths for other platforms
-        cap_flow_path = "/hpc/projects/capillary-flow"
-        diameters_file = os.path.join(cap_flow_path, 'results', 'cap_diameters_areas.csv')
-        diameters_file_renamed = os.path.join(cap_flow_path, 'results', 'cap_diameters_areas_renamed.csv')
-        velocity_file_path = os.path.join(cap_flow_path, 'merged_csv4.csv')
-        segmentation_folder = os.path.join(cap_flow_path, 'results', 'segmented', 'individual_caps_original')
-        segmentation_folder_renamed = os.path.join(cap_flow_path, 'results', 'segmented', 'renamed_individual_caps_original')
+    """
+    Loads the diameter data and compares it with the renamed diameter data.
+    Merges the two dataframes based on area and bulk_diameter values.
+    Checks for duplicate areas.
+    Plots the mean diameter vs bulk diameter.
+    Merges the velocity data with the merged dataframe.
+    Checks for duplicate capillaries.
+    Saves the merged dataframe to a csv file.
+
+    Runs the threshold analysis.
+    Plots the velocity vs diameter by age.
+    Plots the velocity vs diameter by participant.
+    Plots the velocity vs diameter by set.
+    Makes a mixed effects model.
+    Runs the threshold analysis.
+    Plots the pressure drop per length.
+
+    Args: (none inputted)
+        diameter_analysis_df: DataFrame containing the data to plot
+        diameter_plots_dir: Directory to save the plots
+        cap_flow_path: Path to the capillary flow data
+        downloads_path: Path to the downloads
+
+    Returns:
+        None
+    """
+    
+    # Define file and folder paths using the config paths
+    diameters_file = os.path.join(cap_flow_path, 'results', 'cap_diameters_areas.csv')
+    diameters_file_renamed = os.path.join(cap_flow_path, 'results', 'cap_diameters_areas_renamed.csv')
+    velocity_file_path = os.path.join(cap_flow_path, 'merged_csv4.csv')
+    segmentation_folder = os.path.join(cap_flow_path, 'results', 'segmented', 'individual_caps_original')
+    segmentation_folder_renamed = os.path.join(cap_flow_path, 'results', 'segmented', 'renamed_individual_caps_original')
+    
     print(f"Loading diameter data from: {diameters_file}")
 
     # plotting parameters
@@ -53,7 +75,7 @@ def main():
 
     # Set up font
     try:
-        source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+        source_sans = FontProperties(fname=os.path.join(downloads_path, 'Source_Sans_3', 'static', 'SourceSans3-Regular.ttf'))
     except Exception as e:
         print(f"Warning: Could not set up font: {e}")
         source_sans = None
@@ -182,7 +204,7 @@ def main():
     diameter_plots_dir = os.path.join(cap_flow_path, 'results', 'diameter_plots')
     os.makedirs(diameter_plots_dir, exist_ok=True)
 
-    # threshold_analysis(diameter_analysis_df, diameter_plots_dir, cap_flow_path)
+    threshold_analysis(diameter_analysis_df, diameter_plots_dir, cap_flow_path)
     # plot_velocity_vs_diameter_by_age(diameter_analysis_df, diameter_plots_dir)
     # plot_velocity_vs_diameter_by_participant(diameter_analysis_df, diameter_plots_dir)
     # plot_velocity_vs_diameter_by_set(diameter_analysis_df)
@@ -191,11 +213,20 @@ def main():
     # threshold_analysis(diameter_analysis_df)  
     # plot_velocity_vs_diameter_theory()
 
-    plot_pressure_drop_per_length(diameter_analysis_df)
+    # plot_pressure_drop_per_length(diameter_analysis_df)
     return 0
 
 
 def threshold_analysis(diameter_analysis_df, diameter_plots_dir, cap_flow_path):
+    """
+    Creates CDF plots for Mean Diameter split by age groups.
+    Tests different age thresholds.
+    Finds the threshold with the maximum KS statistic (most different distributions).
+    Plots the KS statistic vs threshold.
+
+    Args:
+        diameter_analysis_df: DataFrame containing the data to plot
+    """
     # Create CDF plots for Mean Diameter split by age groups
     print("\nCreating CDF plots for Mean Diameter by age groups...")
     
@@ -236,7 +267,7 @@ def threshold_analysis(diameter_analysis_df, diameter_plots_dir, cap_flow_path):
             plt.close()
             # Set up style and font
             sns.set_style("whitegrid")
-            source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+            source_sans = FontProperties(fname=os.path.join(downloads_path, 'Source_Sans_3', 'static', 'SourceSans3-Regular.ttf'))
             
             plt.rcParams.update({
                 'pdf.fonttype': 42, 'ps.fonttype': 42,
@@ -265,7 +296,7 @@ def threshold_analysis(diameter_analysis_df, diameter_plots_dir, cap_flow_path):
             plt.close()
             # Set up style and font
             sns.set_style("whitegrid")
-            source_sans = FontProperties(fname='C:\\Users\\gt8mar\\Downloads\\Source_Sans_3\\static\\SourceSans3-Regular.ttf')
+            source_sans = FontProperties(fname=os.path.join(downloads_path, 'Source_Sans_3', 'static', 'SourceSans3-Regular.ttf'))
             
             plt.rcParams.update({
                 'pdf.fonttype': 42, 'ps.fonttype': 42,
@@ -284,11 +315,11 @@ def threshold_analysis(diameter_analysis_df, diameter_plots_dir, cap_flow_path):
             
             ax.set_xlabel('Age Threshold (years)', fontproperties=source_sans)
             ax.set_ylabel('KS Statistic', fontproperties=source_sans)
-            ax.set_title('KS Statistic vs Age Threshold', fontproperties=source_sans)
+            ax.set_title('Capillary Diameter Similarity by Age', fontproperties=source_sans)
             ax.grid(True, alpha=0.3)
             ax.legend()
             plt.tight_layout()
-            plt.savefig('ks_statistic_vs_threshold.png', dpi=600, bbox_inches='tight')
+            plt.savefig(os.path.join(diameter_plots_dir, 'ks_statistic_vs_threshold.png'), dpi=600, bbox_inches='tight')
             plt.close()
     return 0
 
