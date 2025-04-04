@@ -19,6 +19,8 @@ from typing import Tuple, List, Dict, Optional
 
 # Import paths from config instead of defining computer paths locally
 from src.config import PATHS, load_source_sans
+from src.tools.plotting_utils import plot_CI_multiple_bands
+
 cap_flow_path = PATHS['cap_flow']
 source_sans = load_source_sans()
 
@@ -234,21 +236,6 @@ def plot_velocity_boxplots(df: pd.DataFrame, best_threshold: Optional[int] = Non
     
     # Standard plot configuration with robust font loading
     sns.set_style("whitegrid")
-    
-    # Safely get the font
-    def get_source_sans_font():
-        """Safely load the SourceSans font with fallback to default font."""
-        try:
-            font_path = os.path.join(PATHS['downloads'], 'Source_Sans_3', 'static', 'SourceSans3-Regular.ttf')
-            if os.path.exists(font_path):
-                return FontProperties(fname=font_path)
-            print("Warning: SourceSans3-Regular.ttf not found, using default font")
-            return None
-        except Exception as e:
-            print(f"Warning: Error loading font: {e}")
-            return None
-    
-    source_sans = get_source_sans_font()
     
     plt.rcParams.update({
         'pdf.fonttype': 42,  # For editable text in PDFs
@@ -491,7 +478,6 @@ def analyze_pressure_specific_thresholds(df: pd.DataFrame) -> Dict[int, int]:
         ax.plot(pressures, thresholds, 'o-', linewidth=1)
         
         # Try to use Source Sans font if available
-        source_sans = get_source_sans_font()
         if source_sans:
             ax.set_xlabel('Pressure (PSI)', fontproperties=source_sans)
             ax.set_ylabel('Best Age Threshold (years)', fontproperties=source_sans)
@@ -517,17 +503,26 @@ def main():
     # Load data
     data_filepath = os.path.join(cap_flow_path, 'summary_df_nhp_video_stats.csv')
     df = pd.read_csv(data_filepath)
+
+    controls_df = df[df['SET'] == 'set01']
     
     # Run threshold analysis to find optimal age cutoff
-    best_threshold = threshold_analysis(df)
+    best_threshold = threshold_analysis(controls_df)
     
     # Plot velocity by age groups
-    plot_velocity_boxplots(df, best_threshold)
+    plot_velocity_boxplots(controls_df, best_threshold)
     
     # Run pressure-specific threshold analysis
-    pressure_thresholds = analyze_pressure_specific_thresholds(df)
+    pressure_thresholds = analyze_pressure_specific_thresholds(controls_df)
     
     print("\nAge threshold analysis complete.")
+
+
+    # Plot the CI bands for age groups
+    # plot_CI_multiple_bands(controls_df, thresholds=[29, 49], variable='Age', method='bootstrap', 
+    #                        n_iterations=1000, ci_percentile=95, write=True, dimensionless=False, 
+    #                        video_median=False, log_scale=False, velocity_variable='Corrected Velocity')
+
     return 0
 
 
