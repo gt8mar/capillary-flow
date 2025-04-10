@@ -523,14 +523,23 @@ def apply_models_to_new_data(rf_model, cnn_model, kymograph_dir, output_dir, tar
         
         # Store results
         results.append({
-            'File': kymograph_file,
+            'Filename': kymograph_file,
             'RF_Prediction': rf_prediction,
             'CNN_Prediction': cnn_prediction,
-            'Ensemble_Prediction': ensemble_prediction
+            'Estimated_Counts': ensemble_prediction
         })
     
     # Convert to DataFrame and save
     results_df = pd.DataFrame(results)
+    # Load in velocity data
+    velocity_folder = "H:\\240729\\Frog2\\Right\\velocities"
+    velocity_file = "H:\\240729\\Frog2\\Right\\classified_kymos_Frog2_240729.csv"
+    velocity_df = pd.read_csv(velocity_file)
+    velocity_df['Filename'] = velocity_df['Filename'].str.replace('velocities', 'kymograph')
+    # add '.tiff' to the filename column
+    velocity_df['Filename'] = velocity_df['Filename'].str.replace('.tiff', '') + '.tiff'
+    # merge the two dataframes on the filename column
+    results_df = pd.merge(results_df, velocity_df, on='Filename', how='left')
     results_df.to_csv(os.path.join(output_dir, 'predictions.csv'), index=False)
     
     print(f"Applied models to {len(results)} new images. Results saved to {os.path.join(output_dir, 'predictions.csv')}")
@@ -619,15 +628,15 @@ def main():
     # Compare models
     compare_models(rf_metrics, cnn_metrics, comparison_output_dir)
     
-    # Apply models to new data
-    print("\nApplying models to new data...")
-    predictions_df = apply_models_to_new_data(rf_model, cnn_model, kymograph_dir, output_dir, target_size)
+    # # Apply models to new data
+    # print("\nApplying models to new data...")
+    # predictions_df = apply_models_to_new_data(rf_model, cnn_model, kymograph_dir, output_dir, target_size)
     
-    # Print some sample predictions
-    print("\nSample predictions:")
-    if len(predictions_df) > 0:
-        sample_size = min(5, len(predictions_df))
-        print(predictions_df.head(sample_size).to_string())
+    # # Print some sample predictions
+    # print("\nSample predictions:")
+    # if len(predictions_df) > 0:
+    #     sample_size = min(5, len(predictions_df))
+    #     print(predictions_df.head(sample_size).to_string())
     
     print("\nDone!")
 
