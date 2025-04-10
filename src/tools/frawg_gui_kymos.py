@@ -301,8 +301,8 @@ class KymographClassifier:
 
 if __name__ == "__main__":
     classifier = KymographClassifier(
-        'D:\\frog\\kymographs', 
+        'H:\\frog\\results\\kymographs', 
         'frog', # 'C:\\Users\\gt8mar\\capillary-flow\\metadata',
-        'D:\\frog\\velocities\\CalFrog4fps220Lankle_velocities_u.csv',
-        'D:\\frog\\classified_kymos_CalFrog4.csv'
+        'H:\\frog\\velocities\\CalFrog2.csv',
+        'H:\\frog\\classified_kymos_CalFrog2.csv'
     )

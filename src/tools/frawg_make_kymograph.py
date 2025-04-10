@@ -194,6 +194,9 @@ def main(path, write = True, variable_radii = False, verbose = False, plot = Fal
     
     # Create output folders
     centerline_folder = os.path.join(path, 'centerlines')
+    if not os.path.exists(centerline_folder):
+        print(f"Centerline folder does not exist for {path}")
+        return 1
 
     os.makedirs(os.path.join(path, 'kymographs'), exist_ok=True)
     output_folder = os.path.join(path, 'kymographs')
@@ -299,15 +302,15 @@ if __name__ == "__main__":
         for frog in os.listdir(os.path.join(umbrella_folder, date)):
             if frog.startswith('STD'):
                 continue
-            if not frog.startswith('Frog4'):
+            if not frog.startswith('Frog'):
                 continue   
             for side in os.listdir(os.path.join(umbrella_folder, date, frog)):
                 if side.startswith('STD'):
                     continue
                 if side == 'archive':
                     continue
-                if not side.startswith('Left'): # only process the left side for now
-                    continue
+                # if not side.startswith('Left'): # only process the left side for now
+                #     continue
                 print('Processing: ' + date + ' ' + frog + ' ' + side)
                 path = os.path.join(umbrella_folder, date, frog, side)
                 main(path)
