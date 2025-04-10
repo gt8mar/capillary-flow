@@ -265,7 +265,7 @@ def main(path, fps_type, fps, verbose = False, write = False, write_data = True,
     images = get_images(input_folder, "tiff")
 
     # Create a dataframe to store the results
-    df = pd.DataFrame(columns = ['Date', 'Frog', 'Side', 'Condition', 'Capillary', 'Velocity (um/s)'])
+    df = pd.DataFrame(columns = ['Filename', 'Date', 'Frog', 'Side', 'Condition', 'Capillary', 'Velocity (um/s)'])
 
     if platform.system() != 'Windows':
         date = path.split("/")[-3]
@@ -315,7 +315,7 @@ def main(path, fps_type, fps, verbose = False, write = False, write_data = True,
         # transform slope from pixels/frames into um/s:
         um_slope = np.absolute(weighted_average_slope) *fps/PIX_UM
         # add row to dataframe
-        new_data = pd.DataFrame([[date, frog, side, condition, capillary_name, um_slope]], columns = df.columns)
+        new_data = pd.DataFrame([[filename,date, frog, side, condition, capillary_name, um_slope]], columns = df.columns)
         df = pd.concat([df, new_data], ignore_index=True)
 
     # Write the dataframe to a file
