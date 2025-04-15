@@ -6,7 +6,8 @@ the Segment Anything Model. The user can click on the frog to provide prompts
 for the segmentation algorithm.
 
 Usage:
-    python -m src.tools.frog_segmentation [image_path] [--model_type TYPE]
+    1. Run directly in Cursor by pressing play (modify SCRIPT_CONFIG at the bottom of file)
+    2. Or run from command line: python -m scripts.frog_segmentation [image_path] [--model_type TYPE]
 
 Arguments:
     image_path: Optional path to a specific image
@@ -21,6 +22,7 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Button
 import torch
 import argparse
+import json
 from segment_anything import sam_model_registry, SamPredictor
 from src.config import PATHS
 
@@ -35,6 +37,10 @@ ax = None
 mask_overlay = None
 status_text = None
 image_path = None
+original_image_size = None  # To track resizing for point coordinate adjustments
+
+# Path to the progress tracking file
+PROGRESS_FILE = os.path.join(PATHS['frog_dir'], "segmentation_progress.json")
 
 def parse_arguments():
     """Parse command-line arguments."""
@@ -42,6 +48,9 @@ def parse_arguments():
     parser.add_argument("image_path", nargs="?", default=None, help="Path to specific image file (optional)")
     parser.add_argument("--model_type", choices=["vit_h", "vit_l", "vit_b"], default="vit_b", 
                       help="SAM model type (vit_b is fastest, vit_h is most accurate)")
+    parser.add_argument("--resume", action="store_true", help="Resume from previously unfinished files")
+    parser.add_argument("--skip_completed", action="store_true", default=True,
+                      help="Skip images that already have segmentations saved (default: True)")
     return parser.parse_args()
 
 def setup_sam(model_type="vit_b"):
@@ -105,6 +114,8 @@ def load_image(img_path):
     Returns:
         numpy.ndarray: The loaded image in RGB format
     """
+    global original_image_size
+    
     # Check file extension
     _, ext = os.path.splitext(img_path)
     
@@ -115,6 +126,7 @@ def load_image(img_path):
             import rawpy
             with rawpy.imread(img_path) as raw:
                 image = raw.postprocess()
+                original_image_size = image.shape[:2]
                 return image
         except ImportError:
             print("rawpy module not found. Install with: pip install rawpy")
@@ -128,6 +140,9 @@ def load_image(img_path):
     
     # Convert to RGB (from BGR)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    
+    # Save original size for point scaling
+    original_image_size = image.shape[:2]
     
     # Resize large images for better performance
     max_dim = 1024
@@ -150,6 +165,87 @@ def update_status(message):
         status_text = plt.figtext(0.5, 0.01, message, ha="center", fontsize=10)
     
     fig.canvas.draw_idle()
+
+def load_progress():
+    """Load progress from the JSON file."""
+    if os.path.exists(PROGRESS_FILE):
+        try:
+            with open(PROGRESS_FILE, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError):
+            print("Error loading progress file. Creating a new one.")
+    
+    # Create default structure if file doesn't exist or has errors
+    return {
+        "completed": [],
+        "in_progress": {}
+    }
+
+def save_progress():
+    """Save current progress to the JSON file."""
+    global input_points, input_labels, image_path
+    
+    # Get the current progress
+    progress = load_progress()
+    
+    # Don't record empty progress
+    if len(input_points) == 0:
+        return
+    
+    # Update in-progress files
+    progress["in_progress"][image_path] = {
+        "points": input_points,
+        "labels": input_labels
+    }
+    
+    # Create directory if it doesn't exist
+    os.makedirs(os.path.dirname(PROGRESS_FILE), exist_ok=True)
+    
+    # Save to file
+    with open(PROGRESS_FILE, 'w') as f:
+        json.dump(progress, f, indent=2)
+    
+    print(f"Progress saved for {os.path.basename(image_path)}")
+
+def mark_as_completed():
+    """Mark the current image as completed."""
+    global image_path
+    
+    # Get the current progress
+    progress = load_progress()
+    
+    # Add to completed list if not already there
+    if image_path not in progress["completed"]:
+        progress["completed"].append(image_path)
+    
+    # Remove from in-progress if it was there
+    if image_path in progress["in_progress"]:
+        del progress["in_progress"][image_path]
+    
+    # Save to file
+    with open(PROGRESS_FILE, 'w') as f:
+        json.dump(progress, f, indent=2)
+    
+    print(f"Marked {os.path.basename(image_path)} as completed")
+
+def is_completed(img_path):
+    """Check if an image has been completed."""
+    progress = load_progress()
+    
+    # Check if the image is in the completed list
+    if img_path in progress["completed"]:
+        return True
+    
+    # Also check if there's a segmentation file already
+    mask_filename = os.path.join(PATHS['frog_segmented'], f"{os.path.splitext(os.path.basename(img_path))[0]}_mask.png")
+    if os.path.exists(mask_filename):
+        # Add to completed list for future checks
+        progress["completed"].append(img_path)
+        with open(PROGRESS_FILE, 'w') as f:
+            json.dump(progress, f, indent=2)
+        return True
+    
+    return False
 
 def on_click(event):
     """
@@ -204,6 +300,9 @@ def on_click(event):
     fig.canvas.draw()
     update_status("Ready - Click to add points, 'Save' when done")
     
+    # Save progress after each point
+    save_progress()
+    
     # Clear CUDA cache to free up memory
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -235,6 +334,9 @@ def on_reset(event):
     ax.set_title("Click on the frog to segment it")
     ax.axis('off')
     
+    # Save empty progress to clear saved points
+    save_progress()
+    
     fig.canvas.draw()
     update_status("Ready - Click to add points")
 
@@ -245,7 +347,7 @@ def on_save(event):
     Args:
         event: The matplotlib event object
     """
-    global fig, image_path
+    global fig, image_path, original_image_size
     
     if mask is None:
         update_status("No mask to save. Please segment the image first.")
@@ -257,20 +359,59 @@ def on_save(event):
     os.makedirs(PATHS['frog_segmented'], exist_ok=True)
     
     # Get output paths
-    mask_filename = os.path.join(PATHS['frog_segmented'], f"{os.path.splitext(os.path.basename(image_path))[0]}_mask.png")
-    segmented_filename = os.path.join(PATHS['frog_segmented'], f"{os.path.splitext(os.path.basename(image_path))[0]}_segmented.png")
+    base_name = os.path.splitext(os.path.basename(image_path))[0]
+    mask_filename = os.path.join(PATHS['frog_segmented'], f"{base_name}_mask.png")
+    segmented_filename = os.path.join(PATHS['frog_segmented'], f"{base_name}_segmented.png")
+    points_filename = os.path.join(PATHS['frog_segmented'], f"{base_name}_points.json")
     
     # Save the mask
-    cv2.imwrite(mask_filename, mask.astype(np.uint8) * 255)
+    # If the image was resized, we need to resize the mask back to the original size
+    saved_mask = mask
+    if original_image_size and (original_image_size[0], original_image_size[1]) != mask.shape:
+        h, w = original_image_size
+        saved_mask = cv2.resize(mask.astype(np.uint8), (w, h), interpolation=cv2.INTER_NEAREST).astype(bool)
+    
+    cv2.imwrite(mask_filename, saved_mask.astype(np.uint8) * 255)
     
     # Save the segmented image (original with mask overlay)
-    segmented_image = image.copy()
-    segmented_image[mask] = segmented_image[mask] * 0.5 + np.array([255, 0, 0]) * 0.5
+    orig_image = cv2.imread(image_path)
+    orig_image = cv2.cvtColor(orig_image, cv2.COLOR_BGR2RGB)
+    
+    segmented_image = orig_image.copy()
+    segmented_image[saved_mask] = segmented_image[saved_mask] * 0.5 + np.array([255, 0, 0]) * 0.5
     
     cv2.imwrite(segmented_filename, cv2.cvtColor(segmented_image, cv2.COLOR_RGB2BGR))
     
+    # Save the points used
+    with open(points_filename, 'w') as f:
+        json.dump({
+            "points": input_points,
+            "labels": input_labels
+        }, f, indent=2)
+    
     print(f"Saved mask to {mask_filename}")
     print(f"Saved segmented image to {segmented_filename}")
+    print(f"Saved points to {points_filename}")
+    
+    # Mark as completed in progress tracking
+    mark_as_completed()
+    
+    # Close the figure
+    plt.close(fig)
+
+def on_skip(event):
+    """
+    Skip the current image without saving.
+    
+    Args:
+        event: The matplotlib event object
+    """
+    global fig
+    
+    print(f"Skipping {os.path.basename(image_path)}")
+    
+    # Save any progress
+    save_progress()
     
     # Close the figure
     plt.close(fig)
@@ -293,6 +434,14 @@ def interactive_segmentation(img_path):
     mask = None
     mask_overlay = None
     
+    # Check if there's saved progress for this image
+    progress = load_progress()
+    if img_path in progress["in_progress"]:
+        saved_progress = progress["in_progress"][img_path]
+        input_points = saved_progress["points"]
+        input_labels = saved_progress["labels"]
+        print(f"Loaded {len(input_points)} saved points for {os.path.basename(img_path)}")
+    
     # Load the image
     print(f"Loading image: {os.path.basename(image_path)}")
     image = load_image(image_path)
@@ -310,23 +459,88 @@ def interactive_segmentation(img_path):
     ax.axis('off')
     
     # Add buttons
-    reset_ax = plt.axes([0.7, 0.05, 0.1, 0.075])
+    reset_ax = plt.axes([0.59, 0.05, 0.1, 0.075])
+    skip_ax = plt.axes([0.7, 0.05, 0.1, 0.075])
     save_ax = plt.axes([0.81, 0.05, 0.1, 0.075])
     
     reset_button = Button(reset_ax, 'Reset')
+    skip_button = Button(skip_ax, 'Skip')
     save_button = Button(save_ax, 'Save')
     
     reset_button.on_clicked(on_reset)
+    skip_button.on_clicked(on_skip)
     save_button.on_clicked(on_save)
     
     # Connect the click event
     fig.canvas.mpl_connect('button_press_event', on_click)
+    
+    # If we have saved points, display them and generate the mask
+    if len(input_points) > 0:
+        # Display saved points
+        for point in input_points:
+            ax.plot(point[0], point[1], 'ro', markersize=8)
+        
+        # Generate mask from saved points
+        points_array = np.array(input_points)
+        labels_array = np.array(input_labels)
+        
+        # Generate mask
+        with torch.no_grad():
+            masks, scores, logits = predictor.predict(
+                point_coords=points_array,
+                point_labels=labels_array,
+                multimask_output=True
+            )
+        
+        # Select the mask with the highest score
+        mask_idx = np.argmax(scores)
+        mask = masks[mask_idx]
+        
+        # Create a colored mask overlay
+        colored_mask = np.zeros((mask.shape[0], mask.shape[1], 4))
+        colored_mask[mask] = [1, 0, 0, 0.5]  # Red with 50% transparency
+        
+        # Display the mask overlay
+        mask_overlay = ax.imshow(colored_mask)
     
     # Add status message
     update_status("Ready - Click on the frog to segment it")
     
     # Show the plot
     plt.show()
+
+def get_remaining_images(image_paths, args):
+    """
+    Filter the list of images to only include those that need processing.
+    
+    Args:
+        image_paths (list): List of all image paths
+        args (Namespace): Command line arguments
+        
+    Returns:
+        list: Filtered list of image paths
+    """
+    if not args.skip_completed:
+        return image_paths
+    
+    remaining = []
+    for img_path in image_paths:
+        if is_completed(img_path):
+            print(f"Skipping {os.path.basename(img_path)} (already completed)")
+        else:
+            remaining.append(img_path)
+    
+    return remaining
+
+def get_unfinished_images():
+    """
+    Get the list of images that have been started but not completed.
+    
+    Returns:
+        list: List of image paths
+    """
+    progress = load_progress()
+    return list(progress["in_progress"].keys())
 
 def process_images(image_paths, args):
     """
@@ -337,6 +551,13 @@ def process_images(image_paths, args):
         args (Namespace): Command line arguments
     """
     global predictor
+    
+    # Filter out completed images if requested
+    image_paths = get_remaining_images(image_paths, args)
+    
+    if not image_paths:
+        print("No images to process. All images have been completed or skipped.")
+        return
     
     # Load the model only once
     predictor = setup_sam(args.model_type)
@@ -350,25 +571,42 @@ def process_images(image_paths, args):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-if __name__ == "__main__":
-    # Parse command-line arguments
-    args = parse_arguments()
+def run_with_config(config):
+    """
+    Run the segmentation with the given configuration.
     
-    # If a specific image path is provided, use it
+    Args:
+        config (dict): Configuration dictionary
+    """
+    # Create args object to maintain compatibility with existing code
+    class Args:
+        pass
+    
+    args = Args()
+    args.model_type = config.get("model_type", "vit_b")
+    args.resume = config.get("resume", False)
+    args.skip_completed = config.get("skip_completed", True)
+    args.image_path = config.get("specific_image_path", None)
+    
+    # Process specific image if provided
     if args.image_path:
         if os.path.isfile(args.image_path):
             process_images([args.image_path], args)
         else:
             print(f"Error: Image file not found: {args.image_path}")
+            return
     else:
-        # Otherwise process all images in the default folder
-        image_folder = os.path.join(PATHS['downloads'], "whole-frog")
+        # Get the image folder from config or use default
+        image_folder = config.get("image_folder", None)
+        if image_folder is None:
+            image_folder = os.path.join(PATHS['downloads'], "whole-frog")
+        
         image_folder = os.path.normpath(image_folder)
         
         # Check if the folder exists
         if not os.path.exists(image_folder):
             print(f"Error: Image folder not found: {image_folder}")
-            sys.exit(1)
+            return
         
         # Get list of image files
         image_files = [f for f in os.listdir(image_folder) 
@@ -376,14 +614,90 @@ if __name__ == "__main__":
         
         if not image_files:
             print(f"No image files found in {image_folder}")
-            sys.exit(1)
+            return
         
         # Convert to full paths
         image_paths = [os.path.join(image_folder, f) for f in image_files]
         
         print(f"Found {len(image_paths)} images to process")
         
+        # Process unfinished images first if resuming
+        if args.resume:
+            unfinished_images = get_unfinished_images()
+            if unfinished_images:
+                print(f"Resuming {len(unfinished_images)} unfinished images")
+                process_images(unfinished_images, args)
+            else:
+                print("No unfinished images found.")
+        
         # Process all images with the same model instance
         process_images(image_paths, args)
-        
+    
     print("Processing complete.")
+
+if __name__ == "__main__":
+    # Configuration options for running from Cursor (edit these as needed)
+    SCRIPT_CONFIG = {
+        # Model options: "vit_b" (faster), "vit_l" (medium), "vit_h" (more accurate)
+        "model_type": "vit_b",
+        
+        # Set to True to resume working on images you started but didn't finish
+        "resume": True,
+        
+        # Set to True to skip images that already have saved segmentations
+        "skip_completed": True,
+        
+        # Optional: Path to a specific image to process (leave as None to process all images in the folder)
+        "specific_image_path": None,
+        
+        # Optional: Path to folder with images (leave as None to use default folder)
+        "image_folder": None,
+    }
+    
+    # If command line arguments are provided, use them instead of SCRIPT_CONFIG
+    if len(sys.argv) > 1:
+        args = parse_arguments()
+        
+        # If resuming, process unfinished images first
+        if args.resume:
+            unfinished_images = get_unfinished_images()
+            if unfinished_images:
+                print(f"Resuming {len(unfinished_images)} unfinished images")
+                process_images(unfinished_images, args)
+            else:
+                print("No unfinished images found.")
+        
+        # If a specific image path is provided, use it
+        if args.image_path:
+            if os.path.isfile(args.image_path):
+                process_images([args.image_path], args)
+            else:
+                print(f"Error: Image file not found: {args.image_path}")
+        else:
+            # Otherwise process all images in the default folder
+            image_folder = os.path.join(PATHS['downloads'], "whole-frog")
+            image_folder = os.path.normpath(image_folder)
+            
+            # Check if the folder exists
+            if not os.path.exists(image_folder):
+                print(f"Error: Image folder not found: {image_folder}")
+                sys.exit(1)
+            
+            # Get list of image files
+            image_files = [f for f in os.listdir(image_folder) 
+                        if f.lower().endswith(('.jpg', '.jpeg', '.png', '.cr2', '.nef', '.arw', '.dng'))]
+            
+            if not image_files:
+                print(f"No image files found in {image_folder}")
+                sys.exit(1)
+            
+            # Convert to full paths
+            image_paths = [os.path.join(image_folder, f) for f in image_files]
+            
+            print(f"Found {len(image_paths)} images to process")
+            
+            # Process all images with the same model instance
+            process_images(image_paths, args)
+    else:
+        # Run with configuration from SCRIPT_CONFIG
+        run_with_config(SCRIPT_CONFIG)

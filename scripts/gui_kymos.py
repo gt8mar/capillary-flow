@@ -54,6 +54,9 @@ class KymographClassifier:
         fps = self.get_fps(self.df.loc[self.index, 'Participant'], self.df.loc[self.index, 'Date'], self.df.loc[self.index, 'Location'], self.df.loc[self.index, 'Video'])
         um_slope = self.df.loc[self.index, 'Velocity']
         if self.current_velocity_index == 0:
+            print(self.df.loc[self.index, 'Participant'], self.df.loc[self.index, 'Date'], self.df.loc[self.index, 'Location'], self.df.loc[self.index, 'Video'])
+            print(um_slope)
+            print(fps)
             average_slope = (um_slope * 2.44) / fps
             self.original_velocity = um_slope
         else:
@@ -263,8 +266,12 @@ class KymographClassifier:
 
 if __name__ == "__main__":
     classifier = KymographClassifier(
-        'C:\\Users\\gt8mar\\capillary-flow\\results\\kymographs\\part49_to_part81', 
-        'C:\\Users\\gt8mar\\capillary-flow\\metadata', 
-        'C:\\Users\\gt8mar\\capillary-flow\\results\\velocity_df_part33_to_part81.csv',
-        'C:\\Users\\gt8mar\\capillary-flow\\classified_kymos_part33_to_part81.csv'
+        # 'C:\\Users\\gt8mar\\capillary-flow\\results\\kymographs\\part49_to_part81', 
+        # 'C:\\Users\\gt8mar\\capillary-flow\\metadata', 
+        # 'C:\\Users\\gt8mar\\capillary-flow\\results\\velocity_df_part33_to_part81.csv',
+        # 'C:\\Users\\gt8mar\\capillary-flow\\classified_kymos_part33_to_part81.csv'
+        'D:\\Marcus\\results\\kymographs\\part34-80',
+        'C:\\Users\\ejerison\\capillary-flow\\metadata',
+        'D:\\Marcus\\results\\velocity_df_part34_to_part80.csv',
+        'D:\\Marcus\\results\\classified_kymos_part34_to_part80.csv'
     )

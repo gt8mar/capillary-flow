@@ -409,7 +409,7 @@ def quality_control(image):
     pass
 
 if __name__ == "__main__":
-    for file in os.listdir("C://Users//gt8ma//Downloads//whole-frog"):
-        if file.endswith(".JPG"):
+    for file in os.listdir(os.path.join(PATHS['downloads'], "whole-frog")):
+        if file.endswith(".JPG" or ".jpg" or ".png" or ".cr2" or ".CR2"):
             print(file)
             main(file, plot = False)
