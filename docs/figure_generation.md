@@ -86,7 +86,7 @@ This script provides tools for comparing images taken with different LED configu
 
 #### Example Output
 
-![Video Translation by Pressure](methods_plots/video_transl_by_pressure.png)
+![Video Translation by Pressure](methods_plots/line_profile_comparisonsnr.png)
 
 *Figure: Comparison of illumination profiles with different LED configurations. This visualization shows how the pressure affects translation in video analysis.*
 
