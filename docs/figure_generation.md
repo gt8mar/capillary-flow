@@ -39,6 +39,12 @@ This script analyzes the intensity profiles along rows and columns of calibratio
    - Adjust the y-axis limits by modifying `ax1.set_ylim([200, 255])` and `ax2.set_ylim([200, 255])`
    - Modify figure dimensions with `figsize=(4.8, 2.0)`
 
+#### Example Output
+
+![Profile Calibration Example](methods_plots/profile_calibration_20250416_153542.png)
+
+*Figure: Example output showing row and column intensity profiles from a calibration image. The plots reveal the uniformity of illumination across the field of view.*
+
 #### Example Usage
 
 ```python
@@ -77,6 +83,12 @@ This script provides tools for comparing images taken with different LED configu
    - Compares two line profiles with a focus on signal quality and contrast
    - Calculates SNR, contrast, and FWHM for each profile
    - Generates a comparison visualization
+
+#### Example Output
+
+![Video Translation by Pressure](methods_plots/video_transl_by_pressure.png)
+
+*Figure: Comparison of illumination profiles with different LED configurations. This visualization shows how the pressure affects translation in video analysis.*
 
 #### How to Use
 
@@ -133,6 +145,12 @@ This script analyzes and compares contrast metrics for microscope images. It's p
 
 5. **plot_contrast_boxplots_color(results)**
    - Creates boxplots comparing green vs. white illumination for RMS and Weber contrast
+
+#### Example Output
+
+![Contrast Boxplots](methods_plots/contrast_boxplots.png)
+
+*Figure: Boxplots comparing RMS and Weber contrast metrics between green and white illumination. The plots demonstrate the superior contrast achieved with green illumination.*
 
 #### How to Use
 
