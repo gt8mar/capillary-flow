@@ -86,9 +86,9 @@ This script provides tools for comparing images taken with different LED configu
 
 #### Example Output
 
-![Video Translation by Pressure](methods_plots/line_profile_comparisonsnr.png)
+![Video Translation by Pressure](methods_plots/normalized_profiles_with_snr.png)
 
-*Figure: Comparison of illumination profiles with different LED configurations. This visualization shows how the pressure affects translation in video analysis.*
+*Figure: Comparison of illumination profiles shows two LEDs to have superior signal to noise.*
 
 #### How to Use
 
