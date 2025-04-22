@@ -226,6 +226,9 @@ The valley-based SNR method works in several steps:
 
 #### Example Output
 
+![Line Profiles](methods_plots/line_profiles.png)
+*Figure: Line profiles for one and two LED illumination setups. We pre-registered the profiles so the valleys (the capillaries) are at the same index values. These profiles are the inputs to the calculate_valley_snr function.*
+
 ![Valley Analysis](methods_plots/valley_analysis_two_leds.png)
 
 *Figure: Valley analysis for a two LED profile showing detected valleys (red dots), valley baselines (green dots), and measurement lines. The regions of interest are highlighted with gray bands. The analysis quantifies the depth and SNR of each valley, providing metrics to compare illumination quality.*
