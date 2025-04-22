@@ -6,8 +6,8 @@ This document provides a detailed explanation of how the figures for the paper a
 
 1. [Profile Calibration](#profile-calibration)
 2. [Compare LEDs](#compare-leds)
-3. [Compare Contrast](#compare-contrast)
-4. [Valley-Based SNR Analysis](#valley-based-snr-analysis)
+3. [Valley-Based SNR Analysis](#valley-based-snr-analysis)
+4. [Compare Contrast](#compare-contrast) 
 5. [Image Processing](#image-processing) (To be completed)
 6. [Velocity Analysis](#velocity-analysis) (To be completed)
 7. [Flow Visualization](#flow-visualization) (To be completed)
@@ -98,9 +98,9 @@ This script provides tools for comparing images taken with different LED configu
 
 #### Example Output
 
-![Video Translation by Pressure](methods_plots/normalized_profiles_with_snr.png)
+![Line Profiles](methods_plots/line_profiles.png)
 
-*Figure: Comparison of normalized illumination profiles with SNR metrics. The offset allows clear comparison of profile shapes while the SNR values quantify signal quality. This plot demonstrates that the two LED configuration (blue) provides better contrast than the single LED configuration (orange).*
+*Figure: Line profiles for one and two LED illumination setups. We pre-registered the profiles so the valleys (the capillaries) are at the same index values. These profiles are the inputs to the calculate_valley_snr function.*
 
 #### How to Use
 
@@ -117,20 +117,85 @@ This script provides tools for comparing images taken with different LED configu
    right_image = cv2.imread(right_image_path, cv2.IMREAD_GRAYSCALE)
    both_image = cv2.imread(both_image_path, cv2.IMREAD_GRAYSCALE)
    
-   # Extract line profiles
+   # Extract line profiles with same shape and 1D index
    profile1 = both_image[574, 74:-74]     # Two LED profile
    profile2 = right_image[634, 0:-148]    # One LED profile
    
    # Generate normalized profiles with SNR metrics
-   normalized_snr = normalize_with_snr(profile1, profile2)
+   simple_plot_profiles(profile1, profile2)
    ```
 
 3. **Output**: 
    - The script generates comparison plots saved to the results directory
-   - Returns dictionaries with comparison metrics
+
 
 #### Figure Output in Paper
-This script generates figures comparing illumination profiles with different LED configurations. In the paper, these figures demonstrate how the illumination setup affects image quality and contrast. The normalized comparison with SNR metrics is particularly important for validating that the two-LED configuration provides better imaging quality.
+This script generates figures comparing illumination profiles with different LED configurations. In the paper, these figures demonstrate how the illumination setup affects image quality and contrast. 
+
+## Valley-Based SNR Analysis
+
+### Script: `src/analysis/compare_leds.py` (function: `calculate_valley_snr`)
+
+#### Purpose
+This script implements a specialized signal-to-noise ratio (SNR) analysis that focuses on detecting and measuring the depth of valleys in intensity profiles. By identifying these valleys (which correspond to capillaries in the microscope images) and comparing their depths to the background noise, we can quantitatively assess the quality of different illumination configurations.
+
+#### Key Functions
+
+1. **calculate_valley_snr(profile1, profile2, window_size=15, names=('Two LEDs', 'One LED'))**
+   - Compares two profile signals by identifying valleys (local minima) in each
+   - Calculates the depth of each valley relative to local baseline
+   - Computes SNR as the ratio of valley depth to noise power
+   - Generates detailed visualizations for each profile
+
+2. **process_profile(profile, name)** (internal function)
+   - Applies Savitzky-Golay filtering to smooth the profile
+   - Identifies valleys using signal processing techniques
+   - Uses regions of interest (ROIs) to target specific features
+   - Calculates valley depths and SNR for each valley
+   - Generates visualization showing valleys and measurements
+
+#### Analysis Approach
+
+The valley-based SNR method works in several steps:
+1. **Signal Smoothing**: Applies a Savitzky-Golay filter to reduce noise while preserving signal features
+2. **Noise Estimation**: Calculates residuals between the original and smoothed signals to estimate noise power
+3. **Valley Detection**: Uses peak finding algorithms on the inverted signal to find valleys, with specific ROIs to focus on important features
+4. **Baseline Determination**: For each valley, identifies local maximums on either side to serve as the baseline
+5. **Valley Depth Calculation**: Measures the intensity difference between the valley minimum and its baseline
+6. **SNR Calculation**: Divides valley depth by noise power to obtain SNR for each valley
+
+#### Example Output
+
+![Valley Analysis](methods_plots/valley_analysis_two_leds.png)
+
+*Figure: Valley analysis for a two LED profile showing detected valleys (red dots), valley baselines (green dots), and measurement lines. The regions of interest are highlighted with gray bands. The analysis quantifies the depth and SNR of each valley, providing metrics to compare illumination quality.*
+
+#### How to Use
+
+```python
+# Load line profiles from images (pre-register to be same shape and have same index)
+profile1 = both_image[574, 74:-74]  # Two LED profile
+profile2 = right_image[634, 0:-148]  # One LED profile
+
+# Calculate SNR using valley method
+valley_results1, valley_results2 = calculate_valley_snr(profile1, profile2, window_size=15)
+
+# Print results for valley analysis
+print(valley_results1)
+print(valley_results2)
+```
+
+#### Output
+The function returns a dictionary with the following metrics for each profile:
+- Valley positions
+- Valley depths
+- Valley SNR values
+- Noise power estimate
+- Mean valley depth
+- Mean valley SNR
+
+#### Figure Output in Paper
+This analysis generates figures that visualize the valleys in intensity profiles with different illumination configurations. In the paper, these figures demonstrate how the two LED configuration provides deeper valleys and higher SNR compared to the single LED configuration, quantifying the improved contrast of capillaries in the images.
 
 ## Compare Contrast
 
@@ -192,75 +257,7 @@ This script analyzes and compares contrast metrics for microscope images. It's p
 #### Figure Output in Paper
 This script generates figures comparing contrast metrics between different illumination colors. In the paper, these boxplots demonstrate the quantitative differences in image quality achieved with green vs. white illumination, supporting the choice of optimal illumination for the experiments.
 
-## Valley-Based SNR Analysis
 
-### Script: `src/analysis/compare_leds.py` (function: `calculate_valley_snr`)
-
-#### Purpose
-This script implements a specialized signal-to-noise ratio (SNR) analysis that focuses on detecting and measuring the depth of valleys in intensity profiles. By identifying these valleys (which correspond to capillaries in the microscope images) and comparing their depths to the background noise, we can quantitatively assess the quality of different illumination configurations.
-
-#### Key Functions
-
-1. **calculate_valley_snr(profile1, profile2, window_size=15, names=('Two LEDs', 'One LED'))**
-   - Compares two profile signals by identifying valleys (local minima) in each
-   - Calculates the depth of each valley relative to local baseline
-   - Computes SNR as the ratio of valley depth to noise power
-   - Generates detailed visualizations for each profile
-
-2. **process_profile(profile, name)** (internal function)
-   - Applies Savitzky-Golay filtering to smooth the profile
-   - Identifies valleys using signal processing techniques
-   - Uses regions of interest (ROIs) to target specific features
-   - Calculates valley depths and SNR for each valley
-   - Generates visualization showing valleys and measurements
-
-#### Analysis Approach
-
-The valley-based SNR method works in several steps:
-1. **Signal Smoothing**: Applies a Savitzky-Golay filter to reduce noise while preserving signal features
-2. **Noise Estimation**: Calculates residuals between the original and smoothed signals to estimate noise power
-3. **Valley Detection**: Uses peak finding algorithms on the inverted signal to find valleys, with specific ROIs to focus on important features
-4. **Baseline Determination**: For each valley, identifies local maximums on either side to serve as the baseline
-5. **Valley Depth Calculation**: Measures the intensity difference between the valley minimum and its baseline
-6. **SNR Calculation**: Divides valley depth by noise power to obtain SNR for each valley
-
-#### Input Profiles:
-
-![Line Profiles](methods_plots/line_profiles.png)
-*Figure: Line profiles for one and two LED illumination setups. We pre-registered the profiles so the valleys (the capillaries) are at the same index values. These profiles are the inputs to the calculate_valley_snr function.*
-
-#### Example Output
-
-![Valley Analysis](methods_plots/valley_analysis_two_leds.png)
-
-*Figure: Valley analysis for a two LED profile showing detected valleys (red dots), valley baselines (green dots), and measurement lines. The regions of interest are highlighted with gray bands. The analysis quantifies the depth and SNR of each valley, providing metrics to compare illumination quality.*
-
-#### How to Use
-
-```python
-# Load line profiles from images
-profile1 = both_image[574, 74:-74]  # Two LED profile
-profile2 = right_image[634, 0:-148]  # One LED profile
-
-# Calculate SNR using valley method
-valley_results1, valley_results2 = calculate_valley_snr(profile1, profile2, window_size=15)
-
-# Print results for valley analysis
-print(valley_results1)
-print(valley_results2)
-```
-
-#### Output
-The function returns a dictionary with the following metrics for each profile:
-- Valley positions
-- Valley depths
-- Valley SNR values
-- Noise power estimate
-- Mean valley depth
-- Mean valley SNR
-
-#### Figure Output in Paper
-This analysis generates figures that visualize the valleys in intensity profiles with different illumination configurations. In the paper, these figures demonstrate how the two LED configuration provides deeper valleys and higher SNR compared to the single LED configuration, quantifying the improved contrast of capillaries in the images.
 
 ## Image Processing
 (To be completed)
