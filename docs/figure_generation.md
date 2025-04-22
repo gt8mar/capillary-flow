@@ -224,10 +224,12 @@ The valley-based SNR method works in several steps:
 5. **Valley Depth Calculation**: Measures the intensity difference between the valley minimum and its baseline
 6. **SNR Calculation**: Divides valley depth by noise power to obtain SNR for each valley
 
-#### Example Output
+#### Input Profiles:
 
 ![Line Profiles](methods_plots/line_profiles.png)
 *Figure: Line profiles for one and two LED illumination setups. We pre-registered the profiles so the valleys (the capillaries) are at the same index values. These profiles are the inputs to the calculate_valley_snr function.*
+
+#### Example Output
 
 ![Valley Analysis](methods_plots/valley_analysis_two_leds.png)
 
