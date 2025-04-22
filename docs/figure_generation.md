@@ -171,7 +171,7 @@ The valley-based SNR method works in several steps:
 *Figure: Valley analysis for a two LED profile showing detected valleys (red dots), valley baselines (green dots), and measurement lines. The regions of interest are highlighted with gray bands. The analysis quantifies the depth and SNR of each valley, providing metrics to compare illumination quality.*
 
 ![Comparison Valley Analysis](methods_plots/combined_profile_analysis.png)
-*Figure: Valley analyais for both profiles*
+*Figure: Valley analysis for both profiles*
 
 #### How to Use
 
