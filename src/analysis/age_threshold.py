@@ -66,6 +66,12 @@ def create_age_cdf_plot(df: pd.DataFrame, threshold: int,
     
     # Run KS test
     ks_stat, p_value = stats.ks_2samp(young_group, old_group)
+
+    print(f"KS statistic for threshold {threshold}: {ks_stat}")
+    print(f"p-value for threshold {threshold}: {p_value}")
+    print(f"The median velocity for the low group is {young_group.median()} and the high group is {old_group.median()}")
+    print(f"The interquartile range for the low group is {young_group.quantile(0.25)} to {young_group.quantile(0.75)} and the high group is {old_group.quantile(0.25)} to {old_group.quantile(0.75)}")
+        
     
     # Add KS test result to plot
     p_text = f"p = {p_value:.3f}" if p_value >= 0.001 else "p < 0.001"
