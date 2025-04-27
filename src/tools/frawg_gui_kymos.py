@@ -27,6 +27,7 @@ class KymographClassifier:
 
     def prepare_data(self):
         tiff_files = {file for file in os.listdir(self.image_dir) if file.lower().endswith(('.tif', '.tiff'))}
+        print(tiff_files)
         self.df['Image_Path'] = self.df.apply(lambda row: self.generate_filename(row), axis=1)
         self.df = self.df[self.df['Image_Path'].apply(lambda path: os.path.basename(path) in tiff_files)]
         self.df['Initial_Classification'] = None
@@ -37,7 +38,9 @@ class KymographClassifier:
         if self.metadata_dir == 'frog':
             condition = row['Condition']
             capillary = row['Capillary']
-            filename = f'CalFrog4fps{condition}_kymograph_0{capillary}.tiff'
+            filename = row['Filename']
+            filename = filename.replace('velocities', 'kymograph')
+            filename = f'{filename}.tiff'
             return filename
         else:
             return f"set01_{row['Participant']}_{row['Date']}_{row['Location']}_{row['Video']}_kymograph_{row['Capillary']}.tiff"
@@ -45,8 +48,16 @@ class KymographClassifier:
     def get_fps(self, participant, date, location, video):
         if self.metadata_dir == 'frog':
             # get fps from "Condition" column of the csv file
-            condition = self.df.loc[self.index, 'Condition']
-            return int(condition.split('Lankle')[0])
+            # see if 'fps' or 'fp' is in the filename
+            if 'fps' in self.df.loc[self.index, 'Filename']:
+                fps = self.df.loc[self.index, 'Filename'].split('fps')[1].split('Rankle')[0]
+            elif 'fp' in self.df.loc[self.index, 'Filename']:
+                fps = self.df.loc[self.index, 'Filename'].split('fp')[1].split('Rankle')[0]
+            else:
+                print(f"FPS not found for {self.df.loc[self.index, 'Filename']}")
+                return None
+            fps = int(fps)
+            return fps
         else:
             # get fps from the metadata excel file
             filename = f'{participant}_{int(date)}.xlsx'
@@ -64,8 +75,9 @@ class KymographClassifier:
         if self.metadata_dir == 'frog':
             condition = self.df.loc[self.index, 'Condition']
             capillary = self.df.loc[self.index, 'Capillary']
-            filename = f'CalFrog4fps{condition}_kymograph_0{capillary}.tiff'
-            img_path = filename
+            filename = self.df.loc[self.index, 'Filename']
+            img_path = filename.replace('velocities', 'kymograph')
+            img_path = f'{img_path}.tiff'
         else:
             img_path = self.df.loc[self.index, 'Image_Path']
         image = cv2.imread(os.path.join(self.image_dir, img_path))
@@ -251,7 +263,7 @@ class KymographClassifier:
     def initialize_output_csv(self):
         if self.metadata_dir == 'frog':
             if not os.path.exists(self.output_csv_path):
-                output_df = self.df[['Date', 'Frog', 'Side', 'Condition', 'Capillary', 'Velocity (um/s)']]
+                output_df = self.df[['Filename','Date', 'Frog', 'Side', 'Condition', 'Capillary', 'Velocity (um/s)']]
                 output_df['Classified_Velocity'] = None
                 output_df['Initial_Classification'] = None
                 output_df['Second_Classification'] = None
@@ -272,6 +284,7 @@ class KymographClassifier:
         output_df = pd.read_csv(self.output_csv_path)
         current_row = self.df.iloc[self.index]
         output_df.loc[self.index] = [
+            current_row['Filename'],
             current_row['Date'],
             current_row['Frog'],
             current_row['Side'],
@@ -301,8 +314,8 @@ class KymographClassifier:
 
 if __name__ == "__main__":
     classifier = KymographClassifier(
-        'D:\\frog\\kymographs', 
-        'frog', # 'C:\\Users\\gt8mar\\capillary-flow\\metadata',
-        'D:\\frog\\velocities\\CalFrog4fps220Lankle_velocities_u.csv',
-        'D:\\frog\\classified_kymos_CalFrog4.csv'
+        'H:\\240729\\Frog2\\Right\\kymographs', 
+        'frog', # 'C:\\Users\\gt8mar\\capillary-flow\\metadata', for human data
+        'H:\\240729\\Frog2\\Right\\velocities\\Frog2velocities.csv',
+        'H:\\240729\\Frog2\\Right\\classified_kymos_Frog2_240729.csv'
     )

@@ -6,7 +6,14 @@ import shutil
 def main(frog_side_path):
     print('Renaming individual capillaries in ' + frog_side_path)
     individual_caps_folder = os.path.join(frog_side_path, 'individual_caps')
+    if not os.path.exists(individual_caps_folder):
+        print('No individual caps folder found for ' + frog_side_path)
+        return 0
     name_csv = os.path.join(individual_caps_folder, 'cap_names.csv')
+    if not os.path.exists(name_csv):
+        print('No cap_names.csv file found for ' + frog_side_path)
+        return 0
+
 
     renamed_folder = os.path.join(frog_side_path, 'individual_caps_renamed')
     os.makedirs(renamed_folder, exist_ok=True)
@@ -33,13 +40,13 @@ if __name__ == "__main__":
         for frog in os.listdir(os.path.join(umbrella_folder, date)):
             if frog.startswith('STD'):
                 continue
-            if not frog.startswith('Frog4'):
+            if not frog.startswith('Frog'):
                 continue
             for side in os.listdir(os.path.join(umbrella_folder, date, frog)):
                 if side.startswith('STD'):
                     continue
-                if not side.startswith('Left'): # only process the left side for now
-                    continue
+                # if not side.startswith('Left'): # only process the left side for now
+                #     continue
                 if side == 'archive':
                     continue
                 print('Processing: ' + date + ' ' + frog + ' ' + side)

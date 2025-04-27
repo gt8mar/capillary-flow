@@ -257,11 +257,15 @@ def main(path, fps_type, fps, verbose = False, write = False, write_data = True,
     os.makedirs(os.path.join(path, 'velocities'), exist_ok=True)
     output_folder = os.path.join(path, 'velocities')
 
+    if not os.path.exists(input_folder):
+        print(f"Kymographs folder does not exist for {path}")
+        return 1
+
     # Read in the kymographs
     images = get_images(input_folder, "tiff")
 
     # Create a dataframe to store the results
-    df = pd.DataFrame(columns = ['Date', 'Frog', 'Side', 'Condition', 'Capillary', 'Velocity (um/s)'])
+    df = pd.DataFrame(columns = ['Filename', 'Date', 'Frog', 'Side', 'Condition', 'Capillary', 'Velocity (um/s)'])
 
     if platform.system() != 'Windows':
         date = path.split("/")[-3]
@@ -275,9 +279,17 @@ def main(path, fps_type, fps, verbose = False, write = False, write_data = True,
     for image in images:
         #if fps is not a number, print letter 
         if fps_type == 'individual':
-            fps = image.split("Frog4fps")[1].split('Lankle')[0] #hardcode to get the fps between Frog4fps and Lankle
+            # see if 'fps' or 'fp' is in image.
+            if 'fps' in image:
+                fps = image.split("fps")[1].split('Rankle')[0] #hardcode to get the fps between Frog4fps and Lankle
+                condition = image.split("fps")[1].split('_kymograph')[0] #hardcode to get the condition between Frog2fps and _kymograph
+            elif 'fp' in image:
+                fps = image.split("fp")[1].split('Rankle')[0] #hardcode to get the fps between Frog4fps and Lankle
+                condition = image.split("fp")[1].split('_kymograph')[0] #hardcode to get the condition between Frog2fp and _kymograph
+            else:
+                print(f"FPS not found for {image}")
+                continue
             fps = int(fps)
-            condition = image.split("Frog4fps")[1].split('_kymograph')[0]
             filename = image.replace('kymograph', 'velocities').replace('.tiff', '').replace('_0','_')    
         else:
             fps = fps
@@ -303,7 +315,7 @@ def main(path, fps_type, fps, verbose = False, write = False, write_data = True,
         # transform slope from pixels/frames into um/s:
         um_slope = np.absolute(weighted_average_slope) *fps/PIX_UM
         # add row to dataframe
-        new_data = pd.DataFrame([[date, frog, side, condition, capillary_name, um_slope]], columns = df.columns)
+        new_data = pd.DataFrame([[filename,date, frog, side, condition, capillary_name, um_slope]], columns = df.columns)
         df = pd.concat([df, new_data], ignore_index=True)
 
     # Write the dataframe to a file
@@ -414,13 +426,13 @@ if __name__ == "__main__":
         for frog in os.listdir(os.path.join(umbrella_folder, date)):
             if frog.startswith('STD'):
                 continue
-            if not frog.startswith('Frog4'):
+            if not frog.startswith('Frog2'):
                 continue   
             for side in os.listdir(os.path.join(umbrella_folder, date, frog)):
                 if side.startswith('STD'):
                     continue
-                if not side.startswith('Left'): # only process the left side for now
-                    continue
+                # if not side.startswith('Left'): # only process the left side for now
+                #     continue
                 if side == 'archive':
                     continue
                 print('Processing: ' + date + ' ' + frog + ' ' + side)

@@ -73,7 +73,7 @@ def analyze_kymograph(path_to_kymograph, counts_df, prominence_threshold=0.05):
     kymograph = kymograph[kymograph.shape[0]//2:, :]
     kymograph = kymograph.astype(float)  # ensure floating point
     # get other data from counts_df based on the filename
-    counts_row = counts_df[counts_df['Image_Path'] == os.path.basename(path_to_kymograph)]
+    counts_row = counts_df[counts_df['Filename'] == os.path.basename(path_to_kymograph)]
     image_name = os.path.basename(path_to_kymograph)
     rbc_velocity_um_s = counts_row['Velocity (um/s)'].values[0]
     rbc_count_est = counts_row['Estimated_Counts'].values[0]
@@ -138,9 +138,14 @@ class RBCCounterGUI:
         self.kymograph_dir = kymograph_dir
         
         # Check if output file already exists
-        output_filename = counts_df_path.replace('counts', 'final_counts')
-        if output_filename == counts_df_path:
-            output_filename = os.path.splitext(counts_df_path)[0] + '_final' + os.path.splitext(counts_df_path)[1]
+        # Get base filename without extension
+        base_name = os.path.basename(counts_df_path)
+        dir_name = os.path.dirname(counts_df_path)
+        name_without_ext, extension = os.path.splitext(base_name)
+        
+        # Create output filename in the same folder but with 'final_' prefix
+        output_filename = os.path.join(dir_name, f"final_{name_without_ext}{extension}")
+        
         self.output_path = output_filename
         
         # If output file exists, load it; otherwise, create from the counts file
@@ -196,8 +201,8 @@ class RBCCounterGUI:
         for i, file_path in enumerate(self.kymograph_files):
             filename = os.path.basename(file_path)
             # Check if this file exists in the output_df and has no Final_Counts
-            if filename in self.output_df['Image_Path'].values:
-                idx = self.output_df[self.output_df['Image_Path'] == filename].index[0]
+            if filename in self.output_df['Filename'].values:
+                idx = self.output_df[self.output_df['Filename'] == filename].index[0]
                 if pd.isna(self.output_df.at[idx, 'Adjustment_Type']):
                     return i
         
@@ -213,7 +218,7 @@ class RBCCounterGUI:
         valid_files = []
         for file_path in all_files:
             filename = os.path.basename(file_path)
-            if filename in self.counts_df['Image_Path'].values:
+            if filename in self.counts_df['Filename'].values:
                 valid_files.append(file_path)
         
         return valid_files
@@ -404,19 +409,19 @@ class RBCCounterGUI:
         self.file_label.config(text=f"File: {filename} ({self.current_index + 1}/{len(self.kymograph_files)})")
         
         # Get current velocity from dataframe or use previously set velocity
-        if 'Classified_Velocity' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Image_Path'] == filename, 'Classified_Velocity'].values[0]):
-            current_velocity = self.output_df.loc[self.output_df['Image_Path'] == filename, 'Classified_Velocity'].values[0]
+        if 'Classified_Velocity' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Filename'] == filename, 'Classified_Velocity'].values[0]):
+            current_velocity = self.output_df.loc[self.output_df['Filename'] == filename, 'Classified_Velocity'].values[0]
         else:
-            current_velocity = self.counts_df.loc[self.counts_df['Image_Path'] == filename, 'Velocity (um/s)'].values[0]
+            current_velocity = self.counts_df.loc[self.counts_df['Filename'] == filename, 'Velocity (um/s)'].values[0]
         
         self.original_velocity = current_velocity
         
         # Store the original estimated count from the input file
-        original_est_count = self.counts_df.loc[self.counts_df['Image_Path'] == filename, 'Estimated_Counts'].values[0]
+        original_est_count = self.counts_df.loc[self.counts_df['Filename'] == filename, 'Estimated_Counts'].values[0]
         
         # Get current estimated counts from dataframe or use previously set value
-        if 'Modified_Estimated_Counts' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Image_Path'] == filename, 'Modified_Estimated_Counts'].values[0]):
-            current_est_count = self.output_df.loc[self.output_df['Image_Path'] == filename, 'Modified_Estimated_Counts'].values[0]
+        if 'Modified_Estimated_Counts' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Filename'] == filename, 'Modified_Estimated_Counts'].values[0]):
+            current_est_count = self.output_df.loc[self.output_df['Filename'] == filename, 'Modified_Estimated_Counts'].values[0]
         else:
             current_est_count = original_est_count
         
@@ -431,7 +436,7 @@ class RBCCounterGUI:
         
         # Create a temporary dataframe for analysis
         temp_df = self.counts_df.copy()
-        idx = temp_df[temp_df['Image_Path'] == filename].index[0]
+        idx = temp_df[temp_df['Filename'] == filename].index[0]
         temp_df.at[idx, 'Velocity (um/s)'] = current_velocity
         temp_df.at[idx, 'Estimated_Counts'] = current_est_count
         
@@ -458,7 +463,7 @@ class RBCCounterGUI:
         self.update_plots()
         
         # Update output dataframe
-        idx = self.counts_df[self.counts_df['Image_Path'] == filename].index[0]
+        idx = self.counts_df[self.counts_df['Filename'] == filename].index[0]
         self.output_df.at[idx, 'Measured_Counts'] = rbc_count
         if pd.isna(self.output_df.at[idx, 'Final_Counts']):
             self.output_df.at[idx, 'Final_Counts'] = rbc_count
@@ -519,7 +524,7 @@ class RBCCounterGUI:
                 try:
                     manual_count = int(self.manual_count_value)
                     filename = os.path.basename(self.kymograph_files[self.current_index])
-                    idx = self.counts_df[self.counts_df['Image_Path'] == filename].index[0]
+                    idx = self.counts_df[self.counts_df['Filename'] == filename].index[0]
                     self.output_df.at[idx, 'Final_Counts'] = manual_count
                     self.output_df.at[idx, 'Adjustment_Type'] = 'Manual'
                     self.status_label.config(text=f"Saved manual count: {manual_count}")
@@ -542,7 +547,7 @@ class RBCCounterGUI:
         else:
             # Mark the current count as correct
             filename = os.path.basename(self.kymograph_files[self.current_index])
-            idx = self.counts_df[self.counts_df['Image_Path'] == filename].index[0]
+            idx = self.counts_df[self.counts_df['Filename'] == filename].index[0]
             self.output_df.at[idx, 'Final_Counts'] = self.current_count
             self.output_df.at[idx, 'Adjustment_Type'] = 'Correct'
             self.status_label.config(text="Marked as correct")
@@ -630,10 +635,10 @@ class RBCCounterGUI:
             self.mode_label.config(text="VELOCITY ADJUSTMENT MODE", bg="#ffe0e0")  # Light red background
             # Initialize velocity values
             filename = os.path.basename(self.kymograph_files[self.current_index])
-            if 'Classified_Velocity' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Image_Path'] == filename, 'Classified_Velocity'].values[0]):
-                self.original_velocity = self.output_df.loc[self.output_df['Image_Path'] == filename, 'Classified_Velocity'].values[0]
+            if 'Classified_Velocity' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Filename'] == filename, 'Classified_Velocity'].values[0]):
+                self.original_velocity = self.output_df.loc[self.output_df['Filename'] == filename, 'Classified_Velocity'].values[0]
             else:
-                self.original_velocity = self.counts_df.loc[self.counts_df['Image_Path'] == filename, 'Velocity (um/s)'].values[0]
+                self.original_velocity = self.counts_df.loc[self.counts_df['Filename'] == filename, 'Velocity (um/s)'].values[0]
             
             self.current_velocity_index = 0
             self.inverted_velocity = self.original_velocity < 0
@@ -664,7 +669,7 @@ class RBCCounterGUI:
             
             # Update the classified velocity
             filename = os.path.basename(self.kymograph_files[self.current_index])
-            idx = self.counts_df[self.counts_df['Image_Path'] == filename].index[0]
+            idx = self.counts_df[self.counts_df['Filename'] == filename].index[0]
             self.output_df.at[idx, 'Classified_Velocity'] = current_velocity
             
             # Update velocity label
@@ -689,10 +694,10 @@ class RBCCounterGUI:
             self.mode_label.config(text="ESTIMATED COUNTS MODE", bg="#e0ffe0")  # Light green background
             # Initialize estimated count values
             filename = os.path.basename(self.kymograph_files[self.current_index])
-            if 'Modified_Estimated_Counts' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Image_Path'] == filename, 'Modified_Estimated_Counts'].values[0]):
-                self.original_est_count = self.output_df.loc[self.output_df['Image_Path'] == filename, 'Modified_Estimated_Counts'].values[0]
+            if 'Modified_Estimated_Counts' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Filename'] == filename, 'Modified_Estimated_Counts'].values[0]):
+                self.original_est_count = self.output_df.loc[self.output_df['Filename'] == filename, 'Modified_Estimated_Counts'].values[0]
             else:
-                self.original_est_count = self.counts_df.loc[self.counts_df['Image_Path'] == filename, 'Estimated_Counts'].values[0]
+                self.original_est_count = self.counts_df.loc[self.counts_df['Filename'] == filename, 'Estimated_Counts'].values[0]
             
             self.current_est_count_index = 0
         else:
@@ -705,7 +710,7 @@ class RBCCounterGUI:
             idx = int(event.char)
             if idx == 0:
                 # Use original estimated count from input file
-                current_est_count = self.counts_df.loc[self.counts_df['Image_Path'] == os.path.basename(self.kymograph_files[self.current_index]), 'Estimated_Counts'].values[0]
+                current_est_count = self.counts_df.loc[self.counts_df['Filename'] == os.path.basename(self.kymograph_files[self.current_index]), 'Estimated_Counts'].values[0]
                 self.current_est_count_index = 0
             else:
                 # Use selected estimated count
@@ -714,7 +719,7 @@ class RBCCounterGUI:
             
             # Update the modified estimated count in output dataframe
             filename = os.path.basename(self.kymograph_files[self.current_index])
-            df_idx = self.counts_df[self.counts_df['Image_Path'] == filename].index[0]
+            df_idx = self.counts_df[self.counts_df['Filename'] == filename].index[0]
             self.output_df.at[df_idx, 'Modified_Estimated_Counts'] = current_est_count
             
             # Update estimated count label (for new est count only)
@@ -729,13 +734,13 @@ class RBCCounterGUI:
         """Reanalyze kymograph with the new estimated count"""
         # Temporarily update the estimated count in the dataframe
         filename = os.path.basename(self.kymograph_files[self.current_index])
-        idx = self.counts_df[self.counts_df['Image_Path'] == filename].index[0]
+        idx = self.counts_df[self.counts_df['Filename'] == filename].index[0]
         old_est_count = self.counts_df.at[idx, 'Estimated_Counts']
         self.counts_df.at[idx, 'Estimated_Counts'] = new_est_count
         
         # Get current velocity (use classified if available)
-        if 'Classified_Velocity' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Image_Path'] == filename, 'Classified_Velocity'].values[0]):
-            current_velocity = self.output_df.loc[self.output_df['Image_Path'] == filename, 'Classified_Velocity'].values[0]
+        if 'Classified_Velocity' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Filename'] == filename, 'Classified_Velocity'].values[0]):
+            current_velocity = self.output_df.loc[self.output_df['Filename'] == filename, 'Classified_Velocity'].values[0]
             # Also update velocity temporarily
             old_velocity = self.counts_df.at[idx, 'Velocity (um/s)']
             self.counts_df.at[idx, 'Velocity (um/s)'] = current_velocity
@@ -782,7 +787,7 @@ class RBCCounterGUI:
             
         key = event.char.lower()
         filename = os.path.basename(self.kymograph_files[self.current_index])
-        idx = self.counts_df[self.counts_df['Image_Path'] == filename].index[0]
+        idx = self.counts_df[self.counts_df['Filename'] == filename].index[0]
         
         if key == 'z':  # Zero velocity
             self.output_df.at[idx, 'Classified_Velocity'] = 0
@@ -818,7 +823,7 @@ class RBCCounterGUI:
             
             # Update the classified velocity in output dataframe
             filename = os.path.basename(self.kymograph_files[self.current_index])
-            df_idx = self.counts_df[self.counts_df['Image_Path'] == filename].index[0]
+            df_idx = self.counts_df[self.counts_df['Filename'] == filename].index[0]
             self.output_df.at[df_idx, 'Classified_Velocity'] = current_velocity
             
             # Update velocity label
@@ -833,13 +838,13 @@ class RBCCounterGUI:
         """Reanalyze kymograph with the new velocity"""
         # Temporarily update the velocity in the dataframe
         filename = os.path.basename(self.kymograph_files[self.current_index])
-        idx = self.counts_df[self.counts_df['Image_Path'] == filename].index[0]
+        idx = self.counts_df[self.counts_df['Filename'] == filename].index[0]
         old_velocity = self.counts_df.at[idx, 'Velocity (um/s)']
         self.counts_df.at[idx, 'Velocity (um/s)'] = new_velocity
         
         # Get current estimated count if available
-        if 'Modified_Estimated_Counts' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Image_Path'] == filename, 'Modified_Estimated_Counts'].values[0]):
-            current_est_count = self.output_df.loc[self.output_df['Image_Path'] == filename, 'Modified_Estimated_Counts'].values[0]
+        if 'Modified_Estimated_Counts' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Filename'] == filename, 'Modified_Estimated_Counts'].values[0]):
+            current_est_count = self.output_df.loc[self.output_df['Filename'] == filename, 'Modified_Estimated_Counts'].values[0]
             # Also update estimated count temporarily
             old_est_count = self.counts_df.at[idx, 'Estimated_Counts']
             self.counts_df.at[idx, 'Estimated_Counts'] = current_est_count
@@ -898,7 +903,7 @@ class RBCCounterGUI:
                 
                 # Update the classified velocity
                 filename = os.path.basename(self.kymograph_files[self.current_index])
-                idx = self.counts_df[self.counts_df['Image_Path'] == filename].index[0]
+                idx = self.counts_df[self.counts_df['Filename'] == filename].index[0]
                 self.output_df.at[idx, 'Classified_Velocity'] = current_velocity
                 
                 # Update velocity label
@@ -910,19 +915,19 @@ class RBCCounterGUI:
     def refresh_analysis(self, event=None):
         """Refresh the analysis with current velocity and estimated count values"""
         filename = os.path.basename(self.kymograph_files[self.current_index])
-        idx = self.counts_df[self.counts_df['Image_Path'] == filename].index[0]
+        idx = self.counts_df[self.counts_df['Filename'] == filename].index[0]
         
         # Get current velocity
-        if 'Classified_Velocity' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Image_Path'] == filename, 'Classified_Velocity'].values[0]):
-            current_velocity = self.output_df.loc[self.output_df['Image_Path'] == filename, 'Classified_Velocity'].values[0]
+        if 'Classified_Velocity' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Filename'] == filename, 'Classified_Velocity'].values[0]):
+            current_velocity = self.output_df.loc[self.output_df['Filename'] == filename, 'Classified_Velocity'].values[0]
         else:
-            current_velocity = self.counts_df.loc[self.counts_df['Image_Path'] == filename, 'Velocity (um/s)'].values[0]
+            current_velocity = self.counts_df.loc[self.counts_df['Filename'] == filename, 'Velocity (um/s)'].values[0]
         
         # Get current estimated count
-        if 'Modified_Estimated_Counts' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Image_Path'] == filename, 'Modified_Estimated_Counts'].values[0]):
-            current_est_count = self.output_df.loc[self.output_df['Image_Path'] == filename, 'Modified_Estimated_Counts'].values[0]
+        if 'Modified_Estimated_Counts' in self.output_df.columns and not pd.isna(self.output_df.loc[self.output_df['Filename'] == filename, 'Modified_Estimated_Counts'].values[0]):
+            current_est_count = self.output_df.loc[self.output_df['Filename'] == filename, 'Modified_Estimated_Counts'].values[0]
         else:
-            current_est_count = self.counts_df.loc[self.counts_df['Image_Path'] == filename, 'Estimated_Counts'].values[0]
+            current_est_count = self.counts_df.loc[self.counts_df['Filename'] == filename, 'Estimated_Counts'].values[0]
         
         # Create temporary df for analysis
         temp_df = self.counts_df.copy()
@@ -1004,4 +1009,4 @@ if __name__ == '__main__':
     #     main(path, counts_df)
     
     # Run the GUI instead
-    run_gui('D:\\frog\\results\\kymographs', 'D:\\frog\\results\\kymograph_counts_velocities_20250317_203720.csv')
+    run_gui('H:\\240729\\Frog2\\Right\\kymographs', 'H:\\240729\\Frog2\\Right\\counts\\predictions.csv')

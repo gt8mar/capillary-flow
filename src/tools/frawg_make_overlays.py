@@ -8,6 +8,9 @@ import csv
 def main(path, rename = False):
     backgrounds_folder = os.path.join(path, 'stdevs')
     segmented_folder = os.path.join(path, 'segmented')
+    if not os.path.exists(segmented_folder):
+        print('No segmented folder found for ' + path)
+        return 0
     if rename:
         old_overlays_folder = os.path.join(path, 'overlays')
         overlays_folder = os.path.join(path, 'overlays_renamed')
@@ -116,13 +119,13 @@ if __name__ == "__main__":
         for frog in os.listdir(os.path.join(umbrella_folder, date)):
             if frog.startswith('STD'):
                 continue
-            if not frog.startswith('Frog4'): # only process Frog4 for now
+            if not frog.startswith('Frog'): # only process Frog4 for now
                 continue
             for side in os.listdir(os.path.join(umbrella_folder, date, frog)):
                 if side.startswith('STD'):
                     continue
-                if not side.startswith('Left'): # only process the left side for now
-                    continue
+                # if not side.startswith('Left'): # only process the left side for now
+                #     continue
                 if side == 'archive':
                     continue
                 print('Processing: ' + date + ' ' + frog + ' ' + side)

@@ -232,7 +232,13 @@ def main(path, verbose = True, write = True, plot=False):
     warnings.filterwarnings("ignore", category=UserWarning, module="fil_finder.filament")
     
     segmented_folder = os.path.join(path, 'segmented')
+    if not os.path.exists(segmented_folder):
+        print(f"Segmented folder does not exist for {path}")
+        return 1
     individual_caps_folder = os.path.join(path, 'individual_caps_renamed')
+    if not os.path.exists(individual_caps_folder):
+        print(f"Individual caps folder does not exist for {path}")
+        return 1
     os.makedirs(os.path.join(path, 'centerlines', 'coords'), exist_ok=True)
     output_folder = os.path.join(path, 'centerlines')
     
@@ -343,14 +349,14 @@ if __name__ == "__main__":
         for frog in os.listdir(os.path.join(umbrella_folder, date)):
             if frog.startswith('STD'):
                 continue
-            if not frog.startswith('Frog4'):
+            if not frog.startswith('Frog'):
                 continue
 
             for side in os.listdir(os.path.join(umbrella_folder, date, frog)):
                 if side.startswith('STD'):
                     continue
-                if not side.startswith('Left'): # only process the left side for now
-                    continue
+                # if not side.startswith('Left'): # only process the left side for now
+                #     continue
                 if side == 'archive':
                     continue
                 print('Processing: ' + date + ' ' + frog + ' ' + side)

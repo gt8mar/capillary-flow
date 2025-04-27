@@ -489,13 +489,7 @@ def quality_control(image):
     pass
 
 if __name__ == "__main__":
-    download_path = "C://Users//gt8ma//Downloads//whole-frog//"
-    
-    # Process both JPG and CR2 files
-    supported_extensions = ['.jpg', '.jpeg', '.cr2', '.cr3']
-    
-    for file in os.listdir(download_path):
-        _, ext = os.path.splitext(file)
-        if ext.lower() in supported_extensions:
-            print(f"Processing {file}")
-            main(file, plot=False)
+    for file in os.listdir(os.path.join(PATHS['downloads'], "whole-frog")):
+        if file.endswith(".JPG" or ".jpg" or ".png" or ".cr2" or ".CR2"):
+            print(file)
+            main(file, plot = False)
