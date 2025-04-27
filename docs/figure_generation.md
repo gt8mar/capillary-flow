@@ -12,6 +12,7 @@ This document provides a detailed explanation of how the figures for the paper a
 6. [Velocity Analysis](#velocity-analysis) (To be completed)
 7. [Flow Visualization](#flow-visualization) (To be completed)
 8. [Statistical Analysis](#statistical-analysis) (To be completed)
+9. [Velocity Validation](#velocity-validation)
 
 ## Profile Calibration
 
@@ -272,4 +273,73 @@ This script generates figures comparing contrast metrics between different illum
 (To be completed)
 
 ## Statistical Analysis
-(To be completed) 
+(To be completed)
+
+## Velocity Validation
+
+### Script: `scripts/gui_kymos.py`
+
+#### Purpose
+This script provides a graphical user interface for manual validation of velocities from kymographs, which are time-space images used to measure blood flow velocities in capillaries. The tool allows users to visually assess the accuracy of automatically detected velocities and adjust them if necessary.
+
+#### Key Functions
+
+1. **KymographClassifier class**
+   - Loads kymograph images and associated velocity data
+   - Displays kymographs with overlaid velocity reference lines
+   - Provides interface for classifying and adjusting velocities
+
+2. **Classification Workflow**
+   - Initial classification of each kymograph as "Correct," "Too Fast," "Too Slow," "Zero," or "Unclear"
+   - For "Too Fast" or "Too Slow" classifications, selection of an alternative velocity from predefined sets
+   - Navigation through unclassified kymographs with progress tracking
+
+3. **Velocity Adjustment System**
+   - Two velocity sets accessible via Shift key toggle:
+     - High velocities (10, 420, 500, 600, 750, 1000, 1500, 2000, 3000, 4000 μm/s)
+     - Additional velocities (10, 20, 35, 50, 75, 110, 160, 220, 290, 360 μm/s)
+   - Dynamic overlay of velocity reference lines based on selected velocity
+   - Slope inversion option for handling bidirectional flows
+
+4. **Data Management**
+   - Real-time saving of classification results to CSV
+   - Loading of relevant metadata (e.g., FPS) for accurate velocity calculations
+   - Tracking of classification decisions for quality control
+
+#### How to Use
+
+1. **Input**: 
+   - Directory containing kymograph TIFF images
+   - Metadata directory with acquisition parameters
+   - CSV file with initial velocity measurements
+   - Output path for classification results
+
+2. **Example Usage**:
+   ```python
+   classifier = KymographClassifier(
+       'path/to/kymographs',
+       'path/to/metadata',
+       'path/to/velocity_measurements.csv',
+       'path/to/output_classifications.csv'
+   )
+   ```
+
+3. **Keyboard Controls**:
+   - `c`: Mark kymograph as correct or accept current velocity
+   - `f`: Mark original velocity as too fast
+   - `s`: Mark original velocity as too slow
+   - `z`: Mark as zero flow
+   - `u`: Mark as unclear
+   - `p`: Toggle slope direction
+   - `n`: Next kymograph
+   - `b`: Previous kymograph
+   - `Shift`: Toggle between velocity sets
+   - `0-9`: Select velocity from current set
+
+4. **Output**:
+   - CSV file with original velocities, classifications, and adjusted velocities
+
+#### Figure Output in Paper
+This tool generates the dataset used for analyzing the accuracy of automated velocity measurements. The classifications and adjusted velocities are used in figures comparing automated and manual measurements, demonstrating the reliability of the velocity detection algorithms and identifying systematic biases or limitations.
+
+[Figure placeholder: Example kymograph with velocity overlay and classification interface] 
