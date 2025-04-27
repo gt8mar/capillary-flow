@@ -8,7 +8,7 @@ for lighting and contrast.
 
 Steps:
 1. Load the Segment Anything Model (SAM).
-2. Load an image.
+2. Load an image (supports JPG, PNG, and RAW formats like CR2).
 3. Add SAM to the code.
 4. Run SAM.
 5. Input either a point, a box, or two points to segment the frog.
@@ -38,28 +38,87 @@ Things to remember:
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-import os
+import os, sys
 import platform
 from src.config import get_paths
+import rawpy  # For handling RAW files
+import imageio
 
 # Get paths at module level for use in functions
 PATHS = get_paths()
 
-def main(frog_path, plot=False):
-    # load_sam()   
-    # add_sam_to_code()
-    # masks, scores, logits = run_sam(image)
-    # frog_path = "C://Users//gt8ma//Downloads//FrogPhoto-removebg-preview.png"
-    download_path = "C://Users//gt8ma//Downloads//whole-frog//"
-    image = cv2.imread(download_path + frog_path)
+def load_image(image_path):
+    """Load an image file, supporting both regular formats and RAW files.
     
+    Args:
+        image_path (str): Path to the image file
+        
+    Returns:
+        tuple: (numpy.ndarray, numpy.ndarray) - The loaded image in BGR format (for OpenCV) and RGB format
+    """
+    # Check file extension
+    _, ext = os.path.splitext(image_path)
+    ext = ext.lower()
+    
+    if ext in ['.cr2', '.cr3', '.nef', '.arw', '.dng']:  # RAW formats
+        try:
+            print(f"Loading RAW file: {image_path}")
+            # Use rawpy to open and process the RAW file
+            with rawpy.imread(image_path) as raw:
+                # Get the raw data with minimal processing
+                rgb = raw.postprocess(
+                    use_camera_wb=False,  # Don't use camera white balance
+                    no_auto_bright=True,  # Don't auto-adjust brightness
+                    output_bps=16,        # 16-bit output
+                    gamma=(1, 1),         # Linear gamma (no gamma correction)
+                    user_flip=0           # Don't flip the image
+                )
+                
+                # Convert to 8-bit for consistency with JPEG processing
+                rgb = (rgb / 256).astype(np.uint8)
+                
+                # Convert RGB to BGR for OpenCV compatibility
+                bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+                
+                return bgr, rgb
+        except Exception as e:
+            print(f"Error loading RAW file: {e}")
+            return None, None
+    else:  # Regular image formats (JPEG, PNG, etc.)
+        bgr = cv2.imread(image_path)
+        if bgr is None:
+            print(f"Could not load image from {image_path}")
+            return None, None
+        
+        # Convert BGR to RGB
+        rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+        return bgr, rgb
+
+def main(frog_path, plot=False):
+    """Main function to analyze a frog image.
+    
+    Args:
+        frog_path (str): Path to the frog image
+        plot (bool): Whether to display plots
+    """
     # Extract filename without extension for output files
     base_filename = os.path.splitext(os.path.basename(frog_path))[0]
     print(f'Analyzing {base_filename}')
-
     
-    analyze_frog(image, base_filename, plot)
-    # quality_control(image)
+    # Determine full path
+    download_path = "C://Users//gt8ma//Downloads//whole-frog//"
+    full_path = os.path.join(download_path, frog_path)
+    
+    # Load the image using the new function
+    image_bgr, image_rgb = load_image(full_path)
+    
+    if image_bgr is None:
+        print(f"Failed to load image: {frog_path}")
+        return
+    
+    # Always use existing masks if available
+    analyze_frog(image_bgr, image_rgb, base_filename, plot, use_existing_mask=True)
+    # quality_control(image_bgr)
 
 def load_sam():
     # Load the Segment Anything Model (SAM)
@@ -248,13 +307,15 @@ def analyze_rgb_by_region(frog_mask, image_rgb, base_filename="frog", plot=False
     
     return tuple(r_values), tuple(g_values), tuple(b_values)
 
-def analyze_frog(image, base_filename="frog", plot=False):
+def analyze_frog(image_bgr, image_rgb=None, base_filename="frog", plot=False, use_existing_mask=True):
     """ Analyze the segmented frog
 
     Args:
-        image (numpy.ndarray): The image of the frog.
+        image_bgr (numpy.ndarray): The image of the frog in BGR format (for OpenCV).
+        image_rgb (numpy.ndarray, optional): The image in RGB format. If None, will be converted from BGR.
         base_filename (str): Base filename for saving output files
         plot (bool): Whether to display plots
+        use_existing_mask (bool): Whether to use an existing mask file
 
     Returns:
         dict: A dictionary containing the following keys:
@@ -264,23 +325,38 @@ def analyze_frog(image, base_filename="frog", plot=False):
             - 'red_rg_ratio_by_region': The red/(red+green) ratio by region.
             - 'rgb_by_region': The RGB values by region.
     """
-    # Convert BGR to RGB (OpenCV loads images in BGR format)
-    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    # If RGB image is not provided, convert from BGR
+    if image_rgb is None:
+        image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
     
     # Separate RGB channels
     r_channel = image_rgb[:, :, 0]
     g_channel = image_rgb[:, :, 1]
     b_channel = image_rgb[:, :, 2]
     
-    # Create a mask for the frog (non-transparent areas)
-    # Assuming the background is transparent or white
-    if image.shape[2] == 4:  # Image has alpha channel
-        frog_mask = image[:, :, 3] > 0
-    else:
+    # Create or load a mask for the frog
+    if use_existing_mask:
+        # Look for an existing mask file
+        mask_filename = os.path.join(PATHS['frog_segmented'], f"{base_filename}_mask.png")
+        
+        if os.path.exists(mask_filename):
+            print(f"Using existing mask: {mask_filename}")
+            mask_image = cv2.imread(mask_filename, cv2.IMREAD_GRAYSCALE)
+            frog_mask = mask_image > 0
+        else:
+            print(f"Warning: Mask file not found: {mask_filename}")
+            print("Falling back to automatic masking")
+            # Fall back to automatic masking
+            use_existing_mask = False
+    
+    if not use_existing_mask:
         # Create a simple mask based on white background
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        _, frog_mask = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY_INV)
-        frog_mask = frog_mask > 0
+        if image_bgr.shape[2] == 4:  # Image has alpha channel
+            frog_mask = image_bgr[:, :, 3] > 0
+        else:
+            gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+            _, frog_mask = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY_INV)
+            frog_mask = frog_mask > 0
     
     # Calculate redness metrics
     # 1. Red minus green (higher values indicate more red than green)
@@ -321,10 +397,14 @@ def analyze_frog(image, base_filename="frog", plot=False):
     # Plot the results
     plt.figure(figsize=(15, 12))
     
-    # Original image
+    # Original image with mask overlay
     plt.subplot(3, 2, 1)
     plt.imshow(image_rgb)
-    plt.title('Original Image')
+    # Add mask overlay
+    mask_overlay = np.zeros((image_rgb.shape[0], image_rgb.shape[1], 4))
+    mask_overlay[frog_mask] = [1, 0, 0, 0.3]  # Red with 30% transparency
+    plt.imshow(mask_overlay)
+    plt.title('Original Image with Mask')
     plt.axis('off')
     
     # Individual channels
@@ -409,7 +489,13 @@ def quality_control(image):
     pass
 
 if __name__ == "__main__":
-    for file in os.listdir("C://Users//gt8ma//Downloads//whole-frog"):
-        if file.endswith(".JPG"):
-            print(file)
-            main(file, plot = False)
+    download_path = "C://Users//gt8ma//Downloads//whole-frog//"
+    
+    # Process both JPG and CR2 files
+    supported_extensions = ['.jpg', '.jpeg', '.cr2', '.cr3']
+    
+    for file in os.listdir(download_path):
+        _, ext = os.path.splitext(file)
+        if ext.lower() in supported_extensions:
+            print(f"Processing {file}")
+            main(file, plot=False)
