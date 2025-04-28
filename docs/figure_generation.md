@@ -8,11 +8,12 @@ This document provides a detailed explanation of how the figures for the paper a
 2. [Compare LEDs](#compare-leds)
 3. [Valley-Based SNR Analysis](#valley-based-snr-analysis)
 4. [Compare Contrast](#compare-contrast) 
-5. [Image Processing](#image-processing) (To be completed)
-6. [Velocity Analysis](#velocity-analysis) (To be completed)
-7. [Flow Visualization](#flow-visualization) (To be completed)
-8. [Statistical Analysis](#statistical-analysis) (To be completed)
-9. [Velocity Validation](#velocity-validation)
+5. [Resolution Line Profile](#resolution-line-profile)
+6. [Image Processing](#image-processing) (To be completed)
+7. [Velocity Analysis](#velocity-analysis) (To be completed)
+8. [Flow Visualization](#flow-visualization) (To be completed)
+9. [Statistical Analysis](#statistical-analysis) (To be completed)
+10. [Velocity Validation](#velocity-validation)
 
 ## Profile Calibration
 
@@ -261,7 +262,86 @@ This script analyzes and compares contrast metrics for microscope images. It's p
 #### Figure Output in Paper
 This script generates figures comparing contrast metrics between different illumination colors. In the paper, these boxplots demonstrate the quantitative differences in image quality achieved with green vs. white illumination, supporting the choice of optimal illumination for the experiments.
 
+## Resolution Line Profile
 
+### Script: `src/analysis/resolution_line_profile.py`
+
+#### Purpose
+This script analyzes the resolution of our microscope system by examining intensity profiles from the USAF 1951 resolution target. By measuring how sharply the system can resolve line pairs in the target, we can quantify the spatial resolution of our optical setup.
+
+#### Key Functions
+
+1. **setup_plot_style()**
+   - Configures plot styling according to coding standards
+   - Sets up whitegrid style, font sizes, and line widths
+   - Handles the loading of custom fonts with fallback options
+
+2. **analyze_resolution_profile(image_path, profile_row, profile_col_start, profile_col_end, save, show)**
+   - Loads a grayscale image of the resolution target
+   - Extracts an intensity profile along a row at specified column range
+   - Creates a standardized plot showing the intensity transitions between light and dark bars
+   - Calculates and displays the profile with proper labeling
+   - Saves the output figure with timestamp in standardized format
+
+#### Analysis Approach
+
+The resolution line profile analysis works as follows:
+1. **Target Selection**: The USAF 1951 resolution target provides standardized line pairs at different spatial frequencies
+2. **Profile Extraction**: A line profile is extracted across a group of line pairs on the target
+3. **Contrast Analysis**: The depth of intensity modulation between light and dark bars indicates resolution quality
+4. **Resolution Calculation**: The smallest line pairs that show clear intensity peaks and valleys define the resolving power
+
+#### Example Output
+
+![Resolution Profile](methods_plots/resolution_profile_example.png)
+
+*Figure: Resolution line profile showing intensity variations across line pairs in the USAF 1951 resolution target. Sharper transitions between peaks and valleys indicate better spatial resolution. From this profile, we can determine that our system resolves Group 7 Element 6 of the target, corresponding to a resolution of approximately 2.2 μm.*
+
+#### How to Use
+
+```python
+# Import the function
+from src.analysis.resolution_line_profile import analyze_resolution_profile
+
+# Path to the resolution target image
+image_path = os.path.join(downloads_path, "Image__2024-05-22__09-28-06.tiff")
+
+# Analyze with default parameters (specific row and column range for the target)
+profile, fig = analyze_resolution_profile(
+    image_path,
+    profile_row=566,
+    profile_col_start=600,
+    profile_col_end=615,
+    save=True,
+    show=True
+)
+
+# Alternatively, find the resolution at a different location on the target
+profile2, fig2 = analyze_resolution_profile(
+    image_path,
+    profile_row=400,  # Different row location
+    profile_col_start=500,
+    profile_col_end=530,
+    save=True,
+    show=True
+)
+```
+
+#### Resolution Calculation
+
+To calculate the actual spatial resolution from the profile, we use the following approach:
+1. Identify which group and element on the USAF target is barely resolvable
+2. Use the standard formula to convert group/element to resolution:
+   - Resolution (line pairs/mm) = 2^(group + (element-1)/6) * 2
+   - Resolution (μm) = 1000 / (line pairs/mm)
+
+For our system viewing Group 7 Element 6:
+- Line pairs/mm = 2^(7 + (6-1)/6) * 2 = 228.1 lp/mm
+- Resolution = 1000 / 228.1 = 4.38 μm (for a line pair)
+- Minimum resolvable feature = 4.38 / 2 = 2.19 μm
+
+#### Figure Output in Paper
+This analysis generates figures showing the resolution capabilities of our microscope system. In the paper, these figures demonstrate that our setup can resolve features down to approximately 2.2 μm, which is sufficient for visualizing and measuring the smallest capillaries in our samples (typically 5-10 μm in diameter).
 
 ## Image Processing
 (To be completed)
