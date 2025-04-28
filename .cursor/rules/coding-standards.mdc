@@ -1,0 +1,10 @@
+---
+description: This rule is helpful for when writing code.
+globs: .py
+alwaysApply: false
+---
+
+# Your rule content
+Please code using the [coding_standards.md](mdc:docs/coding_standards.md) markdown file.
+- You can @ files here
+- You can use markdown but dont have to

@@ -293,7 +293,7 @@ The resolution line profile analysis works as follows:
 
 #### Example Output
 
-![Resolution Profile](methods_plots/resolution_profile_example.png)
+![Resolution Profile](methods_plots/resolution_profile.png)
 
 *Figure: Resolution line profile showing intensity variations across line pairs in the USAF 1951 resolution target. Sharper transitions between peaks and valleys indicate better spatial resolution. From this profile, we can determine that our system resolves Group 7 Element 6 of the target, corresponding to a resolution of approximately 2.2 μm.*
 
