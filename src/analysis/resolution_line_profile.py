@@ -12,6 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.font_manager import FontProperties
+from matplotlib.ticker import MaxNLocator
 from datetime import datetime
 
 # Local imports
@@ -86,6 +87,9 @@ def analyze_resolution_profile(image_path, profile_row=566, profile_col_start=60
     
     # Plot the profile using original column indices
     ax.plot(x_values, profile, linewidth=0.75, color='#1f77b4')
+    
+    # Set x-axis to use integer ticks only
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     
     # Set plot labels and title with the appropriate font
     if source_sans:
