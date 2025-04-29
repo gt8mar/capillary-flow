@@ -4,6 +4,7 @@ flowchart TD
     start[Raw Microscope Images]
     
     %% Processing Nodes
+    moco[External: MOCO ImageJ Plugin]
     contrast[src/capillary_contrast.py]
     background[src/write_background_file.py]
     hasty[External: hasty.ai Segmentation]
@@ -16,6 +17,8 @@ flowchart TD
     validation[scripts/gui_kymos.py]
     
     %% Data Nodes
+    stabilizedImg[Stabilized Images]
+    shiftsCSV[results.csv (Shift Data)]
     contrastImg[Contrast-Enhanced Images]
     bgImg[Background & StdDev Images]
     segMasks[Segmentation Masks]
@@ -28,7 +31,11 @@ flowchart TD
     valVelData[Validated Velocity Data]
     
     %% Connections
-    start --> contrast
+    start --> moco
+    moco --> stabilizedImg
+    moco --> shiftsCSV
+    stabilizedImg --> contrast
+    shiftsCSV --> background
     contrast --> contrastImg
     contrastImg --> background
     background --> bgImg
@@ -43,6 +50,7 @@ flowchart TD
     namedCaps --> centerline
     centerline --> capCenterlines
     capCenterlines --> kymograph
+    stabilizedImg --> kymograph
     kymograph --> kymoImages
     kymoImages --> velocity
     velocity --> velData
@@ -56,7 +64,7 @@ flowchart TD
     classDef externalNode fill:#ffebee,stroke:#c62828,stroke-width:2px
     
     class contrast,background,naming,renaming,centerline,kymograph,velocity,validation processNode
-    class contrastImg,bgImg,segMasks,numCaps,updatedCSV,namedCaps,capCenterlines,kymoImages,velData,valVelData dataNode
+    class start,stabilizedImg,shiftsCSV,contrastImg,bgImg,segMasks,numCaps,updatedCSV,namedCaps,capCenterlines,kymoImages,velData,valVelData dataNode
     class manual manualNode
-    class hasty externalNode
+    class moco,hasty externalNode
 ``` 

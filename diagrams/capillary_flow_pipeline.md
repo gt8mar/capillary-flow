@@ -1,7 +1,8 @@
 ```mermaid
 flowchart TD
     %% Image Preprocessing
-    A[Raw Microscope Images] --> B[src/capillary_contrast.py]
+    A[Raw Microscope Images] --> AA[External: MOCO ImageJ Plugin]
+    AA -->|Stabilized Images & results.csv| B[src/capillary_contrast.py]
     B -->|Contrast Enhanced Images| C[src/write_background_file.py]
     C -->|Background & StdDev Images| D[External: hasty.ai Segmentation]
     
@@ -25,7 +26,7 @@ flowchart TD
     classDef external fill:#ffcdd2,stroke:#05386b
     
     class A,B,C preprocessing
-    class D external
+    class AA,D external
     class E,G,H identification
     class F manual
     class I,J,K analysis

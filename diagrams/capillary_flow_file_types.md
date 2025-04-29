@@ -1,9 +1,16 @@
 ```mermaid
 graph TD
+    subgraph "Image Stabilization"
+        A["Raw Microscope Images (.tiff)"] --> AA["MOCO ImageJ Plugin (External)"]
+        AA --> AB["Stabilized Images (.tiff)"]
+        AA --> AC["Shift Data (results.csv)"]
+    end
+    
     subgraph "Image Preprocessing"
-        A["Raw Microscope Images (.tiff)"] --> B["src/capillary_contrast.py"]
+        AB --> B["src/capillary_contrast.py"]
         B --> C["Contrast Enhanced Images (.tiff)"]
         C --> D["src/write_background_file.py"]
+        AC --> D
         D --> E["Background Images (.tiff)"]
         D --> F["StdDev Images (.tiff)"]
     end
@@ -29,7 +36,7 @@ graph TD
         O --> Q["src/find_centerline.py"]
         Q --> R["Centerline Data (.npy/.csv)"]
         R --> S["src/make_kymograph.py"]
-        C --> S
+        AB --> S
         S --> T["Kymograph Images (.tiff)"]
         T --> U["src/analysis/make_velocities.py"]
         U --> V["Velocity Data (.csv)"]
@@ -45,7 +52,7 @@ graph TD
     classDef external fill:#ffebee,stroke:#c62828,stroke-width:1px
     
     class B,D,I,N,Q,S,U,W script
-    class A,C,E,F,H,J,K,M,O,P,R,T,V,X data
+    class A,AB,AC,C,E,F,H,J,K,M,O,P,R,T,V,X data
     class L manual
-    class G external
+    class AA,G external
 ``` 
