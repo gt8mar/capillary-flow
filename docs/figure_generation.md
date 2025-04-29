@@ -4,13 +4,13 @@ This document provides a detailed explanation of how the figures for the paper a
 
 ## Table of Contents
 
-Figures and Supplemental Figures:
+### Figures and Supplemental Figures:
 1. [Profile Calibration](#profile-calibration)
 2. [Compare LEDs](#compare-leds)
 3. [Valley-Based SNR Analysis](#valley-based-snr-analysis)
 4. [Compare Contrast](#compare-contrast) 
 5. [Resolution Line Profile](#resolution-line-profile)
-Data Pipeline
+### Data Pipeline
 6. [Image Processing and Velocity Extraction](#image-processing-and-velocity-extraction) 
 7. [Velocity Analysis](#velocity-analysis) (To be completed)
 8. [Flow Visualization](#flow-visualization) (To be completed)
