@@ -27,4 +27,4 @@ The documentation is divided into:
 For actual code implementation, please refer to the `src/` directory in the main repository.
 
 ## Project flow chart:
-![Flow-Chart](diagrams\pdf\flowchart.png)
+![Flow-Chart](diagrams/pdf/flowchart.png)
