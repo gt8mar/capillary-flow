@@ -25,3 +25,6 @@ The documentation is divided into:
 - Detailed explanations of each step in the data processing pipeline
 
 For actual code implementation, please refer to the `src/` directory in the main repository.
+
+Project flow chart:
+![Flow Chart](\capillary-flow\diagrams\pdf\flowchart.png)
