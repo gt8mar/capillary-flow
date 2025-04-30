@@ -19,7 +19,7 @@ This folder contains flowchart diagrams that visualize the capillary flow analys
 ## Flow chart
 
 
-![Capillary Flow Pipeline](pdf/flowchart.png)
+![Capillary Flow Pipeline](pdf/Flowchart.png)
 
 
 ## Viewing the Diagrams
