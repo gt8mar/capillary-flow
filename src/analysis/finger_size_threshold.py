@@ -25,7 +25,8 @@ cap_flow_path = PATHS['cap_flow']
 source_sans = load_source_sans()
 
 def create_finger_size_cdf_plot(df: pd.DataFrame, threshold: float, 
-                               output_path: str, ax=None) -> Optional[float]:
+                               output_path: str, original_velocities: pd.Series = None,
+                               ax=None) -> Optional[float]:
     """
     Creates a CDF plot for velocities split by finger size groups based on the given threshold.
     
@@ -33,6 +34,8 @@ def create_finger_size_cdf_plot(df: pd.DataFrame, threshold: float,
         df: DataFrame containing FingerSizeBottom and Video_Median_Velocity columns
         threshold: Finger size threshold to split groups (smaller vs larger)
         output_path: Path for finding fonts and saving results
+        original_velocities: Series containing Video_Median_Velocity from the original dataset
+                            before filtering for finger size data
         ax: Matplotlib axis object to plot on (optional)
     
     Returns:
@@ -47,6 +50,7 @@ def create_finger_size_cdf_plot(df: pd.DataFrame, threshold: float,
     # Group data
     small_group = df[df['FingerSizeBottom'] < threshold]['Video_Median_Velocity']
     large_group = df[df['FingerSizeBottom'] >= threshold]['Video_Median_Velocity']
+    filtered_data = df['Video_Median_Velocity']  # Velocity data after filtering for finger size
     
     # Check if we have enough data in both groups
     if len(small_group) < 3 or len(large_group) < 3:
@@ -54,15 +58,29 @@ def create_finger_size_cdf_plot(df: pd.DataFrame, threshold: float,
         return None
     
     # Calculate empirical CDFs
+    # Small finger group
     x_small = np.sort(small_group)
     y_small = np.arange(1, len(x_small) + 1) / len(x_small)
     
+    # Large finger group
     x_large = np.sort(large_group)
     y_large = np.arange(1, len(x_large) + 1) / len(x_large)
+    
+    # Filtered data distribution (current sample)
+    x_filtered = np.sort(filtered_data)
+    y_filtered = np.arange(1, len(x_filtered) + 1) / len(x_filtered)
     
     # Plot CDFs
     ax.plot(x_small, y_small, 'b-', linewidth=1, label=f'<{threshold} mm (n={len(small_group)})')
     ax.plot(x_large, y_large, 'r-', linewidth=1, label=f'≥{threshold} mm (n={len(large_group)})')
+    ax.plot(x_filtered, y_filtered, 'g--', linewidth=0.8, label=f'Current sample (n={len(filtered_data)})')
+    
+    # Add original data CDF if provided
+    if original_velocities is not None and not original_velocities.empty:
+        # Original full dataset (before filtering)
+        x_original = np.sort(original_velocities.dropna())
+        y_original = np.arange(1, len(x_original) + 1) / len(x_original)
+        ax.plot(x_original, y_original, 'k:', linewidth=1, label=f'Full dataset (n={len(x_original)})')
     
     # Run KS test
     ks_stat, p_value = stats.ks_2samp(small_group, large_group)
@@ -83,26 +101,34 @@ def create_finger_size_cdf_plot(df: pd.DataFrame, threshold: float,
         ax.set_ylabel('Cumulative Probability', fontproperties=source_sans)
         ax.set_title(f'Velocity CDF by Finger Size (Threshold: {threshold} mm)', 
                     fontproperties=source_sans)
-        ax.legend(prop=source_sans)
+        # Shrink the legend font size and place it in a better position
+        leg = ax.legend(prop=source_sans, fontsize=4, loc='lower right')
     else:
         # Fall back to default font
         ax.set_xlabel('Video Median Velocity (mm/s)')
         ax.set_ylabel('Cumulative Probability')
         ax.set_title(f'Velocity CDF by Finger Size (Threshold: {threshold} mm)')
-        ax.legend()
+        # Shrink the legend font size and place it in a better position
+        leg = ax.legend(fontsize=4, loc='lower right')
+    
+    # Ensure legend has a semi-transparent background to not obscure the plot
+    if leg:
+        leg.get_frame().set_alpha(0.7)
     
     ax.grid(True, alpha=0.3)
     
     return ks_stat
 
 
-def threshold_analysis(df: pd.DataFrame) -> float:
+def threshold_analysis(df: pd.DataFrame, original_velocities: pd.Series = None) -> float:
     """
     Analyzes different finger size thresholds to find the one that best differentiates
     velocity distributions.
     
     Args:
         df: DataFrame containing FingerSizeBottom and Video_Median_Velocity columns
+        original_velocities: Series containing Video_Median_Velocity from the original dataset
+                            before filtering for finger size data
     
     Returns:
         The best finger size threshold for differentiating velocity distributions
@@ -165,7 +191,7 @@ def threshold_analysis(df: pd.DataFrame) -> float:
         })
         
         fig, ax = plt.subplots(figsize=(2.4, 2.0))
-        ks_stat = create_finger_size_cdf_plot(size_df, threshold, cap_flow_path, ax)
+        ks_stat = create_finger_size_cdf_plot(size_df, threshold, cap_flow_path, original_velocities, ax)
         if ks_stat is not None:
             ks_results[threshold] = ks_stat
         
@@ -375,12 +401,14 @@ def plot_velocity_boxplots(df: pd.DataFrame, best_threshold: Optional[float] = N
         plt.close()
 
 
-def analyze_pressure_specific_thresholds(df: pd.DataFrame) -> Dict[int, float]:
+def analyze_pressure_specific_thresholds(df: pd.DataFrame, original_velocities: pd.Series = None) -> Dict[int, float]:
     """
     Analyzes finger size thresholds separately for each pressure level.
     
     Args:
         df: DataFrame containing FingerSizeBottom, Pressure, and Video_Median_Velocity columns
+        original_velocities: Series containing Video_Median_Velocity from the original dataset
+                             before filtering for finger size data
     
     Returns:
         Dictionary mapping pressure levels to their best finger size thresholds
@@ -399,6 +427,16 @@ def analyze_pressure_specific_thresholds(df: pd.DataFrame) -> Dict[int, float]:
     # Get unique pressure levels
     pressures = sorted(df['Pressure'].unique())
     print(f"Found {len(pressures)} pressure levels: {pressures}")
+    
+    # If original_velocities is provided and has a Pressure column, prepare pressure-specific original data
+    original_by_pressure = {}
+    if original_velocities is not None and 'Pressure' in original_velocities.index.names:
+        for pressure in pressures:
+            try:
+                original_by_pressure[pressure] = original_velocities.xs(pressure, level='Pressure')
+            except:
+                # If pressure not found in original data
+                original_by_pressure[pressure] = pd.Series()
     
     best_thresholds = {}
     ks_all_pressures = {}
@@ -471,7 +509,11 @@ def analyze_pressure_specific_thresholds(df: pd.DataFrame) -> Dict[int, float]:
             })
             
             fig, ax = plt.subplots(figsize=(2.4, 2.0))
-            create_finger_size_cdf_plot(pressure_df, threshold, cap_flow_path, ax)
+            
+            # Get original velocities for this pressure if available
+            pressure_original = original_by_pressure.get(pressure, None) if original_by_pressure else None
+            
+            create_finger_size_cdf_plot(pressure_df, threshold, cap_flow_path, pressure_original, ax)
             
             plt.tight_layout()
             plt.savefig(os.path.join(output_dir, f'pressure_{pressure}_threshold_{threshold}.png'), 
@@ -526,13 +568,31 @@ def load_and_prepare_data():
     Loads data from CSV files and prepares the merged dataset for finger size analysis.
     
     Returns:
-        DataFrame containing both finger metrics and velocity data
+        Tuple containing:
+            - DataFrame containing both finger metrics and velocity data
+            - Series containing original velocity data before filtering for finger size
     """
     print("\nLoading and preparing data for finger size threshold analysis...")
     
     # Load velocity data
     data_filepath = os.path.join(cap_flow_path, 'summary_df_nhp_video_stats.csv')
     df = pd.read_csv(data_filepath)
+    
+    # Store the original velocity data before any filtering
+    original_velocities = df['Video_Median_Velocity'].copy()
+    
+    # If Pressure column exists, create a MultiIndex for original_velocities
+    if 'Pressure' in df.columns:
+        # Create a Series with Pressure as index for easier slicing later
+        original_velocities = pd.Series(
+            df['Video_Median_Velocity'].values,
+            index=pd.MultiIndex.from_arrays([df['Pressure']], names=['Pressure'])
+        )
+    
+    # Print statistics about original data
+    print(f"Original dataset: {len(df)} observations")
+    print(f"Original velocity data: mean={original_velocities.mean():.2f}, median={original_velocities.median():.2f}")
+    print(f"Original IQR: {original_velocities.quantile(0.25):.2f} to {original_velocities.quantile(0.75):.2f}")
     
     # Standardize finger column names
     df['Finger'] = df['Finger'].str[1:]
@@ -573,17 +633,370 @@ def load_and_prepare_data():
     unique_participants = participants_with_data['Participant'].nunique()
     
     print(f"Found {unique_participants} participants with both finger size and velocity data")
-    print(f"Total observations: {len(participants_with_data)}")
+    print(f"Total observations after filtering: {len(participants_with_data)}")
     
-    return merged_df
+    # Print comparison of original vs filtered data
+    filtered_velocities = participants_with_data['Video_Median_Velocity']
+    print(f"Filtered data: mean={filtered_velocities.mean():.2f}, median={filtered_velocities.median():.2f}")
+    print(f"Filtered IQR: {filtered_velocities.quantile(0.25):.2f} to {filtered_velocities.quantile(0.75):.2f}")
+    
+    return merged_df, original_velocities
+
+
+def plot_age_vs_velocity_by_finger_size(df: pd.DataFrame, original_df: pd.DataFrame) -> None:
+    """
+    Creates a scatter plot showing Age vs. Median Velocity, colored by finger size.
+    Points without finger size data are colored in bright pink.
+    
+    Args:
+        df: DataFrame containing filtered data with finger size measurements
+        original_df: Original DataFrame before filtering for finger size
+    """
+    # Create output directory for plots
+    output_dir = os.path.join(cap_flow_path, 'results', 'FingerSizeThreshold')
+    os.makedirs(output_dir, exist_ok=True)
+    
+    print("\nCreating Age vs. Velocity scatter plot colored by finger size...")
+    
+    # Set up plot style
+    sns.set_style("whitegrid")
+    plt.rcParams.update({
+        'pdf.fonttype': 42,
+        'ps.fonttype': 42,
+        'font.size': 7,
+        'axes.labelsize': 7,
+        'xtick.labelsize': 6,
+        'ytick.labelsize': 6,
+        'legend.fontsize': 5
+    })
+    
+    # Create figure
+    fig, ax = plt.subplots(figsize=(4.0, 3.0))
+    
+    # Prepare data - get median velocity per participant
+    # For the filtered data
+    participant_data = df.groupby('Participant').agg({
+        'Age': 'first',  # Age is same for each participant
+        'Video_Median_Velocity': 'median',
+        'FingerSizeBottom': 'mean'  # Average finger size for participant
+    }).reset_index()
+    
+    # For the original data, get participants without finger size data
+    has_finger_size = set(participant_data['Participant'].unique())
+    
+    # Group original data by participant
+    original_participant_data = original_df.groupby('Participant').agg({
+        'Age': 'first',
+        'Video_Median_Velocity': 'median'
+    }).reset_index()
+    
+    # Mark participants with and without finger size data
+    original_participant_data['Has_Finger_Size'] = original_participant_data['Participant'].isin(has_finger_size)
+    
+    # Plot participants with finger size data using viridis colormap
+    scatter = ax.scatter(
+        participant_data['Age'],
+        participant_data['Video_Median_Velocity'],
+        c=participant_data['FingerSizeBottom'],
+        cmap='viridis',
+        s=50,
+        alpha=0.8,
+        edgecolors='k',
+        linewidths=0.5
+    )
+    
+    # Plot participants without finger size data in bright pink
+    no_finger_size_data = original_participant_data[~original_participant_data['Has_Finger_Size']]
+    if len(no_finger_size_data) > 0:
+        ax.scatter(
+            no_finger_size_data['Age'],
+            no_finger_size_data['Video_Median_Velocity'],
+            color='magenta',
+            s=50,
+            alpha=0.8,
+            marker='X',
+            label='No finger size data'
+        )
+    
+    # Add colorbar for finger size
+    cbar = plt.colorbar(scatter)
+    
+    # Set labels and title
+    if source_sans:
+        ax.set_xlabel('Age (years)', fontproperties=source_sans)
+        ax.set_ylabel('Median Velocity (mm/s)', fontproperties=source_sans)
+        ax.set_title('Age vs. Median Velocity by Finger Size', fontproperties=source_sans)
+        cbar.set_label('Mean Finger Size (mm)', fontproperties=source_sans)
+        if len(no_finger_size_data) > 0:
+            ax.legend(prop=source_sans, fontsize=5)
+    else:
+        ax.set_xlabel('Age (years)')
+        ax.set_ylabel('Median Velocity (mm/s)')
+        ax.set_title('Age vs. Median Velocity by Finger Size')
+        cbar.set_label('Mean Finger Size (mm)')
+        if len(no_finger_size_data) > 0:
+            ax.legend(fontsize=5)
+    
+    # Add gridlines
+    ax.grid(True, alpha=0.3)
+    
+    # Save plot
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'age_vs_velocity_by_finger_size.png'), dpi=300)
+    plt.close()
+
+
+def plot_age_vs_velocity_by_pressure_and_finger_size(df: pd.DataFrame, original_df: pd.DataFrame) -> None:
+    """
+    Creates scatter plots showing Age vs. Velocity for each pressure value, colored by finger size.
+    Similar to plot_age_vs_velocity_by_finger_size but with separate plots for each pressure.
+    
+    Args:
+        df: DataFrame containing filtered data with finger size measurements
+        original_df: Original DataFrame before filtering for finger size
+    """
+    # Check if Pressure column exists
+    if 'Pressure' not in df.columns:
+        print("Warning: No Pressure column found. Cannot create pressure-specific plots.")
+        return
+    
+    # Create output directory for plots
+    output_dir = os.path.join(cap_flow_path, 'results', 'FingerSizeThreshold', 'PressureSpecific')
+    os.makedirs(output_dir, exist_ok=True)
+    
+    print("\nCreating Age vs. Velocity scatter plots for specific pressures, colored by finger size...")
+    
+    # Set up plot style
+    sns.set_style("whitegrid")
+    plt.rcParams.update({
+        'pdf.fonttype': 42,
+        'ps.fonttype': 42,
+        'font.size': 7,
+        'axes.labelsize': 7,
+        'xtick.labelsize': 6,
+        'ytick.labelsize': 6,
+        'legend.fontsize': 5
+    })
+    
+    # Get unique pressure values
+    pressures = sorted(df['Pressure'].unique())
+    print(f"Creating plots for {len(pressures)} pressure values: {pressures}")
+    
+    for pressure in pressures:
+        # Filter data for this pressure
+        pressure_df = df[df['Pressure'] == pressure]
+        original_pressure_df = original_df[original_df['Pressure'] == pressure]
+        
+        # Check if we have enough data
+        if len(pressure_df) < 5:
+            print(f"Skipping pressure {pressure} - insufficient data ({len(pressure_df)} samples)")
+            continue
+        
+        print(f"Creating plot for pressure {pressure} with {len(pressure_df)} samples")
+        
+        # Create figure
+        fig, ax = plt.subplots(figsize=(4.0, 3.0))
+        
+        # Prepare data - get median velocity per participant for this pressure
+        # For the filtered data
+        participant_data = pressure_df.groupby('Participant').agg({
+            'Age': 'first',  # Age is same for each participant
+            'Video_Median_Velocity': 'median',
+            'FingerSizeBottom': 'mean'  # Average finger size for participant
+        }).reset_index()
+        
+        # For the original data, get participants without finger size data
+        has_finger_size = set(participant_data['Participant'].unique())
+        
+        # Group original data by participant for this pressure
+        original_participant_data = original_pressure_df.groupby('Participant').agg({
+            'Age': 'first',
+            'Video_Median_Velocity': 'median'
+        }).reset_index()
+        
+        # Mark participants with and without finger size data
+        original_participant_data['Has_Finger_Size'] = original_participant_data['Participant'].isin(has_finger_size)
+        
+        # Plot participants with finger size data using viridis colormap
+        scatter = ax.scatter(
+            participant_data['Age'],
+            participant_data['Video_Median_Velocity'],
+            c=participant_data['FingerSizeBottom'],
+            cmap='viridis',
+            s=50,
+            alpha=0.8,
+            edgecolors='k',
+            linewidths=0.5
+        )
+        
+        # Plot participants without finger size data in bright pink
+        no_finger_size_data = original_participant_data[~original_participant_data['Has_Finger_Size']]
+        if len(no_finger_size_data) > 0:
+            ax.scatter(
+                no_finger_size_data['Age'],
+                no_finger_size_data['Video_Median_Velocity'],
+                color='magenta',
+                s=50,
+                alpha=0.8,
+                marker='X',
+                label='No finger size data'
+            )
+        
+        # Add colorbar for finger size
+        cbar = plt.colorbar(scatter)
+        
+        # Set labels and title
+        if source_sans:
+            ax.set_xlabel('Age (years)', fontproperties=source_sans)
+            ax.set_ylabel('Velocity (mm/s)', fontproperties=source_sans)
+            ax.set_title(f'Age vs. Velocity at {pressure} PSI by Finger Size', fontproperties=source_sans)
+            cbar.set_label('Mean Finger Size (mm)', fontproperties=source_sans)
+            if len(no_finger_size_data) > 0:
+                ax.legend(prop=source_sans, fontsize=5)
+        else:
+            ax.set_xlabel('Age (years)')
+            ax.set_ylabel('Velocity (mm/s)')
+            ax.set_title(f'Age vs. Velocity at {pressure} PSI by Finger Size')
+            cbar.set_label('Mean Finger Size (mm)')
+            if len(no_finger_size_data) > 0:
+                ax.legend(fontsize=5)
+        
+        # Add sample count to title
+        if source_sans:
+            ax.text(0.5, 0.02, f'n = {len(participant_data)} participants with finger size data', 
+                  transform=ax.transAxes, ha='center', fontproperties=source_sans, fontsize=6)
+        else:
+            ax.text(0.5, 0.02, f'n = {len(participant_data)} participants with finger size data', 
+                  transform=ax.transAxes, ha='center', fontsize=6)
+        
+        # Add gridlines
+        ax.grid(True, alpha=0.3)
+        
+        # Save plot
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, f'age_vs_velocity_pressure_{pressure}_by_finger_size.png'), dpi=300)
+        plt.close()
+
+
+def plot_velocity_boxplots_by_pressure(df: pd.DataFrame) -> None:
+    """
+    Creates boxplots of video median velocities grouped by finger size categories for each pressure.
+    
+    Args:
+        df: DataFrame containing FingerSizeBottom, Pressure, and Video_Median_Velocity columns
+    """
+    # Check if Pressure column exists
+    if 'Pressure' not in df.columns:
+        print("Warning: No Pressure column found. Cannot create pressure-specific boxplots.")
+        return
+    
+    # Create output directory for plots
+    output_dir = os.path.join(cap_flow_path, 'results', 'FingerSizeThreshold', 'PressureSpecific')
+    os.makedirs(output_dir, exist_ok=True)
+    
+    print("\nCreating velocity boxplots by finger size groups for each pressure level...")
+    
+    # Standard plot configuration with robust font loading
+    sns.set_style("whitegrid")
+    
+    plt.rcParams.update({
+        'pdf.fonttype': 42,  # For editable text in PDFs
+        'ps.fonttype': 42,   # For editable text in PostScript
+        'font.size': 7,
+        'axes.labelsize': 7,
+        'xtick.labelsize': 6,
+        'ytick.labelsize': 6,
+        'legend.fontsize': 5,
+        'lines.linewidth': 0.5
+    })
+    
+    # Get unique pressure values
+    pressures = sorted(df['Pressure'].unique())
+    print(f"Creating boxplots for {len(pressures)} pressure values: {pressures}")
+    
+    for pressure in pressures:
+        # Filter data for this pressure
+        pressure_df = df[df['Pressure'] == pressure].dropna(subset=['Video_Median_Velocity', 'FingerSizeBottom']).copy()
+        
+        # Check if we have enough data
+        if len(pressure_df) < 5:
+            print(f"Skipping pressure {pressure} - insufficient data ({len(pressure_df)} samples)")
+            continue
+        
+        print(f"Creating boxplot for pressure {pressure} with {len(pressure_df)} samples")
+        
+        # Calculate bin edges for approximately 5 bins
+        size_min = pressure_df['FingerSizeBottom'].min()
+        size_max = pressure_df['FingerSizeBottom'].max()
+        bin_width = (size_max - size_min) / 5
+        
+        # Create custom bins
+        bin_edges = [size_min + i * bin_width for i in range(6)]
+        bin_edges = [round(edge, 1) for edge in bin_edges]
+        
+        # Make sure bin edges are unique
+        bin_edges = sorted(list(set(bin_edges)))
+        
+        # Create size groups
+        labels = [f"{bin_edges[i]:.1f}-{bin_edges[i+1]:.1f}" for i in range(len(bin_edges)-1)]
+        pressure_df['Size_Group'] = pd.cut(
+            pressure_df['FingerSizeBottom'], 
+            bins=bin_edges, 
+            labels=labels,
+            include_lowest=True
+        )
+        
+        # Create the boxplot
+        plt.figure(figsize=(2.8, 2.2))
+        ax = sns.boxplot(
+            x='Size_Group',
+            y='Video_Median_Velocity',
+            data=pressure_df,
+            color='#1f77b4',
+            width=0.6,
+            fliersize=3
+        )
+        
+        # Set title and labels
+        if source_sans:
+            ax.set_title(f'Video Median Velocity by Finger Size at {pressure} PSI', 
+                        fontproperties=source_sans, fontsize=8)
+            ax.set_xlabel('Finger Size (mm)', fontproperties=source_sans)
+            ax.set_ylabel('Median Velocity (mm/s)', fontproperties=source_sans)
+        else:
+            ax.set_title(f'Video Median Velocity by Finger Size at {pressure} PSI', fontsize=8)
+            ax.set_xlabel('Finger Size (mm)')
+            ax.set_ylabel('Median Velocity (mm/s)')
+        
+        # Get counts for each size group
+        counts = pressure_df['Size_Group'].value_counts().sort_index()
+        
+        # Add counts to the x-tick labels
+        xtick_labels = [f"{label.get_text()}\n(n={counts[label.get_text()]})" 
+                      if label.get_text() in counts.index else label.get_text()
+                      for label in ax.get_xticklabels()]
+        ax.set_xticklabels(xtick_labels)
+        
+        # Rotate x-axis labels if they're getting crowded
+        plt.xticks(rotation=30, ha='right')
+        
+        # Save the figure
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, f'velocity_by_finger_size_pressure_{pressure}.png'), 
+                   dpi=300, bbox_inches='tight')
+        plt.close()
 
 
 def main():
     """Main function for finger size threshold analysis."""
     print("\nRunning finger size threshold analysis for capillary velocity data...")
     
-    # Load and prepare data
-    merged_df = load_and_prepare_data()
+    # Load and prepare data, now returns both merged data and original velocities
+    merged_df, original_velocities = load_and_prepare_data()
+    
+    # Also load the original dataframe to use for the scatter plot
+    data_filepath = os.path.join(cap_flow_path, 'summary_df_nhp_video_stats.csv')
+    original_df = pd.read_csv(data_filepath)
     
     # Optionally filter for control data if needed
     # controls_df = merged_df[merged_df['SET'] == 'set01']
@@ -602,14 +1015,23 @@ def main():
         'lines.linewidth': 0.5
     })
     
-    # Run threshold analysis to find optimal finger size cutoff
-    best_threshold = threshold_analysis(controls_df)
+    # Run threshold analysis to find optimal finger size cutoff, now passing original_velocities
+    best_threshold = threshold_analysis(controls_df, original_velocities)
     
     # Plot velocity by finger size groups
     plot_velocity_boxplots(controls_df, best_threshold)
     
-    # Run pressure-specific threshold analysis
-    pressure_thresholds = analyze_pressure_specific_thresholds(controls_df)
+    # Plot velocity by finger size groups for each pressure level
+    plot_velocity_boxplots_by_pressure(controls_df)
+    
+    # Run pressure-specific threshold analysis, now passing original_velocities
+    pressure_thresholds = analyze_pressure_specific_thresholds(controls_df, original_velocities)
+    
+    # Create Age vs. Velocity scatter plot colored by finger size
+    plot_age_vs_velocity_by_finger_size(controls_df, original_df)
+    
+    # Create Age vs. Velocity scatter plots for each pressure value
+    plot_age_vs_velocity_by_pressure_and_finger_size(controls_df, original_df)
     
     print("\nFinger size threshold analysis complete.")
     

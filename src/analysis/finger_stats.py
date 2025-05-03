@@ -1427,6 +1427,10 @@ def main():
     # Merge with velocity data
     merged_df = pd.merge(df, finger_stats_df, on='Participant', how='left')
     merged_df = merged_df.dropna(subset=['Pointer bottom'])
+    # Do not drop rows here based on a specific finger column (e.g., 'Pointer bottom').
+    # Rows will be filtered later once the finger-specific size column (`FingerSizeBottom`)
+    # has been computed, ensuring that observations for other fingers (e.g., Middle, Ring)
+    # are not inadvertently removed.
     
     # Map from 'Finger' string to the column name holding the bottom size
     bottom_col_map = {f: f"{f} bottom" for f in ['Pointer', 'Middle', 'Ring', 'Pinky']}
