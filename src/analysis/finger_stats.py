@@ -1002,8 +1002,8 @@ def analyze_finger_size_pressure_interaction(merged_df: pd.DataFrame) -> Dict:
     
     # Model 2: Add interaction between finger size and pressure (Pressure numeric)
     try:
-        print("\nModel 2: Finger size × Pressure interaction")
-        formula = "Video_Median_Velocity ~ FingerSizeBottom * Pressure"
+        print("\nModel 2: FingerSize + C(Pressure) + FingerSize:Pressure (Cat Main, Cont Interaction)")
+        formula = "Video_Median_Velocity ~ FingerSizeBottom + C(Pressure) + FingerSizeBottom:Pressure"
         model = sm.formula.mixedlm(formula, analysis_df, groups=analysis_df["Participant"])
         models['interaction'] = model.fit()
         print(models['interaction'].summary())
@@ -1177,8 +1177,8 @@ def plot_finger_size_pressure_interaction(models: Dict, merged_df: pd.DataFrame,
     
     # Check if we have valid model results
     if 'interaction' not in models or not isinstance(models['interaction'], 
-                                                    sm.regression.linear_model.RegressionResultsWrapper):
-        print("Cannot create interaction plots: interaction model results not available")
+                                                    (sm.regression.linear_model.RegressionResultsWrapper, sm.regression.mixed_linear_model.MixedLMResultsWrapper)):
+        print("Cannot create interaction plots: interaction model results not available or not correct type")
         return
     
     print("\nCreating interaction plots...")
@@ -1201,10 +1201,19 @@ def plot_finger_size_pressure_interaction(models: Dict, merged_df: pd.DataFrame,
                            data=analysis_df, alpha=0.7, s=50, legend='brief')
     
     # Add regression lines for specific pressure levels (e.g., min, mean, max)
-    min_pressure = analysis_df['Pressure'].min()
-    mean_pressure = analysis_df['Pressure'].mean()
-    max_pressure = analysis_df['Pressure'].max()
-    example_pressures = [min_pressure, mean_pressure, max_pressure]
+    # MODIFICATION: Use actual unique pressure levels from the data
+    unique_pressures = sorted(list(analysis_df['Pressure'].unique()))
+    if len(unique_pressures) >= 3:
+        # Pick first, middle, and last unique pressure values if possible
+        example_pressures = [unique_pressures[0], 
+                             unique_pressures[len(unique_pressures) // 2], 
+                             unique_pressures[-1]]
+        # Ensure uniqueness if, for example, only 2 unique pressures exist and middle maps to first.
+        example_pressures = sorted(list(set(example_pressures)))
+    elif len(unique_pressures) > 0:
+        example_pressures = unique_pressures # Use all if less than 3
+    else:
+        example_pressures = [] # No pressures to plot if unique_pressures is empty
     
     finger_range = np.linspace(analysis_df['FingerSizeBottom'].min(), analysis_df['FingerSizeBottom'].max(), 100)
     
@@ -1232,7 +1241,7 @@ def plot_finger_size_pressure_interaction(models: Dict, merged_df: pd.DataFrame,
     norm = plt.Normalize(analysis_df['Pressure'].min(), analysis_df['Pressure'].max())
     sm_ = plt.cm.ScalarMappable(cmap="viridis", norm=norm)
     sm_.set_array([])
-    scatter.figure.colorbar(sm_, label='Pressure (PSI)')
+    scatter.figure.colorbar(sm_, ax=scatter, label='Pressure (PSI)')
     
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, 'finger_size_velocity_by_pressure.png'), dpi=300)
@@ -1247,7 +1256,8 @@ def plot_finger_size_pressure_interaction(models: Dict, merged_df: pd.DataFrame,
     finger_range = np.linspace(finger_min, finger_max, 100)
     
     # Plot predicted lines for different pressures
-    pressures_to_plot = np.linspace(analysis_df['Pressure'].min(), analysis_df['Pressure'].max(), 5) # Plot 5 lines
+    # MODIFICATION: Use actual unique pressure levels from the data
+    pressures_to_plot = sorted(list(analysis_df['Pressure'].unique())) 
     colors = sns.color_palette('viridis_r', n_colors=len(pressures_to_plot))
 
     for i, pressure in enumerate(pressures_to_plot):
@@ -1331,8 +1341,8 @@ def plot_random_slopes_visualization(models: Dict, merged_df: pd.DataFrame, outp
     
     # Check if we have valid random slopes model
     if 'random_slopes' not in models or not isinstance(models['random_slopes'], 
-                                                      sm.regression.linear_model.RegressionResultsWrapper):
-        print("Cannot create random slopes visualization: model results not available")
+                                                      (sm.regression.linear_model.RegressionResultsWrapper, sm.regression.mixed_linear_model.MixedLMResultsWrapper)):
+        print("Cannot create random slopes visualization: model results not available or not correct type")
         return
     
     print("\nCreating random slopes visualization...")
@@ -1404,6 +1414,251 @@ def plot_random_slopes_visualization(models: Dict, merged_df: pd.DataFrame, outp
     else:
         ax2.text(0.5, 0.5, "No random slopes found in model.", ha='center', va='center')
         ax2.set_title('Distribution of Random Pressure Slopes')
+
+def plot_effect_size_comparison(models: Dict, merged_df: pd.DataFrame, output_dir: str) -> None:
+    """
+    Creates visualizations comparing the effect sizes of finger size vs pressure on velocity.
+    
+    Args:
+        models: Dictionary of fitted model results
+        merged_df: DataFrame containing finger metrics and velocity data
+        output_dir: Directory to save output plots
+    """
+    # Ensure output directory exists
+    os.makedirs(output_dir, exist_ok=True)
+    
+    print("\nCreating effect size comparison plots...")
+    print(f"--- Debug (plot_effect_size_comparison): Received models keys: {list(models.keys())}")
+    
+    # Check if we have valid model results
+    if 'basic' not in models:
+        print("Error (plot_effect_size_comparison): 'basic' key not in models dictionary.")
+        return
+        
+    basic_model_candidate = models['basic']
+    print(f"--- Debug (plot_effect_size_comparison): Type of models['basic']: {type(basic_model_candidate)}")
+    
+    if not isinstance(basic_model_candidate, (sm.regression.linear_model.RegressionResultsWrapper, sm.regression.mixed_linear_model.MixedLMResultsWrapper)):
+        print("Error (plot_effect_size_comparison): models['basic'] is not a RegressionResultsWrapper or MixedLMResultsWrapper.")
+        if isinstance(basic_model_candidate, dict):
+            print(f"--- Debug (plot_effect_size_comparison): Contents of models['basic'] (it is a dict): {basic_model_candidate}")
+        return
+    
+    # If we reach here, basic_model_candidate is the actual model
+    basic_model = basic_model_candidate
+    
+    # Extract coefficients and p-values
+    coefs = basic_model.params
+    pvals = basic_model.pvalues
+    
+    # Create a coefficient plot with confidence intervals
+    plt.figure(figsize=(6, 4))
+    
+    # Extract coefficient names, values, and confidence intervals
+    names = []
+    values = []
+    errors = []
+    
+    # Skip the intercept and random effects
+    for name in coefs.index:
+        if name not in ['Intercept', 'Group Var']:
+            names.append(name)
+            values.append(coefs[name])
+            # Use standard error to compute 95% CI
+            errors.append(basic_model.bse[name] * 1.96)
+    
+    # Create horizontal bar plot with error bars
+    y_pos = np.arange(len(names))
+    plt.barh(y_pos, values, xerr=errors, align='center', alpha=0.7, 
+           color=['#1f77b4', '#ff7f0e'])
+    
+    # Add vertical line at zero
+    plt.axvline(x=0, color='black', linestyle='-', alpha=0.3)
+    
+    # Add p-value annotations
+    for i, name in enumerate(names):
+        p_value = pvals[name]
+        p_text = f"p = {p_value:.3f}" if p_value >= 0.001 else "p < 0.001"
+        plt.text(values[i] + (15 if values[i] < 0 else 15), i, p_text, 
+               va='center', fontsize=8)
+    
+    # Add labels and title
+    if source_sans:
+        plt.yticks(y_pos, names, fontproperties=source_sans)
+        plt.xlabel('Effect on Velocity (mm/s)', fontproperties=source_sans)
+        plt.title('Effect Size Comparison: Finger Size vs Pressure', fontproperties=source_sans)
+    else:
+        plt.yticks(y_pos, names)
+        plt.xlabel('Effect on Velocity (mm/s)')
+        plt.title('Effect Size Comparison: Finger Size vs Pressure')
+    
+    plt.grid(True, axis='x', alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'effect_size_comparison.png'), dpi=300)
+    plt.close()
+    
+    # Create a scatter plot showing the actual relationship
+    # between variables and velocity
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+    
+    # 1. Plot velocity vs pressure with regression line
+    sns.regplot(x='Pressure', y='Video_Median_Velocity', data=merged_df, 
+               ax=ax1, scatter_kws={'alpha': 0.3, 's': 20}, 
+               line_kws={'color': 'red'})
+    
+    # Calculate correlation for annotation
+    # Ensure no NaNs in data used for correlation
+    plot_df_pressure = merged_df.dropna(subset=['Pressure', 'Video_Median_Velocity'])
+    pressure_corr = plot_df_pressure['Pressure'].corr(plot_df_pressure['Video_Median_Velocity'])
+    pressure_p = stats.pearsonr(plot_df_pressure['Pressure'], plot_df_pressure['Video_Median_Velocity'])[1]
+    pressure_text = f"r = {pressure_corr:.3f}\n{('p = ' + str(round(pressure_p, 3))) if pressure_p >= 0.001 else 'p < 0.001'}"
+    
+    # 2. Plot velocity vs finger size with regression line
+    sns.regplot(x='FingerSizeBottom', y='Video_Median_Velocity', data=merged_df, 
+               ax=ax2, scatter_kws={'alpha': 0.3, 's': 20}, 
+               line_kws={'color': 'red'})
+    
+    # Calculate correlation for annotation
+    # Ensure no NaNs in data used for correlation
+    plot_df_finger = merged_df.dropna(subset=['FingerSizeBottom', 'Video_Median_Velocity'])
+    finger_corr = plot_df_finger['FingerSizeBottom'].corr(plot_df_finger['Video_Median_Velocity'])
+    finger_p = stats.pearsonr(plot_df_finger['FingerSizeBottom'], plot_df_finger['Video_Median_Velocity'])[1]
+    finger_text = f"r = {finger_corr:.3f}\np = {finger_p:.3f}"
+    
+    # Add correlation info to plots
+    ax1.text(0.05, 0.95, pressure_text, transform=ax1.transAxes, 
+           fontsize=8, va='top')
+    ax2.text(0.05, 0.95, finger_text, transform=ax2.transAxes, 
+           fontsize=8, va='top')
+    
+    # Set titles and labels
+    if source_sans:
+        ax1.set_title('Velocity vs Pressure', fontproperties=source_sans)
+        ax1.set_xlabel('Pressure (PSI)', fontproperties=source_sans)
+        ax1.set_ylabel('Velocity (mm/s)', fontproperties=source_sans)
+        
+        ax2.set_title('Velocity vs Finger Size', fontproperties=source_sans)
+        ax2.set_xlabel('Finger Size (mm)', fontproperties=source_sans)
+        ax2.set_ylabel('Velocity (mm/s)', fontproperties=source_sans)
+    else:
+        ax1.set_title('Velocity vs Pressure')
+        ax1.set_xlabel('Pressure (PSI)')
+        ax1.set_ylabel('Velocity (mm/s)')
+        
+        ax2.set_title('Velocity vs Finger Size')
+        ax2.set_xlabel('Finger Size (mm)')
+        ax2.set_ylabel('Velocity (mm/s)')
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'velocity_relationships.png'), dpi=300)
+    plt.close()
+    
+    # Create a 3D visualization to show the joint relationship
+    try:
+        from mpl_toolkits.mplot3d import Axes3D
+        
+        # Create a 3D figure
+        fig = plt.figure(figsize=(8, 6))
+        ax = fig.add_subplot(111, projection='3d')
+        
+        # Get data points
+        xs = merged_df['FingerSizeBottom']
+        ys = merged_df['Pressure']
+        zs = merged_df['Video_Median_Velocity']
+        
+        # Create scatter plot
+        scatter = ax.scatter(xs, ys, zs, c=ys, cmap='viridis', s=30, alpha=0.6)
+        
+        # Create a meshgrid for the predicted surface
+        finger_min, finger_max = merged_df['FingerSizeBottom'].min(), merged_df['FingerSizeBottom'].max()
+        pressure_min, pressure_max = merged_df['Pressure'].min(), merged_df['Pressure'].max()
+        
+        finger_range = np.linspace(finger_min, finger_max, 20)
+        pressure_range = np.linspace(pressure_min, pressure_max, 20)
+        
+        finger_mesh, pressure_mesh = np.meshgrid(finger_range, pressure_range)
+        
+        # Use the model to predict velocity for each combination
+        points = pd.DataFrame({
+            'FingerSizeBottom': finger_mesh.flatten(),
+            'Pressure': pressure_mesh.flatten()
+        })
+        
+        # If we have an interaction model, use that, otherwise use basic model
+        if 'interaction' in models and isinstance(models['interaction'], 
+                                                 (sm.regression.linear_model.RegressionResultsWrapper, sm.regression.mixed_linear_model.MixedLMResultsWrapper)):
+            # For interaction model, we need to add the interaction term
+            prediction_model = models['interaction']
+            points['FingerSizeBottom:Pressure'] = points['FingerSizeBottom'] * points['Pressure']
+        else:
+            prediction_model = basic_model
+        
+        # Calculate predicted velocities
+        predicted = prediction_model.predict(points)
+        velocity_mesh = np.reshape(predicted, pressure_mesh.shape)
+        
+        # Create surface plot
+        surf = ax.plot_surface(finger_mesh, pressure_mesh, velocity_mesh, 
+                              cmap='viridis', alpha=0.7, linewidth=0)
+        
+        # Add colorbar
+        fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5, label='Predicted Velocity (mm/s)')
+        
+        # Set labels
+        if source_sans:
+            ax.set_xlabel('Finger Size (mm)', fontproperties=source_sans)
+            ax.set_ylabel('Pressure (PSI)', fontproperties=source_sans)
+            ax.set_zlabel('Velocity (mm/s)', fontproperties=source_sans)
+            plt.title('3D Relationship: Finger Size, Pressure, and Velocity', 
+                    fontproperties=source_sans)
+        else:
+            ax.set_xlabel('Finger Size (mm)')
+            ax.set_ylabel('Pressure (PSI)')
+            ax.set_zlabel('Velocity (mm/s)')
+            plt.title('3D Relationship: Finger Size, Pressure, and Velocity')
+        
+        # Adjust view angle
+        ax.view_init(elev=30, azim=45)
+        
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, '3d_velocity_relationship.png'), dpi=300)
+        plt.close()
+        
+    except Exception as e:
+        print(f"Could not create 3D visualization: {e}")
+    
+    # Create a heatmap showing velocity by finger size and pressure
+    plt.figure(figsize=(8, 6))
+    
+    # Create binned data for heatmap
+    finger_bins = pd.cut(merged_df['FingerSizeBottom'], 5)
+    pressure_bins = pd.cut(merged_df['Pressure'], 6)
+    
+    # Create a pivot table of mean velocities
+    heatmap_data = merged_df.pivot_table(
+        values='Video_Median_Velocity',
+        index=finger_bins,
+        columns=pressure_bins,
+        aggfunc='mean'
+    )
+    
+    # Plot heatmap
+    ax = sns.heatmap(heatmap_data, cmap='viridis', annot=True, fmt='.0f',
+                   cbar_kws={'label': 'Mean Velocity (mm/s)'})
+    
+    # Set title and labels
+    if source_sans:
+        ax.set_xlabel('Pressure (PSI)', fontproperties=source_sans)
+        ax.set_ylabel('Finger Size (mm)', fontproperties=source_sans)
+        ax.set_title('Mean Velocity by Finger Size and Pressure', fontproperties=source_sans)
+    else:
+        ax.set_xlabel('Pressure (PSI)')
+        ax.set_ylabel('Finger Size (mm)')
+        ax.set_title('Mean Velocity by Finger Size and Pressure')
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, 'velocity_heatmap.png'), dpi=300)
+    plt.close()
 
 def main():
     """Main function for finger size (bottom) analysis."""
@@ -1589,13 +1844,16 @@ def main():
     # Create random slopes visualization
     plot_random_slopes_visualization(interaction_models, controls_df, interaction_output_dir)
     
+    # NEW: Create effect size comparison plots
+    plot_effect_size_comparison(interaction_models, controls_df, interaction_output_dir)
+    
     # Save model comparison and summaries
     with open(os.path.join(interaction_output_dir, 'model_summaries.txt'), 'w') as f:
         f.write("Mixed-Effects Model Analysis of Finger Size × Pressure Interaction\n\n")
         
         # Write model comparison
         valid_models = [name for name, result in interaction_models.items() 
-                      if isinstance(result, sm.regression.linear_model.RegressionResultsWrapper)]
+                      if isinstance(result, (sm.regression.linear_model.RegressionResultsWrapper, sm.regression.mixed_linear_model.MixedLMResultsWrapper))]
         
         if len(valid_models) > 1:
             f.write("Model Comparison:\n")
