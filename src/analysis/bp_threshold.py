@@ -80,7 +80,7 @@ def create_bp_cdf_plot(df: pd.DataFrame, threshold: int,
     print(f"KS statistic for threshold {threshold}: {ks_stat}")
     print(f"p-value for threshold {threshold}: {p_value}")
     print(f"The median velocity for the low group is {low_group.median()} and the high group is {high_group.median()}")
-    print(f"The standard deviation for the low group is {low_group.std()} and the high group is {high_group.std()}")
+    print(f"The interquartile range for the low group is {low_group.quantile(0.25)} to {low_group.quantile(0.75)} and the high group is {high_group.quantile(0.25)} to {high_group.quantile(0.75)}")
             
     
     # Try to use Source Sans font if available

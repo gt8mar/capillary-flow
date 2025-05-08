@@ -148,4 +148,5 @@ src/_pycache_/
 src/__pycache__/
 src/tools/__pycache__/
 src/analysis/__pycache__/
-
+*.csv
+classified_kymos_part40_to_part48.csv

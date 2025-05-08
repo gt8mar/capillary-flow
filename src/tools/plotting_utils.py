@@ -300,8 +300,24 @@ def plot_PCA(participant_medians):
 
 def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000, 
             ci_percentile=99.5, write=True, dimensionless=False, video_median=False, 
-            log_scale=False, old = False, velocity_variable = 'Corrected Velocity'):
-    """Plots the mean/median and CI for the variable of interest, with KS statistic."""
+            log_scale=False, old = False, velocity_variable = 'Corrected Velocity',
+            participant_weighting=False):
+    """
+    Plots the mean/median and CI for the variable of interest, 
+    with KS statistic. 
+    
+    Args:
+        df (pd.DataFrame): The dataframe to plot.
+        variable (str): The variable to plot. Example: 'Age', 'Sex', 'SYS_BP', 'Diabetes', 'Hypertension', 'Set_affected'
+        method (str): The method to use for the CI. Example: 'bootstrap', 't-test'
+        n_iterations (int): The number of iterations to use for the CI.
+        ci_percentile (float): The percentile to use for the CI.
+        write (bool): Whether to write the plot to a file.
+        participant_weighting (bool): If True, each participant will be weighted equally in the distribution regardless of number of data points.
+
+    Returns:
+        None
+    """
     # Set up style and font
     sns.set_style("whitegrid")
     source_sans = get_source_sans_font()
@@ -312,16 +328,21 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
         'xtick.labelsize': 6, 'ytick.labelsize': 6,
         'legend.fontsize': 5, 'lines.linewidth': 0.5
     })
-    control_df = df[df['SET']=='set01']
-    hypertensive_df = df[df['SET']=='set02']
-    diabetic_df = df[df['SET']=='set03']
-    affected_df = df[df['Set_affected']=='set04']
+    # control_df = df[df['SET']=='set01']
+    # hypertensive_df = df[df['SET']=='set02']
+    # diabetic_df = df[df['SET']=='set03']
+    # if 'Set_affected' in df.columns:
+    #     affected_df = df[df['Set_affected']=='set04']
+    # else:
+    #     print('Set_affected not in df. Using SET column.')
+    #     affected_df = df[df['SET']=='set03']
+    #     affected_df = affected_df.append(df[df['SET']=='set02'])
 
     # Set color palette based on variable
     if variable == 'Age':
         base_color = '#1f77b4'
-        conditions = [df[variable] <= 50, df[variable] > 50]
-        choices = ['≤50', '>50']
+        conditions = [df[variable] <= 29, df[variable] > 29]
+        choices = ['≤29', '>29']
     elif variable == 'SYS_BP':
         base_color = '2ca02c'
         conditions = [df[variable] < 120, df[variable] >= 120]
@@ -387,7 +408,8 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
     # print(f"DEBUG - Calling stats_func with parameters: method={method}, ci_percentile={ci_percentile}, dimensionless={dimensionless}, velocity_variable={velocity_variable}")
     
     stats_df = df.groupby([group_col, 'Pressure']).apply(
-        lambda x: stats_func(x, ci_percentile=ci_percentile, dimensionless=dimensionless, velocity_variable=velocity_variable)
+        lambda x: stats_func(x, ci_percentile=ci_percentile, dimensionless=dimensionless, 
+                            velocity_variable=velocity_variable, participant_weighting=participant_weighting)
     ).reset_index()
     
     # # DEBUG: Print stats_df columns and a sample row
@@ -617,7 +639,8 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
                 output_path = os.path.join(output_cap_flow_path, 'results', 'shear', f'{variable}_CI_shear_rate.png')
             else:
                 output_path = os.path.join(output_cap_flow_path, 'results', f'{variable}_CI_new.png')
-                
+        if participant_weighting:
+            output_path = os.path.join(output_cap_flow_path, 'results', f'{variable}_participant_weighted_CI_new.png')
         plt.savefig(output_path, dpi=600)
         print(f"Plot saved to: {output_path}")
     else:
@@ -626,7 +649,8 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
     return 0
 
 # Function to calculate median and bootstrap 95% CI
-def calculate_median_ci(group, n_iterations=1000, ci_percentile=95, dimensionless=False, velocity_variable='Corrected_Velocity'):
+def calculate_median_ci(group, n_iterations=1000, ci_percentile=95, dimensionless=False, 
+                        velocity_variable='Corrected_Velocity', participant_weighting=False):
     """
     Calculates the median and bootstrap 95% CI for the given group.
     If the group has a 'Dimensionless Velocity' column, it will use that column.
@@ -638,12 +662,10 @@ def calculate_median_ci(group, n_iterations=1000, ci_percentile=95, dimensionles
         ci_percentile (int): The percentile to use for the CI.
         dimensionless (bool): Whether to return the median and CI in dimensionless units.
         velocity_variable (str): The variable to use for the velocity. Options are 'Corrected_Velocity' or 'Shear_Rate'.
+        participant_weighting (bool): If True, each participant will be weighted equally in the bootstrapping process.
 
     Returns:
         pd.Series: A series containing the median and CI bounds.
-
-    Example:
-        stats_df = df.groupby([group_col, 'Pressure']).apply(stats_func, ci_percentile=ci_percentile, dimensionless=dimensionless).reset_index()
     """
     # # DEBUG print statements
     # print(f"DEBUG - calculate_median_ci called with:")
@@ -677,14 +699,33 @@ def calculate_median_ci(group, n_iterations=1000, ci_percentile=95, dimensionles
         if len(valid_data) == 0:
             print("DEBUG - No valid Dimensionless Velocity data")
             return pd.Series(result)
+        
+        if participant_weighting:
+            # Group data by participant and calculate participant-level medians
+            participant_medians = group.groupby('Participant')['Dimensionless Velocity'].median().dropna()
             
-        for _ in range(n_iterations):
-            sample = resample(valid_data)
-            medians_dimless.append(np.median(sample))
+            if len(participant_medians) == 0:
+                print("DEBUG - No valid participant medians for Dimensionless Velocity")
+                return pd.Series(result)
+                
+            # Bootstrap at the participant level
+            for _ in range(n_iterations):
+                # Resample participants with replacement
+                sample = resample(participant_medians)
+                medians_dimless.append(np.median(sample))
+                
+            # Calculate the overall median using participant-level medians
+            median_dimless = np.median(participant_medians)
+        else:
+            # Original bootstrapping method at the measurement level
+            for _ in range(n_iterations):
+                sample = resample(valid_data)
+                medians_dimless.append(np.median(sample))
+                
+            median_dimless = np.median(valid_data)
             
         lower = np.percentile(medians_dimless, (100 - ci_percentile) / 2)
         upper = np.percentile(medians_dimless, 100 - (100 - ci_percentile) / 2)
-        median_dimless = np.median(valid_data)
         
         result = {
             'Median Dimensionless Velocity': median_dimless, 
@@ -705,31 +746,47 @@ def calculate_median_ci(group, n_iterations=1000, ci_percentile=95, dimensionles
                 print(f"DEBUG - No suitable replacement for '{velocity_variable}' found")
                 return pd.Series(result)
             
-        # print(f"DEBUG - Using {velocity_variable}")    
         # Drop any NaN values before bootstrapping
         valid_data = group[velocity_variable].dropna()
         
         if len(valid_data) == 0:
             print(f"DEBUG - No valid {velocity_variable} data")
             return pd.Series(result)
+        
+        if participant_weighting:
+            # Group data by participant and calculate participant-level medians
+            participant_medians = group.groupby('Participant')[velocity_variable].median().dropna()
             
-        for _ in range(n_iterations):
-            sample = resample(valid_data)
-            medians.append(np.median(sample))
+            if len(participant_medians) == 0:
+                print(f"DEBUG - No valid participant medians for {velocity_variable}")
+                return pd.Series(result)
+                
+            # Bootstrap at the participant level
+            for _ in range(n_iterations):
+                # Resample participants with replacement
+                sample = resample(participant_medians)
+                medians.append(np.median(sample))
+                
+            # Calculate the overall median using participant-level medians
+            median = np.median(participant_medians)
+        else:
+            # Original bootstrapping method at the measurement level
+            for _ in range(n_iterations):
+                sample = resample(valid_data)
+                medians.append(np.median(sample))
+                
+            median = np.median(valid_data)
             
         lower = np.percentile(medians, (100 - ci_percentile) / 2)
         upper = np.percentile(medians, 100 - (100 - ci_percentile) / 2)
-        median = np.median(valid_data)
         
         if velocity_variable == 'Shear_Rate':
-            # print("DEBUG - Setting result for Shear_Rate")
             result = {
                 'Median Shear Rate': median, 
                 'CI Lower Bound': lower, 
                 'CI Upper Bound': upper
             }
         else:
-            # print("DEBUG - Setting result for Velocity")
             result = {
                 'Median Velocity': median, 
                 'CI Lower Bound': lower, 
@@ -740,7 +797,8 @@ def calculate_median_ci(group, n_iterations=1000, ci_percentile=95, dimensionles
     return pd.Series(result)
 
 # Function to calculate mean, standard error, and 95% CI
-def calculate_mean_ci(group, ci_percentile = 95, dimensionless = False, velocity_variable = 'Corrected_Velocity'):
+def calculate_mean_ci(group, ci_percentile = 95, dimensionless = False, 
+                     velocity_variable = 'Corrected_Velocity', participant_weighting=False):
     """
     Calculates the mean, standard error, and 95% CI for a given group.
     If the group has a 'Dimensionless Velocity' column, it will use that column.
@@ -750,18 +808,33 @@ def calculate_mean_ci(group, ci_percentile = 95, dimensionless = False, velocity
         group (pd.DataFrame): The group to calculate the stats for.
         ci_percentile (int): The percentile to use for the CI.
         dimensionless (bool): Whether to return the stats in dimensionless units.
+        participant_weighting (bool): If True, each participant will be weighted equally.
 
     Returns:
         pd.Series: A series containing the mean, lower bound, and upper bound of the CI.
     """
     if dimensionless:
-        mean = group['Dimensionless Velocity'].mean()
-        sem = stats.sem(group['Dimensionless Velocity'])
+        if participant_weighting:
+            # Group by participant and get mean per participant
+            participant_means = group.groupby('Participant')['Dimensionless Velocity'].mean()
+            mean = participant_means.mean()
+            sem = stats.sem(participant_means)
+        else:
+            mean = group['Dimensionless Velocity'].mean()
+            sem = stats.sem(group['Dimensionless Velocity'])
+            
         ci = 1.96 * sem
         return pd.Series({'Mean Dimensionless Velocity': mean, 'Lower Bound': mean - ci, 'Upper Bound': mean + ci})
     else:
-        mean = group[velocity_variable].mean()
-        sem = stats.sem(group[velocity_variable])
+        if participant_weighting:
+            # Group by participant and get mean per participant
+            participant_means = group.groupby('Participant')[velocity_variable].mean()
+            mean = participant_means.mean()
+            sem = stats.sem(participant_means)
+        else:
+            mean = group[velocity_variable].mean()
+            sem = stats.sem(group[velocity_variable])
+            
         ci = 1.96 * sem
         return pd.Series({'Mean Velocity': mean, 'Lower Bound': mean - ci, 'Upper Bound': mean + ci})
 
@@ -1448,3 +1521,697 @@ def plot_cdf(diameter_analysis_df, variable, pressure, age_groups, cutoff_percen
                 dpi=600, bbox_inches='tight')
     plt.close()
     return 0
+
+def plot_CI_multiple_bands(df, thresholds=[29, 49], variable='Age', method='bootstrap', 
+                 n_iterations=1000, ci_percentile=99.5, write=True, dimensionless=False, 
+                 video_median=False, log_scale=False, 
+                 velocity_variable='Corrected Velocity'):
+    """Creates a confidence interval plot with multiple age bands based on specified thresholds.
+    
+    Creates a line plot with confidence intervals showing velocity distributions for multiple
+    age groups defined by the provided thresholds. By default creates three groups:
+    under 30, 30-49, and 50+.
+    
+    Args:
+        df: DataFrame containing the data to plot
+        thresholds: List of age thresholds to define groups (e.g., [29, 49] creates groups <30, 30-49, 50+)
+        variable: Column name to group by (typically 'Age')
+        method: Method for calculating confidence intervals ('bootstrap' or 'mean')
+        n_iterations: Number of bootstrap iterations if using bootstrap method
+        ci_percentile: Confidence interval percentile (e.g., 95, 99, 99.5)
+        write: Whether to save the plot to disk
+        dimensionless: Whether to use dimensionless values
+        video_median: Whether to use video median velocity instead of corrected velocity
+        log_scale: Whether to use log scale for y-axis
+        velocity_variable: Name of the velocity column to use
+        
+    Returns:
+        0 if successful, 1 if error occurred
+    
+    Example:
+        >>> plot_CI_multiple_bands(data, thresholds=[29, 49], write=True)
+        0
+    """
+    # Get Source Sans font
+    source_sans = get_source_sans_font()
+    
+    # Standard plot configuration
+    sns.set_style("whitegrid")
+    plt.rcParams.update({
+        'pdf.fonttype': 42,  # For editable text in PDFs
+        'ps.fonttype': 42,   # For editable text in PostScript
+        'font.size': 7,
+        'axes.labelsize': 7,
+        'xtick.labelsize': 6,
+        'ytick.labelsize': 6,
+        'legend.fontsize': 5,
+        'lines.linewidth': 0.5
+    })
+    
+    # Sort thresholds to ensure correct ordering
+    thresholds = sorted(thresholds)
+    
+    # Create a copy of the dataframe
+    plot_df = df.copy()
+    
+    # Determine which velocity variable to use
+    if video_median:
+        velocity_variable = 'Video_Median_Velocity'
+        
+    # Create age group labels based on thresholds
+    group_labels = []
+    
+    # First group is below the first threshold
+    group_labels.append(f'<{thresholds[0]+1}')
+    
+    # Middle groups are between thresholds
+    for i in range(len(thresholds) - 1):
+        group_labels.append(f'{thresholds[i]+1}-{thresholds[i+1]}')
+    
+    # Last group is above the last threshold
+    group_labels.append(f'≥{thresholds[-1]+1}')
+    
+    # Create age groups based on thresholds
+    plot_df['Age_Group'] = pd.cut(
+        plot_df['Age'],
+        bins=[0] + thresholds + [200],  # Add 0 at start and large value at end
+        labels=group_labels,
+        include_lowest=True
+    )
+    
+    # Create a monochromatic color palette regardless of number of groups
+    # Use a blue base color with increasing intensity
+    base_color = '#1f77b4'  # Blue base
+    num_groups = 10
+    base_colors = create_monochromatic_palette(base_color, 10)
+    
+    # Get unique pressures and sort them
+    pressures = sorted(plot_df['Pressure'].unique())
+    
+    # Create a dictionary to store results for each age group and pressure
+    results = {}
+    
+    # Calculate confidence intervals for each age group and pressure
+    for group_label in group_labels:
+        results[group_label] = {'pressures': [], 'medians': [], 'lower': [], 'upper': []}
+        
+        for pressure in pressures:
+            # Get data for this group and pressure
+            group_data = plot_df[(plot_df['Age_Group'] == group_label) & 
+                                (plot_df['Pressure'] == pressure)]
+            
+            if len(group_data) < 3:
+                continue  # Skip if not enough data
+                
+            # Calculate confidence intervals
+            if method == 'bootstrap':
+                ci_data = calculate_median_ci(
+                    group_data, 
+                    n_iterations=n_iterations, 
+                    ci_percentile=ci_percentile,
+                    dimensionless=dimensionless,
+                    velocity_variable=velocity_variable
+                )
+            else:
+                ci_data = calculate_mean_ci(
+                    group_data,
+                    ci_percentile=ci_percentile,
+                    dimensionless=dimensionless,
+                    velocity_variable=velocity_variable
+                )
+            
+            # Skip empty results
+            if ci_data is None:
+                continue
+                
+            median, lower, upper = ci_data
+            
+            # Store results
+            results[group_label]['pressures'].append(pressure)
+            results[group_label]['medians'].append(median)
+            results[group_label]['lower'].append(lower)
+            results[group_label]['upper'].append(upper)
+    
+    # Create figure
+    fig, ax = plt.subplots(figsize=(2.4, 2.0))
+    
+    # Dictionary to store handles for legend
+    legend_handles = {}
+    
+    # Plot each age group
+    for group_idx, group_label in enumerate(group_labels):
+        group_results = results[group_label]
+        
+        # Skip if no data for this group
+        if not group_results['pressures']:
+            continue
+        
+        # Get color for this group
+        color = base_colors[group_idx*(3)]
+        
+        # Plot median line
+        line, = ax.plot(
+            group_results['pressures'], 
+            group_results['medians'], 
+            'o-', 
+            color=color, 
+            markersize=3,
+            linewidth=0.75,
+            label=group_label
+        )
+        
+        # Plot confidence interval
+        ax.fill_between(
+            group_results['pressures'],
+            group_results['lower'],
+            group_results['upper'],
+            alpha=0.2,
+            color=color
+        )
+        
+        # Store handle for legend
+        legend_handles[group_label] = line
+    
+    # Set labels and title
+    if source_sans:
+        ax.set_xlabel('Pressure (PSI)', fontproperties=source_sans)
+        if dimensionless:
+            ax.set_ylabel('Dimensionless Velocity', fontproperties=source_sans)
+        else:
+            ax.set_ylabel('Velocity (µm/s)', fontproperties=source_sans)
+        ax.set_title('Velocity by Pressure and Age Group', fontproperties=source_sans)
+    else:
+        ax.set_xlabel('Pressure (PSI)')
+        if dimensionless:
+            ax.set_ylabel('Dimensionless Velocity')
+        else:
+            ax.set_ylabel('Velocity (µm/s)')
+        ax.set_title('Velocity by Pressure and Age Group')
+    
+    # Set log scale if requested
+    if log_scale:
+        ax.set_yscale('log')
+    
+    # Create legend with group labels
+    if legend_handles:
+        legend_items = [(handle, label) for label, handle in legend_handles.items()]
+        # Sort by label to ensure consistent order
+        legend_items.sort(key=lambda x: x[1])
+        handles, labels = zip(*legend_items)
+        
+        if source_sans:
+            ax.legend(handles, labels, prop=source_sans)
+        else:
+            ax.legend(handles, labels)
+    
+    plt.tight_layout()
+    
+    # Save figure if requested
+    if write:
+        # Create output directory
+        from src.config import PATHS
+        cap_flow_path = PATHS['cap_flow']
+        output_dir = os.path.join(cap_flow_path, 'results', 'CI_plots')
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Create filename based on parameters
+        filename = f'CI_multi_age_bands_{"-".join(str(t) for t in thresholds)}'
+        if video_median:
+            filename += '_video_median'
+        if dimensionless:
+            filename += '_dimensionless'
+        if log_scale:
+            filename += '_log'
+        
+        # Save as PNG and PDF
+        plt.savefig(os.path.join(output_dir, f'{filename}.png'), 
+                   dpi=300, bbox_inches='tight')
+        plt.savefig(os.path.join(output_dir, f'{filename}.pdf'), 
+                   dpi=300, bbox_inches='tight')
+    
+    plt.show()
+    return 0
+
+def plot_participant_velocity_profiles(df, method='bootstrap', n_iterations=1000, 
+                                      ci_percentile=95, write=True, dimensionless=False, 
+                                      log_scale=False, velocity_variable='Corrected Velocity',
+                                      save_dir=None, filename_prefix='participant_profiles'):
+    """
+    Creates velocity profiles for each participant by averaging their velocities at each pressure,
+    then plots confidence intervals for all participants.
+    
+    Args:
+        df (pd.DataFrame): The dataframe containing the velocity data.
+        method (str): The method to use for the CI. Example: 'bootstrap', 'mean'
+        n_iterations (int): The number of iterations to use for bootstrap CI.
+        ci_percentile (float): The percentile to use for the CI.
+        write (bool): Whether to write the plot to a file.
+        dimensionless (bool): Whether to use dimensionless values.
+        log_scale (bool): Whether to use a log scale for the y-axis.
+        velocity_variable (str): The velocity variable to use.
+        save_dir (str): Directory to save plots. If None, uses default.
+        filename_prefix (str): Prefix for saved filenames.
+        
+    Returns:
+        pd.DataFrame: The participant profiles dataframe, containing averaged velocities
+                     for each participant at each pressure.
+    """
+    # Set up style and font
+    sns.set_style("whitegrid")
+    source_sans = get_source_sans_font()
+    
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 5, 'lines.linewidth': 0.5
+    })
+    
+    # Create a copy of the dataframe to avoid modifying the original
+    plot_df = df.copy()
+    
+    # Get unique pressures and sort them
+    pressures = sorted(plot_df['Pressure'].unique())
+    
+    # Create participant velocity profiles by averaging velocities at each pressure
+    # This avoids giving more weight to participants with more measurements
+    participant_profiles = []
+    
+    # Get unique participant IDs
+    participants = plot_df['Participant'].unique()
+    
+    # For each participant, calculate the average velocity at each pressure
+    for participant in participants:
+        participant_data = plot_df[plot_df['Participant'] == participant]
+        
+        # Group by pressure and calculate mean velocity
+        profile = participant_data.groupby('Pressure')[velocity_variable].mean().reset_index()
+        profile['Participant'] = participant
+        
+        # Add any additional participant metadata (take first occurrence)
+        metadata_cols = ['Age', 'Sex', 'SET', 'Diabetes', 'Hypertension', 'SYS_BP']
+        for col in metadata_cols:
+            if col in participant_data.columns:
+                profile[col] = participant_data[col].iloc[0]
+        
+        participant_profiles.append(profile)
+    
+    # Combine all participant profiles into one dataframe
+    if participant_profiles:
+        profiles_df = pd.concat(participant_profiles, ignore_index=True)
+    else:
+        print("Error: No participant profiles created. Check input data.")
+        return None
+    
+    # Create figure for plotting
+    fig, ax = plt.subplots(figsize=(2.4, 2.0))
+    
+    # Calculate statistics for each pressure
+    stats_df = pd.DataFrame(columns=['Pressure', 'median', 'lower', 'upper'])
+    
+    for pressure in pressures:
+        # Filter data for this pressure
+        pressure_data = profiles_df[profiles_df['Pressure'] == pressure]
+        
+        # Skip if not enough data
+        if len(pressure_data) < 3:
+            print(f"Warning: Not enough data for pressure {pressure}, skipping.")
+            continue
+        
+        # Calculate CI based on method
+        if method == 'bootstrap':
+            ci_data = calculate_median_ci(
+                pressure_data, 
+                n_iterations=n_iterations, 
+                ci_percentile=ci_percentile,
+                dimensionless=dimensionless,
+                velocity_variable=velocity_variable
+            )
+        else:
+            ci_data = calculate_mean_ci(
+                pressure_data,
+                ci_percentile=ci_percentile,
+                dimensionless=dimensionless,
+                velocity_variable=velocity_variable
+            )
+        
+        # Skip if CI calculation failed
+        if ci_data is None:
+            print(f"Warning: CI calculation failed for pressure {pressure}, skipping.")
+            continue
+        
+        median, lower, upper = ci_data
+        
+        # Add to stats dataframe
+        stats_df = pd.concat([stats_df, pd.DataFrame({
+            'Pressure': [pressure],
+            'median': [median],
+            'lower': [lower],
+            'upper': [upper]
+        })], ignore_index=True)
+    
+    # Sort stats by pressure
+    stats_df = stats_df.sort_values('Pressure')
+    
+    # Plot the confidence intervals
+    y_col = 'median'
+    lower_col = 'lower'
+    upper_col = 'upper'
+    
+    # Plot the main line
+    ax.plot(stats_df['Pressure'], stats_df[y_col], '-o', color='blue', markersize=2)
+    
+    # Add the confidence interval as a shaded region
+    ax.fill_between(stats_df['Pressure'], stats_df[lower_col], stats_df[upper_col], 
+                   alpha=0.4, color='blue')
+    
+    # Add log scale if requested
+    if log_scale:
+        ax.set_yscale('log')
+        ax.yaxis.set_major_locator(ticker.LogLocator(base=10.0, numticks=5))
+        ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
+    
+    # Set labels and title
+    ax.set_xlabel('Pressure (psi)', fontproperties=source_sans)
+    
+    if dimensionless:
+        ax.set_ylabel('Dimensionless Velocity', fontproperties=source_sans)
+        ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Participant Velocity Profiles with {ci_percentile}% CI', 
+                  fontproperties=source_sans, fontsize=8)
+    else:
+        ax.set_ylabel('Velocity (um/s)', fontproperties=source_sans)
+        ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Participant Velocity Profiles with {ci_percentile}% CI', 
+                  fontproperties=source_sans, fontsize=8)
+    
+    # Add annotation with sample size
+    sample_size = len(participants)
+    ax.annotate(f'n = {sample_size} participants', xy=(0.02, 0.95), xycoords='axes fraction',
+               fontsize=5, fontproperties=source_sans)
+    
+    ax.grid(True, linewidth=0.3)
+    plt.tight_layout()
+    
+    # Save the figure if requested
+    if write:
+        if save_dir is None:
+            # Use a default directory if none provided
+            save_dir = os.path.join(PATHS.get('cap_flow', '.'), 'results', 'velocity_profiles')
+            os.makedirs(save_dir, exist_ok=True)
+        
+        # Create filename with parameters
+        filename = f"{filename_prefix}_{method}_ci{ci_percentile}"
+        if dimensionless:
+            filename += "_dimensionless"
+        if log_scale:
+            filename += "_log"
+        
+        # Save as PNG and PDF
+        plt.savefig(os.path.join(save_dir, f"{filename}.png"), dpi=600, bbox_inches='tight')
+        plt.savefig(os.path.join(save_dir, f"{filename}.pdf"), bbox_inches='tight')
+    
+    plt.close()
+    
+    return profiles_df
+
+def plot_participant_velocity_profiles_by_group(df, variable='Age', method='bootstrap', n_iterations=1000,
+                                              ci_percentile=95, write=True, dimensionless=False,
+                                              log_scale=False, velocity_variable='Corrected Velocity',
+                                              save_dir=None, filename_prefix=None):
+    """
+    Creates velocity profiles for each participant by averaging their velocities at each pressure,
+    then plots confidence intervals comparing different groups (by age, diabetes, etc).
+    
+    Args:
+        df (pd.DataFrame): The dataframe containing the velocity data.
+        variable (str): The variable to group by. Example: 'Age', 'Sex', 'SYS_BP', 'Diabetes', 'Hypertension', 'Set_affected'
+        method (str): The method to use for the CI. Example: 'bootstrap', 'mean'
+        n_iterations (int): The number of iterations to use for bootstrap CI.
+        ci_percentile (float): The percentile to use for the CI.
+        write (bool): Whether to write the plot to a file.
+        dimensionless (bool): Whether to use dimensionless values.
+        log_scale (bool): Whether to use a log scale for the y-axis.
+        velocity_variable (str): The velocity variable to use.
+        save_dir (str): Directory to save plots. If None, uses default.
+        filename_prefix (str): Prefix for saved filenames. If None, uses the variable name.
+        
+    Returns:
+        pd.DataFrame: The participant profiles dataframe, containing averaged velocities
+                     for each participant at each pressure, with group labels.
+    """
+    # Set up style and font
+    sns.set_style("whitegrid")
+    source_sans = get_source_sans_font()
+    
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 5, 'lines.linewidth': 0.5
+    })
+    
+    # Create a copy of the dataframe to avoid modifying the original
+    plot_df = df.copy()
+    
+    # Set color palette and conditions based on variable (similar to plot_CI function)
+    if variable == 'Age':
+        base_color = '#1f77b4'
+        conditions = [df[variable] <= 29, df[variable] > 29]
+        choices = ['≤29', '>29']
+    elif variable == 'SYS_BP':
+        base_color = '2ca02c'
+        conditions = [df[variable] < 120, df[variable] >= 120]
+        choices = ['<120', '≥120']
+    elif variable == 'Sex':
+        base_color = '674F92'
+        conditions = [df[variable] == 'M', df[variable] == 'F']
+        choices = ['Male', 'Female']
+    elif variable == 'Diabetes':
+        base_color = 'ff7f0e'
+        conditions = [df['SET'] == 'set01', df['SET'] == 'set03']
+        choices = ['Control', 'Diabetic']
+    elif variable == 'Hypertension':
+        base_color = 'd62728'
+        conditions = [df['SET'] == 'set01', df['SET'] == 'set02']
+        choices = ['Control', 'Hypertensive']
+    elif variable == 'Set_affected':
+        base_color = '#00CED1'  # sky blue
+        conditions = [df['SET'] == 'set01', df['Set_affected'] == 'set04']
+        choices = ['Control', 'Affected']
+    else:
+        raise ValueError(f"Unsupported variable: {variable}")
+
+    # Create color palette
+    palette = create_monochromatic_palette(base_color)
+    palette = adjust_brightness_of_colors(palette, brightness_scale=.1)
+    
+    # Ensure consistent coloring by using only two colors
+    control_color = palette[4]
+    condition_color = palette[1]
+    
+    # Add group column to the dataframe
+    group_col = f'{variable} Group'
+    plot_df[group_col] = np.select(conditions, choices, default='Unknown')
+    
+    # Print unique values for debugging
+    print(f"Unique values in {group_col}: {plot_df[group_col].unique()}")
+    
+    # Create participant velocity profiles by averaging velocities at each pressure
+    # This avoids giving more weight to participants with more measurements
+    participant_profiles = []
+    
+    # Get unique participant IDs
+    participants = plot_df['Participant'].unique()
+    
+    # For each participant, calculate the average velocity at each pressure
+    for participant in participants:
+        participant_data = plot_df[plot_df['Participant'] == participant]
+        
+        # Group by pressure and calculate mean velocity
+        profile = participant_data.groupby('Pressure')[velocity_variable].mean().reset_index()
+        profile['Participant'] = participant
+        
+        # Add any additional participant metadata (take first occurrence)
+        metadata_cols = ['Age', 'Sex', 'SET', 'Diabetes', 'Hypertension', 'SYS_BP', group_col, 'Set_affected']
+        for col in metadata_cols:
+            if col in participant_data.columns:
+                # Use the most common value for the group column (in case there are inconsistencies)
+                if col == group_col:
+                    profile[col] = participant_data[col].mode().iloc[0]
+                else:
+                    profile[col] = participant_data[col].iloc[0]
+        
+        participant_profiles.append(profile)
+    
+    # Combine all participant profiles into one dataframe
+    if participant_profiles:
+        profiles_df = pd.concat(participant_profiles, ignore_index=True)
+    else:
+        print("Error: No participant profiles created. Check input data.")
+        return None
+    
+    # Create figure for plotting
+    fig, ax = plt.subplots(figsize=(2.4, 2.0))
+    
+    # Get unique pressures and sort them
+    pressures = sorted(profiles_df['Pressure'].unique())
+    
+    # Calculate stats for each group and pressure
+    stats_df = pd.DataFrame()
+    
+    for group_name in choices:
+        group_stats = []
+        
+        # Filter profiles for this group
+        group_profiles = profiles_df[profiles_df[group_col] == group_name]
+        
+        # Skip if not enough participants in this group
+        if len(group_profiles['Participant'].unique()) < 2:
+            print(f"Warning: Not enough participants in group {group_name}, skipping.")
+            continue
+            
+        for pressure in pressures:
+            # Get data for this pressure
+            pressure_data = group_profiles[group_profiles['Pressure'] == pressure]
+            
+            # Skip if not enough data
+            if len(pressure_data) < 3:
+                continue
+                
+            # Calculate CI based on method
+            if method == 'bootstrap':
+                ci_data = calculate_median_ci(
+                    pressure_data, 
+                    n_iterations=n_iterations, 
+                    ci_percentile=ci_percentile,
+                    dimensionless=dimensionless,
+                    velocity_variable=velocity_variable
+                )
+            else:
+                ci_data = calculate_mean_ci(
+                    pressure_data,
+                    ci_percentile=ci_percentile,
+                    dimensionless=dimensionless,
+                    velocity_variable=velocity_variable
+                )
+                
+            # Skip if calculation failed
+            if ci_data is None:
+                continue
+                
+            median, lower, upper = ci_data
+            
+            # Add to group stats
+            group_stats.append({
+                'Group': group_name,
+                'Pressure': pressure,
+                'median': median,
+                'lower': lower,
+                'upper': upper
+            })
+            
+        # Add group stats to main stats dataframe
+        if group_stats:
+            group_stats_df = pd.DataFrame(group_stats)
+            stats_df = pd.concat([stats_df, group_stats_df], ignore_index=True)
+    
+    # Determine column names for plotting based on method and dimensionless flag
+    y_col = 'median'
+    lower_col = 'lower'
+    upper_col = 'upper'
+    
+    # Plot for each group
+    for i, group_name in enumerate(choices):
+        group_data = stats_df[stats_df['Group'] == group_name]
+        
+        # Skip if no data for this group
+        if group_data.empty:
+            print(f"Warning: No valid data for group {group_name}")
+            continue
+            
+        # Sort by pressure
+        group_data = group_data.sort_values('Pressure')
+        
+        # Plot the main line with error bars
+        color = control_color if i == 0 else condition_color
+        
+        ax.errorbar(
+            group_data['Pressure'], 
+            group_data[y_col],
+            yerr=[group_data[y_col] - group_data[lower_col], group_data[upper_col] - group_data[y_col]],
+            label=group_name, 
+            fmt='-o', 
+            markersize=2, 
+            color=color
+        )
+        
+        # Add the confidence interval as a shaded region
+        ax.fill_between(
+            group_data['Pressure'], 
+            group_data[lower_col], 
+            group_data[upper_col],
+            alpha=0.4, 
+            color=color
+        )
+    
+    # Add log scale if requested
+    if log_scale:
+        ax.set_yscale('log')
+        ax.yaxis.set_major_locator(ticker.LogLocator(base=10.0, numticks=5))
+        ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
+    
+    # Create legend handles with consistent colors
+    legend_handles = [
+        mpatches.Patch(color=control_color, label=f'{choices[0]} group', alpha=0.6),
+        mpatches.Patch(color=condition_color, label=f'{choices[1]} group', alpha=0.6)
+    ]
+    
+    # Set labels and title
+    ax.set_xlabel('Pressure (psi)', fontproperties=source_sans)
+    
+    # Calculate participant counts for each group
+    group_counts = profiles_df.groupby(group_col)['Participant'].nunique()
+    count_str = ", ".join([f"{grp}: n={cnt}" for grp, cnt in group_counts.items() if grp in choices])
+    
+    # Set appropriate labels based on configuration
+    if dimensionless:
+        ax.set_ylabel('Dimensionless Velocity', fontproperties=source_sans)
+        ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Participant Profiles by {variable} ({count_str})', 
+                    fontproperties=source_sans, fontsize=8)
+    else:
+        ax.set_ylabel('Velocity (um/s)', fontproperties=source_sans)
+        ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Participant Profiles by {variable} ({count_str})', 
+                    fontproperties=source_sans, fontsize=8)
+    
+    # Add legend
+    if source_sans:
+        ax.legend(handles=legend_handles, prop=source_sans)
+    else:
+        ax.legend(handles=legend_handles)
+    
+    ax.grid(True, linewidth=0.3)
+    plt.tight_layout()
+    
+    # Save the figure if requested
+    if write:
+        if save_dir is None:
+            # Use a default directory if none provided
+            save_dir = os.path.join(PATHS.get('cap_flow', '.'), 'results', 'velocity_profiles')
+            os.makedirs(save_dir, exist_ok=True)
+        
+        # Create filename with parameters
+        if filename_prefix is None:
+            filename_prefix = f"participant_profiles_{variable.lower()}"
+            
+        filename = f"{filename_prefix}_{method}_ci{ci_percentile}"
+        if dimensionless:
+            filename += "_dimensionless"
+        if log_scale:
+            filename += "_log"
+        
+        # Save as PNG and PDF
+        plt.savefig(os.path.join(save_dir, f"{filename}.png"), dpi=600, bbox_inches='tight')
+        plt.savefig(os.path.join(save_dir, f"{filename}.pdf"), bbox_inches='tight')
+    
+    plt.close()
+    
+    return profiles_df
