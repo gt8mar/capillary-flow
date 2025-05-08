@@ -39,6 +39,8 @@ status_text = None
 image_path = None
 original_image_size = None  # To track resizing for point coordinate adjustments
 navigation_action = "next"  # Controls navigation between images ("next" or "back")
+current_label = 1  # 1 = add (foreground), 0 = subtract (background)
+COLOR_MAP = {1: 'r', 0: 'b'}  # Red for add, Blue for subtract
 
 # Path to the progress tracking file
 PROGRESS_FILE = os.path.join(PATHS['frog_dir'], "segmentation_progress.json")
@@ -233,81 +235,92 @@ def mark_as_completed():
     print(f"Marked {os.path.basename(image_path)} as completed")
 
 def is_completed(img_path):
-    """Check if an image has been completed."""
+    """Check if an image has been completed for the *with-delete* workflow.
+
+    An image is considered complete **only** if the new style mask file
+    (ending with ``_mask_with_delete.png``) exists.  This allows users who
+    have already generated the legacy ``_mask.png`` to rerun the script and
+    enrich their annotations with subtract points without having to move or
+    delete the old masks.
+    """
     progress = load_progress()
-    
-    # Check if the image is in the completed list
-    if img_path in progress["completed"]:
+
+    # Locate the *new* mask file that corresponds to the with-delete flow
+    base = os.path.splitext(os.path.basename(img_path))[0]
+    delete_mask_path = os.path.join(
+        PATHS['frog_segmented'], f"{base}_mask_with_delete.png"
+    )
+
+    # If the new mask exists, mark as complete (persistently) and skip
+    if os.path.exists(delete_mask_path):
+        if img_path not in progress["completed"]:
+            progress["completed"].append(img_path)
+            with open(PROGRESS_FILE, 'w') as f:
+                json.dump(progress, f, indent=2)
         return True
-    
-    # Also check if there's a segmentation file already
-    mask_filename = os.path.join(PATHS['frog_segmented'], f"{os.path.splitext(os.path.basename(img_path))[0]}_mask.png")
-    if os.path.exists(mask_filename):
-        # Add to completed list for future checks
-        progress["completed"].append(img_path)
+
+    # Otherwise ensure the image is NOT marked complete (might have been
+    # completed in the legacy run). This enables re-processing.
+    if img_path in progress["completed"]:
+        progress["completed"].remove(img_path)
         with open(PROGRESS_FILE, 'w') as f:
             json.dump(progress, f, indent=2)
-        return True
-    
+
     return False
 
 def on_click(event):
     """
     Handle mouse click events on the image.
-    
-    Args:
-        event: The matplotlib event object
+    The annotation label (add/subtract) is controlled by the global
+    ``current_label`` which can be toggled with the ``t`` key.
+    Positive points (foreground) use label ``1`` (red), negative points
+    (background) use label ``0`` (blue) as per Segment Anything docs.
     """
     global input_points, input_labels, mask, mask_overlay
-    
+
     if event.inaxes != ax:
         return
-    
-    update_status("Processing...")
-    
-    # Add the clicked point
+
+    update_status("Processing…")
+
+    # Add the clicked point with current label
     input_points.append([event.xdata, event.ydata])
-    input_labels.append(1)  # 1 for foreground
-    
-    # Update the plot with the new point
-    ax.plot(event.xdata, event.ydata, 'ro', markersize=8)
-    
+    input_labels.append(current_label)
+
+    # Visualise the point using appropriate colour
+    ax.plot(event.xdata, event.ydata, f"{COLOR_MAP[current_label]}o", markersize=8)
+
     # Generate mask if we have at least one point
     if len(input_points) > 0:
-        # Convert points to numpy array
         points_array = np.array(input_points)
         labels_array = np.array(input_labels)
-        
-        # Generate mask
+
         with torch.no_grad():  # Disable gradient calculation for inference
             masks, scores, logits = predictor.predict(
                 point_coords=points_array,
                 point_labels=labels_array,
                 multimask_output=True
             )
-        
-        # Select the mask with the highest score
+
         mask_idx = np.argmax(scores)
         mask = masks[mask_idx]
-        
+
         # Remove previous mask overlay if it exists
         if mask_overlay is not None:
             mask_overlay.remove()
-        
-        # Create a colored mask overlay
-        colored_mask = np.zeros((mask.shape[0], mask.shape[1], 4))
-        colored_mask[mask] = [1, 0, 0, 0.5]  # Red with 50% transparency
-        
-        # Display the mask overlay
-        mask_overlay = ax.imshow(colored_mask)
-    
+
+        # Create a coloured mask overlay (still red)
+        coloured_mask = np.zeros((mask.shape[0], mask.shape[1], 4))
+        coloured_mask[mask] = [1, 0, 0, 0.5]  # Red with 50% transparency
+        mask_overlay = ax.imshow(coloured_mask)
+
     fig.canvas.draw()
-    update_status("Ready - Click to add points, 'Save' when done")
-    
+    mode_str = "Add (red)" if current_label == 1 else "Subtract (blue)"
+    update_status(f"Mode: {mode_str}  –  Click to add points, 'Save' when done")
+
     # Save progress after each point
     save_progress()
-    
-    # Clear CUDA cache to free up memory
+
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
@@ -357,14 +370,14 @@ def on_save(event):
         update_status("No mask to save. Please segment the image first.")
         return
     
-    update_status("Saving...")
+    update_status("Saving…")
     
     # Create output directory if it doesn't exist
     os.makedirs(PATHS['frog_segmented'], exist_ok=True)
     
     # Get output paths
     base_name = os.path.splitext(os.path.basename(image_path))[0]
-    mask_filename = os.path.join(PATHS['frog_segmented'], f"{base_name}_mask.png")
+    mask_filename = os.path.join(PATHS['frog_segmented'], f"{base_name}_mask_with_delete.png")
     
     # Save the mask
     # If the image was resized, we need to resize the mask back to the original size
@@ -424,6 +437,11 @@ def on_key_press(event):
         on_back(event)
     elif key == 'r':
         on_reset(event)
+    elif key == 't':
+        global current_label
+        current_label = 0 if current_label == 1 else 1
+        mode_str = "Add (red)" if current_label == 1 else "Subtract (blue)"
+        update_status(f"Toggled mode: {mode_str}")
 
 def interactive_segmentation(img_path):
     """
@@ -487,9 +505,9 @@ def interactive_segmentation(img_path):
     
     # If we have saved points, display them and generate the mask
     if len(input_points) > 0:
-        # Display saved points
-        for point in input_points:
-            ax.plot(point[0], point[1], 'ro', markersize=8)
+        # Display saved points with colour according to label
+        for point, lbl in zip(input_points, input_labels):
+            ax.plot(point[0], point[1], f"{COLOR_MAP.get(lbl, 'r')}o", markersize=8)
         
         # Generate mask from saved points
         points_array = np.array(input_points)
@@ -507,12 +525,12 @@ def interactive_segmentation(img_path):
         mask_idx = np.argmax(scores)
         mask = masks[mask_idx]
         
-        # Create a colored mask overlay
-        colored_mask = np.zeros((mask.shape[0], mask.shape[1], 4))
-        colored_mask[mask] = [1, 0, 0, 0.5]  # Red with 50% transparency
+        # Create a coloured mask overlay (still red)
+        coloured_mask = np.zeros((mask.shape[0], mask.shape[1], 4))
+        coloured_mask[mask] = [1, 0, 0, 0.5]  # Red with 50% transparency
         
         # Display the mask overlay
-        mask_overlay = ax.imshow(colored_mask)
+        mask_overlay = ax.imshow(coloured_mask)
     
     # Add status message
     update_status("Ready - Click on the frog to segment it")
