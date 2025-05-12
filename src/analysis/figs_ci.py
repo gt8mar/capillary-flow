@@ -33,7 +33,7 @@ def main(plot_participant_profiles=False, plot_group_profiles=False):
                                    Default is True.
     """
     # Load the data
-    data_filepath = os.path.join(PATHS['cap_flow'], 'summary_df_nhp_video_stats2.csv')
+    data_filepath = os.path.join(PATHS['cap_flow'], 'summary_df_nhp_video_stats.csv')
     df = pd.read_csv(data_filepath)
 
     # ------------------------------------------------------------------------------------------------

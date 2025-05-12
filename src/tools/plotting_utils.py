@@ -341,8 +341,8 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
     # Set color palette based on variable
     if variable == 'Age':
         base_color = '#1f77b4'
-        conditions = [df[variable] <= 29, df[variable] > 29]
-        choices = ['≤29', '>29']
+        conditions = [df[variable] <= 59, df[variable] > 59]
+        choices = ['≤59', '>59']
     elif variable == 'SYS_BP':
         base_color = '2ca02c'
         conditions = [df[variable] < 120, df[variable] >= 120]

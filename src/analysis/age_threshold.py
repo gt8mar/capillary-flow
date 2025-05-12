@@ -25,15 +25,16 @@ cap_flow_path = PATHS['cap_flow']
 source_sans = load_source_sans()
 
 def create_age_cdf_plot(df: pd.DataFrame, threshold: int, 
-                        output_path: str, ax=None) -> Optional[float]:
+                        output_path: str, ax=None, average_by_participant: bool = False) -> Optional[float]:
     """
     Creates a CDF plot for velocities split by age groups based on the given threshold.
     
     Args:
         df: DataFrame containing Age and Video_Median_Velocity columns
         threshold: Age threshold to split groups (younger vs older)
-        output_path: Path for finding fonts and saving results
+        output_path: Path for finding fonts and saving results (Note: not used for saving if ax is provided)
         ax: Matplotlib axis object to plot on (optional)
+        average_by_participant: Flag indicating if data was averaged by participant.
     
     Returns:
         KS statistic measuring the difference between distributions
@@ -47,6 +48,7 @@ def create_age_cdf_plot(df: pd.DataFrame, threshold: int,
     # Group data
     young_group = df[df['Age'] < threshold]['Video_Median_Velocity']
     old_group = df[df['Age'] >= threshold]['Video_Median_Velocity']
+
     
     # Check if we have enough data in both groups
     if len(young_group) < 3 or len(old_group) < 3:
@@ -78,21 +80,23 @@ def create_age_cdf_plot(df: pd.DataFrame, threshold: int,
     ax.text(0.05, 0.95, f"KS stat: {ks_stat:.3f}\n{p_text}", 
            transform=ax.transAxes, fontsize=6, va='top')
     
+    title_suffix = " (Participant Avg)" if average_by_participant else ""
+    
     # Try to use Source Sans font if available
     try:
-        source_sans = FontProperties(fname=os.path.join(PATHS['downloads'], 
+        source_sans_font = FontProperties(fname=os.path.join(PATHS['downloads'], 
                                                        'Source_Sans_3', 'static', 
                                                        'SourceSans3-Regular.ttf'))
-        ax.set_xlabel('Video Median Velocity (mm/s)', fontproperties=source_sans)
-        ax.set_ylabel('Cumulative Probability', fontproperties=source_sans)
-        ax.set_title(f'Velocity CDF by Age (Threshold: {threshold})', 
-                    fontproperties=source_sans)
-        ax.legend(prop=source_sans)
+        ax.set_xlabel('Velocity (um/s)', fontproperties=source_sans_font)
+        ax.set_ylabel('Cumulative Probability', fontproperties=source_sans_font)
+        ax.set_title(f'Velocity CDF by Age (Threshold: {threshold}){title_suffix}', 
+                    fontproperties=source_sans_font)
+        ax.legend(prop=source_sans_font)
     except:
         # Fall back to default font
-        ax.set_xlabel('Video Median Velocity (mm/s)')
+        ax.set_xlabel('Velocity (um/s)')
         ax.set_ylabel('Cumulative Probability')
-        ax.set_title(f'Velocity CDF by Age (Threshold: {threshold})')
+        ax.set_title(f'Velocity CDF by Age (Threshold: {threshold}){title_suffix}')
         ax.legend()
     
     ax.grid(True, alpha=0.3)
@@ -100,13 +104,14 @@ def create_age_cdf_plot(df: pd.DataFrame, threshold: int,
     return ks_stat
 
 
-def threshold_analysis(df: pd.DataFrame) -> int:
+def threshold_analysis(df: pd.DataFrame, average_by_participant: bool = False) -> int:
     """
     Analyzes different age thresholds to find the one that best differentiates
     velocity distributions.
     
     Args:
         df: DataFrame containing Age and Video_Median_Velocity columns
+        average_by_participant: Flag indicating if data was averaged by participant.
     
     Returns:
         The best age threshold for differentiating velocity distributions
@@ -131,26 +136,14 @@ def threshold_analysis(df: pd.DataFrame) -> int:
     print(f"Median age: {age_df['Age'].median():.2f} years")
     
     # Test different age thresholds
-    age_min = int(np.floor(age_df['Age'].min()))
-    age_max = int(np.ceil(age_df['Age'].max()))
-    
-    # Create a range of thresholds to test
-    # If we have a wide age range, test every 5 years
-    if age_max - age_min > 20:
-        thresholds = list(range(age_min + 5, age_max - 5, 5))
-    # Otherwise test every 2 years
-    else:
-        thresholds = list(range(age_min + 2, age_max - 2, 2))
-    
-    # Ensure we have at least some thresholds
-    if len(thresholds) == 0:
-        # If age range is very narrow, just use the median
-        thresholds = [int(age_df['Age'].median())]
+    thresholds = [25, 29, 34, 39, 44, 49, 54, 59, 64, 69, 74, 79]
     
     print(f"Testing age thresholds: {thresholds}")
     
     # Create individual plots for each threshold
     ks_results = {}
+    plot_suffix = "_avg_participant" if average_by_participant else ""
+    
     for threshold in thresholds:
         plt.close()
         # Set up style and font
@@ -164,12 +157,12 @@ def threshold_analysis(df: pd.DataFrame) -> int:
         })
         
         fig, ax = plt.subplots(figsize=(2.4, 2.0))
-        ks_stat = create_age_cdf_plot(age_df, threshold, cap_flow_path, ax)
+        ks_stat = create_age_cdf_plot(age_df, threshold, cap_flow_path, ax, average_by_participant)
         if ks_stat is not None:
             ks_results[threshold] = ks_stat
         
         plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, f'age_velocity_cdf_threshold_{threshold}.png'), 
+        plt.savefig(os.path.join(output_dir, f'age_velocity_cdf_threshold_{threshold}{plot_suffix}.png'), 
                    dpi=600, bbox_inches='tight')
         plt.close()
     
@@ -200,24 +193,25 @@ def threshold_analysis(df: pd.DataFrame) -> int:
             ax.axvline(x=best_threshold, color='red', linestyle='--', 
                       label=f'Best threshold: {best_threshold} years')
             
+            title_suffix = " (Participant Avg)" if average_by_participant else ""
             # Try to use Source Sans font if available
             try:
-                source_sans = FontProperties(fname=os.path.join(PATHS['downloads'], 
+                source_sans_font = FontProperties(fname=os.path.join(PATHS['downloads'], 
                                                                'Source_Sans_3', 'static', 
                                                                'SourceSans3-Regular.ttf'))
-                ax.set_xlabel('Age Threshold (years)', fontproperties=source_sans)
-                ax.set_ylabel('KS Statistic', fontproperties=source_sans)
-                ax.set_title('Capillary Velocity Similarity by Age', fontproperties=source_sans)
-                ax.legend(prop=source_sans)
+                ax.set_xlabel('Age Threshold (years)', fontproperties=source_sans_font)
+                ax.set_ylabel('KS Statistic', fontproperties=source_sans_font)
+                ax.set_title(f'Capillary Velocity Similarity by Age{title_suffix}', fontproperties=source_sans_font)
+                ax.legend(prop=source_sans_font)
             except:
                 ax.set_xlabel('Age Threshold (years)')
                 ax.set_ylabel('KS Statistic')
-                ax.set_title('Capillary Velocity Similarity by Age')
+                ax.set_title(f'Capillary Velocity Similarity by Age{title_suffix}')
                 ax.legend()
                 
             ax.grid(True, alpha=0.3)
             plt.tight_layout()
-            plt.savefig(os.path.join(output_dir, 'velocity_ks_statistic_vs_threshold.png'), 
+            plt.savefig(os.path.join(output_dir, f'velocity_ks_statistic_vs_threshold{plot_suffix}.png'), 
                        dpi=600, bbox_inches='tight')
             plt.close()
             
@@ -226,13 +220,14 @@ def threshold_analysis(df: pd.DataFrame) -> int:
     return None
 
 
-def plot_velocity_boxplots(df: pd.DataFrame, best_threshold: Optional[int] = None) -> None:
+def plot_velocity_boxplots(df: pd.DataFrame, best_threshold: Optional[int] = None, average_by_participant: bool = False) -> None:
     """
     Creates boxplots of video median velocities grouped by different age categories.
     
     Args:
         df: DataFrame containing Age and Video_Median_Velocity columns
         best_threshold: Optional optimal age threshold from threshold_analysis
+        average_by_participant: Flag indicating if data was averaged by participant.
     """
     # Create output directory for plots
     output_dir = os.path.join(cap_flow_path, 'results', 'AgeThreshold')
@@ -254,6 +249,9 @@ def plot_velocity_boxplots(df: pd.DataFrame, best_threshold: Optional[int] = Non
         'lines.linewidth': 0.5
     })
     
+    plot_suffix = "_avg_participant" if average_by_participant else ""
+    title_suffix = " (Participant Avg)" if average_by_participant else ""
+
     # 1. Create boxplot by predefined age groups
     plt.figure(figsize=(2.4, 2.0))
     
@@ -267,37 +265,65 @@ def plot_velocity_boxplots(df: pd.DataFrame, best_threshold: Optional[int] = Non
     )
     
     # Create the boxplot
-    ax = sns.boxplot(
-        x='Age_Group',
-        y='Video_Median_Velocity',
-        data=age_df,
-        color='#1f77b4',
-        width=0.6,
-        fliersize=3
-    )
-    
+    if average_by_participant:
+        ax = sns.boxplot(
+            x='Age_Group',
+            y='Video_Median_Velocity',
+            data=age_df,
+            color='#1f77b4',
+            width=0.6,
+            showfliers=False # Hide fliers when stripplot is shown
+        )
+        sns.stripplot(
+            x='Age_Group',
+            y='Video_Median_Velocity',
+            data=age_df,
+            color='black', 
+            size=3,
+            jitter=True,
+            alpha=0.6,
+            ax=ax
+        )
+    else:
+        ax = sns.boxplot(
+            x='Age_Group',
+            y='Video_Median_Velocity',
+            data=age_df,
+            color='#1f77b4',
+            width=0.6,
+            fliersize=3
+        )
+
     # Set title and labels
     if source_sans:
-        ax.set_title('Video Median Velocity by Age Group', fontproperties=source_sans, fontsize=8)
+        ax.set_title(f'Video Median Velocity by Age Group{title_suffix}', fontproperties=source_sans, fontsize=8)
         ax.set_xlabel('Age Group', fontproperties=source_sans)
-        ax.set_ylabel('Median Velocity (mm/s)', fontproperties=source_sans)
+        ax.set_ylabel('Velocity (um/s)', fontproperties=source_sans)
     else:
-        ax.set_title('Video Median Velocity by Age Group', fontsize=8)
+        ax.set_title(f'Video Median Velocity by Age Group{title_suffix}', fontsize=8)
         ax.set_xlabel('Age Group')
-        ax.set_ylabel('Median Velocity (mm/s)')
+        ax.set_ylabel('Velocity (um/s)')
     
     # Get counts for each age group
-    counts = age_df['Age_Group'].value_counts().sort_index()
+    counts_30 = age_df[age_df['Age_Group'] == '<30']['Video_Median_Velocity'].count()
+    counts_50 = age_df[age_df['Age_Group'] == '30-49']['Video_Median_Velocity'].count()
+    counts_60 = age_df[age_df['Age_Group'] == '50-59']['Video_Median_Velocity'].count()
+    counts_70 = age_df[age_df['Age_Group'] == '60-69']['Video_Median_Velocity'].count()
+    counts_100 = age_df[age_df['Age_Group'] == '70+']['Video_Median_Velocity'].count()
     
     # Add counts to the x-tick labels
-    xtick_labels = [f"{label.get_text()}\n(n={counts[label.get_text()]})" 
-                  if label.get_text() in counts.index else label.get_text()
-                  for label in ax.get_xticklabels()]
+    xtick_labels = [
+        f"<30\n(n={counts_30})",
+        f"30-49\n(n={counts_50})",
+        f"50-59\n(n={counts_60})",
+        f"60-69\n(n={counts_70})",
+        f"70+\n(n={counts_100})"
+    ]
     ax.set_xticklabels(xtick_labels)
     
     # Save the figure
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'velocity_by_age_groups.png'), 
+    plt.savefig(os.path.join(output_dir, f'velocity_by_age_groups{plot_suffix}.png'), 
                dpi=300, bbox_inches='tight')
     plt.close()
     
@@ -310,34 +336,55 @@ def plot_velocity_boxplots(df: pd.DataFrame, best_threshold: Optional[int] = Non
             lambda x: f'<{best_threshold} years' if x < best_threshold else f'≥{best_threshold} years'
         )
         
-        # Create the boxplot
-        ax = sns.boxplot(
-            x='Threshold_Group',
-            y='Video_Median_Velocity',
-            data=age_df,
-            color='#2ca02c',
-            width=0.6,
-            fliersize=3
-        )
+        if average_by_participant:
+            # Create the boxplot
+            ax = sns.boxplot(
+                x='Threshold_Group',
+                y='Video_Median_Velocity',
+                data=age_df,
+                color='#2ca02c',
+                width=0.6, 
+                showfliers=False
+            )
+        else: 
+            ax = sns.boxplot(
+                x='Threshold_Group',
+                y='Video_Median_Velocity',
+                data=age_df,
+                color='#2ca02c',
+                width=0.6,
+                fliersize=3
+            )
+        if average_by_participant:
+            sns.stripplot(
+                x='Threshold_Group',
+                y='Video_Median_Velocity',
+                data=age_df,
+                color='black', # Or a darker shade like '#1b5e20'
+                size=3,
+                jitter=True,
+                alpha=0.6,
+                ax=ax
+            )
         
         # Set title and labels
         if source_sans:
-            ax.set_title(f'Video Median Velocity by Age Threshold ({best_threshold} years)', 
+            ax.set_title(f'Video Median Velocity by Age Threshold ({best_threshold} years){title_suffix}', 
                         fontproperties=source_sans, fontsize=8)
             ax.set_xlabel('Age Group', fontproperties=source_sans)
-            ax.set_ylabel('Median Velocity (mm/s)', fontproperties=source_sans)
+            ax.set_ylabel('Velocity (um/s)', fontproperties=source_sans)
         else:
-            ax.set_title(f'Video Median Velocity by Age Threshold ({best_threshold} years)', fontsize=8)
+            ax.set_title(f'Video Median Velocity by Age Threshold ({best_threshold} years){title_suffix}', fontsize=8)
             ax.set_xlabel('Age Group')
-            ax.set_ylabel('Median Velocity (mm/s)')
+            ax.set_ylabel('Velocity (um/s)')
         
         # Get counts for each threshold group
-        counts = age_df['Threshold_Group'].value_counts().sort_index()
+        counts_young_threshold = age_df[age_df['Threshold_Group'] == f'<{best_threshold} years']['Video_Median_Velocity'].count()
+        counts_old_threshold = age_df[age_df['Threshold_Group'] == f'≥{best_threshold} years']['Video_Median_Velocity'].count()
         
         # Add counts to the x-tick labels
-        xtick_labels = [f"{label.get_text()}\n(n={counts[label.get_text()]})" 
-                      if label.get_text() in counts.index else label.get_text()
-                      for label in ax.get_xticklabels()]
+        xtick_labels = [f"<{best_threshold}\n(n={counts_young_threshold})",
+                        f">={best_threshold}\n(n={counts_old_threshold})"]
         ax.set_xticklabels(xtick_labels)
         
         # Add statistical annotation
@@ -357,17 +404,18 @@ def plot_velocity_boxplots(df: pd.DataFrame, best_threshold: Optional[int] = Non
         
         # Save the figure
         plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, f'velocity_by_threshold_{best_threshold}.png'), 
+        plt.savefig(os.path.join(output_dir, f'velocity_by_threshold_{best_threshold}{plot_suffix}.png'), 
                    dpi=300, bbox_inches='tight')
         plt.close()
 
 
-def analyze_pressure_specific_thresholds(df: pd.DataFrame) -> Dict[int, int]:
+def analyze_pressure_specific_thresholds(df: pd.DataFrame, average_by_participant: bool = False) -> Dict[int, int]:
     """
     Analyzes age thresholds separately for each pressure level.
     
     Args:
         df: DataFrame containing Age, Pressure, and Video_Median_Velocity columns
+        average_by_participant: Flag indicating if data was averaged by participant.
     
     Returns:
         Dictionary mapping pressure levels to their best age thresholds
@@ -390,6 +438,8 @@ def analyze_pressure_specific_thresholds(df: pd.DataFrame) -> Dict[int, int]:
     best_thresholds = {}
     ks_all_pressures = {}
     
+    plot_suffix = "_avg_participant" if average_by_participant else ""
+    
     for pressure in pressures:
         print(f"\nAnalyzing threshold for pressure: {pressure}")
         
@@ -403,20 +453,8 @@ def analyze_pressure_specific_thresholds(df: pd.DataFrame) -> Dict[int, int]:
         # Print data size
         print(f"Samples for pressure {pressure}: {len(pressure_df)}")
         
-        # Determine age range for thresholds
-        age_min = int(np.floor(pressure_df['Age'].min()))
-        age_max = int(np.ceil(pressure_df['Age'].max()))
-        
-        # Create a range of thresholds to test
-        if age_max - age_min > 20:
-            thresholds = list(range(age_min + 5, age_max - 5, 5))
-        else:
-            thresholds = list(range(age_min + 2, age_max - 2, 2))
-        
-        # Ensure we have at least some thresholds
-        if len(thresholds) == 0:
-            thresholds = [int(pressure_df['Age'].median())]
-        
+         # Test different age thresholds
+        thresholds = [25, 29, 34, 39, 44, 49, 54, 59, 64, 69, 74, 79]
         print(f"Testing thresholds for pressure {pressure}: {thresholds}")
         
         # Test each threshold
@@ -452,10 +490,11 @@ def analyze_pressure_specific_thresholds(df: pd.DataFrame) -> Dict[int, int]:
             })
             
             fig, ax = plt.subplots(figsize=(2.4, 2.0))
-            create_age_cdf_plot(pressure_df, threshold, cap_flow_path, ax)
+            ks_stat2 =create_age_cdf_plot(pressure_df, threshold, cap_flow_path, ax, average_by_participant)
+            print(f'ks_stat: {ks_stat}, ks_stat2: {ks_stat2}')
             
             plt.tight_layout()
-            plt.savefig(os.path.join(output_dir, f'pressure_{pressure}_threshold_{threshold}.png'), 
+            plt.savefig(os.path.join(output_dir, f'pressure_{pressure}_threshold_{threshold}{plot_suffix}.png'), 
                        dpi=600, bbox_inches='tight')
             plt.close()
         
@@ -483,26 +522,158 @@ def analyze_pressure_specific_thresholds(df: pd.DataFrame) -> Dict[int, int]:
         
         ax.plot(pressures, thresholds, 'o-', linewidth=1)
         
+        title_suffix = " (Participant Avg)" if average_by_participant else ""
         # Try to use Source Sans font if available
         if source_sans:
             ax.set_xlabel('Pressure (PSI)', fontproperties=source_sans)
             ax.set_ylabel('Best Age Threshold (years)', fontproperties=source_sans)
-            ax.set_title('Optimal Age Threshold by Pressure', fontproperties=source_sans)
+            ax.set_title(f'Optimal Age Threshold by Pressure{title_suffix}', fontproperties=source_sans)
         else:
             ax.set_xlabel('Pressure (PSI)')
             ax.set_ylabel('Best Age Threshold (years)')
-            ax.set_title('Optimal Age Threshold by Pressure')
+            ax.set_title(f'Optimal Age Threshold by Pressure{title_suffix}')
         
         ax.grid(True, alpha=0.3)
         plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, 'best_threshold_by_pressure.png'), 
+        plt.savefig(os.path.join(output_dir, f'best_threshold_by_pressure{plot_suffix}.png'), 
                    dpi=600, bbox_inches='tight')
         plt.close()
     
     return best_thresholds
 
 
-def main():
+def plot_velocity_boxplots_by_pressure(
+    df: pd.DataFrame,
+    pressures: Optional[List[float]] = None,
+    min_samples: int = 5,
+    average_by_participant: bool = False,
+) -> None:
+    """Create boxplots of *Video_Median_Velocity* by predefined age bins **for each pressure level**.
+
+    Each pressure-specific subset is handled independently, ensuring that the *n* displayed
+    in the labels correspond to the exact pool of videos used for that pressure.
+
+    Args:
+        df: Complete dataframe containing at least *Age*, *Pressure* and
+            *Video_Median_Velocity* columns.
+        pressures: If provided, limits the plots to the specified pressure levels.
+            When *None* (default) all distinct, non-null pressure values are processed.
+        min_samples: Minimal number of rows required for a pressure level to be plotted.
+            This avoids generating misleading plots for very sparse subsets.
+        average_by_participant: Flag indicating if data was averaged by participant.
+    """
+    # Determine which pressure levels to plot
+    if pressures is None:
+        pressures = sorted(df['Pressure'].dropna().unique())
+
+    output_dir = os.path.join(cap_flow_path, 'results', 'AgeThreshold', 'PressureSpecific', 'Boxplots')
+    os.makedirs(output_dir, exist_ok=True)
+
+    print("\nCreating pressure-specific velocity boxplots by age bins…")
+
+    # Common seaborn / matplotlib style (reuse config from the other boxplot helper)
+    sns.set_style("whitegrid")
+    plt.rcParams.update({
+        'pdf.fonttype': 42,
+        'ps.fonttype': 42,
+        'font.size': 7,
+        'axes.labelsize': 7,
+        'xtick.labelsize': 6,
+        'ytick.labelsize': 6,
+        'legend.fontsize': 5,
+        'lines.linewidth': 0.5,
+    })
+
+    plot_suffix = "_avg_participant" if average_by_participant else ""
+    title_suffix = " (Participant Avg)" if average_by_participant else ""
+
+    for pressure in pressures:
+        pressure_df = df[df['Pressure'] == pressure].dropna(subset=['Video_Median_Velocity', 'Age']).copy()
+
+        if len(pressure_df) < min_samples:
+            print(f"Skipping pressure {pressure} PSI – insufficient data (n={len(pressure_df)})")
+            continue
+
+        # Bin ages exactly the same way as in *plot_velocity_boxplots*
+        pressure_df['Age_Group'] = pd.cut(
+            pressure_df['Age'],
+            bins=[0, 30, 50, 60, 70, 100],
+            labels=['<30', '30-49', '50-59', '60-69', '70+'],
+            include_lowest=True,
+        )
+
+        plt.figure(figsize=(2.4, 2.0))
+        if average_by_participant:
+            ax = sns.boxplot(
+                x='Age_Group',
+                y='Video_Median_Velocity',
+                data=pressure_df,
+                color='#1f77b4',
+                width=0.6,
+                showfliers=False # Hide fliers when stripplot is shown
+            )
+            sns.stripplot(
+                x='Age_Group',
+                y='Video_Median_Velocity',
+                data=pressure_df,
+                color='black', 
+                size=3,
+                jitter=True,
+                alpha=0.6,
+                ax=ax
+            )
+        else:
+            ax = sns.boxplot(
+                x='Age_Group',
+                y='Video_Median_Velocity',
+                data=pressure_df,
+                color='#1f77b4',
+                width=0.6,
+                fliersize=3,
+            )
+
+        # Title & labels with Source Sans fallback
+        if source_sans:
+            ax.set_title(
+                f'Velocity at {pressure} PSI by Age Group{title_suffix}',
+                fontproperties=source_sans,
+                fontsize=8,
+            )
+            ax.set_xlabel('Age Group', fontproperties=source_sans)
+            ax.set_ylabel('Velocity (um/s)', fontproperties=source_sans)
+        else:
+            ax.set_title(f'Velocity at {pressure} PSI by Age Group{title_suffix}', fontsize=8)
+            ax.set_xlabel('Age Group')
+            ax.set_ylabel('Velocity (um/s)')
+
+        # Get counts for each age group
+        counts_30 = pressure_df[pressure_df['Age_Group'] == '<30']['Video_Median_Velocity'].count()
+        counts_50 = pressure_df[pressure_df['Age_Group'] == '30-49']['Video_Median_Velocity'].count()
+        counts_60 = pressure_df[pressure_df['Age_Group'] == '50-59']['Video_Median_Velocity'].count()
+        counts_70 = pressure_df[pressure_df['Age_Group'] == '60-69']['Video_Median_Velocity'].count()
+        counts_100 = pressure_df[pressure_df['Age_Group'] == '70+']['Video_Median_Velocity'].count()
+        
+        xtick_labels = [
+            f"<30\n(n={counts_30})",
+            f"30-49\n(n={counts_50})",
+            f"50-59\n(n={counts_60})",
+            f"60-69\n(n={counts_70})",
+            f"70+\n(n={counts_100})"
+        ]
+        ax.set_xticklabels(xtick_labels)
+
+        plt.tight_layout()
+        outfile = os.path.join(
+            output_dir,
+            f'velocity_by_age_groups_pressure_{pressure}{plot_suffix}.png',
+        )
+        plt.savefig(outfile, dpi=300, bbox_inches='tight')
+        plt.close()
+
+    print("Pressure-specific boxplots saved to:", output_dir)
+
+
+def main(debug=False, average_by_participant: bool = False):
     """Main function for age threshold analysis."""
     print("\nRunning age threshold analysis for capillary velocity data...")
     
@@ -511,26 +682,70 @@ def main():
     df = pd.read_csv(data_filepath)
 
     controls_df = df[df['SET'] == 'set01']
+
+    # drop rows with nan video_median_velocity
+    controls_df = controls_df[controls_df['Video_Median_Velocity'].notna()]
+
+    if average_by_participant:
+        print("Averaging Video_Median_Velocity by Participant and Pressure...")
+        # Assuming 'Participant' is the participant identifier and 'Age' is a stable characteristic of the participant.
+        # We group by Participant and Pressure, calculate the median velocity,
+        # and retain the 'Age' associated with that Participant.
+        # If an Participant could have multiple Ages in the dataset, 'first()' takes the first one encountered.
+        averaged_df = controls_df.groupby(['Participant', 'Pressure']).agg(
+            Video_Median_Velocity=('Video_Median_Velocity', 'median'),
+            Age=('Age', 'first')  # Assumes Age is fixed per Participant for the relevant dataset
+        ).reset_index()
+        
+        # Ensure essential columns are not NaN after aggregation/merge
+        controls_df = averaged_df.dropna(subset=['Video_Median_Velocity', 'Age'])
+        print(f"Number of rows after averaging by participant and pressure: {len(controls_df)}")
+
+    if debug:
+        print(f'number of rows in controls_df: {len(controls_df)}')
+        print(f'number of unique pressures in controls_df: {controls_df["Pressure"].nunique()}')
+        print(f'unique pressures in controls_df: {controls_df["Pressure"].unique()}')
+   
+        # make slices of controls_df for each pressure level
+        pressures = controls_df['Pressure'].unique()
+        for pressure in pressures:
+            print(f'pressure: {pressure}')
+            pressure_df = controls_df[controls_df['Pressure'] == pressure]
+            print(f'number of rows in pressure_df: {len(pressure_df)}')
+            print(f'number of unique pressures in pressure_df: {pressure_df["Pressure"].nunique()}')
+            print(f'unique pressures in pressure_df: {pressure_df["Pressure"].unique()}')
+
+    # make a pressure df for each pressure level, 0.2 through 1.2 in increments of 0.2
+    pressure_02_df = controls_df[controls_df['Pressure'] == 0.2]
+    pressure_04_df = controls_df[controls_df['Pressure'] == 0.4]
+    pressure_06_df = controls_df[controls_df['Pressure'] == 0.6]
+    pressure_08_df = controls_df[controls_df['Pressure'] == 0.8]
+    pressure_10_df = controls_df[controls_df['Pressure'] == 1.0]
+    pressure_12_df = controls_df[controls_df['Pressure'] == 1.2]
     
     # Run threshold analysis to find optimal age cutoff
-    best_threshold = threshold_analysis(controls_df)
+    best_threshold = threshold_analysis(controls_df, average_by_participant=average_by_participant)
     
     # Plot velocity by age groups
-    plot_velocity_boxplots(controls_df, best_threshold)
+    plot_velocity_boxplots(controls_df, best_threshold, average_by_participant=average_by_participant)
     
     # Run pressure-specific threshold analysis
-    pressure_thresholds = analyze_pressure_specific_thresholds(controls_df)
+    pressure_thresholds = analyze_pressure_specific_thresholds(controls_df, average_by_participant=average_by_participant)
+    
+    # Generate pressure-specific boxplots
+    plot_velocity_boxplots_by_pressure(controls_df, average_by_participant=average_by_participant)
     
     print("\nAge threshold analysis complete.")
 
 
-    # Plot the CI bands for age groups
-    # plot_CI_multiple_bands(controls_df, thresholds=[29, 49], variable='Age', method='bootstrap', 
-    #                        n_iterations=1000, ci_percentile=95, write=True, dimensionless=False, 
-    #                        video_median=False, log_scale=False, velocity_variable='Corrected Velocity')
+    # # Plot the CI bands for age groups
+    # # plot_CI_multiple_bands(controls_df, thresholds=[29, 49], variable='Age', method='bootstrap', 
+    # #                        n_iterations=1000, ci_percentile=95, write=True, dimensionless=False, 
+    # #                        video_median=False, log_scale=False, velocity_variable='Corrected Velocity')
 
     return 0
 
 
 if __name__ == "__main__":
     main() 
+    main(average_by_participant=True)

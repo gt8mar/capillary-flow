@@ -20,6 +20,7 @@ from typing import Optional, Dict
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from statsmodels.regression.mixed_linear_model import MixedLM
+from scipy.stats import norm
 
 # Import paths from config
 from src.config import PATHS, load_source_sans
@@ -113,6 +114,13 @@ def fit_mixed_models(df: pd.DataFrame) -> Dict:
     models['log_velocity'] = model.fit()
     print(models['log_velocity'].summary())
     
+    # Model 5: Log-transformed velocity with random slopes for Pressure
+    print("\nModel 5: Log-transformed velocity with random slopes for Pressure")
+    formula = "Log_Video_Median_Velocity ~ Age + Pressure"  # + Sex + SYS_BP
+    model = smf.mixedlm(formula, df, groups=df["Participant"], re_formula="~Pressure")
+    models['log_random_slopes'] = model.fit()
+    print(models['log_random_slopes'].summary())
+    
     return models
 
 def plot_diagnostics(df: pd.DataFrame, model_results: Dict) -> None:
@@ -177,7 +185,7 @@ def plot_diagnostics(df: pd.DataFrame, model_results: Dict) -> None:
         plt.close()
         
         # 3. Random effects plots (for models with random slopes)
-        if model_name == 'random_slopes':
+        if model_name in ['random_slopes', 'log_random_slopes']:
             random_effects = result.random_effects
             re_df = pd.DataFrame.from_dict(random_effects, orient='index')
             re_df.columns = ['Intercept', 'Pressure_Slope']
@@ -202,7 +210,7 @@ def plot_diagnostics(df: pd.DataFrame, model_results: Dict) -> None:
         # 4. Observed vs predicted plot
         fig, ax = plt.subplots(figsize=(10, 6))
         
-        if model_name == 'log_velocity':
+        if model_name in ['log_velocity', 'log_random_slopes']:
             observed = np.exp(df['Log_Video_Median_Velocity']) - 1
             predicted = np.exp(fitted) - 1
             ax.set_title(f'Observed vs Predicted (Back-transformed) - {model_name} Model')
@@ -425,6 +433,177 @@ def plot_pressure_vs_velocity_by_age(df: pd.DataFrame, model_results: Dict) -> N
     plt.savefig(os.path.join(output_dir, 'pressure_vs_velocity_with_ci.png'), dpi=300)
     plt.close()
 
+def write_summary_results(model_results: Dict) -> None:
+    """
+    Writes a summary of model results to a text file.
+    
+    Args:
+        model_results: Dictionary of fitted model results
+    """
+    print("\nWriting summary results to text file...")
+    
+    output_dir = os.path.join(PATHS['cap_flow'], 'results', 'mixed_model')
+    os.makedirs(output_dir, exist_ok=True)
+    
+    summary_path = os.path.join(output_dir, 'model_summary.txt')
+    
+    with open(summary_path, 'w') as f:
+        f.write("MIXED EFFECTS MODEL ANALYSIS SUMMARY\n")
+        f.write("===================================\n\n")
+        
+        # Write summary for each model
+        for model_name, result in model_results.items():
+            f.write(f"MODEL: {model_name}\n")
+            f.write("=" * (len(model_name) + 7) + "\n\n")
+            
+            # Extract key statistics
+            aic = result.aic
+            bic = result.bic
+            loglike = result.llf
+            
+            f.write(f"AIC: {aic:.2f}\n")
+            f.write(f"BIC: {bic:.2f}\n")
+            f.write(f"Log-Likelihood: {loglike:.2f}\n\n")
+            
+            # Extract fixed effect parameters
+            f.write("Fixed Effects:\n")
+            f.write("-" * 60 + "\n")
+            f.write("{:<20} {:<12} {:<12} {:<12}\n".format("Parameter", "Estimate", "Std.Err", "P-value"))
+            f.write("-" * 60 + "\n")
+            
+            # Access model parameters directly - MixedLMResults doesn't have params_names attribute
+            fe_params = result.fe_params
+            # Standard errors and p-values are directly available from the fitted result
+            bse = result.bse  # Standard errors
+            p_values = result.pvalues  # Two-sided p-values
+            
+            # Get parameter names from fe_params index
+            for param_name in fe_params.index:
+                estimate = fe_params[param_name]
+                std_err = bse.get(param_name, np.nan)
+                p_value = p_values.get(param_name, np.nan)
+
+                if np.isnan(std_err) or np.isnan(p_value):
+                    f.write("{:<20} {:<12.4f} {:<12} {:<12}\n".format(
+                        param_name, estimate, "N/A", "N/A"))
+                else:
+                    f.write("{:<20} {:<12.4f} {:<12.4f} {:<12.4f}\n".format(
+                        param_name, estimate, std_err, p_value))
+            
+            f.write("-" * 60 + "\n\n")
+            
+            # Write random effects summary if available
+            if hasattr(result, 'cov_re'):
+                f.write("Random Effects Covariance Parameters:\n")
+                f.write("-" * 60 + "\n")
+                cov_re = np.asarray(result.cov_re)
+                # If names are available and array is 1-D, pair names with values
+                if hasattr(result, 'cov_re_names') and cov_re.ndim == 1:
+                    for i, name in enumerate(result.cov_re_names):
+                        f.write(f"{name}: {float(cov_re[i]):.4f}\n")
+                else:
+                    # Print the covariance matrix row-by-row
+                    for row_idx in range(cov_re.shape[0]):
+                        row_vals = ", ".join([f"{float(v):.4f}" for v in cov_re[row_idx].flatten()])
+                        f.write(f"Row {row_idx + 1}: {row_vals}\n")
+                f.write("-" * 60 + "\n\n")
+            
+            f.write("\n" + "=" * 80 + "\n\n")
+    
+    print(f"Summary results written to: {summary_path}")
+
+def write_latex_table(model_results: Dict) -> None:
+    """
+    Creates a LaTeX table of model results.
+    
+    Args:
+        model_results: Dictionary of fitted model results
+    """
+    print("\nCreating LaTeX table of model results...")
+    
+    output_dir = os.path.join(PATHS['cap_flow'], 'results', 'mixed_model')
+    os.makedirs(output_dir, exist_ok=True)
+    
+    latex_path = os.path.join(output_dir, 'model_results_table.tex')
+    
+    with open(latex_path, 'w') as f:
+        # Write LaTeX preamble
+        f.write("% LaTeX table for mixed effects model results\n")
+        f.write("% Generated by mixed_model.py\n\n")
+        
+        # Begin table environment
+        f.write("\\begin{table}[htbp]\n")
+        f.write("\\centering\n")
+        f.write("\\caption{Mixed Effects Model Results for Blood Flow Analysis}\n")
+        f.write("\\label{tab:mixed_model_results}\n")
+        f.write("\\resizebox{\\textwidth}{!}{\n")
+        f.write("\\begin{tabular}{l" + "r" * len(model_results) + "}\n")
+        f.write("\\toprule\n")
+        
+        # Write header row with model names
+        header = "Parameter"
+        for model_name in model_results.keys():
+            # Format model name for display (replace underscores with spaces, capitalize)
+            display_name = model_name.replace('_', ' ').title()
+            header += f" & {display_name}"
+        f.write(f"{header} \\\\\n")
+        f.write("\\midrule\n")
+        
+        # Get a unique set of all parameters across models
+        all_params = set()
+        for result in model_results.values():
+            all_params.update(result.fe_params.index)
+        
+        # Fixed effects parameters
+        f.write("\\multicolumn{" + str(len(model_results) + 1) + "}{l}{\\textbf{Fixed Effects}} \\\\\n")
+        for param in sorted(all_params):
+            row = param
+            for model_name, result in model_results.items():
+                if param in result.fe_params.index:
+                    estimate = result.fe_params[param]
+                    std_err = result.bse.get(param, np.nan)
+                    if np.isnan(std_err):
+                        row += f" & {estimate:.4f}"
+                    else:
+                        row += f" & {estimate:.4f} ({std_err:.4f})"
+                else:
+                    row += " & --"
+            f.write(f"{row} \\\\\n")
+        
+        # Model fit statistics
+        f.write("\\midrule\n")
+        f.write("\\multicolumn{" + str(len(model_results) + 1) + "}{l}{\\textbf{Model Statistics}} \\\\\n")
+        
+        # AIC row
+        row = "AIC"
+        for result in model_results.values():
+            row += f" & {result.aic:.2f}"
+        f.write(f"{row} \\\\\n")
+        
+        # BIC row
+        row = "BIC"
+        for result in model_results.values():
+            row += f" & {result.bic:.2f}"
+        f.write(f"{row} \\\\\n")
+        
+        # Log-likelihood row
+        row = "Log-Likelihood"
+        for result in model_results.values():
+            row += f" & {result.llf:.2f}"
+        f.write(f"{row} \\\\\n")
+        
+        # Close table
+        f.write("\\bottomrule\n")
+        f.write("\\end{tabular}\n")
+        f.write("}\n")
+        f.write("\\begin{tablenotes}\n")
+        f.write("\\small\n")
+        f.write("\\item Note: Values in parentheses represent standard errors.\n")
+        f.write("\\end{tablenotes}\n")
+        f.write("\\end{table}\n")
+    
+    print(f"LaTeX table written to: {latex_path}")
+
 def main():
     """Main function to run the mixed effects analysis."""
     print("\nRunning mixed effects analysis for blood flow data...")
@@ -443,6 +622,12 @@ def main():
     
     # Create pressure vs velocity by age plot
     plot_pressure_vs_velocity_by_age(df, model_results)
+    
+    # Write summary results to text file
+    write_summary_results(model_results)
+    
+    # Create LaTeX table
+    write_latex_table(model_results)
     
     print("\nMixed effects analysis complete.")
     return 0
