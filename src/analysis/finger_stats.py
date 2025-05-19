@@ -144,14 +144,14 @@ def plot_finger_size_correlations(merged_df: pd.DataFrame, correlations: Dict, o
         p_text = f"r = {r_value:.2f}, p = {p_value:.3f}, n = {n_value}" if p_value >= 0.001 else f"r = {r_value:.2f}, p < 0.001, n = {n_value}"
         
         if source_sans:
-            plt.xlabel('Finger Bottom Circumference (mm)', fontproperties=source_sans)
-            plt.ylabel('Velocity (mm/s)', fontproperties=source_sans)
+            plt.xlabel('Finger Bottom Circumference (cm)', fontproperties=source_sans)
+            plt.ylabel('Velocity (um/s)', fontproperties=source_sans)
             plt.title(f'Finger Size vs Velocity at {pressure} psi', fontproperties=source_sans)
             plt.text(0.05, 0.95, p_text, transform=plt.gca().transAxes, 
                    fontproperties=source_sans, fontsize=6)
         else:
-            plt.xlabel('Finger Bottom Circumference (mm)')
-            plt.ylabel('Velocity (mm/s)')
+            plt.xlabel('Finger Bottom Circumference (cm)')
+            plt.ylabel('Velocity (um/s)')
             plt.title(f'Finger Size vs Velocity at {pressure} psi')
             plt.text(0.05, 0.95, p_text, transform=plt.gca().transAxes, fontsize=6)
         
@@ -190,14 +190,14 @@ def plot_finger_size_correlations(merged_df: pd.DataFrame, correlations: Dict, o
         p_text = f"r = {corr_result[0]:.2f}, p = {corr_result[1]:.3f}, n = {len(all_data)}" if corr_result[1] >= 0.001 else f"r = {corr_result[0]:.2f}, p < 0.001, n = {len(all_data)}"
         
         if source_sans:
-            plt.xlabel('Finger Bottom Circumference (mm)', fontproperties=source_sans)
-            plt.ylabel('Velocity (mm/s)', fontproperties=source_sans)
+            plt.xlabel('Finger Bottom Circumference (cm)', fontproperties=source_sans)
+            plt.ylabel('Velocity (um/s)', fontproperties=source_sans)
             plt.title('Finger Size vs Velocity (All Pressures)', fontproperties=source_sans)
             plt.text(0.05, 0.95, p_text, transform=plt.gca().transAxes, 
                    fontproperties=source_sans, fontsize=6)
         else:
-            plt.xlabel('Finger Bottom Circumference (mm)')
-            plt.ylabel('Velocity (mm/s)')
+            plt.xlabel('Finger Bottom Circumference (cm)')
+            plt.ylabel('Velocity (um/s)')
             plt.title('Finger Size vs Velocity (All Pressures)')
             plt.text(0.05, 0.95, p_text, transform=plt.gca().transAxes, fontsize=6)
         
@@ -301,13 +301,13 @@ def plot_finger_size_log_correlations(merged_df: pd.DataFrame, correlations: Dic
         p_text = f"r = {r_value:.2f}, p = {p_value:.3f}, n = {n_value}" if p_value >= 0.001 else f"r = {r_value:.2f}, p < 0.001, n = {n_value}"
         
         if source_sans:
-            plt.xlabel('Finger Bottom Circumference (mm)', fontproperties=source_sans)
+            plt.xlabel('Finger Bottom Circumference (cm)', fontproperties=source_sans)
             plt.ylabel('Log Velocity (log mm/s)', fontproperties=source_sans)
             plt.title(f'Finger Size vs Log Velocity at {pressure} psi', fontproperties=source_sans)
             plt.text(0.05, 0.95, p_text, transform=plt.gca().transAxes, 
                    fontproperties=source_sans, fontsize=6)
         else:
-            plt.xlabel('Finger Bottom Circumference (mm)')
+            plt.xlabel('Finger Bottom Circumference (cm)')
             plt.ylabel('Log Velocity (log mm/s)')
             plt.title(f'Finger Size vs Log Velocity at {pressure} psi')
             plt.text(0.05, 0.95, p_text, transform=plt.gca().transAxes, fontsize=6)
@@ -347,13 +347,13 @@ def plot_finger_size_log_correlations(merged_df: pd.DataFrame, correlations: Dic
         p_text = f"r = {corr_result[0]:.2f}, p = {corr_result[1]:.3f}, n = {len(all_data)}" if corr_result[1] >= 0.001 else f"r = {corr_result[0]:.2f}, p < 0.001, n = {len(all_data)}"
         
         if source_sans:
-            plt.xlabel('Finger Bottom Circumference (mm)', fontproperties=source_sans)
+            plt.xlabel('Finger Bottom Circumference (cm)', fontproperties=source_sans)
             plt.ylabel('Log Velocity (log mm/s)', fontproperties=source_sans)
             plt.title('Finger Size vs Log Velocity (All Pressures)', fontproperties=source_sans)
             plt.text(0.05, 0.95, p_text, transform=plt.gca().transAxes, 
                    fontproperties=source_sans, fontsize=6)
         else:
-            plt.xlabel('Finger Bottom Circumference (mm)')
+            plt.xlabel('Finger Bottom Circumference (cm)')
             plt.ylabel('Log Velocity (log mm/s)')
             plt.title('Finger Size vs Log Velocity (All Pressures)')
             plt.text(0.05, 0.95, p_text, transform=plt.gca().transAxes, fontsize=6)
@@ -552,14 +552,14 @@ def plot_anova_results(merged_df: pd.DataFrame, output_dir: str) -> None:
     corr_text = f"r = {corr:.3f}, p = {p_value:.3f}" if p_value >= 0.001 else f"r = {corr:.3f}, p < 0.001"
     
     if source_sans:
-        plt.xlabel('Finger Bottom Circumference (mm)', fontproperties=source_sans)
-        plt.ylabel('Velocity (mm/s)', fontproperties=source_sans)
+        plt.xlabel('Finger Bottom Circumference (cm)', fontproperties=source_sans)
+        plt.ylabel('Velocity (um/s)', fontproperties=source_sans)
         plt.title('Finger Size Effect on Velocity', fontproperties=source_sans)
         plt.text(0.05, 0.95, corr_text, transform=plt.gca().transAxes, 
                fontproperties=source_sans, fontsize=6)
     else:
-        plt.xlabel('Finger Bottom Circumference (mm)')
-        plt.ylabel('Velocity (mm/s)')
+        plt.xlabel('Finger Bottom Circumference (cm)')
+        plt.ylabel('Velocity (um/s)')
         plt.title('Finger Size Effect on Velocity')
         plt.text(0.05, 0.95, corr_text, transform=plt.gca().transAxes, fontsize=6)
     
@@ -579,13 +579,13 @@ def plot_anova_results(merged_df: pd.DataFrame, output_dir: str) -> None:
     
     if source_sans:
         plt.xlabel('Age (years)', fontproperties=source_sans)
-        plt.ylabel('Velocity (mm/s)', fontproperties=source_sans)
+        plt.ylabel('Velocity (um/s)', fontproperties=source_sans)
         plt.title('Age Effect on Velocity', fontproperties=source_sans)
         plt.text(0.05, 0.95, corr_text, transform=plt.gca().transAxes, 
                fontproperties=source_sans, fontsize=6)
     else:
         plt.xlabel('Age (years)')
-        plt.ylabel('Velocity (mm/s)')
+        plt.ylabel('Velocity (um/s)')
         plt.title('Age Effect on Velocity')
         plt.text(0.05, 0.95, corr_text, transform=plt.gca().transAxes, fontsize=6)
     
@@ -629,18 +629,18 @@ def plot_anova_results(merged_df: pd.DataFrame, output_dir: str) -> None:
         
         # Set labels
         if source_sans:
-            ax.set_xlabel('Finger Size (mm)', fontproperties=source_sans)
+            ax.set_xlabel('Finger Size (cm)', fontproperties=source_sans)
             ax.set_ylabel('Age (years)', fontproperties=source_sans)
-            ax.set_zlabel('Velocity (mm/s)', fontproperties=source_sans)
+            ax.set_zlabel('Velocity (um/s)', fontproperties=source_sans)
             plt.title('Finger Size and Age Effects on Velocity', fontproperties=source_sans)
         else:
-            ax.set_xlabel('Finger Size (mm)')
+            ax.set_xlabel('Finger Size (cm)')
             ax.set_ylabel('Age (years)')
-            ax.set_zlabel('Velocity (mm/s)')
+            ax.set_zlabel('Velocity (um/s)')
             plt.title('Finger Size and Age Effects on Velocity')
         
         # Add colorbar
-        fig.colorbar(surface, ax=ax, shrink=0.5, aspect=10, label='Predicted Velocity (mm/s)')
+        fig.colorbar(surface, ax=ax, shrink=0.5, aspect=10, label='Predicted Velocity (um/s)')
         
         plt.tight_layout()
         plt.savefig(os.path.join(output_dir, '3d_regression_surface.png'), dpi=300)
@@ -1227,13 +1227,13 @@ def plot_finger_size_pressure_interaction(models: Dict, merged_df: pd.DataFrame,
                  label=f'Predicted at {pressure:.2f} PSI')
     
     if source_sans:
-        plt.xlabel('Finger Bottom Circumference (mm)', fontproperties=source_sans)
-        plt.ylabel('Velocity (mm/s)', fontproperties=source_sans)
+        plt.xlabel('Finger Bottom Circumference (cm)', fontproperties=source_sans)
+        plt.ylabel('Velocity (um/s)', fontproperties=source_sans)
         plt.title('Finger Size vs Velocity by Pressure', fontproperties=source_sans)
         plt.legend(prop=source_sans)
     else:
-        plt.xlabel('Finger Bottom Circumference (mm)')
-        plt.ylabel('Velocity (mm/s)')
+        plt.xlabel('Finger Bottom Circumference (cm)')
+        plt.ylabel('Velocity (um/s)')
         plt.title('Finger Size vs Velocity by Pressure')
         plt.legend()
     
@@ -1273,13 +1273,13 @@ def plot_finger_size_pressure_interaction(models: Dict, merged_df: pd.DataFrame,
                  color=colors[i], label=f'Pressure = {pressure:.2f} PSI')
     
     if source_sans:
-        plt.xlabel('Finger Bottom Circumference (mm)', fontproperties=source_sans)
-        plt.ylabel('Predicted Velocity (mm/s)', fontproperties=source_sans)
+        plt.xlabel('Finger Bottom Circumference (cm)', fontproperties=source_sans)
+        plt.ylabel('Predicted Velocity (um/s)', fontproperties=source_sans)
         plt.title('Mixed Model Predictions: Finger Size × Pressure Interaction', fontproperties=source_sans)
         plt.legend(prop=source_sans)
     else:
-        plt.xlabel('Finger Bottom Circumference (mm)')
-        plt.ylabel('Predicted Velocity (mm/s)')
+        plt.xlabel('Finger Bottom Circumference (cm)')
+        plt.ylabel('Predicted Velocity (um/s)')
         plt.title('Mixed Model Predictions: Finger Size × Pressure Interaction')
         plt.legend()
     
@@ -1485,11 +1485,11 @@ def plot_effect_size_comparison(models: Dict, merged_df: pd.DataFrame, output_di
     # Add labels and title
     if source_sans:
         plt.yticks(y_pos, names, fontproperties=source_sans)
-        plt.xlabel('Effect on Velocity (mm/s)', fontproperties=source_sans)
+        plt.xlabel('Effect on Velocity (um/s)', fontproperties=source_sans)
         plt.title('Effect Size Comparison: Finger Size vs Pressure', fontproperties=source_sans)
     else:
         plt.yticks(y_pos, names)
-        plt.xlabel('Effect on Velocity (mm/s)')
+        plt.xlabel('Effect on Velocity (um/s)')
         plt.title('Effect Size Comparison: Finger Size vs Pressure')
     
     plt.grid(True, axis='x', alpha=0.3)
@@ -1535,19 +1535,19 @@ def plot_effect_size_comparison(models: Dict, merged_df: pd.DataFrame, output_di
     if source_sans:
         ax1.set_title('Velocity vs Pressure', fontproperties=source_sans)
         ax1.set_xlabel('Pressure (PSI)', fontproperties=source_sans)
-        ax1.set_ylabel('Velocity (mm/s)', fontproperties=source_sans)
+        ax1.set_ylabel('Velocity (um/s)', fontproperties=source_sans)
         
         ax2.set_title('Velocity vs Finger Size', fontproperties=source_sans)
-        ax2.set_xlabel('Finger Size (mm)', fontproperties=source_sans)
-        ax2.set_ylabel('Velocity (mm/s)', fontproperties=source_sans)
+        ax2.set_xlabel('Finger Size (cm)', fontproperties=source_sans)
+        ax2.set_ylabel('Velocity (um/s)', fontproperties=source_sans)
     else:
         ax1.set_title('Velocity vs Pressure')
         ax1.set_xlabel('Pressure (PSI)')
-        ax1.set_ylabel('Velocity (mm/s)')
+        ax1.set_ylabel('Velocity (um/s)')
         
         ax2.set_title('Velocity vs Finger Size')
-        ax2.set_xlabel('Finger Size (mm)')
-        ax2.set_ylabel('Velocity (mm/s)')
+        ax2.set_xlabel('Finger Size (cm)')
+        ax2.set_ylabel('Velocity (um/s)')
     
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, 'velocity_relationships.png'), dpi=300)
@@ -1602,19 +1602,19 @@ def plot_effect_size_comparison(models: Dict, merged_df: pd.DataFrame, output_di
                               cmap='viridis', alpha=0.7, linewidth=0)
         
         # Add colorbar
-        fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5, label='Predicted Velocity (mm/s)')
+        fig.colorbar(surf, ax=ax, shrink=0.5, aspect=5, label='Predicted Velocity (um/s)')
         
         # Set labels
         if source_sans:
-            ax.set_xlabel('Finger Size (mm)', fontproperties=source_sans)
+            ax.set_xlabel('Finger Size (cm)', fontproperties=source_sans)
             ax.set_ylabel('Pressure (PSI)', fontproperties=source_sans)
-            ax.set_zlabel('Velocity (mm/s)', fontproperties=source_sans)
+            ax.set_zlabel('Velocity (um/s)', fontproperties=source_sans)
             plt.title('3D Relationship: Finger Size, Pressure, and Velocity', 
                     fontproperties=source_sans)
         else:
-            ax.set_xlabel('Finger Size (mm)')
+            ax.set_xlabel('Finger Size (cm)')
             ax.set_ylabel('Pressure (PSI)')
-            ax.set_zlabel('Velocity (mm/s)')
+            ax.set_zlabel('Velocity (um/s)')
             plt.title('3D Relationship: Finger Size, Pressure, and Velocity')
         
         # Adjust view angle
@@ -1644,16 +1644,16 @@ def plot_effect_size_comparison(models: Dict, merged_df: pd.DataFrame, output_di
     
     # Plot heatmap
     ax = sns.heatmap(heatmap_data, cmap='viridis', annot=True, fmt='.0f',
-                   cbar_kws={'label': 'Mean Velocity (mm/s)'})
+                   cbar_kws={'label': 'Mean Velocity (um/s)'})
     
     # Set title and labels
     if source_sans:
         ax.set_xlabel('Pressure (PSI)', fontproperties=source_sans)
-        ax.set_ylabel('Finger Size (mm)', fontproperties=source_sans)
+        ax.set_ylabel('Finger Size (cm)', fontproperties=source_sans)
         ax.set_title('Mean Velocity by Finger Size and Pressure', fontproperties=source_sans)
     else:
         ax.set_xlabel('Pressure (PSI)')
-        ax.set_ylabel('Finger Size (mm)')
+        ax.set_ylabel('Finger Size (cm)')
         ax.set_title('Mean Velocity by Finger Size and Pressure')
     
     plt.tight_layout()

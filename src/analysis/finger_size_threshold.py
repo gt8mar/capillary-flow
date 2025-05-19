@@ -45,7 +45,7 @@ def create_finger_size_cdf_plot(df: pd.DataFrame, threshold: float,
         fig, ax = plt.subplots(figsize=(2.4, 2.0))
     
     # Create finger size groups
-    df['Size_Group'] = df['FingerSizeBottom'].apply(lambda x: f'<{threshold} mm' if x < threshold else f'≥{threshold} mm')
+    df['Size_Group'] = df['FingerSizeBottom'].apply(lambda x: f'<{threshold} cm' if x < threshold else f'≥{threshold} cm')
     
     # Group data
     small_group = df[df['FingerSizeBottom'] < threshold]['Video_Median_Velocity']
@@ -71,8 +71,8 @@ def create_finger_size_cdf_plot(df: pd.DataFrame, threshold: float,
     y_filtered = np.arange(1, len(x_filtered) + 1) / len(x_filtered)
     
     # Plot CDFs
-    ax.plot(x_small, y_small, 'b-', linewidth=1, label=f'<{threshold} mm (n={len(small_group)})')
-    ax.plot(x_large, y_large, 'r-', linewidth=1, label=f'≥{threshold} mm (n={len(large_group)})')
+    ax.plot(x_small, y_small, 'b-', linewidth=1, label=f'<{threshold} cm (n={len(small_group)})')
+    ax.plot(x_large, y_large, 'r-', linewidth=1, label=f'≥{threshold} cm (n={len(large_group)})')
     ax.plot(x_filtered, y_filtered, 'g--', linewidth=0.8, label=f'Current sample (n={len(filtered_data)})')
     
     # Add original data CDF if provided
@@ -97,17 +97,17 @@ def create_finger_size_cdf_plot(df: pd.DataFrame, threshold: float,
     
     # Try to use Source Sans font if available
     if source_sans:
-        ax.set_xlabel('Video Median Velocity (mm/s)', fontproperties=source_sans)
+        ax.set_xlabel('Video Median Velocity (um/s)', fontproperties=source_sans)
         ax.set_ylabel('Cumulative Probability', fontproperties=source_sans)
-        ax.set_title(f'Velocity CDF by Finger Size (Threshold: {threshold} mm)', 
+        ax.set_title(f'Velocity CDF by Finger Size (Threshold: {threshold} cm)', 
                     fontproperties=source_sans)
         # Shrink the legend font size and place it in a better position
         leg = ax.legend(prop=source_sans, fontsize=4, loc='lower right')
     else:
         # Fall back to default font
-        ax.set_xlabel('Video Median Velocity (mm/s)')
+        ax.set_xlabel('Video Median Velocity (um/s)')
         ax.set_ylabel('Cumulative Probability')
-        ax.set_title(f'Velocity CDF by Finger Size (Threshold: {threshold} mm)')
+        ax.set_title(f'Velocity CDF by Finger Size (Threshold: {threshold} cm)')
         # Shrink the legend font size and place it in a better position
         leg = ax.legend(fontsize=4, loc='lower right')
     
@@ -148,9 +148,9 @@ def threshold_analysis(df: pd.DataFrame, original_velocities: pd.Series = None) 
     size_df = df.dropna(subset=['Video_Median_Velocity', 'FingerSizeBottom']).copy()
     
     # Print finger size statistics
-    print(f"Finger size range in data: {size_df['FingerSizeBottom'].min():.2f} to {size_df['FingerSizeBottom'].max():.2f} mm")
-    print(f"Mean finger size: {size_df['FingerSizeBottom'].mean():.2f} mm")
-    print(f"Median finger size: {size_df['FingerSizeBottom'].median():.2f} mm")
+    print(f"Finger size range in data: {size_df['FingerSizeBottom'].min():.2f} to {size_df['FingerSizeBottom'].max():.2f} cm")
+    print(f"Mean finger size: {size_df['FingerSizeBottom'].mean():.2f} cm")
+    print(f"Median finger size: {size_df['FingerSizeBottom'].median():.2f} cm")
     
     # Test different finger size thresholds
     size_min = float(np.floor(size_df['FingerSizeBottom'].min()))
@@ -203,7 +203,7 @@ def threshold_analysis(df: pd.DataFrame, original_velocities: pd.Series = None) 
     # Find the threshold with the maximum KS statistic (most different distributions)
     if ks_results:
         best_threshold = max(ks_results, key=ks_results.get)
-        print(f"\nThreshold with most distinct velocity distributions: {best_threshold:.1f} mm")
+        print(f"\nThreshold with most distinct velocity distributions: {best_threshold:.1f} cm")
         print(f"KS statistic: {ks_results[best_threshold]:.3f}")
         
         # Create a plot showing KS statistic vs threshold
@@ -225,16 +225,16 @@ def threshold_analysis(df: pd.DataFrame, original_velocities: pd.Series = None) 
             
             ax.plot(thresholds_list, ks_stats, 'o-', linewidth=0.5)
             ax.axvline(x=best_threshold, color='red', linestyle='--', 
-                      label=f'Best threshold: {best_threshold:.1f} mm')
+                      label=f'Best threshold: {best_threshold:.1f} cm')
             
             # Try to use Source Sans font if available
             if source_sans:
-                ax.set_xlabel('Finger Size Threshold (mm)', fontproperties=source_sans)
+                ax.set_xlabel('Finger Size Threshold (cm)', fontproperties=source_sans)
                 ax.set_ylabel('KS Statistic', fontproperties=source_sans)
                 ax.set_title('Capillary Velocity Similarity by Finger Size', fontproperties=source_sans)
                 ax.legend(prop=source_sans)
             else:
-                ax.set_xlabel('Finger Size Threshold (mm)')
+                ax.set_xlabel('Finger Size Threshold (cm)')
                 ax.set_ylabel('KS Statistic')
                 ax.set_title('Capillary Velocity Similarity by Finger Size')
                 ax.legend()
@@ -318,12 +318,12 @@ def plot_velocity_boxplots(df: pd.DataFrame, best_threshold: Optional[float] = N
     # Set title and labels
     if source_sans:
         ax.set_title('Video Median Velocity by Finger Size Group', fontproperties=source_sans, fontsize=8)
-        ax.set_xlabel('Finger Size (mm)', fontproperties=source_sans)
-        ax.set_ylabel('Median Velocity (mm/s)', fontproperties=source_sans)
+        ax.set_xlabel('Finger Size (cm)', fontproperties=source_sans)
+        ax.set_ylabel('Median Velocity (um/s)', fontproperties=source_sans)
     else:
         ax.set_title('Video Median Velocity by Finger Size Group', fontsize=8)
-        ax.set_xlabel('Finger Size (mm)')
-        ax.set_ylabel('Median Velocity (mm/s)')
+        ax.set_xlabel('Finger Size (cm)')
+        ax.set_ylabel('Median Velocity (um/s)')
     
     # Get counts for each size group
     counts = size_df['Size_Group'].value_counts().sort_index()
@@ -346,7 +346,7 @@ def plot_velocity_boxplots(df: pd.DataFrame, best_threshold: Optional[float] = N
         
         # Create binary size groups based on threshold
         size_df['Threshold_Group'] = size_df['FingerSizeBottom'].apply(
-            lambda x: f'<{best_threshold:.1f} mm' if x < best_threshold else f'≥{best_threshold:.1f} mm'
+            lambda x: f'<{best_threshold:.1f} cm' if x < best_threshold else f'≥{best_threshold:.1f} cm'
         )
         
         # Create the boxplot
@@ -361,14 +361,14 @@ def plot_velocity_boxplots(df: pd.DataFrame, best_threshold: Optional[float] = N
         
         # Set title and labels
         if source_sans:
-            ax.set_title(f'Video Median Velocity by Finger Size Threshold ({best_threshold:.1f} mm)', 
+            ax.set_title(f'Video Median Velocity by Finger Size Threshold ({best_threshold:.1f} cm)', 
                         fontproperties=source_sans, fontsize=8)
             ax.set_xlabel('Finger Size Group', fontproperties=source_sans)
-            ax.set_ylabel('Median Velocity (mm/s)', fontproperties=source_sans)
+            ax.set_ylabel('Median Velocity (um/s)', fontproperties=source_sans)
         else:
-            ax.set_title(f'Video Median Velocity by Finger Size Threshold ({best_threshold:.1f} mm)', fontsize=8)
+            ax.set_title(f'Video Median Velocity by Finger Size Threshold ({best_threshold:.1f} cm)', fontsize=8)
             ax.set_xlabel('Finger Size Group')
-            ax.set_ylabel('Median Velocity (mm/s)')
+            ax.set_ylabel('Median Velocity (um/s)')
         
         # Get counts for each threshold group
         counts = size_df['Threshold_Group'].value_counts().sort_index()
@@ -524,7 +524,7 @@ def analyze_pressure_specific_thresholds(df: pd.DataFrame, original_velocities: 
         if ks_results:
             best_threshold = max(ks_results, key=ks_results.get)
             best_thresholds[pressure] = best_threshold
-            print(f"Best threshold for pressure {pressure}: {best_threshold:.1f} mm (KS: {ks_results[best_threshold]:.3f})")
+            print(f"Best threshold for pressure {pressure}: {best_threshold:.1f} cm (KS: {ks_results[best_threshold]:.3f})")
     
     # Create summary plot of best thresholds by pressure
     if best_thresholds:
@@ -547,11 +547,11 @@ def analyze_pressure_specific_thresholds(df: pd.DataFrame, original_velocities: 
         # Try to use Source Sans font if available
         if source_sans:
             ax.set_xlabel('Pressure (PSI)', fontproperties=source_sans)
-            ax.set_ylabel('Best Finger Size Threshold (mm)', fontproperties=source_sans)
+            ax.set_ylabel('Best Finger Size Threshold (cm)', fontproperties=source_sans)
             ax.set_title('Optimal Finger Size Threshold by Pressure', fontproperties=source_sans)
         else:
             ax.set_xlabel('Pressure (PSI)')
-            ax.set_ylabel('Best Finger Size Threshold (mm)')
+            ax.set_ylabel('Best Finger Size Threshold (cm)')
             ax.set_title('Optimal Finger Size Threshold by Pressure')
         
         ax.grid(True, alpha=0.3)
@@ -724,16 +724,16 @@ def plot_age_vs_velocity_by_finger_size(df: pd.DataFrame, original_df: pd.DataFr
     # Set labels and title
     if source_sans:
         ax.set_xlabel('Age (years)', fontproperties=source_sans)
-        ax.set_ylabel('Median Velocity (mm/s)', fontproperties=source_sans)
+        ax.set_ylabel('Median Velocity (um/s)', fontproperties=source_sans)
         ax.set_title('Age vs. Median Velocity by Finger Size', fontproperties=source_sans)
-        cbar.set_label('Mean Finger Size (mm)', fontproperties=source_sans)
+        cbar.set_label('Mean Finger Size (cm)', fontproperties=source_sans)
         if len(no_finger_size_data) > 0:
             ax.legend(prop=source_sans, fontsize=5)
     else:
         ax.set_xlabel('Age (years)')
-        ax.set_ylabel('Median Velocity (mm/s)')
+        ax.set_ylabel('Median Velocity (um/s)')
         ax.set_title('Age vs. Median Velocity by Finger Size')
-        cbar.set_label('Mean Finger Size (mm)')
+        cbar.set_label('Mean Finger Size (cm)')
         if len(no_finger_size_data) > 0:
             ax.legend(fontsize=5)
     
@@ -848,16 +848,16 @@ def plot_age_vs_velocity_by_pressure_and_finger_size(df: pd.DataFrame, original_
         # Set labels and title
         if source_sans:
             ax.set_xlabel('Age (years)', fontproperties=source_sans)
-            ax.set_ylabel('Velocity (mm/s)', fontproperties=source_sans)
+            ax.set_ylabel('Velocity (um/s)', fontproperties=source_sans)
             ax.set_title(f'Age vs. Velocity at {pressure} PSI by Finger Size', fontproperties=source_sans)
-            cbar.set_label('Mean Finger Size (mm)', fontproperties=source_sans)
+            cbar.set_label('Mean Finger Size (cm)', fontproperties=source_sans)
             if len(no_finger_size_data) > 0:
                 ax.legend(prop=source_sans, fontsize=5)
         else:
             ax.set_xlabel('Age (years)')
-            ax.set_ylabel('Velocity (mm/s)')
+            ax.set_ylabel('Velocity (um/s)')
             ax.set_title(f'Age vs. Velocity at {pressure} PSI by Finger Size')
-            cbar.set_label('Mean Finger Size (mm)')
+            cbar.set_label('Mean Finger Size (cm)')
             if len(no_finger_size_data) > 0:
                 ax.legend(fontsize=5)
         
@@ -961,12 +961,12 @@ def plot_velocity_boxplots_by_pressure(df: pd.DataFrame) -> None:
         if source_sans:
             ax.set_title(f'Video Median Velocity by Finger Size at {pressure} PSI', 
                         fontproperties=source_sans, fontsize=8)
-            ax.set_xlabel('Finger Size (mm)', fontproperties=source_sans)
-            ax.set_ylabel('Median Velocity (mm/s)', fontproperties=source_sans)
+            ax.set_xlabel('Finger Size (cm)', fontproperties=source_sans)
+            ax.set_ylabel('Median Velocity (um/s)', fontproperties=source_sans)
         else:
             ax.set_title(f'Video Median Velocity by Finger Size at {pressure} PSI', fontsize=8)
-            ax.set_xlabel('Finger Size (mm)')
-            ax.set_ylabel('Median Velocity (mm/s)')
+            ax.set_xlabel('Finger Size (cm)')
+            ax.set_ylabel('Median Velocity (um/s)')
         
         # Get counts for each size group
         counts = pressure_df['Size_Group'].value_counts().sort_index()

@@ -347,13 +347,13 @@ def plot_correlation_results(correlations: Dict[str, pd.DataFrame],
     
     if source_sans:
         plt.xlabel('Average Finger Circumference (cm)', fontproperties=source_sans)
-        plt.ylabel('Median Velocity (mm/s)', fontproperties=source_sans)
+        plt.ylabel('Median Velocity (um/s)', fontproperties=source_sans)
         plt.title('Finger Size vs Capillary Velocity', fontproperties=source_sans)
         ax.text(0.05, 0.95, p_text, transform=ax.transAxes, 
                fontproperties=source_sans, fontsize=6)
     else:
         plt.xlabel('Average Finger Circumference (cm)')
-        plt.ylabel('Median Velocity (mm/s)')
+        plt.ylabel('Median Velocity (um/s)')
         plt.title('Finger Size vs Capillary Velocity')
         ax.text(0.05, 0.95, p_text, transform=ax.transAxes, fontsize=6)
     
@@ -472,12 +472,12 @@ def analyze_finger_effects_by_age_sex(merged_df: pd.DataFrame, output_dir: str) 
     # Add legend and labels
     if source_sans:
         plt.xlabel('Average Finger Circumference (cm)', fontproperties=source_sans)
-        plt.ylabel('Median Velocity (mm/s)', fontproperties=source_sans)
+        plt.ylabel('Median Velocity (um/s)', fontproperties=source_sans)
         plt.title('Finger Size vs Velocity by Sex', fontproperties=source_sans)
         plt.legend(prop=source_sans)
     else:
         plt.xlabel('Average Finger Circumference (cm)')
-        plt.ylabel('Median Velocity (mm/s)')
+        plt.ylabel('Median Velocity (um/s)')
         plt.title('Finger Size vs Velocity by Sex')
         plt.legend()
     
@@ -519,13 +519,13 @@ def analyze_finger_effects_by_age_sex(merged_df: pd.DataFrame, output_dir: str) 
     
     if source_sans:
         plt.xlabel('Average Finger Circumference (cm)', fontproperties=source_sans)
-        plt.ylabel('Median Velocity (mm/s)', fontproperties=source_sans)
+        plt.ylabel('Median Velocity (um/s)', fontproperties=source_sans)
         plt.title('Finger Size vs Velocity (Age as Continuous)', fontproperties=source_sans)
         plt.text(0.05, 0.95, corr_text, transform=plt.gca().transAxes, 
                fontproperties=source_sans, fontsize=6)
     else:
         plt.xlabel('Average Finger Circumference (cm)')
-        plt.ylabel('Median Velocity (mm/s)')
+        plt.ylabel('Median Velocity (um/s)')
         plt.title('Finger Size vs Velocity (Age as Continuous)')
         plt.text(0.05, 0.95, corr_text, transform=plt.gca().transAxes, fontsize=6)
     
@@ -665,11 +665,11 @@ def perform_regression_analysis(merged_df: pd.DataFrame) -> None:
         
         if source_sans:
             plt.xlabel('Average Finger Circumference (cm)', fontproperties=source_sans)
-            plt.ylabel('Median Velocity (mm/s)', fontproperties=source_sans)
+            plt.ylabel('Median Velocity (um/s)', fontproperties=source_sans)
             plt.title('Finger Size vs Velocity with Age Interaction', fontproperties=source_sans)
         else:
             plt.xlabel('Average Finger Circumference (cm)')
-            plt.ylabel('Median Velocity (mm/s)')
+            plt.ylabel('Median Velocity (um/s)')
             plt.title('Finger Size vs Velocity with Age Interaction')
         
         plt.tight_layout()
@@ -808,14 +808,14 @@ def perform_detailed_anova(merged_df: pd.DataFrame, output_dir: str) -> None:
         
         if source_sans:
             plt.xlabel('Average Finger Circumference (cm)', fontproperties=source_sans)
-            plt.ylabel('Median Velocity (mm/s)', fontproperties=source_sans)
+            plt.ylabel('Median Velocity (um/s)', fontproperties=source_sans)
             plt.title('Finger Size vs Velocity with Age', fontproperties=source_sans)
             plt.legend(prop=source_sans)
             plt.text(0.05, 0.95, corr_text, transform=plt.gca().transAxes, 
                   fontproperties=source_sans, fontsize=6)
         else:
             plt.xlabel('Average Finger Circumference (cm)')
-            plt.ylabel('Median Velocity (mm/s)')
+            plt.ylabel('Median Velocity (um/s)')
             plt.title('Finger Size vs Velocity with Age')
             plt.legend()
             plt.text(0.05, 0.95, corr_text, transform=plt.gca().transAxes, fontsize=6)
@@ -1291,7 +1291,7 @@ def main():
     y = two_df['Video_Median_Velocity']
     plt.scatter(x, y)
     plt.title('Velocity vs Bottom Circumference at 0.2 psi')
-    plt.xlabel('Bottom Circumference (mm)')
+    plt.xlabel('Bottom Circumference (cm)')
     plt.ylabel('Velocity (um/s)')
     plt.show()
     
@@ -1300,7 +1300,7 @@ def main():
     y = four_df['Video_Median_Velocity']
     plt.scatter(x, y)
     plt.title('Velocity vs Bottom Circumference at 0.4 psi')
-    plt.xlabel('Bottom Circumference (mm)')
+    plt.xlabel('Bottom Circumference (cm)')
     plt.ylabel('Velocity (um/s)')
     plt.show() 
 
@@ -1309,7 +1309,7 @@ def main():
     y = twelve_df['Video_Median_Velocity']
     plt.scatter(x, y)
     plt.title('Velocity vs Bottom Circumference at 1.2 psi')
-    plt.xlabel('Bottom Circumference (mm)')
+    plt.xlabel('Bottom Circumference (cm)')
     plt.ylabel('Velocity (um/s)')
     plt.show()
     return 0
