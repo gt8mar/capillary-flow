@@ -380,6 +380,10 @@ This script analyzes the relationship between finger size and capillary velocity
 
 *Figure: Boxplots showing capillary velocity distributions grouped by finger size categories. The plot reveals how finger size influences measured velocities, with smaller fingers typically showing different velocity distributions compared to larger fingers.*
 
+![Velocity Relationships](methods_plots/velocity_relationships.png)
+
+*Figure: Side-by-side comparison of capillary velocity relationships with pressure (left) and finger size (right). Each panel shows a scatter plot with regression line and correlation statistics (r value and p-value). This visualization directly compares how strongly each factor (pressure vs. finger size) correlates with capillary velocity, helping to understand their relative influence on measurements.*
+
 #### How to Use
 
 ```python
