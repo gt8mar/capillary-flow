@@ -10,6 +10,7 @@ This document provides a detailed explanation of how the figures for the paper a
 3. [Valley-Based SNR Analysis](#valley-based-snr-analysis)
 4. [Compare Contrast](#compare-contrast) 
 5. [Resolution Line Profile](#resolution-line-profile)
+6. [Finger Size Threshold Analysis](#finger-size-threshold-analysis)
 
 ## Profile Calibration
 
@@ -338,4 +339,75 @@ For our system viewing Group 7 Element 6:
 
 #### Figure Output in Paper
 This analysis generates figures showing the resolution capabilities of our microscope system. In the paper, these figures demonstrate that our setup can resolve features down to approximately 2.2 μm, which is sufficient for visualizing and measuring the smallest capillaries in our samples (typically 5-10 μm in diameter).
+
+## Finger Size Threshold Analysis
+
+### Script: `src/analysis/finger_size_threshold.py`
+
+#### Purpose
+This script analyzes the relationship between finger size and capillary velocity measurements. It helps identify optimal finger size thresholds for differentiating velocity distributions and examines how finger size might influence measured capillary velocities.
+
+#### Key Functions
+
+1. **threshold_analysis(df, original_velocities)**
+   - Analyzes different finger size thresholds to find the one that best differentiates velocity distributions
+   - Uses Kolmogorov-Smirnov test to quantify distribution differences
+   - Generates CDF plots for various thresholds
+   - Returns the optimal threshold with maximum KS statistic
+
+2. **plot_velocity_boxplots(df, best_threshold)**
+   - Creates boxplots showing velocity distributions grouped by finger size categories
+   - Generates two plots: one with equal-width finger size bins and another using the optimal threshold
+   - Includes statistical comparisons between groups
+
+3. **plot_age_vs_velocity_by_finger_size(df, original_df)**
+   - Creates a scatter plot showing Age vs. Median Velocity, colored by finger size
+   - Points without finger size data are highlighted in a different color
+   - Helps visualize how age and finger size jointly influence capillary velocity
+
+4. **analyze_pressure_specific_thresholds(df, original_velocities)**
+   - Analyzes optimal finger size thresholds separately for each pressure level
+   - Creates CDF plots for various thresholds at each pressure
+   - Returns a dictionary mapping pressure levels to their best finger size thresholds
+
+#### Example Output
+
+![Age vs. Velocity by Finger Size](methods_plots/age_vs_velocity_by_finger_size.png)
+
+*Figure: Scatter plot showing the relationship between age and capillary median velocity, with points colored by finger size. This visualization helps identify whether finger size confounds the relationship between age and capillary flow velocity.*
+
+![Velocity by Finger Size Groups](methods_plots/velocity_by_finger_size_groups.png)
+
+*Figure: Boxplots showing capillary velocity distributions grouped by finger size categories. The plot reveals how finger size influences measured velocities, with smaller fingers typically showing different velocity distributions compared to larger fingers.*
+
+#### How to Use
+
+```python
+# Import required functions
+from src.analysis.finger_size_threshold import load_and_prepare_data, threshold_analysis, plot_velocity_boxplots, plot_age_vs_velocity_by_finger_size
+
+# Load and prepare the data
+merged_df, original_velocities = load_and_prepare_data()
+original_df = pd.read_csv(os.path.join(cap_flow_path, 'summary_df_nhp_video_stats.csv'))
+
+# Find the optimal finger size threshold
+best_threshold = threshold_analysis(merged_df, original_velocities)
+
+# Generate boxplots of velocity by finger size groups
+plot_velocity_boxplots(merged_df, best_threshold)
+
+# Create Age vs. Velocity scatter plot colored by finger size
+plot_age_vs_velocity_by_finger_size(merged_df, original_df)
+```
+
+#### Analysis Approach
+
+The finger size threshold analysis works as follows:
+1. **Data Preparation**: Merges capillary velocity data with finger size measurements
+2. **Threshold Optimization**: Tests multiple finger size thresholds to find where velocity distributions are most distinct
+3. **Visualization**: Creates various plots to illustrate the relationship between finger size and capillary velocity
+4. **Pressure-Specific Analysis**: Examines whether optimal thresholds vary with pressure conditions
+
+#### Figure Output in Paper
+This analysis generates supplementary figures showing how finger size relates to capillary velocity measurements. In the paper, these figures demonstrate the importance of accounting for finger size as a potential confounding factor when analyzing capillary velocity data, especially in studies with participants of varying ages or physical characteristics.
 
