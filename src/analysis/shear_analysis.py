@@ -22,7 +22,7 @@ from matplotlib.font_manager import FontProperties
 
 # Local imports
 from src.tools.parse_filename import parse_filename
-from src.tools.plotting_utils import plot_CI, plot_histogram, plot_violin, plot_boxnwhisker, plot_cdf, calculate_representative_diameters, calculate_participant_medians, calculate_shear_rate_medians
+from src.tools.plotting_utils import plot_CI, plot_histogram, plot_violin, plot_boxnwhisker, plot_cdf, plot_PCA
 from src.config import PATHS
 
 # Get the hostname and set paths
@@ -77,95 +77,98 @@ def main():
     diameter_analysis_df['set_number'] = diameter_analysis_df['SET'].str.split('set').str[1].replace('_', '').astype(int)
     diameter_analysis_df['Set_affected'] = np.where(diameter_analysis_df['SET'] == 'set01', 'set01', 'set04')
 
-    # plot histogram of diameters at 0.2, 0.4, and 1.2 psi for age groups and just set01 for now
-    diameter_analysis_df = diameter_analysis_df[diameter_analysis_df['SET'] == 'set01']
+    # Keep full dataset for CI plots, create filtered dataset for age-specific analyses
+    diameter_analysis_df_full = diameter_analysis_df.copy()
+    
+    # Create filtered dataset for age group analyses (set01 only)
+    diameter_analysis_df_set01 = diameter_analysis_df[diameter_analysis_df['SET'] == 'set01']
 
     print("Creating diameter histograms...")
-    plot_histogram(diameter_analysis_df, 'Mean_Diameter', pressure=0.2, age_groups=['≤50', '>50'])
-    plot_histogram(diameter_analysis_df, 'Mean_Diameter', pressure=0.4, age_groups=['≤50', '>50'])
-    plot_histogram(diameter_analysis_df, 'Mean_Diameter', pressure=1.2, age_groups=['≤50', '>50'])
+    plot_histogram(diameter_analysis_df_set01, 'Mean_Diameter', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_histogram(diameter_analysis_df_set01, 'Mean_Diameter', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_histogram(diameter_analysis_df_set01, 'Mean_Diameter', pressure=1.2, age_groups=['≤50', '>50'])
     
     # plot histograms of velocity, shear rate, and pressure drop
     print("Creating velocity histograms...")
-    plot_histogram(diameter_analysis_df, 'Corrected_Velocity', pressure=0.2, age_groups=['≤50', '>50'])
-    plot_histogram(diameter_analysis_df, 'Corrected_Velocity', pressure=0.4, age_groups=['≤50', '>50'])
-    plot_histogram(diameter_analysis_df, 'Corrected_Velocity', pressure=1.2, age_groups=['≤50', '>50'])
+    plot_histogram(diameter_analysis_df_set01, 'Corrected_Velocity', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_histogram(diameter_analysis_df_set01, 'Corrected_Velocity', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_histogram(diameter_analysis_df_set01, 'Corrected_Velocity', pressure=1.2, age_groups=['≤50', '>50'])
     
     print("Creating shear rate histograms...")
-    plot_histogram(diameter_analysis_df, 'Shear_Rate', pressure=0.2, age_groups=['≤50', '>50'])
-    plot_histogram(diameter_analysis_df, 'Shear_Rate', pressure=0.4, age_groups=['≤50', '>50'])
-    plot_histogram(diameter_analysis_df, 'Shear_Rate', pressure=1.2, age_groups=['≤50', '>50'])
+    plot_histogram(diameter_analysis_df_set01, 'Shear_Rate', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_histogram(diameter_analysis_df_set01, 'Shear_Rate', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_histogram(diameter_analysis_df_set01, 'Shear_Rate', pressure=1.2, age_groups=['≤50', '>50'])
     
     print("Creating pressure drop histograms...")
-    plot_histogram(diameter_analysis_df, 'Pressure_Drop', pressure=0.2, age_groups=['≤50', '>50'])
-    plot_histogram(diameter_analysis_df, 'Pressure_Drop', pressure=0.4, age_groups=['≤50', '>50'])
-    plot_histogram(diameter_analysis_df, 'Pressure_Drop', pressure=1.2, age_groups=['≤50', '>50'])
+    plot_histogram(diameter_analysis_df_set01, 'Pressure_Drop', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_histogram(diameter_analysis_df_set01, 'Pressure_Drop', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_histogram(diameter_analysis_df_set01, 'Pressure_Drop', pressure=1.2, age_groups=['≤50', '>50'])
 
     # plot CDF of diameters, velocity, shear rate, and pressure drop
     print("Creating diameter CDFs...")
-    plot_cdf(diameter_analysis_df, 'Mean_Diameter', pressure=0.2, age_groups=['≤50', '>50'])
-    plot_cdf(diameter_analysis_df, 'Mean_Diameter', pressure=0.4, age_groups=['≤50', '>50'])
-    plot_cdf(diameter_analysis_df, 'Mean_Diameter', pressure=1.2, age_groups=['≤50', '>50'])
+    plot_cdf(diameter_analysis_df_set01, 'Mean_Diameter', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_cdf(diameter_analysis_df_set01, 'Mean_Diameter', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_cdf(diameter_analysis_df_set01, 'Mean_Diameter', pressure=1.2, age_groups=['≤50', '>50'])
     
     print("Creating velocity CDFs...")
-    plot_cdf(diameter_analysis_df, 'Corrected_Velocity', pressure=0.2, age_groups=['≤50', '>50'])
-    plot_cdf(diameter_analysis_df, 'Corrected_Velocity', pressure=0.4, age_groups=['≤50', '>50'])
-    plot_cdf(diameter_analysis_df, 'Corrected_Velocity', pressure=1.2, age_groups=['≤50', '>50'])
+    plot_cdf(diameter_analysis_df_set01, 'Corrected_Velocity', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_cdf(diameter_analysis_df_set01, 'Corrected_Velocity', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_cdf(diameter_analysis_df_set01, 'Corrected_Velocity', pressure=1.2, age_groups=['≤50', '>50'])
     
     print("Creating shear rate CDFs...")
-    plot_cdf(diameter_analysis_df, 'Shear_Rate', pressure=0.2, age_groups=['≤50', '>50'])
-    plot_cdf(diameter_analysis_df, 'Shear_Rate', pressure=0.4, age_groups=['≤50', '>50'])
-    plot_cdf(diameter_analysis_df, 'Shear_Rate', pressure=1.2, age_groups=['≤50', '>50'])
+    plot_cdf(diameter_analysis_df_set01, 'Shear_Rate', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_cdf(diameter_analysis_df_set01, 'Shear_Rate', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_cdf(diameter_analysis_df_set01, 'Shear_Rate', pressure=1.2, age_groups=['≤50', '>50'])
     
     print("Creating pressure drop CDFs...")
-    plot_cdf(diameter_analysis_df, 'Pressure_Drop', pressure=0.2, age_groups=['≤50', '>50'])
-    plot_cdf(diameter_analysis_df, 'Pressure_Drop', pressure=0.4, age_groups=['≤50', '>50'])
-    plot_cdf(diameter_analysis_df, 'Pressure_Drop', pressure=1.2, age_groups=['≤50', '>50'])
+    plot_cdf(diameter_analysis_df_set01, 'Pressure_Drop', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_cdf(diameter_analysis_df_set01, 'Pressure_Drop', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_cdf(diameter_analysis_df_set01, 'Pressure_Drop', pressure=1.2, age_groups=['≤50', '>50'])
     
     # plot violin plots of diameters, velocity, shear rate, and pressure drop
     print("Creating diameter violin plots...")
-    plot_violin(diameter_analysis_df, 'Mean_Diameter', pressure=0.2, age_groups=['≤50', '>50'])
-    plot_violin(diameter_analysis_df, 'Mean_Diameter', pressure=0.4, age_groups=['≤50', '>50'])
-    plot_violin(diameter_analysis_df, 'Mean_Diameter', pressure=1.2, age_groups=['≤50', '>50'])
+    plot_violin(diameter_analysis_df_set01, 'Mean_Diameter', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_violin(diameter_analysis_df_set01, 'Mean_Diameter', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_violin(diameter_analysis_df_set01, 'Mean_Diameter', pressure=1.2, age_groups=['≤50', '>50'])
     
     print("Creating velocity violin plots...")
-    plot_violin(diameter_analysis_df, 'Corrected_Velocity', pressure=0.2, age_groups=['≤50', '>50'])
-    plot_violin(diameter_analysis_df, 'Corrected_Velocity', pressure=0.4, age_groups=['≤50', '>50'])
-    plot_violin(diameter_analysis_df, 'Corrected_Velocity', pressure=1.2, age_groups=['≤50', '>50'])
+    plot_violin(diameter_analysis_df_set01, 'Corrected_Velocity', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_violin(diameter_analysis_df_set01, 'Corrected_Velocity', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_violin(diameter_analysis_df_set01, 'Corrected_Velocity', pressure=1.2, age_groups=['≤50', '>50'])
     
     print("Creating shear rate violin plots...")
-    plot_violin(diameter_analysis_df, 'Shear_Rate', pressure=0.2, age_groups=['≤50', '>50'])
-    plot_violin(diameter_analysis_df, 'Shear_Rate', pressure=0.4, age_groups=['≤50', '>50'])
-    plot_violin(diameter_analysis_df, 'Shear_Rate', pressure=1.2, age_groups=['≤50', '>50'])
+    plot_violin(diameter_analysis_df_set01, 'Shear_Rate', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_violin(diameter_analysis_df_set01, 'Shear_Rate', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_violin(diameter_analysis_df_set01, 'Shear_Rate', pressure=1.2, age_groups=['≤50', '>50'])
     
     print("Creating pressure drop violin plots...")
-    plot_violin(diameter_analysis_df, 'Pressure_Drop', pressure=0.2, age_groups=['≤50', '>50'])
-    plot_violin(diameter_analysis_df, 'Pressure_Drop', pressure=0.4, age_groups=['≤50', '>50'])
-    plot_violin(diameter_analysis_df, 'Pressure_Drop', pressure=1.2, age_groups=['≤50', '>50'])
+    plot_violin(diameter_analysis_df_set01, 'Pressure_Drop', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_violin(diameter_analysis_df_set01, 'Pressure_Drop', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_violin(diameter_analysis_df_set01, 'Pressure_Drop', pressure=1.2, age_groups=['≤50', '>50'])
 
     # plot box and whisker plots of diameters, velocity, shear rate, and pressure drop
     print("Creating diameter box plots...")
-    plot_boxnwhisker(diameter_analysis_df, 'Mean_Diameter', pressure=0.2, age_groups=['≤50', '>50'])
-    plot_boxnwhisker(diameter_analysis_df, 'Mean_Diameter', pressure=0.4, age_groups=['≤50', '>50'])
-    plot_boxnwhisker(diameter_analysis_df, 'Mean_Diameter', pressure=1.2, age_groups=['≤50', '>50'])
+    plot_boxnwhisker(diameter_analysis_df_set01, 'Mean_Diameter', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_boxnwhisker(diameter_analysis_df_set01, 'Mean_Diameter', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_boxnwhisker(diameter_analysis_df_set01, 'Mean_Diameter', pressure=1.2, age_groups=['≤50', '>50'])
     
     print("Creating velocity box plots...")
-    plot_boxnwhisker(diameter_analysis_df, 'Corrected_Velocity', pressure=0.2, age_groups=['≤50', '>50'])
-    plot_boxnwhisker(diameter_analysis_df, 'Corrected_Velocity', pressure=0.4, age_groups=['≤50', '>50'])
-    plot_boxnwhisker(diameter_analysis_df, 'Corrected_Velocity', pressure=1.2, age_groups=['≤50', '>50'])
+    plot_boxnwhisker(diameter_analysis_df_set01, 'Corrected_Velocity', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_boxnwhisker(diameter_analysis_df_set01, 'Corrected_Velocity', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_boxnwhisker(diameter_analysis_df_set01, 'Corrected_Velocity', pressure=1.2, age_groups=['≤50', '>50'])
     
     print("Creating shear rate box plots...")
-    plot_boxnwhisker(diameter_analysis_df, 'Shear_Rate', pressure=0.2, age_groups=['≤50', '>50'])
-    plot_boxnwhisker(diameter_analysis_df, 'Shear_Rate', pressure=0.4, age_groups=['≤50', '>50'])
-    plot_boxnwhisker(diameter_analysis_df, 'Shear_Rate', pressure=1.2, age_groups=['≤50', '>50'])
+    plot_boxnwhisker(diameter_analysis_df_set01, 'Shear_Rate', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_boxnwhisker(diameter_analysis_df_set01, 'Shear_Rate', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_boxnwhisker(diameter_analysis_df_set01, 'Shear_Rate', pressure=1.2, age_groups=['≤50', '>50'])
     
     print("Creating pressure drop box plots...")
-    plot_boxnwhisker(diameter_analysis_df, 'Pressure_Drop', pressure=0.2, age_groups=['≤50', '>50'])
-    plot_boxnwhisker(diameter_analysis_df, 'Pressure_Drop', pressure=0.4, age_groups=['≤50', '>50'])
-    plot_boxnwhisker(diameter_analysis_df, 'Pressure_Drop', pressure=1.2, age_groups=['≤50', '>50'])
+    plot_boxnwhisker(diameter_analysis_df_set01, 'Pressure_Drop', pressure=0.2, age_groups=['≤50', '>50'])
+    plot_boxnwhisker(diameter_analysis_df_set01, 'Pressure_Drop', pressure=0.4, age_groups=['≤50', '>50'])
+    plot_boxnwhisker(diameter_analysis_df_set01, 'Pressure_Drop', pressure=1.2, age_groups=['≤50', '>50'])
 
-    # calculate median shear rate for each participant video. 
-    diameter_analysis_df = calculate_representative_diameters(diameter_analysis_df)
+    # calculate median shear rate for each participant video using set01 data
+    diameter_analysis_df_set01 = calculate_representative_diameters(diameter_analysis_df_set01)
 
     # Create diameter plots directory if it doesn't exist
     diameter_plots_dir = os.path.join(cap_flow_path, 'results', 'diameter_plots')
@@ -177,25 +180,44 @@ def main():
     animations_dir = os.path.join(shear_rate_plots_dir, 'animations')
     os.makedirs(animations_dir, exist_ok=True)
 
-    # Animated 3D plots - generate one at a time to avoid memory issues
+    # 3D plots using full dataset - animations disabled for faster processing
     # First generate the main shear rate vs diameter and pressure plot
-    plot_shear_rate_3d(diameter_analysis_df, animate=True, fps=20)
+    plot_shear_rate_3d(diameter_analysis_df_full, animate=False, fps=20)
     
-    # Then generate pressure-specific age plots one at a time
-    plot_shear_rate_3d_pressure_age(diameter_analysis_df, pressure=0.2, animate=True, fps=20)
-    plot_shear_rate_3d_pressure_age(diameter_analysis_df, pressure=0.4, animate=True, fps=20)
-    plot_shear_rate_3d_pressure_age(diameter_analysis_df, pressure=1.2, animate=True, fps=20)
+    # Then generate pressure-specific age plots using set01 data for age analysis
+    plot_shear_rate_3d_pressure_age(diameter_analysis_df_set01, pressure=0.2, animate=False, fps=20)
+    plot_shear_rate_3d_pressure_age(diameter_analysis_df_set01, pressure=0.4, animate=False, fps=20)
+    plot_shear_rate_3d_pressure_age(diameter_analysis_df_set01, pressure=1.2, animate=False, fps=20)
     
-    # Calculate and plot CI results
-    shear_rate_medians_df = calculate_shear_rate_medians(diameter_analysis_df)
-    shear_rate_medians_nhp = shear_rate_medians_df[shear_rate_medians_df['Pressure'] <= 1.2]
-    shear_rate_medians_nhp_age = shear_rate_medians_nhp[shear_rate_medians_nhp['SET'] == 'set01']
-    print(f'the number of participants in the nhp set01 is {shear_rate_medians_nhp_age["Participant"].nunique()}')
+    # Calculate and plot CI results using appropriate datasets
+    print("Creating shear rate CI plots...")
+    
+    # Age CI plot: use set01 data only
+    shear_rate_medians_set01 = calculate_shear_rate_medians(diameter_analysis_df_set01)
+    shear_rate_medians_nhp_age = shear_rate_medians_set01[shear_rate_medians_set01['Pressure'] <= 1.2]
+    print(f'Age analysis: number of participants in set01 is {shear_rate_medians_nhp_age["Participant"].nunique()}')
     
     plot_CI(shear_rate_medians_nhp_age, variable = 'Age', method = 'bootstrap', n_iterations = 1000, ci_percentile = 95, write = True, dimensionless = False, video_median = False, log_scale = False, old = False, velocity_variable = 'Shear_Rate')
-    plot_CI(shear_rate_medians_nhp, variable = 'Diabetes', method = 'bootstrap', n_iterations = 1000, ci_percentile = 95, write = True, dimensionless = False, video_median = False, log_scale = False, old = False, velocity_variable = 'Shear_Rate')
     
-    participant_medians = calculate_participant_medians(diameter_analysis_df)
+    # Diabetes CI plot: use full dataset to include both set01 (control) and set03 (diabetic)
+    shear_rate_medians_full = calculate_shear_rate_medians(diameter_analysis_df_full)
+    shear_rate_medians_nhp_full = shear_rate_medians_full[shear_rate_medians_full['Pressure'] <= 1.2]
+    print(f'Diabetes analysis: total participants is {shear_rate_medians_nhp_full["Participant"].nunique()}')
+    print(f'Sets in data: {shear_rate_medians_nhp_full["SET"].unique()}')
+    
+    plot_CI(shear_rate_medians_nhp_full, variable = 'Diabetes', method = 'bootstrap', n_iterations = 1000, ci_percentile = 95, write = True, dimensionless = False, video_median = False, log_scale = False, old = False, velocity_variable = 'Shear_Rate')
+    
+    # Hypertension CI plot: use full dataset to include both set01 (control) and set02 (hypertensive)
+    print(f'Hypertension analysis: total participants is {shear_rate_medians_nhp_full["Participant"].nunique()}')
+    print(f'Sets in data: {shear_rate_medians_nhp_full["SET"].unique()}')
+    
+    plot_CI(shear_rate_medians_nhp_full, variable = 'Hypertension', method = 'bootstrap', n_iterations = 1000, ci_percentile = 95, write = True, dimensionless = False, video_median = False, log_scale = False, old = False, velocity_variable = 'Shear_Rate')
+    
+    # Generate KS statistics tables for shear rate data
+    save_shear_rate_ks_tables(shear_rate_medians_nhp_full)
+    
+    # PCA analysis using set01 data
+    participant_medians = calculate_participant_medians(diameter_analysis_df_set01)
     plot_PCA(participant_medians)
     return 0
 
@@ -213,12 +235,18 @@ def calculate_participant_medians(diameter_analysis_df):
     df_nhp = df[df['Pressure'] <= 1.2]
     
     # Calculate medians of key variables for each participant
-    median_values = df_nhp.groupby('Participant').agg({
-        'Shear_Rate': 'median',
-        'Corrected_Velocity': 'median',
-        'Pressure_Drop': 'median',
-        'Mean_Diameter': 'median'
-    })
+    # Only include columns that exist in the dataframe
+    agg_dict = {}
+    available_columns = ['Shear_Rate', 'Corrected_Velocity', 'Mean_Diameter']
+    for col in available_columns:
+        if col in df_nhp.columns:
+            agg_dict[col] = 'median'
+    
+    # Add Pressure_Drop only if it exists
+    if 'Pressure_Drop' in df_nhp.columns:
+        agg_dict['Pressure_Drop'] = 'median'
+    
+    median_values = df_nhp.groupby('Participant').agg(agg_dict)
     
     # Get participant metadata (using first occurrence for each participant)
     metadata = df_nhp.groupby('Participant').first().reset_index()
@@ -254,6 +282,211 @@ def calculate_participant_medians(diameter_analysis_df):
     
     return participant_medians
 
+
+def save_shear_rate_ks_tables(shear_rate_medians_df):
+    """
+    Calculate and save KS statistics tables for shear rate data at different pressures.
+    Creates tables similar to the velocity analysis for Age, Sex, SYS_BP, Diabetes, and Hypertension.
+    
+    Args:
+        shear_rate_medians_df: DataFrame containing shear rate data with pressure information
+    """
+    from scipy.stats import ks_2samp
+    import pandas as pd
+    import os
+    from src.config import PATHS
+    
+    print("\nGenerating KS statistics tables for shear rate data...")
+    
+    # Create output directory
+    output_dir = os.path.join(PATHS.get('cap_flow', '.'), 'results', 'shear_rate_ks_tables')
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Define variables to test
+    variables = ['Age', 'Sex', 'SYS_BP', 'Diabetes', 'Hypertension']
+    
+    # Get unique pressures and sort them
+    pressures = sorted(shear_rate_medians_df['Pressure'].unique())
+    
+    # Initialize results dictionary
+    ks_results = {}
+    
+    for variable in variables:
+        if variable not in shear_rate_medians_df.columns:
+            print(f"Warning: {variable} column not found in data. Skipping...")
+            continue
+            
+        variable_results = {}
+        
+        for pressure in pressures:
+            pressure_data = shear_rate_medians_df[shear_rate_medians_df['Pressure'] == pressure]
+            
+            # Skip if insufficient data
+            if len(pressure_data) < 10:
+                print(f"Warning: Insufficient data for {variable} at pressure {pressure}. Skipping...")
+                continue
+            
+            # For Age and SYS_BP, create groups based on median split
+            if variable in ['Age', 'SYS_BP']:
+                median_val = pressure_data[variable].median()
+                group1 = pressure_data[pressure_data[variable] <= median_val]['Video_Median_Shear_Rate'].dropna()
+                group2 = pressure_data[pressure_data[variable] > median_val]['Video_Median_Shear_Rate'].dropna()
+                group1_name = f'≤{median_val:.0f}'
+                group2_name = f'>{median_val:.0f}'
+                
+            # For categorical variables
+            elif variable in ['Sex', 'Diabetes', 'Hypertension']:
+                unique_vals = pressure_data[variable].dropna().unique()
+                if len(unique_vals) < 2:
+                    print(f"Warning: Only one category found for {variable} at pressure {pressure}. Skipping...")
+                    continue
+                    
+                if variable == 'Sex':
+                    group1_name, group2_name = 'Female', 'Male'
+                    group1 = pressure_data[pressure_data[variable] == 'Female']['Video_Median_Shear_Rate'].dropna()
+                    group2 = pressure_data[pressure_data[variable] == 'Male']['Video_Median_Shear_Rate'].dropna()
+                elif variable == 'Diabetes':
+                    group1_name, group2_name = 'Control', 'Diabetic'
+                    group1 = pressure_data[pressure_data[variable] == 'Control']['Video_Median_Shear_Rate'].dropna()
+                    group2 = pressure_data[pressure_data[variable] == 'Diabetic']['Video_Median_Shear_Rate'].dropna()
+                elif variable == 'Hypertension':
+                    group1_name, group2_name = 'Control', 'Hypertensive'
+                    group1 = pressure_data[pressure_data[variable] == 'Control']['Video_Median_Shear_Rate'].dropna()
+                    group2 = pressure_data[pressure_data[variable] == 'Hypertensive']['Video_Median_Shear_Rate'].dropna()
+            
+            # Perform KS test if both groups have sufficient data
+            if len(group1) >= 3 and len(group2) >= 3:
+                ks_stat, p_value = ks_2samp(group1, group2)
+                variable_results[pressure] = {
+                    'KS_statistic': ks_stat,
+                    'p_value': p_value,
+                    'group1_name': group1_name,
+                    'group2_name': group2_name,
+                    'group1_n': len(group1),
+                    'group2_n': len(group2)
+                }
+                print(f"{variable} at {pressure} PSI: KS={ks_stat:.3f}, p={p_value:.4f} ({group1_name} n={len(group1)}, {group2_name} n={len(group2)})")
+            else:
+                print(f"Warning: Insufficient sample size for {variable} at pressure {pressure}")
+        
+        ks_results[variable] = variable_results
+    
+    # Create comprehensive table similar to the image
+    table_rows = []
+    
+    for pressure in pressures:
+        row = {'Pressure': pressure}
+        
+        for variable in variables:
+            if variable in ks_results and pressure in ks_results[variable]:
+                ks_stat = ks_results[variable][pressure]['KS_statistic']
+                p_value = ks_results[variable][pressure]['p_value']
+                row[f'{variable}_KS'] = f'{ks_stat:.3f}'
+                row[f'{variable}_p_value'] = f'{p_value:.5f}'
+            else:
+                row[f'{variable}_KS'] = 'N/A'
+                row[f'{variable}_p_value'] = 'N/A'
+        
+        table_rows.append(row)
+    
+    # Create the main KS statistics table
+    ks_table_df = pd.DataFrame(table_rows)
+    
+    # Reorder columns to match the image format
+    column_order = ['Pressure']
+    for variable in variables:
+        column_order.extend([f'{variable}_KS', f'{variable}_p_value'])
+    
+    ks_table_df = ks_table_df[column_order]
+    
+    # Save the main table
+    main_table_path = os.path.join(output_dir, 'Shear_Rate_KS_Statistics_Table.csv')
+    ks_table_df.to_csv(main_table_path, index=False)
+    print(f"Main KS statistics table saved to: {main_table_path}")
+    
+    # Create individual tables for each variable (similar to what we did for velocity)
+    for variable in variables:
+        if variable not in ks_results:
+            continue
+            
+        var_table_rows = []
+        for pressure in pressures:
+            if pressure in ks_results[variable]:
+                var_table_rows.append({
+                    'Pressure': pressure,
+                    'KS_Statistic': ks_results[variable][pressure]['KS_statistic'],
+                    'p_value': ks_results[variable][pressure]['p_value'],
+                    'Group_1': ks_results[variable][pressure]['group1_name'],
+                    'Group_1_N': ks_results[variable][pressure]['group1_n'],
+                    'Group_2': ks_results[variable][pressure]['group2_name'],
+                    'Group_2_N': ks_results[variable][pressure]['group2_n']
+                })
+        
+        if var_table_rows:
+            var_df = pd.DataFrame(var_table_rows)
+            var_table_path = os.path.join(output_dir, f'Shear_Rate_{variable}_KS_Statistics.csv')
+            var_df.to_csv(var_table_path, index=False)
+            print(f"{variable} KS statistics table saved to: {var_table_path}")
+    
+    # Create a summary comparison with velocity KS results if available
+    velocity_ks_path = os.path.join(PATHS.get('cap_flow', '.'), 'results', 'ks_statistics_tables', 'KS_Statistics_Summary.csv')
+    
+    if os.path.exists(velocity_ks_path):
+        print("\nVelocity KS statistics found. Creating simplified comparison...")
+        try:
+            velocity_ks_df = pd.read_csv(velocity_ks_path)
+            
+            # Create a simple summary comparison (since velocity table is structured differently)
+            comparison_summary = []
+            for variable in variables:
+                if variable in ks_results:
+                    # Calculate summary stats for shear rate
+                    var_ks_values = [ks_results[variable][p]['KS_statistic'] for p in pressures if p in ks_results[variable]]
+                    var_p_values = [ks_results[variable][p]['p_value'] for p in pressures if p in ks_results[variable]]
+                    
+                    if var_ks_values:
+                        shear_rate_summary = {
+                            'Variable': variable,
+                            'Shear_Rate_Mean_KS': np.mean(var_ks_values),
+                            'Shear_Rate_Max_KS': np.max(var_ks_values),
+                            'Shear_Rate_Min_p_value': np.min(var_p_values),
+                            'Shear_Rate_Significant_p005': sum(1 for p in var_p_values if p < 0.05),
+                            'Shear_Rate_Total_Pressures': len(var_p_values)
+                        }
+                        
+                        # Add velocity stats if available
+                        velocity_row = velocity_ks_df[velocity_ks_df['Variable'] == variable]
+                        if not velocity_row.empty:
+                            shear_rate_summary.update({
+                                'Velocity_Mean_KS': velocity_row['Mean_KS_Statistic'].iloc[0],
+                                'Velocity_Max_KS': velocity_row['Max_KS_Statistic'].iloc[0],
+                                'Velocity_Min_p_value': velocity_row['Min_p_value'].iloc[0],
+                                'Velocity_Significant_p005': velocity_row['Significant_p005'].iloc[0],
+                                'Velocity_Total_Pressures': velocity_row['Total_Pressure_Points'].iloc[0]
+                            })
+                        else:
+                            shear_rate_summary.update({
+                                'Velocity_Mean_KS': 'N/A',
+                                'Velocity_Max_KS': 'N/A',
+                                'Velocity_Min_p_value': 'N/A',
+                                'Velocity_Significant_p005': 'N/A',
+                                'Velocity_Total_Pressures': 'N/A'
+                            })
+                        
+                        comparison_summary.append(shear_rate_summary)
+            
+            if comparison_summary:
+                comparison_df = pd.DataFrame(comparison_summary)
+                comparison_path = os.path.join(output_dir, 'Shear_Rate_vs_Velocity_Summary_Comparison.csv')
+                comparison_df.to_csv(comparison_path, index=False)
+                print(f"Summary comparison table saved to: {comparison_path}")
+            
+        except Exception as e:
+            print(f"Warning: Could not create velocity comparison: {e}")
+            print("Shear rate KS tables were still saved successfully.")
+    
+    print(f"\nAll shear rate KS statistics tables saved in: {output_dir}")
+    return ks_results
 
 def threshold_analysis(diameter_analysis_df, diameter_plots_dir, cap_flow_path):
     # Create CDF plots for Mean Diameter split by age groups
@@ -474,7 +707,7 @@ def plot_velocity_vs_diameter_by_set(diameter_analysis_df, output_dir):
     for pressure in diameter_analysis_df['Pressure'].unique():
         plt.figure(figsize=(2.4, 2.0))
         # Convert SET strings to numbers by extracting digits
-        set_numbers = diameter_analysis_df[diameter_analysis_df['Pressure'] == pressure]['SET'].str.extract('(\d+)').astype(float)
+        set_numbers = diameter_analysis_df[diameter_analysis_df['Pressure'] == pressure]['SET'].str.extract(r'(\d+)').astype(float)
         scatter = plt.scatter(diameter_analysis_df[diameter_analysis_df['Pressure'] == pressure]['Mean_Diameter'],
                             diameter_analysis_df[diameter_analysis_df['Pressure'] == pressure]['Corrected_Velocity'], 
                             c=set_numbers,

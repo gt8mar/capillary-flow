@@ -62,6 +62,9 @@ def get_source_sans_font():
         print(f"Warning: Error loading font: {e}")
         return None
 
+# Set up source_sans for backward compatibility with other functions
+source_sans = get_source_sans_font()
+
 def plot_PCA(participant_medians):
     """
     Perform Principal Component Analysis on participant median data and create visualizations.
@@ -895,6 +898,20 @@ def adjust_saturation_of_colors(color_list, saturation_scale=10):
         rgb_new = colorsys.hls_to_rgb(h, l, s_new)
         adjusted_colors.append(rgb_new)
     return adjusted_colors
+
+def setup_plotting_style():
+    """Set up consistent plotting style according to coding standards."""
+    plt.rcParams.update({
+        'pdf.fonttype': 42,
+        'ps.fonttype': 42,
+        'font.size': 7,
+        'axes.labelsize': 7,
+        'xtick.labelsize': 6,
+        'ytick.labelsize': 6,
+        'legend.fontsize': 5,
+        'lines.linewidth': 0.5,
+        'figure.figsize': (12, 10)
+    })
 
 def plot_histogram(diameter_analysis_df, variable, pressure, age_groups, cutoff_percentile=95):
     """
@@ -2215,3 +2232,56 @@ def plot_participant_velocity_profiles_by_group(df, variable='Age', method='boot
     plt.close()
     
     return profiles_df
+
+def secomb_viscocity_fn(diameter, H_discharge = 0.45, constant = 0.1):
+    """
+    Calculate the secomb viscosity based on the given parameters.
+    
+    Args:
+        diameter: float, diameter of the capillary in um
+        hematocrit: float, hematocrit of the capillary in percentage
+        
+    Returns:
+        float, secomb viscosity in cp
+    """
+    visc_star = 6 * np.exp(-0.085*diameter) + 3.2 - 2.44 * np.exp(-0.06*(diameter)**0.645)
+    denom = (1+((10**(-11))*diameter**(12)))
+    average_viscosity = 1 # cp
+    constant = (0.8 + np.exp(-0.075*diameter)) * (-1+((1)/denom)) + ((1)/denom)
+    scaler = ((diameter)/(diameter-1.1))**2
+    viscosity = average_viscosity*(1 + (visc_star -1)*((((1-H_discharge)**constant)-1)/(((1-0.45)**constant)-1))*scaler)*scaler
+    return viscosity # in cp
+
+def pressure_drop_per_length(diameter, velocity, viscosity):
+    """
+    Calculate the pressure drop of the capillary based on the given parameters.
+
+    Args:
+        diameter: float, diameter of the capillary in um
+        velocity: float, velocity of the capillary in um/s
+        viscosity: float, viscosity of the capillary in cp
+        
+    Returns:
+        float, pressure drop of the capillary in mmHg/um
+    """
+    viscosity_pascals_s = viscosity * 1e-3 # Pa*s
+    diameter_m = diameter * 1e-6 # m
+    velocity_m = velocity * 1e-6 # m/s
+    pressure_drop_per_length = (8 * viscosity_pascals_s * velocity_m) / ((diameter_m/2)**2) # Pa/m
+    pressure_drop_per_length_mmHg = pressure_drop_per_length * 760 / 101325 # mmHg/m
+    pressure_drop_per_length_mmHg_um = pressure_drop_per_length_mmHg * 1e6 # mmHg/um
+    return pressure_drop_per_length_mmHg_um
+
+def setup_plotting_style():
+    """Set up consistent plotting style according to coding standards."""
+    plt.rcParams.update({
+        'pdf.fonttype': 42,
+        'ps.fonttype': 42,
+        'font.size': 7,
+        'axes.labelsize': 7,
+        'xtick.labelsize': 6,
+        'ytick.labelsize': 6,
+        'legend.fontsize': 5,
+        'lines.linewidth': 0.5,
+        'figure.figsize': (12, 10)
+    })
