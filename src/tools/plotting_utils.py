@@ -2285,3 +2285,181 @@ def setup_plotting_style():
         'lines.linewidth': 0.5,
         'figure.figsize': (12, 10)
     })
+
+# ----------------------------------------------
+# Classic CDF utilities (ported from legacy scripts)
+# ----------------------------------------------
+
+def _calc_norm_cdfs(data):
+    """Return the mean empirical CDF across an iterable of 1-D arrays.
+
+    This helper is used when *normalize=True* in :func:`calculate_cdf`.
+    Each element of *data* is treated as an individual sample (e.g. a
+    participant).  The empirical CDF is computed for every sample and the
+    resulting probability values are averaged.
+    """
+    cdfs = []
+    for sample in data:
+        sample_sorted = np.sort(sample)
+        p_sample = np.arange(len(sample)) / (len(sample) - 1)
+        cdfs.append(np.vstack([sample_sorted, p_sample]))
+    cdfs = np.array(cdfs)
+    return np.mean(cdfs, axis=0)
+
+
+def calculate_cdf(data, normalize: bool = False):
+    """Compute the empirical cumulative distribution function (CDF).
+
+    Parameters
+    ----------
+    data : array-like or iterable of array-like
+        Input data.  When *normalize* is *False* this should be a 1-D array of
+        values.  When *normalize* is *True* this should be an iterable of
+        arrays (for example a list where each element corresponds to one
+        participant).  The average CDF across the arrays is returned.
+    normalize : bool, default False
+        Whether to average CDFs across the outer dimension of *data*.
+
+    Returns
+    -------
+    tuple
+        A tuple ``(x, y)`` where *x* is the sorted data and *y* is the CDF
+        probabilities.
+    """
+    if normalize:
+        return _calc_norm_cdfs(data)
+
+    sorted_data = np.sort(data)
+    p = np.linspace(0, 1, len(sorted_data))
+    return sorted_data, p
+
+
+def plot_cdf_basic(
+    data,
+    subsets,
+    labels,
+    title: str = "CDF Comparison",
+    write: bool = False,
+    normalize: bool = False,
+    variable: str = "Age",
+    log: bool = True,
+):
+    """Legacy CDF plotting routine preserved for backward compatibility.
+
+    This function reproduces the visual style of the original ``plot_cdf``
+    implementation that lived in *plot_big.py*.  It is intended for ad-hoc
+    exploratory graphics and small figure generation scripts rather than the
+    more generic utilities above.
+    """
+
+    plt.close()
+    sns.set_style("whitegrid")
+    source_sans = get_source_sans_font()
+
+    plt.rcParams.update(
+        {
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
+            "font.size": 7,
+            "axes.labelsize": 7,
+            "xtick.labelsize": 6,
+            "ytick.labelsize": 6,
+            "legend.fontsize": 5,
+            "lines.linewidth": 0.5,
+        }
+    )
+
+    # Base colour selection mirrors the original behaviour
+    if variable == "Age":
+        base_color = "#1f77b4"
+    elif variable == "SYS_BP":
+        base_color = "2ca02c"
+    elif variable == "Sex":
+        base_color = "674F92"
+    elif variable == "Individual":
+        base_color = "#1f77b4"
+        individual_color = "#6B0F1A"
+    elif variable == "Diabetes_plot":
+        base_color = "#ff7f0e"
+    elif variable == "Hypertension_plot":
+        base_color = "#d62728"
+    else:
+        raise ValueError(f"Unsupported variable: {variable}")
+
+    palette = create_monochromatic_palette(base_color)
+    palette = adjust_brightness_of_colors(palette, brightness_scale=0.2)
+    sns.set_palette(palette)
+
+    if not subsets:
+        print("⚠️  No subsets provided – nothing to plot.")
+        return 1
+
+    fig, ax = plt.subplots(figsize=(2.4, 2.0))
+
+    # Shift data if log scale requested
+    if log:
+        data = data + 1
+        subsets = [s + 1 for s in subsets]
+
+    # Plot main dataset
+    x, y = calculate_cdf(data, normalize)
+    ax.plot(x, y, label=labels[0])
+
+    # Plot subsets
+    for i, subset in enumerate(subsets):
+        if i == 0:
+            i_color = 0
+        elif i == 1:
+            i_color = 3
+        elif i == 2:
+            i_color = 4
+        else:
+            i_color = i % len(palette)
+
+        x, y = calculate_cdf(subset, normalize)
+        if variable == "Individual":
+            ax.plot(x, y, label=labels[i + 1], linestyle="--", color=individual_color)
+        else:
+            ax.plot(x, y, label=labels[i + 1], linestyle="--", color=palette[i_color])
+
+    # Axis labels & title
+    if source_sans:
+        ax.set_ylabel("CDF", fontproperties=source_sans)
+        if log:
+            xlabel = "Velocity + 1 (µm/s)" if "Pressure" not in title else "Pressure (psi)"
+        else:
+            xlabel = "Velocity (µm/s)" if "Pressure" not in title else "Pressure (psi)"
+        ax.set_xlabel(xlabel, fontproperties=source_sans)
+        ax.set_title(title, fontsize=8, fontproperties=source_sans)
+    else:
+        ax.set_ylabel("CDF")
+        ax.set_xlabel("Velocity + 1 (µm/s)" if log else "Velocity (µm/s)")
+        ax.set_title(title)
+
+    # Log scale formatting
+    if log:
+        ax.set_xscale("log")
+        ax.xaxis.set_major_locator(ticker.LogLocator(base=10.0, numticks=5))
+        ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
+
+    # Legend
+    if source_sans:
+        ax.legend(loc="lower right", bbox_to_anchor=(1, 0.01), prop=source_sans, fontsize=6)
+    else:
+        ax.legend(loc="lower right", bbox_to_anchor=(1, 0.01), fontsize=6)
+
+    ax.grid(True, linewidth=0.3)
+    fig.set_dpi(300)
+    plt.tight_layout()
+
+    if write:
+        cap_flow_path = PATHS.get("cap_flow", os.getcwd())
+        out_dir = os.path.join(cap_flow_path, "results", "cdf_plots")
+        os.makedirs(out_dir, exist_ok=True)
+        filename = f"{title.replace(' ', '_').lower()}.png"
+        fig.savefig(os.path.join(out_dir, filename), dpi=600, bbox_inches="tight")
+        plt.close(fig)
+    else:
+        plt.show()
+
+    return 0
