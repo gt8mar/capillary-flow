@@ -94,26 +94,42 @@ def load_image(image_path):
         rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
         return bgr, rgb
 
-def main(frog_path, plot=False):
+def main(frog_filename, plot=False):
     """Main function to analyze a frog image.
     
     Args:
-        frog_path (str): Path to the frog image
+        frog_filename (str): Filename or full path to the frog image
         plot (bool): Whether to display plots
     """
-    # Extract filename without extension for output files
-    base_filename = os.path.splitext(os.path.basename(frog_path))[0]
+    # Paths to raw image directories provided by the user
+    RAW_JPG_DIR = r"H:\\WkSleep_Trans_Up_to_25-5-1_Named_JPG"
+    RAW_CR2_DIR = r"H:\\WkSleep_Trans_Up_to_25-5-1_Named_cr2"
+
+    # Resolve full path to the image
+    if os.path.isabs(frog_filename) and os.path.exists(frog_filename):
+        full_path = frog_filename
+    else:
+        # Try JPG directory first
+        candidate_path = os.path.join(RAW_JPG_DIR, frog_filename)
+        if os.path.exists(candidate_path):
+            full_path = candidate_path
+        else:
+            # Try CR2 directory
+            candidate_path = os.path.join(RAW_CR2_DIR, frog_filename)
+            if os.path.exists(candidate_path):
+                full_path = candidate_path
+            else:
+                print(f"Image file not found: {frog_filename}")
+                return
+
+    base_filename = os.path.splitext(os.path.basename(full_path))[0]
     print(f'Analyzing {base_filename}')
-    
-    # Determine full path
-    download_path = "C://Users//gt8ma//Downloads//whole-frog//"
-    full_path = os.path.join(download_path, frog_path)
-    
+
     # Load the image using the new function
     image_bgr, image_rgb = load_image(full_path)
     
     if image_bgr is None:
-        print(f"Failed to load image: {frog_path}")
+        print(f"Failed to load image: {frog_filename}")
         return
     
     # Always use existing masks if available
@@ -386,7 +402,7 @@ def analyze_frog(image_bgr, image_rgb=None, base_filename="frog", plot=False, us
     heatmap[:, :, 0] = (255 * red_minus_green_norm).astype(np.uint8)  # Red channel
     
     # Use the paths from config
-    output_dir = PATHS['frog_analysis']
+    output_dir = PATHS.get('frog_results', os.path.join(PATHS['frog_dir'], 'results'))
     
     # Analyze inside vs outside redness
     region_rgb_ratios, region_rg_ratios = analyze_radial_regions(frog_mask, red_ratio, image_rgb, base_filename, plot, output_dir)
@@ -489,7 +505,16 @@ def quality_control(image):
     pass
 
 if __name__ == "__main__":
-    for file in os.listdir(os.path.join(PATHS['downloads'], "whole-frog")):
-        if file.endswith(".JPG" or ".jpg" or ".png" or ".cr2" or ".CR2"):
-            print(file)
-            main(file, plot = False)
+    RAW_JPG_DIR = r"H:\\WkSleep_Trans_Up_to_25-5-1_Named_JPG"
+    RAW_CR2_DIR = r"H:\\WkSleep_Trans_Up_to_25-5-1_Named_cr2"
+    # Collect image filenames from both directories
+    image_files = []
+    for folder in [RAW_JPG_DIR, RAW_CR2_DIR]:
+        if not os.path.isdir(folder):
+            continue
+        for file in os.listdir(folder):
+            if file.lower().endswith((".jpg", ".jpeg", ".png", ".cr2", ".cr3")):
+                image_files.append(file)
+
+    for file in image_files:
+        main(file, plot=False)
