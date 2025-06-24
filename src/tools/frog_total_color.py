@@ -855,20 +855,39 @@ if __name__ == "__main__":
     results_dir = os.path.join(results_root, "region-analysis")
     os.makedirs(results_dir, exist_ok=True)
     
-    # Collect image filenames from both directories
-    image_files = []
-    for folder in [RAW_JPG_DIR, RAW_CR2_DIR]:
-        if not os.path.isdir(folder):
-            continue
-        for file in os.listdir(folder):
-            if file.lower().endswith((".jpg", ".jpeg", ".png", ".cr2", ".cr3")):
-                image_files.append(file)
-
+    # Collect JPG files first
+    jpg_files = []
+    if os.path.isdir(RAW_JPG_DIR):
+        for file in os.listdir(RAW_JPG_DIR):
+            if file.lower().endswith((".jpg", ".jpeg", ".png")):
+                jpg_files.append(file)
+    
+    # Sort JPG files
+    jpg_files.sort()
+    
+    # Collect CR2 files, but only if no corresponding JPG exists
+    cr2_files = []
+    if os.path.isdir(RAW_CR2_DIR):
+        for file in os.listdir(RAW_CR2_DIR):
+            if file.lower().endswith((".cr2", ".cr3")):
+                # Check if corresponding JPG exists
+                base_name = os.path.splitext(file)[0]
+                jpg_exists = any(os.path.splitext(jpg_file)[0] == base_name for jpg_file in jpg_files)
+                if not jpg_exists:
+                    cr2_files.append(file)
+    
+    # Sort CR2 files
+    cr2_files.sort()
+    
+    # Combine files in order: JPG first, then CR2
+    all_files = jpg_files + cr2_files
+    
     # Process each frog and collect CSV data
-    print(f"Found {len(image_files)} image files to process")
+    print(f"Found {len(jpg_files)} JPG files and {len(cr2_files)} CR2 files to process")
+    print(f"Total files to process: {len(all_files)}")
     csv_data_list = []
     
-    for file in image_files:
+    for file in all_files:
         try:
             result = main(file, plot=False)
             if result and 'csv_data' in result:
