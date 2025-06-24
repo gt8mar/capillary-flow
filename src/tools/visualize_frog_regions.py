@@ -408,18 +408,47 @@ def batch_visualize_regions(raw_jpg_dir=r"H:\\WkSleep_Trans_Up_to_25-5-1_Named_J
     output_dir = os.path.join(results_root, "region-visualizations")
     os.makedirs(output_dir, exist_ok=True)
     
-    # Find all available frog masks
-    if not os.path.isdir(frog_seg_dir):
-        print(f"❌ Frog segmentation directory not found: {frog_seg_dir}")
-        return
+    # Collect JPG files first
+    jpg_files = []
+    if os.path.isdir(raw_jpg_dir):
+        for file in os.listdir(raw_jpg_dir):
+            if file.lower().endswith((".jpg", ".jpeg", ".png")):
+                jpg_files.append(file)
     
-    mask_files = [f for f in os.listdir(frog_seg_dir) if f.endswith("_mask.png")]
-    base_filenames = [f.replace("_mask.png", "") for f in mask_files]
+    # Sort JPG files
+    jpg_files.sort()
     
-    print(f"Found {len(base_filenames)} frog masks to process")
+    # Collect CR2 files, but only if no corresponding JPG exists
+    cr2_files = []
+    if os.path.isdir(raw_cr2_dir):
+        for file in os.listdir(raw_cr2_dir):
+            if file.lower().endswith((".cr2", ".cr3")):
+                # Check if corresponding JPG exists
+                base_name = os.path.splitext(file)[0]
+                jpg_exists = any(os.path.splitext(jpg_file)[0] == base_name for jpg_file in jpg_files)
+                if not jpg_exists:
+                    cr2_files.append(file)
+    
+    # Sort CR2 files
+    cr2_files.sort()
+    
+    # Combine files in order: JPG first, then CR2
+    all_files = jpg_files + cr2_files
+    
+    # Filter to only include files that have corresponding masks
+    base_filenames_with_masks = []
+    for file in all_files:
+        base_filename = os.path.splitext(file)[0]
+        mask_path = os.path.join(frog_seg_dir, f"{base_filename}_mask.png")
+        if os.path.exists(mask_path):
+            base_filenames_with_masks.append(base_filename)
+    
+    print(f"Found {len(jpg_files)} JPG files and {len(cr2_files)} CR2 files")
+    print(f"Total files to process: {len(all_files)}")
+    print(f"Files with available masks: {len(base_filenames_with_masks)}")
     
     success_count = 0
-    for base_filename in base_filenames:
+    for base_filename in base_filenames_with_masks:
         try:
             success = visualize_frog_regions(
                 base_filename, output_dir, raw_jpg_dir, raw_cr2_dir, frog_seg_dir, plot
@@ -429,7 +458,7 @@ def batch_visualize_regions(raw_jpg_dir=r"H:\\WkSleep_Trans_Up_to_25-5-1_Named_J
         except Exception as e:
             print(f"❌ Error processing {base_filename}: {e}")
     
-    print(f"\n✅ Successfully processed {success_count}/{len(base_filenames)} frogs")
+    print(f"\n✅ Successfully processed {success_count}/{len(base_filenames_with_masks)} frogs")
     print(f"📁 Visualizations saved to: {output_dir}")
 
 
