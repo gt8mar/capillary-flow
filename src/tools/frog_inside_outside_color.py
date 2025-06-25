@@ -622,32 +622,67 @@ if __name__ == "__main__":
     # Get all available frog images by scanning the raw image directories
     RAW_JPG_DIR = r"H:\\WkSleep_Trans_Up_to_25-5-1_Named_JPG"
     RAW_CR2_DIR = r"H:\\WkSleep_Trans_Up_to_25-5-1_Named_cr2"
+    LIVER_SEG_DIR = r"H:\\whole_frog_livers2"
+    FROG_SEG_DIR = PATHS["frog_segmented"]
     
     results_root = PATHS.get("frog_results", os.path.join(PATHS["frog_dir"], "results"))
     liver_results_dir = os.path.join(results_root, "liver-comparison")
+    os.makedirs(liver_results_dir, exist_ok=True)
     
-    # Find only frogs that have complete data (image + frog mask + liver mask)
-    print("Scanning for frogs with complete data...")
-    base_filenames = find_matching_frogs_with_livers(
-        raw_jpg_dir=RAW_JPG_DIR,
-        raw_cr2_dir=RAW_CR2_DIR,
-        liver_seg_dir=r"H:\\whole_frog_livers2",
-        frog_seg_dir=None  # Use default from config
-    )
+    # Collect JPG files first
+    jpg_files = []
+    if os.path.isdir(RAW_JPG_DIR):
+        for file in os.listdir(RAW_JPG_DIR):
+            if file.lower().endswith((".jpg", ".jpeg", ".png")):
+                jpg_files.append(file)
     
-    if len(base_filenames) == 0:
+    # Sort JPG files
+    jpg_files.sort()
+    
+    # Collect CR2 files, but only if no corresponding JPG exists
+    cr2_files = []
+    if os.path.isdir(RAW_CR2_DIR):
+        for file in os.listdir(RAW_CR2_DIR):
+            if file.lower().endswith((".cr2", ".cr3")):
+                # Check if corresponding JPG exists
+                base_name = os.path.splitext(file)[0]
+                jpg_exists = any(os.path.splitext(jpg_file)[0] == base_name for jpg_file in jpg_files)
+                if not jpg_exists:
+                    cr2_files.append(file)
+    
+    # Sort CR2 files
+    cr2_files.sort()
+    
+    # Combine files in order: JPG first, then CR2
+    all_files = jpg_files + cr2_files
+    
+    # Filter to only include files that have corresponding frog masks AND liver masks
+    base_filenames_with_masks = []
+    for file in all_files:
+        base_filename = os.path.splitext(file)[0]
+        frog_mask_path = os.path.join(FROG_SEG_DIR, f"{base_filename}_mask.png")
+        liver_mask_path = os.path.join(LIVER_SEG_DIR, f"{base_filename}.png")
+        
+        if os.path.exists(frog_mask_path) and os.path.exists(liver_mask_path):
+            base_filenames_with_masks.append(base_filename)
+    
+    print(f"Found {len(jpg_files)} JPG files and {len(cr2_files)} CR2 files")
+    print(f"Total files to process: {len(all_files)}")
+    print(f"Files with both frog and liver masks: {len(base_filenames_with_masks)}")
+    
+    if len(base_filenames_with_masks) == 0:
         print("No frogs found with complete data (image + frog mask + liver mask)")
         print("Please check that the directories contain matching files.")
         exit(1)
     
-    print(f"\nProcessing {len(base_filenames)} frogs with liver segmentations...")
+    print(f"\nProcessing {len(base_filenames_with_masks)} frogs with liver segmentations...")
     
     # Process each frog and collect CSV data
     successful_analyses = 0
     csv_data_list = []
     
-    for i, base_filename in enumerate(base_filenames, 1):
-        print(f"\n[{i}/{len(base_filenames)}] Processing: {base_filename}")
+    for i, base_filename in enumerate(base_filenames_with_masks, 1):
+        print(f"\n[{i}/{len(base_filenames_with_masks)}] Processing: {base_filename}")
         result = analyse_frog_vs_liver(base_filename, liver_results_dir, plot=False)
         if result is not None:
             successful_analyses += 1
@@ -669,5 +704,5 @@ if __name__ == "__main__":
         print(f"\n✅ CSV results saved to: {csv_path}")
         print(f"   Contains {len(csv_df)} rows and {len(csv_df.columns)} columns")
     
-    print(f"\nCompleted {successful_analyses} successful analyses out of {len(base_filenames)} total images")
+    print(f"\nCompleted {successful_analyses} successful analyses out of {len(base_filenames_with_masks)} total images")
     print(f"Results saved to: {liver_results_dir}") 
