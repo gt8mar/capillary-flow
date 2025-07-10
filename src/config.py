@@ -39,11 +39,12 @@ def get_paths():
     # Add derived paths
     paths['frog_dir'] = os.path.join(paths['cap_flow'], "frog")
     paths['frog_analysis'] = os.path.join(paths['frog_dir'], "radial-analysis")
+    paths['frog_results'] = os.path.join(paths['frog_dir'], "results")
     paths['frog_segmented'] = os.path.join(paths['frog_dir'], "segmented")
     
     # Create directories if they don't exist
     for path_name, path in paths.items():
-        if path_name.endswith('_analysis') or path_name.endswith('_segmented'):
+        if path_name.endswith('_analysis') or path_name.endswith('_segmented') or path_name.endswith('_results'):
             os.makedirs(path, exist_ok=True)
     
     return paths
