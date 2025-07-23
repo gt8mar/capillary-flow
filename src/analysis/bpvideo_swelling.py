@@ -239,6 +239,9 @@ def create_swelling_plots(analysis_df: pd.DataFrame, bp_folder: str):
         analysis_df: DataFrame with swelling analysis results
         bp_folder: Path to save plots
     """
+    # Import color utility functions
+    from src.tools.plotting_utils import create_monochromatic_palette, adjust_brightness_of_colors
+    
     # Set up plotting style
     sns.set_style("whitegrid")
     source_sans = load_source_sans()
@@ -254,29 +257,48 @@ def create_swelling_plots(analysis_df: pd.DataFrame, bp_folder: str):
         'lines.linewidth': 0.5
     })
     
+    # Set up color scheme for consistency with individual plots
+    diabetes_base_color = '#ff7f0e'  # Orange for diabetes
+    control_base_color = '#1f77b4'   # Blue for control
+    
+    # Create color palettes
+    diabetes_palette = create_monochromatic_palette(diabetes_base_color)
+    control_palette = create_monochromatic_palette(control_base_color)
+    
+    # Adjust brightness for better contrast
+    diabetes_palette = adjust_brightness_of_colors(diabetes_palette, brightness_scale=0.1)
+    control_palette = adjust_brightness_of_colors(control_palette, brightness_scale=0.1)
+    
+    # Use specific colors from the palettes
+    diabetes_color = diabetes_palette[2]  # Medium orange
+    control_color = control_palette[2]    # Medium blue
+    
     # Create figure with subplots
     fig, axes = plt.subplots(2, 2, figsize=(4.8, 4.0))
     
+    # Set up color palette for boxplots (Control=Blue, Diabetic=Orange)
+    box_colors = [control_color, diabetes_color]
+    
     # Plot 1: Start to swollen percentage change
     ax1 = axes[0, 0]
-    sns.boxplot(data=analysis_df, x='is_diabetic', y='start_to_swollen_pct', ax=ax1)
+    sns.boxplot(data=analysis_df, x='is_diabetic', y='start_to_swollen_pct', ax=ax1, palette=box_colors)
     ax1.set_xlabel('Diabetic Status', fontproperties=source_sans if source_sans else None)
     ax1.set_ylabel('Start to Swollen Change (%)', fontproperties=source_sans if source_sans else None)
-    ax1.set_xticklabels(['Non-Diabetic', 'Diabetic'])
+    ax1.set_xticklabels(['Control', 'Diabetic'])
     
     # Plot 2: Swollen to end percentage change
     ax2 = axes[0, 1]
-    sns.boxplot(data=analysis_df, x='is_diabetic', y='swollen_to_end_pct', ax=ax2)
+    sns.boxplot(data=analysis_df, x='is_diabetic', y='swollen_to_end_pct', ax=ax2, palette=box_colors)
     ax2.set_xlabel('Diabetic Status', fontproperties=source_sans if source_sans else None)
     ax2.set_ylabel('Swollen to End Change (%)', fontproperties=source_sans if source_sans else None)
-    ax2.set_xticklabels(['Non-Diabetic', 'Diabetic'])
+    ax2.set_xticklabels(['Control', 'Diabetic'])
     
     # Plot 3: Total change percentage
     ax3 = axes[1, 0]
-    sns.boxplot(data=analysis_df, x='is_diabetic', y='total_change_pct', ax=ax3)
+    sns.boxplot(data=analysis_df, x='is_diabetic', y='total_change_pct', ax=ax3, palette=box_colors)
     ax3.set_xlabel('Diabetic Status', fontproperties=source_sans if source_sans else None)
     ax3.set_ylabel('Total Change (%)', fontproperties=source_sans if source_sans else None)
-    ax3.set_xticklabels(['Non-Diabetic', 'Diabetic'])
+    ax3.set_xticklabels(['Control', 'Diabetic'])
     
     # Plot 4: Area trajectory for each group
     ax4 = axes[1, 1]
@@ -311,16 +333,119 @@ def create_swelling_plots(analysis_df: pd.DataFrame, bp_folder: str):
     ]
     
     ax4.errorbar(timepoints, diabetic_means, yerr=diabetic_sems, 
-                label='Diabetic', marker='o', capsize=3)
+                label='Diabetic', marker='o', capsize=3, color=diabetes_color, linewidth=2)
     ax4.errorbar(timepoints, non_diabetic_means, yerr=non_diabetic_sems, 
-                label='Non-Diabetic', marker='s', capsize=3)
+                label='Control', marker='s', capsize=3, color=control_color, linewidth=2)
     ax4.set_xlabel('Timepoint', fontproperties=source_sans if source_sans else None)
     ax4.set_ylabel('Mean Mask Area (pixels)', fontproperties=source_sans if source_sans else None)
-    ax4.legend()
+    ax4.legend(prop=source_sans if source_sans else None)
     
     plt.tight_layout()
     plt.savefig(os.path.join(bp_folder, 'swelling_analysis.png'), dpi=300, bbox_inches='tight')
     plt.savefig(os.path.join(bp_folder, 'swelling_analysis.pdf'), bbox_inches='tight')
+    plt.close()
+
+def create_percentage_trajectory_plot(analysis_df: pd.DataFrame, bp_folder: str):
+    """Create a standalone percentage trajectory plot showing group means and error bars.
+    
+    Args:
+        analysis_df: DataFrame with swelling analysis results
+        bp_folder: Path to save plots
+    """
+    # Import color utility functions
+    from src.tools.plotting_utils import create_monochromatic_palette, adjust_brightness_of_colors
+    
+    # Set up plotting style according to coding standards
+    sns.set_style("whitegrid")
+    source_sans = load_source_sans()
+    
+    plt.rcParams.update({
+        'pdf.fonttype': 42,
+        'ps.fonttype': 42,
+        'font.size': 7,
+        'axes.labelsize': 7,
+        'xtick.labelsize': 6,
+        'ytick.labelsize': 6,
+        'legend.fontsize': 5,
+        'lines.linewidth': 0.5
+    })
+    
+    # Set up color scheme consistent with other plots
+    diabetes_base_color = '#ff7f0e'  # Orange for diabetes
+    control_base_color = '#1f77b4'   # Blue for control
+    
+    # Create color palettes
+    diabetes_palette = create_monochromatic_palette(diabetes_base_color)
+    control_palette = create_monochromatic_palette(control_base_color)
+    
+    # Adjust brightness for better contrast
+    diabetes_palette = adjust_brightness_of_colors(diabetes_palette, brightness_scale=0.1)
+    control_palette = adjust_brightness_of_colors(control_palette, brightness_scale=0.1)
+    
+    # Use specific colors from the palettes
+    diabetes_color = diabetes_palette[2]  # Medium orange
+    control_color = control_palette[2]    # Medium blue
+    
+    # Create figure with standard dimensions
+    fig, ax = plt.subplots(figsize=(2.4, 2.0))
+    
+    # Prepare data for trajectory plot
+    diabetic_data = analysis_df[analysis_df['is_diabetic']]
+    non_diabetic_data = analysis_df[~analysis_df['is_diabetic']]
+    
+    timepoints = ['Start', 'Swollen', 'End']
+    
+    # Calculate percentage means and standard errors for each group
+    # For diabetic group
+    diabetic_start_pct = 100  # Always 100% at start
+    diabetic_swollen_pcts = (diabetic_data['swollen_area'] / diabetic_data['start_area']) * 100
+    diabetic_end_pcts = (diabetic_data['end_area'] / diabetic_data['start_area']) * 100
+    
+    diabetic_pct_means = [
+        diabetic_start_pct,
+        diabetic_swollen_pcts.mean(),
+        diabetic_end_pcts.mean()
+    ]
+    diabetic_pct_sems = [
+        0,  # No error at start (all start at 100%)
+        diabetic_swollen_pcts.sem(),
+        diabetic_end_pcts.sem()
+    ]
+    
+    # For non-diabetic group
+    non_diabetic_start_pct = 100  # Always 100% at start
+    non_diabetic_swollen_pcts = (non_diabetic_data['swollen_area'] / non_diabetic_data['start_area']) * 100
+    non_diabetic_end_pcts = (non_diabetic_data['end_area'] / non_diabetic_data['start_area']) * 100
+    
+    non_diabetic_pct_means = [
+        non_diabetic_start_pct,
+        non_diabetic_swollen_pcts.mean(),
+        non_diabetic_end_pcts.mean()
+    ]
+    non_diabetic_pct_sems = [
+        0,  # No error at start (all start at 100%)
+        non_diabetic_swollen_pcts.sem(),
+        non_diabetic_end_pcts.sem()
+    ]
+    
+    # Plot the percentage trajectories with error bars
+    ax.errorbar(timepoints, diabetic_pct_means, yerr=diabetic_pct_sems, 
+               label='Diabetic', marker='o', capsize=3, color=diabetes_color, linewidth=2)
+    ax.errorbar(timepoints, non_diabetic_pct_means, yerr=non_diabetic_pct_sems, 
+               label='Control', marker='s', capsize=3, color=control_color, linewidth=2)
+    
+    # Add a reference line at 100%
+    ax.axhline(y=100, color='gray', linestyle='--', alpha=0.5, linewidth=0.5)
+    
+    # Set labels and formatting
+    ax.set_xlabel('Timepoint', fontproperties=source_sans if source_sans else None)
+    ax.set_ylabel('Area (% of Start)', fontproperties=source_sans if source_sans else None)
+    ax.set_title('Mean Area Percentage Trajectories', fontproperties=source_sans if source_sans else None)
+    ax.legend(prop=source_sans if source_sans else None)
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(bp_folder, 'percentage_trajectory.png'), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(bp_folder, 'percentage_trajectory.pdf'), bbox_inches='tight')
     plt.close()
 
 def main():
@@ -441,6 +566,7 @@ def main():
     print("\nGenerating plots...")
     create_swelling_plots(analysis_df, bp_folder)
     create_individual_trajectory_plots(analysis_df, bp_folder)
+    create_percentage_trajectory_plot(analysis_df, bp_folder)
     print(f"Plots saved in {bp_folder}")
     
     print("\nAnalysis complete!")
