@@ -27,11 +27,12 @@ from matplotlib.font_manager import FontProperties
 from imblearn.over_sampling import SMOTE
 from collections import Counter
 from mpl_toolkits.mplot3d import Axes3D
-from matplotlib.colors import ListedColormap
+from matplotlib.colors import ListedColormap, rgb2hex
 import scipy.stats as stats
 
 # Import paths from config instead of defining computer paths locally
 from src.config import PATHS, load_source_sans
+from src.tools.plotting_utils import create_monochromatic_palette, adjust_brightness_of_colors
 cap_flow_path = PATHS['cap_flow']
 source_sans = load_source_sans()    
 
@@ -995,21 +996,24 @@ def analyze_demographic_features():
       
     print("\nDemographic feature analysis complete.")
 
-def calculate_hysteresis_pvalues(processed_df: pd.DataFrame, use_absolute: bool = False) -> pd.DataFrame:
+def calculate_hysteresis_pvalues(processed_df: pd.DataFrame, use_absolute: bool = False, 
+                                use_anova: bool = True) -> pd.DataFrame:
     """Calculate p-values for differences in hysteresis between groups.
     
     Uses Mann-Whitney U test for binary comparisons and Kruskal-Wallis for multiple groups.
-    For multiple groups (e.g., age), also performs post-hoc pairwise Mann-Whitney U tests.
+    Optionally also uses one-way ANOVA (parametric) and independent t-tests.
+    For multiple groups (e.g., age), also performs post-hoc pairwise tests.
     
     Args:
         processed_df: DataFrame containing participant data with up_down_diff values
         use_absolute: Whether to use absolute values of hysteresis (default: False)
+        use_anova: Whether to include ANOVA tests in addition to non-parametric tests (default: True)
     
     Returns:
         DataFrame with columns: grouping_factor, group1, group2, test_type, 
                                statistic, p_value, n1, n2, significant
     """
-    from scipy.stats import mannwhitneyu, kruskal
+    from scipy.stats import mannwhitneyu, kruskal, f_oneway, ttest_ind
     
     # Create a copy to avoid modifying original
     plot_df = processed_df.copy()
@@ -1059,16 +1063,16 @@ def calculate_hysteresis_pvalues(processed_df: pd.DataFrame, use_absolute: bool 
         
         # Create groups
         if not factor['is_categorical']:
+            group_col = factor.get('group_column', f"{factor['column']}_Group")
             # Create age groups
-            plot_df[f"{factor['column']}_Group"] = pd.cut(
+            plot_df[group_col] = pd.cut(
                 plot_df[factor['column']], 
                 bins=factor['bins'], 
                 labels=factor['labels'],
                 include_lowest=True
             )
-            group_col = f"{factor['column']}_Group"
         else:
-            group_col = factor['column']
+            group_col = factor.get('group_column', factor['column'])
         
         # Get groups with data
         groups = plot_df.groupby(group_col)['up_down_diff'].apply(list).to_dict()
@@ -1090,7 +1094,7 @@ def calculate_hysteresis_pvalues(processed_df: pd.DataFrame, use_absolute: bool 
         # If more than 2 groups, perform Kruskal-Wallis first
         if len(valid_groups) > 2:
             group_values = list(valid_groups.values())
-            h_stat, p_value = kruskal(*group_values)
+            h_stat, p_value_kw = kruskal(*group_values)
             
             results.append({
                 'grouping_factor': factor['name'],
@@ -1098,11 +1102,26 @@ def calculate_hysteresis_pvalues(processed_df: pd.DataFrame, use_absolute: bool 
                 'group2': 'All',
                 'test_type': 'Kruskal-Wallis',
                 'statistic': h_stat,
-                'p_value': p_value,
+                'p_value': p_value_kw,
                 'n1': sum(len(g) for g in group_values),
                 'n2': np.nan,
-                'significant': 'Yes' if p_value < 0.05 else 'No'
+                'significant': 'Yes' if p_value_kw < 0.05 else 'No'
             })
+            
+            # Add one-way ANOVA if requested
+            if use_anova:
+                f_stat, p_value_anova = f_oneway(*group_values)
+                results.append({
+                    'grouping_factor': factor['name'],
+                    'group1': 'All',
+                    'group2': 'All',
+                    'test_type': 'One-way ANOVA',
+                    'statistic': f_stat,
+                    'p_value': p_value_anova,
+                    'n1': sum(len(g) for g in group_values),
+                    'n2': np.nan,
+                    'significant': 'Yes' if p_value_anova < 0.05 else 'No'
+                })
             
             # Perform post-hoc pairwise comparisons
             group_keys = list(valid_groups.keys())
@@ -1118,19 +1137,34 @@ def calculate_hysteresis_pvalues(processed_df: pd.DataFrame, use_absolute: bool 
                         name1 = str(key1)
                         name2 = str(key2)
                     
-                    stat, p_value = mannwhitneyu(valid_groups[key1], valid_groups[key2], alternative='two-sided')
+                    stat_mw, p_value_mw = mannwhitneyu(valid_groups[key1], valid_groups[key2], alternative='two-sided')
                     
                     results.append({
                         'grouping_factor': factor['name'],
                         'group1': name1,
                         'group2': name2,
                         'test_type': 'Mann-Whitney U',
-                        'statistic': stat,
-                        'p_value': p_value,
+                        'statistic': stat_mw,
+                        'p_value': p_value_mw,
                         'n1': len(valid_groups[key1]),
                         'n2': len(valid_groups[key2]),
-                        'significant': 'Yes' if p_value < 0.05 else 'No'
+                        'significant': 'Yes' if p_value_mw < 0.05 else 'No'
                     })
+                    
+                    # Add independent t-test if ANOVA requested
+                    if use_anova:
+                        stat_t, p_value_t = ttest_ind(valid_groups[key1], valid_groups[key2])
+                        results.append({
+                            'grouping_factor': factor['name'],
+                            'group1': name1,
+                            'group2': name2,
+                            'test_type': 'Independent t-test',
+                            'statistic': stat_t,
+                            'p_value': p_value_t,
+                            'n1': len(valid_groups[key1]),
+                            'n2': len(valid_groups[key2]),
+                            'significant': 'Yes' if p_value_t < 0.05 else 'No'
+                        })
         
         # If exactly 2 groups, just do Mann-Whitney U
         elif len(valid_groups) == 2:
@@ -1145,21 +1179,269 @@ def calculate_hysteresis_pvalues(processed_df: pd.DataFrame, use_absolute: bool 
                 name1 = str(key1)
                 name2 = str(key2)
             
-            stat, p_value = mannwhitneyu(valid_groups[key1], valid_groups[key2], alternative='two-sided')
+            stat_mw, p_value_mw = mannwhitneyu(valid_groups[key1], valid_groups[key2], alternative='two-sided')
             
             results.append({
                 'grouping_factor': factor['name'],
                 'group1': name1,
                 'group2': name2,
                 'test_type': 'Mann-Whitney U',
-                'statistic': stat,
-                'p_value': p_value,
+                'statistic': stat_mw,
+                'p_value': p_value_mw,
                 'n1': len(valid_groups[key1]),
                 'n2': len(valid_groups[key2]),
-                'significant': 'Yes' if p_value < 0.05 else 'No'
+                'significant': 'Yes' if p_value_mw < 0.05 else 'No'
             })
+            
+            # Add independent t-test if ANOVA requested
+            if use_anova:
+                stat_t, p_value_t = ttest_ind(valid_groups[key1], valid_groups[key2])
+                results.append({
+                    'grouping_factor': factor['name'],
+                    'group1': name1,
+                    'group2': name2,
+                    'test_type': 'Independent t-test',
+                    'statistic': stat_t,
+                    'p_value': p_value_t,
+                    'n1': len(valid_groups[key1]),
+                    'n2': len(valid_groups[key2]),
+                    'significant': 'Yes' if p_value_t < 0.05 else 'No'
+                })
+        
+        # Special comparison: Under 30 vs All Others (for age groups only)
+        if factor['name'] == 'Age Group' and not factor['is_categorical']:
+            # Get under 30 group
+            under_30_key = '<30'
+            if under_30_key in valid_groups:
+                under_30_values = valid_groups[under_30_key]
+                
+                # Combine all other age groups
+                other_values = []
+                for key in valid_groups.keys():
+                    if key != under_30_key:
+                        other_values.extend(valid_groups[key])
+                
+                if len(other_values) >= 3:
+                    # Mann-Whitney U test
+                    stat_mw, p_value_mw = mannwhitneyu(under_30_values, other_values, alternative='two-sided')
+                    results.append({
+                        'grouping_factor': factor['name'],
+                        'group1': '<30',
+                        'group2': '30+ (All older)',
+                        'test_type': 'Mann-Whitney U',
+                        'statistic': stat_mw,
+                        'p_value': p_value_mw,
+                        'n1': len(under_30_values),
+                        'n2': len(other_values),
+                        'significant': 'Yes' if p_value_mw < 0.05 else 'No'
+                    })
+                    
+                    # t-test if ANOVA requested
+                    if use_anova:
+                        stat_t, p_value_t = ttest_ind(under_30_values, other_values)
+                        results.append({
+                            'grouping_factor': factor['name'],
+                            'group1': '<30',
+                            'group2': '30+ (All older)',
+                            'test_type': 'Independent t-test',
+                            'statistic': stat_t,
+                            'p_value': p_value_t,
+                            'n1': len(under_30_values),
+                            'n2': len(other_values),
+                            'significant': 'Yes' if p_value_t < 0.05 else 'No'
+                        })
     
     return pd.DataFrame(results)
+
+def plot_under30_vs_over30(processed_df: pd.DataFrame, use_absolute: bool = False,
+                           output_dir: str = None, use_log_velocity: bool = False) -> int:
+    """Create a specific plot for under-30 vs over-30 comparison.
+    
+    This comparison showed the strongest significance in the analysis.
+    
+    Args:
+        processed_df: DataFrame containing participant data with up_down_diff and Age columns
+        use_absolute: Whether to plot absolute values of hysteresis (default: False)
+        output_dir: Directory to save the plot (default: results/Hysteresis)
+        use_log_velocity: Whether the data is based on log velocity (default: False)
+    
+    Returns:
+        0 if successful, 1 if error occurred
+    """
+    # Create output directory if not provided
+    if output_dir is None:
+        output_dir = os.path.join(cap_flow_path, 'results', 'Hysteresis')
+        os.makedirs(output_dir, exist_ok=True)
+    
+    # Check if required columns exist
+    if 'up_down_diff' not in processed_df.columns or 'Age' not in processed_df.columns:
+        print("Error: Required columns (up_down_diff, Age) not found")
+        return 1
+    
+    # Set up plotting style
+    sns.set_style("whitegrid")
+    
+    # Get font
+    def get_source_sans_font():
+        try:
+            font_path = os.path.join(PATHS['downloads'], 'Source_Sans_3', 'static', 'SourceSans3-Regular.ttf')
+            if os.path.exists(font_path):
+                return FontProperties(fname=font_path)
+            return None
+        except:
+            return None
+    
+    source_sans = get_source_sans_font()
+    
+    plt.rcParams.update({
+        'pdf.fonttype': 42,
+        'ps.fonttype': 42,
+        'font.size': 9,
+        'axes.labelsize': 9,
+        'xtick.labelsize': 8,
+        'ytick.labelsize': 8,
+        'legend.fontsize': 7,
+        'lines.linewidth': 0.5
+    })
+    
+    # Create a copy and apply absolute if requested
+    plot_df = processed_df.copy()
+    if use_absolute:
+        plot_df['up_down_diff'] = plot_df['up_down_diff'].abs()
+    
+    # Create binary age group (<30 vs 30+)
+    plot_df['Age_Binary'] = plot_df['Age'].apply(lambda x: '<30' if x < 30 else '30+')
+    
+    # Remove NaN values
+    plot_df = plot_df.dropna(subset=['up_down_diff'])
+    
+    # Create color palette using plotting_utils (Age variable uses blue base color)
+    base_color = '#1f77b4'  # Blue base color for Age variable
+    palette = create_monochromatic_palette(base_color)
+    palette = adjust_brightness_of_colors(palette, brightness_scale=0.1)
+    # Use palette[4] (darker) for first group and palette[1] (lighter) for second group
+    # Convert RGB tuples to hex for seaborn
+    palette_hex = [rgb2hex(palette[4]), rgb2hex(palette[1])]
+    
+    # Create figure
+    plt.figure(figsize=(3.0, 2.5))
+    
+    # Create boxplot
+    ax = sns.boxplot(
+        x='Age_Binary',
+        y='up_down_diff',
+        data=plot_df,
+        palette=palette_hex,  
+        width=0.6,
+        fliersize=3
+    )
+    
+    # Set alpha (transparency) for boxplot boxes only
+    for patch in ax.patches:
+        patch.set_alpha(0.7)  # Adjust value between 0 (transparent) and 1 (opaque)
+    
+    # Add individual points with jitter
+    for i, age_group in enumerate(['<30', '30+']):
+        group_data = plot_df[plot_df['Age_Binary'] == age_group]['up_down_diff']
+        x_jitter = np.random.normal(i, 0.04, size=len(group_data))
+        plt.scatter(x_jitter, group_data, alpha=0.4, s=20, color='black', zorder=3)
+    
+    # Add horizontal line at y=0
+    ax.axhline(y=0, color='grey', linestyle='--', linewidth=0.8, alpha=0.7)
+    
+    # Calculate statistics
+    under_30 = plot_df[plot_df['Age_Binary'] == '<30']['up_down_diff'].values
+    over_30 = plot_df[plot_df['Age_Binary'] == '30+']['up_down_diff'].values
+    
+    stat_mw, p_value_mw = stats.mannwhitneyu(under_30, over_30, alternative='two-sided')
+    stat_t, p_value_t = stats.ttest_ind(under_30, over_30)
+    
+    # Determine significance markers
+    if p_value_mw < 0.001:
+        sig_marker = "***"
+    elif p_value_mw < 0.01:
+        sig_marker = "**"
+    elif p_value_mw < 0.05:
+        sig_marker = "*"
+    else:
+        sig_marker = "ns"
+    
+    # Add significance bracket
+    y_min, y_max = ax.get_ylim()
+    y_range = y_max - y_min
+    bracket_height = y_max - (y_range * 0.08)
+    
+    # Draw bracket
+    ax.plot([0, 0, 1, 1], 
+           [bracket_height - (y_range * 0.02), bracket_height, bracket_height, bracket_height - (y_range * 0.02)], 
+           'k-', linewidth=1.0)
+    
+    # Add asterisks
+    ax.text(0.5, bracket_height + (y_range * 0.01), sig_marker, 
+           ha='center', va='bottom', fontsize=12, fontweight='bold')
+    
+    # # Add p-value text box
+    # p_text = (f"Mann-Whitney U: p={p_value_mw:.4f} {sig_marker}\n"
+    #           f"Independent t-test: p={p_value_t:.4f}")
+    
+    # if source_sans:
+    #     ax.text(0.98, 0.97, p_text, transform=ax.transAxes, 
+    #            ha='right', va='top', fontproperties=source_sans, fontsize=7,
+    #            bbox=dict(boxstyle='round', facecolor='white', alpha=0.9, edgecolor='black', linewidth=0.5))
+    # else:
+    #     ax.text(0.98, 0.97, p_text, transform=ax.transAxes, 
+    #            ha='right', va='top', fontsize=7,
+    #            bbox=dict(boxstyle='round', facecolor='white', alpha=0.9, edgecolor='black', linewidth=0.5))
+    
+    # Add sample sizes below x-axis labels
+    n_under30 = len(under_30)
+    n_over30 = len(over_30)
+    ax.set_xticklabels([f'<30\n(n={n_under30})', f'30+\n(n={n_over30})'])
+    
+    # Set labels and title
+    log_prefix = "Log " if use_log_velocity else ""
+    abs_prefix = "Absolute " if use_absolute else ""
+    
+    title = f'{abs_prefix}{log_prefix}Velocity Hysteresis:\nYoung Adults vs Older Adults'
+    ylabel = f'|Velocity Hysteresis| (up-down)' if use_absolute else 'Velocity Hysteresis (up-down)'
+    
+    if source_sans:
+        ax.set_title(title, fontproperties=source_sans, fontsize=10, fontweight='bold')
+        ax.set_xlabel('Age Group', fontproperties=source_sans, fontsize=9)
+        ax.set_ylabel(ylabel, fontproperties=source_sans, fontsize=9)
+    else:
+        ax.set_title(title, fontsize=10, fontweight='bold')
+        ax.set_xlabel('Age Group', fontsize=9)
+        ax.set_ylabel(ylabel, fontsize=9)
+    
+    # Add summary statistics box
+    stats_text = (f"Under 30:\n"
+                 f"  Mean: {np.mean(under_30):.1f}\n"
+                 f"  Median: {np.median(under_30):.1f}\n"
+                 f"30 and older:\n"
+                 f"  Mean: {np.mean(over_30):.1f}\n"
+                 f"  Median: {np.median(over_30):.1f}")
+    
+    if source_sans:
+        ax.text(0.02, 0.97, stats_text, transform=ax.transAxes, 
+               ha='left', va='top', fontproperties=source_sans, fontsize=6,
+               bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8, edgecolor='gray', linewidth=0.5))
+    else:
+        ax.text(0.02, 0.97, stats_text, transform=ax.transAxes, 
+               ha='left', va='top', fontsize=6,
+               bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8, edgecolor='gray', linewidth=0.5))
+    
+    # Save figure
+    log_str = "log_" if use_log_velocity else ""
+    abs_str = "abs_" if use_absolute else ""
+    filename = f'{log_str}{abs_str}hysteresis_under30_vs_over30.png'
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, filename), dpi=300, bbox_inches='tight')
+    plt.close()
+    
+    print(f"Under-30 vs Over-30 plot saved: {filename}")
+    return 0
 
 
 def plot_up_down_diff_boxplots(processed_df: pd.DataFrame, use_absolute: bool = False, output_dir: str = None, use_log_velocity: bool = False) -> int:
@@ -1223,9 +1505,20 @@ def plot_up_down_diff_boxplots(processed_df: pd.DataFrame, use_absolute: bool = 
             'is_categorical': False,
             'bins': [0, 30, 50, 60, 70, 100],
             'labels': ['<30', '30-49', '50-59', '60-69', '70+'],
+            'group_column': 'Age_Group',
             'title': f'Absolute {"Log " if use_log_velocity else ""}Velocity Hysteresis by Age Group' if use_absolute else f'{"Log " if use_log_velocity else ""}Velocity Hysteresis by Age Group',
             'filename': f'{log_prefix}abs_hysteresis_by_age.png' if use_absolute else f'{log_prefix}hysteresis_by_age.png',
             'color': '#1f77b4'  # Default blue
+        },
+        {
+            'column': 'Age',
+            'is_categorical': False,
+            'bins': [0, 30, 60, 120],
+            'labels': ['<30', '30-60', '60+'],
+            'group_column': 'Age_Bracket_Group',
+            'title': f'Absolute {"Log " if use_log_velocity else ""}Velocity Hysteresis by Age Brackets' if use_absolute else f'{"Log " if use_log_velocity else ""}Velocity Hysteresis by Age Brackets',
+            'filename': f'{log_prefix}abs_hysteresis_by_age_brackets.png' if use_absolute else f'{log_prefix}hysteresis_by_age_brackets.png',
+            'color': '#9467bd'  # Purple tone for distinction
         },
         {
             'column': 'is_healthy',
@@ -1359,62 +1652,83 @@ def plot_up_down_diff_boxplots(processed_df: pd.DataFrame, use_absolute: bool = 
                     ax.text(1.5, bracket_height + (y_range * 0.01), sig_marker, 
                            ha='center', va='bottom', fontsize=8, fontweight='bold')
         else:
-            # For multi-group variables (age groups), test all pairwise comparisons
-            # and show only significant ones
-            group_keys = sorted([k for k in groups.keys() if len(groups[k]) >= 3])
-            significant_pairs = []
+            # For multi-group variables (age groups), test comparisons ONLY with <30 group
+            ordered_keys = []
+            if 'labels' in factor:
+                ordered_keys = [label for label in factor['labels']
+                                if label in groups and len(groups[label]) >= 3]
+            else:
+                ordered_keys = [k for k in groups.keys() if len(groups[k]) >= 3]
             
-            for i in range(len(group_keys)):
-                for j in range(i+1, len(group_keys)):
-                    key1, key2 = group_keys[i], group_keys[j]
-                    stat, p_value = stats.mannwhitneyu(groups[key1], groups[key2], alternative='two-sided')
+            # Find the <30 group (reference group)
+            reference_group = '<30'
+            if reference_group in ordered_keys:
+                reference_pos = ordered_keys.index(reference_group)
+                reference_values = groups[reference_group]
+                
+                significant_comparisons = []
+                
+                # Test each other group against <30
+                for key in ordered_keys:
+                    if key != reference_group:
+                        stat, p_value = stats.mannwhitneyu(reference_values, groups[key], alternative='two-sided')
+                        
+                        # Determine significance marker
+                        if p_value < 0.001:
+                            sig_marker = "***"
+                        elif p_value < 0.01:
+                            sig_marker = "**"
+                        elif p_value < 0.05:
+                            sig_marker = "*"
+                        else:
+                            sig_marker = None  # Not significant
+                        
+                        if sig_marker:  # Only add if significant
+                            significant_comparisons.append({
+                                'group': key,
+                                'pos_ref': reference_pos,
+                                'pos_other': ordered_keys.index(key),
+                                'p_value': p_value,
+                                'sig_marker': sig_marker
+                            })
+                
+                # Draw brackets for significant comparisons
+                if significant_comparisons:
+                    y_min, y_max = ax.get_ylim()
+                    y_range = y_max - y_min
                     
-                    if p_value < 0.05:
-                        significant_pairs.append({
-                            'group1': key1,
-                            'group2': key2,
-                            'pos1': i,
-                            'pos2': j,
-                            'p_value': p_value,
-                            'sig_marker': "***" if p_value < 0.001 else "**" if p_value < 0.01 else "*"
-                        })
-            
-            # Draw brackets for significant comparisons (limit to 3 most significant)
-            if significant_pairs:
-                # Sort by p-value and take top 3
-                significant_pairs = sorted(significant_pairs, key=lambda x: x['p_value'])[:3]
-                
-                y_min, y_max = ax.get_ylim()
-                y_range = y_max - y_min
-                
-                for idx, pair in enumerate(significant_pairs):
-                    # Position brackets at different heights to avoid overlap
-                    bracket_height = y_max - (y_range * (0.05 + idx * 0.10))
-                    pos1, pos2 = pair['pos1'], pair['pos2']
+                    # Sort by position to draw in order
+                    significant_comparisons = sorted(significant_comparisons, key=lambda x: x['pos_other'])
                     
-                    # Draw bracket
-                    ax.plot([pos1+1, pos1+1, pos2+1, pos2+1], 
-                           [bracket_height - (y_range * 0.02), bracket_height, bracket_height, bracket_height - (y_range * 0.02)], 
-                           'k-', linewidth=0.8)
+                    for idx, comp in enumerate(significant_comparisons):
+                        # Position brackets at different heights to avoid overlap
+                        bracket_height = y_max - (y_range * (0.05 + idx * 0.10))
+                        pos_ref = comp['pos_ref']
+                        pos_other = comp['pos_other']
+                        
+                        # Draw bracket (positions are already 0-indexed for matplotlib)
+                        ax.plot([pos_ref, pos_ref, pos_other, pos_other], 
+                               [bracket_height - (y_range * 0.02), bracket_height, bracket_height, bracket_height - (y_range * 0.02)], 
+                               'k-', linewidth=0.8)
+                        
+                        # Add asterisks
+                        ax.text((pos_ref + pos_other) / 2, bracket_height + (y_range * 0.01), 
+                               comp['sig_marker'], 
+                               ha='center', va='bottom', fontsize=8, fontweight='bold')
                     
-                    # Add asterisks
-                    ax.text((pos1 + pos2) / 2 + 1, bracket_height + (y_range * 0.01), 
-                           pair['sig_marker'], 
-                           ha='center', va='bottom', fontsize=8, fontweight='bold')
-                
-                # Add summary text
-                summary_lines = [f"{pair['group1']}-{pair['group2']}: p={pair['p_value']:.3f}{pair['sig_marker']}" 
-                               for pair in significant_pairs]
-                summary_text = "Significant pairs:\n" + "\n".join(summary_lines)
-                
-                if source_sans:
-                    ax.text(0.98, 0.97, summary_text, transform=ax.transAxes, 
-                           ha='right', va='top', fontproperties=source_sans, fontsize=5,
-                           bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
-                else:
-                    ax.text(0.98, 0.97, summary_text, transform=ax.transAxes, 
-                           ha='right', va='top', fontsize=5,
-                           bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+                    # Add summary text box
+                    summary_lines = [f"{comp['group']} vs <30: p={comp['p_value']:.3f}{comp['sig_marker']}" 
+                                   for comp in significant_comparisons]
+                    summary_text = "Significant vs <30:\n" + "\n".join(summary_lines)
+                    
+                    if source_sans:
+                        ax.text(0.98, 0.97, summary_text, transform=ax.transAxes, 
+                               ha='right', va='top', fontproperties=source_sans, fontsize=5,
+                               bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+                    else:
+                        ax.text(0.98, 0.97, summary_text, transform=ax.transAxes, 
+                               ha='right', va='top', fontsize=5,
+                               bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
         
         # Add group sample sizes
         if factor['is_categorical']:
@@ -1553,13 +1867,14 @@ def main():
     
     # Calculate p-values for statistical significance
     print("\nCalculating p-values for group differences...")
+    print("Using both non-parametric (Mann-Whitney U, Kruskal-Wallis) and parametric (t-test, ANOVA) tests...")
     
     # Calculate p-values for regular hysteresis
-    pvalues_regular = calculate_hysteresis_pvalues(processed_df, use_absolute=False)
+    pvalues_regular = calculate_hysteresis_pvalues(processed_df, use_absolute=False, use_anova=True)
     pvalues_regular['analysis_type'] = 'Regular Hysteresis'
     
     # Calculate p-values for absolute hysteresis
-    pvalues_absolute = calculate_hysteresis_pvalues(processed_df, use_absolute=True)
+    pvalues_absolute = calculate_hysteresis_pvalues(processed_df, use_absolute=True, use_anova=True)
     pvalues_absolute['analysis_type'] = 'Absolute Hysteresis'
     
     # Combine all p-values
@@ -1597,6 +1912,13 @@ def main():
     # Absolute hysteresis plots
     plot_up_down_diff_boxplots(processed_df, use_absolute=True, 
                               output_dir=output_dir, use_log_velocity=False)
+    
+    # Special plot for under-30 vs over-30 comparison (most significant finding)
+    print("\nCreating special under-30 vs over-30 plots...")
+    plot_under30_vs_over30(processed_df, use_absolute=False, 
+                          output_dir=output_dir, use_log_velocity=False)
+    plot_under30_vs_over30(processed_df, use_absolute=True, 
+                          output_dir=output_dir, use_log_velocity=False)
     
     # # Log velocity plots
     # plot_up_down_diff_boxplots(processed_df_log, use_absolute=False, 
