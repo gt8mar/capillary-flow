@@ -1539,6 +1539,119 @@ def plot_cdf(diameter_analysis_df, variable, pressure, age_groups, cutoff_percen
     plt.close()
     return 0
 
+def plot_cdf_old(data, subsets, labels=['Entire Dataset', 'Subset'], title='CDF Comparison', 
+             write=False, normalize=False, variable = 'Age', log = True):
+    """
+    Plots the CDF of the entire dataset and the inputted subsets.
+
+    Args:
+        data (array-like): The entire dataset
+        subsets (list of array-like): The subsets to be compared
+        labels (list of str): The labels for the entire dataset and the subsets
+        title (str): The title of the plot
+        write (bool): Whether to write the plot to a file
+        normalize (bool): Whether to normalize the CDF
+    
+    Returns:
+        0 if successful, 1 if no subsets provided
+    """
+    plt.close()
+    # Set up style and font
+    sns.set_style("whitegrid")
+    source_sans = get_source_sans_font()
+
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 5, 'lines.linewidth': 0.5
+    })
+
+    # Set color palette based on variable
+    if variable == 'Age':
+        base_color = '#1f77b4'##3FCA54''BDE4A7 #A1E5AB
+    elif variable == 'SYS_BP':
+        base_color = '2ca02c'#80C6C3 #ff7f0e
+    elif variable == 'Sex':
+        base_color = '674F92'#947EB0#2ca02c#CAC0D89467bd
+    elif variable == 'Individual':
+        base_color = '#1f77b4'
+        individual_color = '#6B0F1A' #'#ff7f0e'
+    elif variable == 'Diabetes_plot':
+        base_color = '#ff7f0e' 
+    elif variable == 'Hypertension_plot':
+        base_color = '#d62728'
+    else:
+        raise ValueError(f"Unsupported variable: {variable}")
+
+    palette = create_monochromatic_palette(base_color)
+    # palette = adjust_saturation_of_colors(palette, saturation_scale=1.3)
+    palette = adjust_brightness_of_colors(palette, brightness_scale=.2)
+    sns.set_palette(palette)
+
+    if not subsets:
+        return 1
+
+    fig, ax = plt.subplots(figsize=(2.4, 2.0))
+
+    if log:
+        data = data+1
+        for i in range(len(subsets)):
+            subsets[i]= subsets[i]+1
+   
+    # Plot main dataset
+    x, y = calculate_cdf(data, normalize)
+    ax.plot(x, y, label=labels[0])
+    
+
+    # Plot subsets
+    for i in  range(len(subsets)):
+        if i == 0:
+            i_color = 0
+            dot_color = 0
+        elif i == 1:
+            i_color = 3
+            dot_color = 2
+        elif i == 2:
+            i_color = 4
+            dot_color=3
+        x, y = calculate_cdf(subsets[i], normalize)
+        if variable == 'Individual':
+            ax.plot(x, y, label=labels[i+1], linestyle='--', color=individual_color)
+        else:
+            ax.plot(x, y, label=labels[i+1], linestyle='--', color=palette[i_color])
+
+    ax.set_ylabel('CDF', fontproperties=source_sans)
+    if log:
+        ax.set_xlabel('Velocity + 1 (um/s)' if 'Pressure' not in title else 'Pressure (psi)', fontproperties=source_sans)
+    else:
+        ax.set_xlabel('Velocity (um/s)' if 'Pressure' not in title else 'Pressure (psi)', fontproperties=source_sans)
+    ax.set_title(title, fontsize=8, fontproperties=source_sans)
+
+    if log:
+        ax.set_xscale('log')
+        # ax.set_xticklabels([1, 10, 100, 1000, 5000])
+        ax.xaxis.set_major_locator(ticker.LogLocator(base=10.0, numticks=5))
+        ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
+    
+    # Adjust legend
+    ax.legend(loc='lower right', bbox_to_anchor=(1, 0.01), prop=source_sans, fontsize=6)
+    
+    ax.grid(True, linewidth=0.3)
+    fig.set_dpi(300)
+    # Adjust layout to prevent cutting off labels
+    plt.tight_layout()
+
+    if write:
+        save_plot(fig, title, dpi=300)
+    else:
+        plt.show()
+    if write:
+        plt.close()
+
+    return 0
+
+
 def plot_CI_multiple_bands(df, thresholds=[29, 49], variable='Age', method='bootstrap', 
                  n_iterations=1000, ci_percentile=99.5, write=True, dimensionless=False, 
                  video_median=False, log_scale=False, 

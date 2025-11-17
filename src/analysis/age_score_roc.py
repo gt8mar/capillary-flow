@@ -278,33 +278,37 @@ def plot_roc_with_ci(fpr: np.ndarray, tpr: np.ndarray, roc_auc: float,
         'pdf.fonttype': 42, 'ps.fonttype': 42,
         'font.size': 7, 'axes.labelsize': 7,
         'xtick.labelsize': 6, 'ytick.labelsize': 6,
-        'legend.fontsize': 5, 'lines.linewidth': 0.5
+        'legend.fontsize': 4, 'lines.linewidth': 0.5
     })
 
     base_color = '#1f77b4'
 
     fig, ax = plt.subplots(figsize=(2.4, 2.0))
     
+    # Ensure consistent font sizes by setting them directly on the axes
+    ax.tick_params(axis='both', which='major', labelsize=6)
+    ax.tick_params(axis='both', which='minor', labelsize=6)
+    
     # Plot the ROC curve
     ax.plot(fpr, tpr, marker='', linestyle='-', markersize=2, color=base_color, 
-            label=f'ROC curve (AUC = {roc_auc:.2f}±{(ci_upper - ci_lower)/4:.2f})')
+            label=f'AUC = {roc_auc:.2f}')
     
     # Plot confidence interval
     if len(bootstrapped_tprs) > 1:
         tprs_lower = np.percentile(bootstrapped_tprs, 2.5, axis=0)
         tprs_upper = np.percentile(bootstrapped_tprs, 97.5, axis=0)
         ax.fill_between(np.linspace(0, 1, 100), tprs_lower, tprs_upper, 
-                       color=base_color, alpha=0.2, label=f'95% CI:[{ci_lower:.2f}, {ci_upper:.2f}]')
+                       color=base_color, alpha=0.2, label=f'95% CI')
     
     # Plot diagonal line
-    ax.plot([0, 1], [0, 1], color='grey', linestyle='--', markersize=2, label='Random guess')
+    ax.plot([0, 1], [0, 1], color='grey', linestyle='--', markersize=2, label='Random')
     
-    # Set labels and title
-    ax.set_xlabel('False Positive Rate', fontproperties=source_sans)
-    ax.set_ylabel('True Positive Rate', fontproperties=source_sans)
+    # Set labels and title with consistent font sizes
+    ax.set_xlabel('False Positive Rate', fontproperties=source_sans, fontsize=7)
+    ax.set_ylabel('True Positive Rate', fontproperties=source_sans, fontsize=7)
     ax.set_title(f'Age Classification using {feature} (threshold={age_threshold})', 
                 fontproperties=source_sans, fontsize=8)
-    ax.legend(loc='lower right', prop=source_sans)
+    ax.legend(loc='lower right', prop=source_sans, fontsize=4)
     ax.grid(True, linewidth=0.3)
 
     plt.tight_layout()
