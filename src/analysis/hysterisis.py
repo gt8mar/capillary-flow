@@ -1336,9 +1336,9 @@ def plot_under30_vs_over30(processed_df: pd.DataFrame, use_absolute: bool = Fals
         fliersize=3
     )
     
-    # Set alpha (transparency) for boxplot boxes only
-    for patch in ax.patches:
-        patch.set_alpha(0.7)  # Adjust value between 0 (transparent) and 1 (opaque)
+    # # Set alpha (transparency) for boxplot boxes only
+    # for patch in ax.patches:
+    #     patch.set_alpha(0.7)  # Adjust value between 0 (transparent) and 1 (opaque)
     
     # Add individual points with jitter
     for i, age_group in enumerate(['<30', '30+']):
@@ -1414,22 +1414,22 @@ def plot_under30_vs_over30(processed_df: pd.DataFrame, use_absolute: bool = Fals
         ax.set_xlabel('Age Group', fontsize=9)
         ax.set_ylabel(ylabel, fontsize=9)
     
-    # Add summary statistics box
-    stats_text = (f"Under 30:\n"
-                 f"  Mean: {np.mean(under_30):.1f}\n"
-                 f"  Median: {np.median(under_30):.1f}\n"
-                 f"30 and older:\n"
-                 f"  Mean: {np.mean(over_30):.1f}\n"
-                 f"  Median: {np.median(over_30):.1f}")
+    # # Add summary statistics box
+    # stats_text = (f"Under 30:\n"
+    #              f"  Mean: {np.mean(under_30):.1f}\n"
+    #              f"  Median: {np.median(under_30):.1f}\n"
+    #              f"30 and older:\n"
+    #              f"  Mean: {np.mean(over_30):.1f}\n"
+    #              f"  Median: {np.median(over_30):.1f}")
     
-    if source_sans:
-        ax.text(0.02, 0.97, stats_text, transform=ax.transAxes, 
-               ha='left', va='top', fontproperties=source_sans, fontsize=6,
-               bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8, edgecolor='gray', linewidth=0.5))
-    else:
-        ax.text(0.02, 0.97, stats_text, transform=ax.transAxes, 
-               ha='left', va='top', fontsize=6,
-               bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8, edgecolor='gray', linewidth=0.5))
+    # if source_sans:
+    #     ax.text(0.02, 0.97, stats_text, transform=ax.transAxes, 
+    #            ha='left', va='top', fontproperties=source_sans, fontsize=6,
+    #            bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8, edgecolor='gray', linewidth=0.5))
+    # else:
+    #     ax.text(0.02, 0.97, stats_text, transform=ax.transAxes, 
+    #            ha='left', va='top', fontsize=6,
+    #            bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.8, edgecolor='gray', linewidth=0.5))
     
     # Save figure
     log_str = "log_" if use_log_velocity else ""
@@ -1716,19 +1716,19 @@ def plot_up_down_diff_boxplots(processed_df: pd.DataFrame, use_absolute: bool = 
                                comp['sig_marker'], 
                                ha='center', va='bottom', fontsize=8, fontweight='bold')
                     
-                    # Add summary text box
-                    summary_lines = [f"{comp['group']} vs <30: p={comp['p_value']:.3f}{comp['sig_marker']}" 
-                                   for comp in significant_comparisons]
-                    summary_text = "Significant vs <30:\n" + "\n".join(summary_lines)
+                    # # Add summary text box
+                    # summary_lines = [f"{comp['group']} vs <30: p={comp['p_value']:.3f}{comp['sig_marker']}" 
+                    #                for comp in significant_comparisons]
+                    # summary_text = "Significant vs <30:\n" + "\n".join(summary_lines)
                     
-                    if source_sans:
-                        ax.text(0.98, 0.97, summary_text, transform=ax.transAxes, 
-                               ha='right', va='top', fontproperties=source_sans, fontsize=5,
-                               bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
-                    else:
-                        ax.text(0.98, 0.97, summary_text, transform=ax.transAxes, 
-                               ha='right', va='top', fontsize=5,
-                               bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+                    # if source_sans:
+                    #     ax.text(0.98, 0.97, summary_text, transform=ax.transAxes, 
+                    #            ha='right', va='top', fontproperties=source_sans, fontsize=5,
+                    #            bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+                    # else:
+                    #     ax.text(0.98, 0.97, summary_text, transform=ax.transAxes, 
+                    #            ha='right', va='top', fontsize=5,
+                    #            bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
         
         # Add group sample sizes
         if factor['is_categorical']:
