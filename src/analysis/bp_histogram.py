@@ -24,6 +24,14 @@ from src.config import PATHS, load_source_sans
 cap_flow_path = PATHS['cap_flow']
 source_sans = load_source_sans()
 
+# Title font: copy of source_sans with a larger size so titles stand out
+TITLE_FONTSIZE = 9
+if source_sans is not None:
+    source_sans_title = source_sans.copy()
+    source_sans_title.set_size(TITLE_FONTSIZE)
+else:
+    source_sans_title = None
+
 def create_bp_histogram(df: pd.DataFrame, bp_type: str = 'SYS_BP', 
                        output_dir: Optional[str] = None) -> None:
     """
@@ -53,7 +61,7 @@ def create_bp_histogram(df: pd.DataFrame, bp_type: str = 'SYS_BP',
         'axes.labelsize': 7,
         'xtick.labelsize': 6,
         'ytick.labelsize': 6,
-        'legend.fontsize': 5,
+        'legend.fontsize': 4,
         'lines.linewidth': 0.5
     })
     
@@ -99,12 +107,12 @@ def create_bp_histogram(df: pd.DataFrame, bp_type: str = 'SYS_BP',
     # Set title and labels with font handling
     if source_sans:
         plt.title(f'{bp_label} Blood Pressure Distribution', 
-                 fontproperties=source_sans, fontsize=8)
+                 fontproperties=source_sans_title)
         plt.xlabel(f'{bp_label} Blood Pressure (mmHg)', fontproperties=source_sans)
         plt.ylabel('Frequency', fontproperties=source_sans)
         plt.legend(prop=source_sans)
     else:
-        plt.title(f'{bp_label} Blood Pressure Distribution', fontsize=8)
+        plt.title(f'{bp_label} Blood Pressure Distribution', fontsize=TITLE_FONTSIZE)
         plt.xlabel(f'{bp_label} Blood Pressure (mmHg)')
         plt.ylabel('Frequency')
         plt.legend()
@@ -146,7 +154,7 @@ def create_combined_bp_histogram(df: pd.DataFrame, output_dir: Optional[str] = N
         'pdf.fonttype': 42, 'ps.fonttype': 42,
         'font.size': 7, 'axes.labelsize': 7,
         'xtick.labelsize': 6, 'ytick.labelsize': 6,
-        'legend.fontsize': 5, 'lines.linewidth': 0.5
+        'legend.fontsize': 4, 'lines.linewidth': 0.5,
     })
     
     # Filter out missing BP data
@@ -181,11 +189,11 @@ def create_combined_bp_histogram(df: pd.DataFrame, output_dir: Optional[str] = N
         
         
         if source_sans:
-            ax1.set_title('Systolic Blood Pressure', fontproperties=source_sans, fontsize=8)
+            ax1.set_title('Systolic Blood Pressure', fontproperties=source_sans_title)
             ax1.set_xlabel('Systolic BP (mmHg)', fontproperties=source_sans)
             ax1.set_ylabel('Frequency', fontproperties=source_sans)
         else:
-            ax1.set_title('Systolic Blood Pressure', fontsize=8)
+            ax1.set_title('Systolic Blood Pressure', fontsize=TITLE_FONTSIZE)
             ax1.set_xlabel('Systolic BP (mmHg)')
             ax1.set_ylabel('Frequency')
         
@@ -214,11 +222,11 @@ def create_combined_bp_histogram(df: pd.DataFrame, output_dir: Optional[str] = N
         
         
         if source_sans:
-            ax2.set_title('Diastolic Blood Pressure', fontproperties=source_sans, fontsize=8)
+            ax2.set_title('Diastolic Blood Pressure', fontproperties=source_sans_title)
             ax2.set_xlabel('Diastolic BP (mmHg)', fontproperties=source_sans)
             ax2.set_ylabel('Frequency', fontproperties=source_sans)
         else:
-            ax2.set_title('Diastolic Blood Pressure', fontsize=8)
+            ax2.set_title('Diastolic Blood Pressure', fontsize=TITLE_FONTSIZE)
             ax2.set_xlabel('Diastolic BP (mmHg)')
             ax2.set_ylabel('Frequency')
         
@@ -238,6 +246,404 @@ def create_combined_bp_histogram(df: pd.DataFrame, output_dir: Optional[str] = N
     plt.close()
     
     print(f"Combined histogram saved to: {os.path.join(output_dir, filename)}")
+
+from src.tools.plotting_utils import (
+    create_monochromatic_palette,
+    adjust_brightness_of_colors,
+)
+
+# Colors matching figs_ci.py
+COLOR_CONTROL = '#1f77b4'
+COLOR_HYPERTENSION = '#d62728'
+COLOR_DIABETES = '#ff7f0e'
+FILL_ALPHA = 0.6
+
+
+def _assign_group(row: pd.Series) -> str:
+    """Assign group label from SET."""
+    s = row.get('SET', None)
+    if pd.isna(s):
+        return 'Unknown'
+    s = str(s).strip().lower()
+    if s == 'set01':
+        return 'Control'
+    if s == 'set02':
+        return 'Hypertension'
+    if s == 'set03':
+        return 'Diabetes'
+    return 'Other'
+
+
+def _get_bp_plot_df(df: pd.DataFrame) -> Optional[pd.DataFrame]:
+    """One row per participant with Group; only Control, Hypertension, Diabetes."""
+    plot_df = df.dropna(subset=['SYS_BP']).copy()
+    plot_df = plot_df.drop_duplicates(subset=['Participant'])
+    plot_df['Group'] = plot_df.apply(_assign_group, axis=1)
+    plot_df = plot_df[plot_df['Group'].isin(['Control', 'Hypertension', 'Diabetes'])]
+    return plot_df if len(plot_df) > 0 else None
+
+
+def create_bp_group_histogram(
+    df: pd.DataFrame,
+    group: str,
+    output_dir: Optional[str] = None,
+    shared_bins: Optional[np.ndarray] = None,
+    shared_ylim: Optional[float] = None,
+) -> None:
+    """
+    Creates a systolic BP histogram for a single group.
+
+    Args:
+        df: DataFrame with SYS_BP and SET columns.
+        group: Group name ('Control', 'Hypertension', or 'Diabetes').
+        output_dir: Directory to save the plot (optional).
+        shared_bins: Bin edges (optional; computed from group if None).
+        shared_ylim: Max y value (optional; auto-scaled if None).
+    """
+    color_map = {
+        'Control': COLOR_CONTROL,
+        'Hypertension': COLOR_HYPERTENSION,
+        'Diabetes': COLOR_DIABETES,
+    }
+    if group not in color_map:
+        print(f"Error: Unknown group '{group}'.")
+        return
+
+    if output_dir is None:
+        output_dir = os.path.join(cap_flow_path, 'results', 'BPHistograms')
+    os.makedirs(output_dir, exist_ok=True)
+
+    print(f"\nCreating SYS_BP histogram for {group}...")
+
+    sns.set_style("whitegrid")
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 4, 'lines.linewidth': 0.5,
+    })
+
+    plot_df = _get_bp_plot_df(df)
+    if plot_df is None:
+        print("Error: No valid SYS_BP data found.")
+        return
+
+    group_df = plot_df[plot_df['Group'] == group]
+    if len(group_df) == 0:
+        print(f"Error: No {group} participants with SYS_BP found.")
+        return
+
+    bp_values = group_df['SYS_BP']
+
+    if shared_bins is not None:
+        bins = shared_bins
+    else:
+        bp_min = int(bp_values.min())
+        bp_max = int(bp_values.max())
+        bin_start = (bp_min // 10) * 10
+        bin_end = ((bp_max // 10) + 1) * 10
+        bins = np.arange(bin_start, bin_end + 10, 10)
+
+    pal = create_monochromatic_palette(color_map[group], n_colors=5)
+    pal = adjust_brightness_of_colors(pal, brightness_scale=0.1)
+    light = pal[4]
+    dark = pal[1]
+
+    fig, ax = plt.subplots(figsize=(4, 2.5))
+    fill_color = (*light, FILL_ALPHA)
+    ax.hist(
+        bp_values, bins=bins,
+        color=fill_color, edgecolor=dark, linewidth=0.8,
+        label=f'{group}',
+    )
+
+    if shared_ylim is not None:
+        ax.set_ylim(0, shared_ylim)
+
+    if source_sans:
+        ax.set_title(f'Systolic BP: {group}',
+                     fontproperties=source_sans_title)
+        ax.set_xlabel('Systolic BP (mmHg)', fontproperties=source_sans)
+        ax.set_ylabel('Frequency', fontproperties=source_sans)
+        ax.legend(prop=source_sans)
+    else:
+        ax.set_title(f'Systolic BP: {group}', fontsize=TITLE_FONTSIZE)
+        ax.set_xlabel('Systolic BP (mmHg)')
+        ax.set_ylabel('Frequency')
+        ax.legend()
+
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    filename = f'sys_bp_{group.lower()}_histogram.png'
+    outpath = os.path.join(output_dir, filename)
+    plt.savefig(outpath, dpi=300, bbox_inches='tight')
+    plt.close()
+
+    print(f"  {group}: n={len(group_df)}, SYS_BP {bp_values.min():.0f}-{bp_values.max():.0f}, mean={bp_values.mean():.1f}")
+
+
+def create_bp_all_groups_histogram(
+    df: pd.DataFrame,
+    output_dir: Optional[str] = None,
+) -> None:
+    """
+    Creates overlapping systolic BP histograms for all three groups.
+
+    Args:
+        df: DataFrame with SYS_BP and SET columns.
+        output_dir: Directory to save the plot (optional).
+    """
+    if output_dir is None:
+        output_dir = os.path.join(cap_flow_path, 'results', 'BPHistograms')
+    os.makedirs(output_dir, exist_ok=True)
+
+    print("\nCreating SYS_BP histogram for all groups...")
+
+    sns.set_style("whitegrid")
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 4, 'lines.linewidth': 0.5,
+    })
+
+    plot_df = _get_bp_plot_df(df)
+    if plot_df is None:
+        print("Error: No valid SYS_BP data found.")
+        return
+
+    bp_values = plot_df['SYS_BP']
+    bp_min = int(bp_values.min())
+    bp_max = int(bp_values.max())
+    bin_start = (bp_min // 10) * 10
+    bin_end = ((bp_max // 10) + 1) * 10
+    bins = np.arange(bin_start, bin_end + 10, 10)
+
+    group_order = ['Control', 'Hypertension', 'Diabetes']
+    base_colors = [COLOR_CONTROL, COLOR_HYPERTENSION, COLOR_DIABETES]
+    light_colors = []
+    dark_colors = []
+    for base in base_colors:
+        pal = create_monochromatic_palette(base, n_colors=5)
+        pal = adjust_brightness_of_colors(pal, brightness_scale=0.1)
+        light_colors.append(pal[4])
+        dark_colors.append(pal[1])
+
+    fig, ax = plt.subplots(figsize=(4, 2.5))
+    for i, grp in enumerate(group_order):
+        subset = plot_df[plot_df['Group'] == grp]['SYS_BP']
+        if len(subset) == 0:
+            continue
+        fill_color = (*light_colors[i], FILL_ALPHA)
+        ax.hist(
+            subset, bins=bins, alpha=0.7,
+            color=fill_color, edgecolor=dark_colors[i], linewidth=0.8,
+            label=f'{grp}',
+        )
+
+    if source_sans:
+        ax.set_title('Systolic BP by group', fontproperties=source_sans_title)
+        ax.set_xlabel('Systolic BP (mmHg)', fontproperties=source_sans)
+        ax.set_ylabel('Frequency', fontproperties=source_sans)
+        ax.legend(prop=source_sans)
+    else:
+        ax.set_title('Systolic BP by group', fontsize=TITLE_FONTSIZE)
+        ax.set_xlabel('Systolic BP (mmHg)')
+        ax.set_ylabel('Frequency')
+        ax.legend()
+
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    filename = 'sys_bp_all_groups_histogram.png'
+    outpath = os.path.join(output_dir, filename)
+    plt.savefig(outpath, dpi=300, bbox_inches='tight')
+    plt.close()
+
+    print(f"All-groups SYS_BP histogram saved to: {outpath}")
+
+
+def create_bp_group_histogram_horizontal(
+    df: pd.DataFrame,
+    group: str,
+    output_dir: Optional[str] = None,
+    shared_bins: Optional[np.ndarray] = None,
+    shared_xlim: Optional[float] = None,
+) -> None:
+    """
+    Creates a horizontal systolic BP histogram for a single group.
+
+    Args:
+        df: DataFrame with SYS_BP and SET columns.
+        group: Group name ('Control', 'Hypertension', or 'Diabetes').
+        output_dir: Directory to save the plot (optional).
+        shared_bins: Bin edges (optional; computed from group if None).
+        shared_xlim: Max x value / frequency (optional; auto-scaled if None).
+    """
+    color_map = {
+        'Control': COLOR_CONTROL,
+        'Hypertension': COLOR_HYPERTENSION,
+        'Diabetes': COLOR_DIABETES,
+    }
+    if group not in color_map:
+        print(f"Error: Unknown group '{group}'.")
+        return
+
+    if output_dir is None:
+        output_dir = os.path.join(cap_flow_path, 'results', 'BPHistograms')
+    os.makedirs(output_dir, exist_ok=True)
+
+    print(f"\nCreating horizontal SYS_BP histogram for {group}...")
+
+    sns.set_style("whitegrid")
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 4, 'lines.linewidth': 0.5,
+    })
+
+    plot_df = _get_bp_plot_df(df)
+    if plot_df is None:
+        print("Error: No valid SYS_BP data found.")
+        return
+
+    group_df = plot_df[plot_df['Group'] == group]
+    if len(group_df) == 0:
+        print(f"Error: No {group} participants with SYS_BP found.")
+        return
+
+    bp_values = group_df['SYS_BP']
+
+    if shared_bins is not None:
+        bins = shared_bins
+    else:
+        bp_min = int(bp_values.min())
+        bp_max = int(bp_values.max())
+        bin_start = (bp_min // 10) * 10
+        bin_end = ((bp_max // 10) + 1) * 10
+        bins = np.arange(bin_start, bin_end + 10, 10)
+
+    pal = create_monochromatic_palette(color_map[group], n_colors=5)
+    pal = adjust_brightness_of_colors(pal, brightness_scale=0.1)
+    light = pal[4]
+    dark = pal[1]
+
+    fig, ax = plt.subplots(figsize=(4, 2.5))
+    fill_color = (*light, FILL_ALPHA)
+    ax.hist(
+        bp_values, bins=bins, orientation='horizontal',
+        color=fill_color, edgecolor=dark, linewidth=0.8,
+        label=f'{group}',
+    )
+
+    if shared_xlim is not None:
+        ax.set_xlim(0, shared_xlim)
+
+    if source_sans:
+        ax.set_title(f'Systolic BP: {group}',
+                     fontproperties=source_sans_title)
+        ax.set_ylabel('Systolic BP (mmHg)', fontproperties=source_sans)
+        ax.set_xlabel('Frequency', fontproperties=source_sans)
+        ax.legend(prop=source_sans)
+    else:
+        ax.set_title(f'Systolic BP: {group}', fontsize=TITLE_FONTSIZE)
+        ax.set_ylabel('Systolic BP (mmHg)')
+        ax.set_xlabel('Frequency')
+        ax.legend()
+
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    filename = f'sys_bp_{group.lower()}_histogram_horizontal.png'
+    outpath = os.path.join(output_dir, filename)
+    plt.savefig(outpath, dpi=300, bbox_inches='tight')
+    plt.close()
+
+    print(f"  {group} (horizontal): n={len(group_df)}, SYS_BP {bp_values.min():.0f}-{bp_values.max():.0f}")
+
+
+def create_bp_all_groups_histogram_horizontal(
+    df: pd.DataFrame,
+    output_dir: Optional[str] = None,
+) -> None:
+    """
+    Creates overlapping horizontal systolic BP histograms for all three groups.
+
+    Args:
+        df: DataFrame with SYS_BP and SET columns.
+        output_dir: Directory to save the plot (optional).
+    """
+    if output_dir is None:
+        output_dir = os.path.join(cap_flow_path, 'results', 'BPHistograms')
+    os.makedirs(output_dir, exist_ok=True)
+
+    print("\nCreating horizontal SYS_BP histogram for all groups...")
+
+    sns.set_style("whitegrid")
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 4, 'lines.linewidth': 0.5,
+    })
+
+    plot_df = _get_bp_plot_df(df)
+    if plot_df is None:
+        print("Error: No valid SYS_BP data found.")
+        return
+
+    bp_values = plot_df['SYS_BP']
+    bp_min = int(bp_values.min())
+    bp_max = int(bp_values.max())
+    bin_start = (bp_min // 10) * 10
+    bin_end = ((bp_max // 10) + 1) * 10
+    bins = np.arange(bin_start, bin_end + 10, 10)
+
+    group_order = ['Control', 'Hypertension', 'Diabetes']
+    base_colors = [COLOR_CONTROL, COLOR_HYPERTENSION, COLOR_DIABETES]
+    light_colors = []
+    dark_colors = []
+    for base in base_colors:
+        pal = create_monochromatic_palette(base, n_colors=5)
+        pal = adjust_brightness_of_colors(pal, brightness_scale=0.1)
+        light_colors.append(pal[4])
+        dark_colors.append(pal[1])
+
+    fig, ax = plt.subplots(figsize=(4, 2.5))
+    for i, grp in enumerate(group_order):
+        subset = plot_df[plot_df['Group'] == grp]['SYS_BP']
+        if len(subset) == 0:
+            continue
+        fill_color = (*light_colors[i], FILL_ALPHA)
+        ax.hist(
+            subset, bins=bins, orientation='horizontal', alpha=0.7,
+            color=fill_color, edgecolor=dark_colors[i], linewidth=0.8,
+            label=f'{grp}',
+        )
+
+    if source_sans:
+        ax.set_title('Systolic BP by group', fontproperties=source_sans_title)
+        ax.set_ylabel('Systolic BP (mmHg)', fontproperties=source_sans)
+        ax.set_xlabel('Frequency', fontproperties=source_sans)
+        ax.legend(prop=source_sans)
+    else:
+        ax.set_title('Systolic BP by group', fontsize=TITLE_FONTSIZE)
+        ax.set_ylabel('Systolic BP (mmHg)')
+        ax.set_xlabel('Frequency')
+        ax.legend()
+
+    ax.grid(True, alpha=0.3)
+    plt.tight_layout()
+
+    filename = 'sys_bp_all_groups_histogram_horizontal.png'
+    outpath = os.path.join(output_dir, filename)
+    plt.savefig(outpath, dpi=300, bbox_inches='tight')
+    plt.close()
+
+    print(f"All-groups horizontal SYS_BP histogram saved to: {outpath}")
+
 
 def main(bp_type: str = 'both', show_combined: bool = True):
     """
@@ -280,7 +686,39 @@ def main(bp_type: str = 'both', show_combined: bool = True):
     # Create combined histogram if requested
     if show_combined and bp_type == 'both':
         create_combined_bp_histogram(controls_df, output_dir)
-    
+
+    # --- Group-based SYS_BP histograms (all participants, not just controls) ---
+    # All-groups overlapping histogram
+    create_bp_all_groups_histogram(df, output_dir)
+
+    # Individual histograms with shared axes
+    plot_df = _get_bp_plot_df(df)
+    if plot_df is not None:
+        all_bp = plot_df['SYS_BP']
+        bp_min = int(all_bp.min())
+        bp_max = int(all_bp.max())
+        bin_start = (bp_min // 10) * 10
+        bin_end = ((bp_max // 10) + 1) * 10
+        shared_bins = np.arange(bin_start, bin_end + 10, 10)
+        max_count = 0
+        for grp in ['Control', 'Hypertension', 'Diabetes']:
+            grp_bp = plot_df[plot_df['Group'] == grp]['SYS_BP']
+            if len(grp_bp) > 0:
+                counts, _ = np.histogram(grp_bp, bins=shared_bins)
+                max_count = max(max_count, counts.max())
+        shared_ylim = max_count + 1
+
+        for grp in ['Control', 'Hypertension', 'Diabetes']:
+            create_bp_group_histogram(df, grp, output_dir,
+                                      shared_bins=shared_bins,
+                                      shared_ylim=shared_ylim)
+            create_bp_group_histogram_horizontal(df, grp, output_dir,
+                                                 shared_bins=shared_bins,
+                                                 shared_xlim=shared_ylim)
+
+    # Horizontal all-groups overlay
+    create_bp_all_groups_histogram_horizontal(df, output_dir)
+
     print(f"\nBlood pressure histogram analysis complete.")
     print(f"Results saved to: {output_dir}")
     
