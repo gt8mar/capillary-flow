@@ -7,10 +7,14 @@ By: Marcus Forst
 """
 
 import os
+import json
 import pandas as pd
 import numpy as np
 from scipy.integrate import trapz
+from scipy import stats
 from typing import Dict, Tuple, Optional
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
 
 # Import paths from config
 from src.config import PATHS
@@ -205,6 +209,97 @@ def calculate_restart_pressure(down_pressures: np.ndarray,
     return float(restart_pressure)
 
 
+def calculate_p50(up_pressures: np.ndarray,
+                 up_velocities: np.ndarray) -> Optional[float]:
+    """Calculate P50: pressure at which velocity reaches 50% of maximum.
+    
+    P50 is a mechanical readout metric indicating the pressure at which
+    the capillary reaches half of its maximum velocity response.
+    
+    Args:
+        up_pressures: Array of pressures for up curve (sorted ascending)
+        up_velocities: Array of velocities for up curve
+    
+    Returns:
+        P50 pressure in psi, or None if cannot be determined
+    """
+    if len(up_velocities) == 0:
+        return None
+    
+    max_velocity = np.nanmax(up_velocities)
+    if np.isnan(max_velocity) or max_velocity <= 0:
+        return None
+    
+    target_velocity = 0.5 * max_velocity
+    
+    # Find where velocity crosses 50% of maximum
+    # Look for first pressure where velocity >= target_velocity
+    above_target = up_velocities >= target_velocity
+    
+    if not np.any(above_target):
+        return None
+    
+    # Interpolate to get exact pressure
+    first_above_idx = np.where(above_target)[0][0]
+    
+    if first_above_idx == 0:
+        return float(up_pressures[0])
+    
+    # Linear interpolation between points
+    v_before = up_velocities[first_above_idx - 1]
+    v_after = up_velocities[first_above_idx]
+    p_before = up_pressures[first_above_idx - 1]
+    p_after = up_pressures[first_above_idx]
+    
+    if v_after == v_before:
+        return float(p_after)
+    
+    # Interpolate
+    fraction = (target_velocity - v_before) / (v_after - v_before)
+    p50 = p_before + fraction * (p_after - p_before)
+    
+    return float(p50)
+
+
+def calculate_ev_lin(up_pressures: np.ndarray,
+                     up_velocities: np.ndarray,
+                     pressure_range: Tuple[float, float] = (0.2, 0.8)) -> Optional[float]:
+    """Calculate EV_lin: linear elastic modulus from pressure-velocity relationship.
+    
+    EV_lin is a mechanical readout metric calculated as the slope of the
+    linear portion of the pressure-velocity curve.
+    
+    Args:
+        up_pressures: Array of pressures for up curve (sorted ascending)
+        up_velocities: Array of velocities for up curve
+        pressure_range: Tuple of (min, max) pressure for linear fit (default: 0.2-0.8 psi)
+    
+    Returns:
+        EV_lin (slope) in (um/s)/psi, or None if cannot be determined
+    """
+    # Filter to pressure range
+    mask = (up_pressures >= pressure_range[0]) & (up_pressures <= pressure_range[1])
+    
+    if np.sum(mask) < 2:
+        return None
+    
+    filtered_pressures = up_pressures[mask]
+    filtered_velocities = up_velocities[mask]
+    
+    # Remove NaN values
+    valid = ~(np.isnan(filtered_pressures) | np.isnan(filtered_velocities))
+    if np.sum(valid) < 2:
+        return None
+    
+    filtered_pressures = filtered_pressures[valid]
+    filtered_velocities = filtered_velocities[valid]
+    
+    # Linear fit: velocity = slope * pressure + intercept
+    slope, intercept = np.polyfit(filtered_pressures, filtered_velocities, 1)
+    
+    return float(slope)
+
+
 def calculate_stiffness_metrics(df: pd.DataFrame,
                                velocity_column: str = 'Video_Median_Velocity') -> pd.DataFrame:
     """Calculate stiffness coefficients and stopping/restart pressures for all participants.
@@ -216,10 +311,13 @@ def calculate_stiffness_metrics(df: pd.DataFrame,
     Returns:
         DataFrame with one row per participant containing:
             - Participant: Participant ID
-            - stiffness_coeff_up: Area under up curve from 0.4 to 1.2 psi
-            - stiffness_coeff_averaged: Area under averaged curve from 0.4 to 1.2 psi
+            - stiffness_coeff_up_04_12: Area under up curve from 0.4 to 1.2 psi
+            - stiffness_coeff_up_02_12: Area under up curve from 0.2 to 1.2 psi
+            - stiffness_coeff_averaged_04_12: Area under averaged curve from 0.4 to 1.2 psi
+            - stiffness_coeff_averaged_02_12: Area under averaged curve from 0.2 to 1.2 psi
             - stopping_pressure: Pressure where flow stops in up curve (psi)
             - restart_pressure: Pressure where flow restarts in down curve (psi)
+            - MAP: Mean arterial pressure (mmHg)
             - Additional columns from original data (Age, Diabetes, Hypertension, etc.)
     """
     participant_data = []
@@ -232,31 +330,81 @@ def calculate_stiffness_metrics(df: pd.DataFrame,
             participant_df, velocity_column
         )
         
-        # Calculate stiffness coefficients
-        stiffness_coeff_up = calculate_stiffness_coefficient_up(
-            up_pressures, up_velocities
+        # Calculate stiffness coefficients for both ranges
+        stiffness_coeff_up_04_12 = calculate_stiffness_coefficient_up(
+            up_pressures, up_velocities, pressure_min=0.4, pressure_max=1.2
         )
-        stiffness_coeff_averaged = calculate_stiffness_coefficient_averaged(
-            up_pressures, up_velocities, down_pressures, down_velocities
+        stiffness_coeff_up_02_12 = calculate_stiffness_coefficient_up(
+            up_pressures, up_velocities, pressure_min=0.2, pressure_max=1.2
+        )
+        stiffness_coeff_averaged_04_12 = calculate_stiffness_coefficient_averaged(
+            up_pressures, up_velocities, down_pressures, down_velocities,
+            pressure_min=0.4, pressure_max=1.2
+        )
+        stiffness_coeff_averaged_02_12 = calculate_stiffness_coefficient_averaged(
+            up_pressures, up_velocities, down_pressures, down_velocities,
+            pressure_min=0.2, pressure_max=1.2
         )
         
         # Calculate stopping and restart pressures
         stopping_pressure = calculate_stopping_pressure(up_pressures, up_velocities)
         restart_pressure = calculate_restart_pressure(down_pressures, down_velocities)
         
+        # Calculate secondary mechanical metrics
+        p50 = calculate_p50(up_pressures, up_velocities)
+        ev_lin = calculate_ev_lin(up_pressures, up_velocities)
+        
+        # Calculate hysteresis (up-down difference)
+        up_mean = np.mean(up_velocities) if len(up_velocities) > 0 else np.nan
+        down_mean = np.mean(down_velocities) if len(down_velocities) > 0 else np.nan
+        hysteresis = up_mean - down_mean if not (np.isnan(up_mean) or np.isnan(down_mean)) else np.nan
+        
+        # Get velocities at specific pressures (for composite score)
+        velocity_04 = np.nan
+        velocity_12 = np.nan
+        if len(up_pressures) > 0:
+            # Interpolate to get velocities at 0.4 and 1.2 psi
+            if 0.4 in up_pressures:
+                idx = np.where(up_pressures == 0.4)[0][0]
+                velocity_04 = up_velocities[idx]
+            elif len(up_pressures) > 1:
+                velocity_04 = np.interp(0.4, up_pressures, up_velocities)
+            
+            if 1.2 in up_pressures:
+                idx = np.where(up_pressures == 1.2)[0][0]
+                velocity_12 = up_velocities[idx]
+            elif len(up_pressures) > 1:
+                velocity_12 = np.interp(1.2, up_pressures, up_velocities)
+        
         # Gather participant information
         result = {
             'Participant': participant,
-            'stiffness_coeff_up': stiffness_coeff_up,
-            'stiffness_coeff_averaged': stiffness_coeff_averaged,
+            'stiffness_coeff_up_04_12': stiffness_coeff_up_04_12,
+            'stiffness_coeff_up_02_12': stiffness_coeff_up_02_12,
+            'stiffness_coeff_averaged_04_12': stiffness_coeff_averaged_04_12,
+            'stiffness_coeff_averaged_02_12': stiffness_coeff_averaged_02_12,
             'stopping_pressure': stopping_pressure,
-            'restart_pressure': restart_pressure
+            'restart_pressure': restart_pressure,
+            'P50': p50,
+            'EV_lin': ev_lin,
+            'hysteresis': hysteresis,
+            'velocity_04': velocity_04,
+            'velocity_12': velocity_12
         }
         
         # Add demographic/health information if available
         for col in ['Age', 'Diabetes', 'Hypertension', 'SET', 'Sex', 'SYS_BP', 'DIA_BP']:
             if col in participant_df.columns:
                 result[col] = participant_df[col].iloc[0]
+        
+        # Calculate MAP if SYS_BP and DIA_BP are available
+        if 'SYS_BP' in result and 'DIA_BP' in result:
+            if pd.notna(result['SYS_BP']) and pd.notna(result['DIA_BP']):
+                result['MAP'] = result['DIA_BP'] + (result['SYS_BP'] - result['DIA_BP']) / 3
+            else:
+                result['MAP'] = np.nan
+        else:
+            result['MAP'] = np.nan
         
         # Convert Diabetes to boolean if it's a string
         if 'Diabetes' in result:
@@ -276,17 +424,29 @@ def calculate_stiffness_metrics(df: pd.DataFrame,
     print("STIFFNESS COEFFICIENT SUMMARY")
     print("="*70)
     print(f"\nTotal participants: {len(results_df)}")
-    print(f"\nStiffness Coefficient (Up Curve):")
-    print(f"  Mean: {results_df['stiffness_coeff_up'].mean():.3f}")
-    print(f"  Median: {results_df['stiffness_coeff_up'].median():.3f}")
-    print(f"  Range: {results_df['stiffness_coeff_up'].min():.3f} to {results_df['stiffness_coeff_up'].max():.3f}")
-    print(f"  Valid values: {results_df['stiffness_coeff_up'].notna().sum()}")
+    print(f"\nStiffness Coefficient (Up Curve, 0.4-1.2 psi):")
+    print(f"  Mean: {results_df['stiffness_coeff_up_04_12'].mean():.3f}")
+    print(f"  Median: {results_df['stiffness_coeff_up_04_12'].median():.3f}")
+    print(f"  Range: {results_df['stiffness_coeff_up_04_12'].min():.3f} to {results_df['stiffness_coeff_up_04_12'].max():.3f}")
+    print(f"  Valid values: {results_df['stiffness_coeff_up_04_12'].notna().sum()}")
     
-    print(f"\nStiffness Coefficient (Averaged):")
-    print(f"  Mean: {results_df['stiffness_coeff_averaged'].mean():.3f}")
-    print(f"  Median: {results_df['stiffness_coeff_averaged'].median():.3f}")
-    print(f"  Range: {results_df['stiffness_coeff_averaged'].min():.3f} to {results_df['stiffness_coeff_averaged'].max():.3f}")
-    print(f"  Valid values: {results_df['stiffness_coeff_averaged'].notna().sum()}")
+    print(f"\nStiffness Coefficient (Up Curve, 0.2-1.2 psi):")
+    print(f"  Mean: {results_df['stiffness_coeff_up_02_12'].mean():.3f}")
+    print(f"  Median: {results_df['stiffness_coeff_up_02_12'].median():.3f}")
+    print(f"  Range: {results_df['stiffness_coeff_up_02_12'].min():.3f} to {results_df['stiffness_coeff_up_02_12'].max():.3f}")
+    print(f"  Valid values: {results_df['stiffness_coeff_up_02_12'].notna().sum()}")
+    
+    print(f"\nStiffness Coefficient (Averaged, 0.4-1.2 psi):")
+    print(f"  Mean: {results_df['stiffness_coeff_averaged_04_12'].mean():.3f}")
+    print(f"  Median: {results_df['stiffness_coeff_averaged_04_12'].median():.3f}")
+    print(f"  Range: {results_df['stiffness_coeff_averaged_04_12'].min():.3f} to {results_df['stiffness_coeff_averaged_04_12'].max():.3f}")
+    print(f"  Valid values: {results_df['stiffness_coeff_averaged_04_12'].notna().sum()}")
+    
+    print(f"\nStiffness Coefficient (Averaged, 0.2-1.2 psi):")
+    print(f"  Mean: {results_df['stiffness_coeff_averaged_02_12'].mean():.3f}")
+    print(f"  Median: {results_df['stiffness_coeff_averaged_02_12'].median():.3f}")
+    print(f"  Range: {results_df['stiffness_coeff_averaged_02_12'].min():.3f} to {results_df['stiffness_coeff_averaged_02_12'].max():.3f}")
+    print(f"  Valid values: {results_df['stiffness_coeff_averaged_02_12'].notna().sum()}")
     
     print(f"\nStopping Pressure:")
     valid_stopping = results_df['stopping_pressure'].notna()
@@ -308,6 +468,178 @@ def calculate_stiffness_metrics(df: pd.DataFrame,
     return results_df
 
 
+def get_classifier_weights(df: pd.DataFrame, target: str = 'Diabetes') -> Dict[str, float]:
+    """Get feature importance weights from Random Forest classifier.
+    
+    Trains a classifier to predict health condition and extracts weights
+    for velocities at 0.4 psi, 1.2 psi, and hysteresis.
+    
+    Args:
+        df: DataFrame containing participant data
+        target: Target variable ('Diabetes', 'Hypertension', or 'is_healthy')
+    
+    Returns:
+        Dictionary with weights for 'velocity_04', 'velocity_12', and 'hysteresis'
+    """
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.preprocessing import StandardScaler
+    
+    # Prepare features
+    participant_data = []
+    for participant in df['Participant'].unique():
+        participant_df = df[df['Participant'] == participant].copy()
+        
+        # Get velocities at specific pressures
+        up_data = participant_df[participant_df['UpDown'] == 'U'].copy()
+        down_data = participant_df[participant_df['UpDown'] == 'D'].copy()
+        
+        # Get mean velocities at 0.4 and 1.2 psi
+        vel_04 = up_data[up_data['Pressure'] == 0.4]['Video_Median_Velocity'].mean() if len(up_data[up_data['Pressure'] == 0.4]) > 0 else np.nan
+        vel_12 = up_data[up_data['Pressure'] == 1.2]['Video_Median_Velocity'].mean() if len(up_data[up_data['Pressure'] == 1.2]) > 0 else np.nan
+        
+        # Interpolate if exact pressure not available
+        if pd.isna(vel_04) and len(up_data) > 1:
+            pressures = up_data['Pressure'].values
+            velocities = up_data['Video_Median_Velocity'].values
+            if len(pressures) > 1:
+                vel_04 = np.interp(0.4, pressures, velocities)
+        
+        if pd.isna(vel_12) and len(up_data) > 1:
+            pressures = up_data['Pressure'].values
+            velocities = up_data['Video_Median_Velocity'].values
+            if len(pressures) > 1:
+                vel_12 = np.interp(1.2, pressures, velocities)
+        
+        # Calculate hysteresis
+        up_mean = up_data['Video_Median_Velocity'].mean() if len(up_data) > 0 else np.nan
+        down_mean = down_data['Video_Median_Velocity'].mean() if len(down_data) > 0 else np.nan
+        hyst = up_mean - down_mean if not (pd.isna(up_mean) or pd.isna(down_mean)) else np.nan
+        
+        # Get target variable
+        if target == 'is_healthy':
+            target_val = str(participant_df['SET'].iloc[0]).startswith('set01') if 'SET' in participant_df.columns else False
+        else:
+            target_val = str(participant_df[target].iloc[0]).upper() == 'TRUE' if target in participant_df.columns else False
+        
+        participant_data.append({
+            'Participant': participant,
+            'velocity_04': vel_04,
+            'velocity_12': vel_12,
+            'hysteresis': hyst,
+            target: target_val
+        })
+    
+    feature_df = pd.DataFrame(participant_data)
+    
+    # Remove rows with missing values
+    feature_df = feature_df.dropna(subset=['velocity_04', 'velocity_12', 'hysteresis', target])
+    
+    if len(feature_df) < 10:
+        print(f"Warning: Not enough data for classifier. Using default weights.")
+        return {'velocity_04': 0.33, 'velocity_12': 0.33, 'hysteresis': 0.34}
+    
+    # Prepare features and target
+    X = feature_df[['velocity_04', 'velocity_12', 'hysteresis']].values
+    y = feature_df[target].values
+    
+    # Scale features
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+    
+    # Train Random Forest
+    rf = RandomForestClassifier(n_estimators=100, random_state=42)
+    rf.fit(X_scaled, y)
+    
+    # Get feature importances
+    importances = rf.feature_importances_
+    weights = {
+        'velocity_04': float(importances[0]),
+        'velocity_12': float(importances[1]),
+        'hysteresis': float(importances[2])
+    }
+    
+    # Normalize weights to sum to 1
+    total = sum(weights.values())
+    if total > 0:
+        weights = {k: v / total for k, v in weights.items()}
+    
+    print(f"\nClassifier weights for {target}:")
+    print(f"  velocity_04: {weights['velocity_04']:.3f}")
+    print(f"  velocity_12: {weights['velocity_12']:.3f}")
+    print(f"  hysteresis: {weights['hysteresis']:.3f}")
+    
+    return weights
+
+
+def calculate_composite_stiffness(results_df: pd.DataFrame, weights: Dict[str, float]) -> pd.Series:
+    """Calculate composite stiffness score using classifier weights.
+    
+    Composite Stiffness = w1 * V(0.4) + w2 * V(1.2) + w3 * H
+    
+    Args:
+        results_df: DataFrame with stiffness metrics
+        weights: Dictionary with weights for velocity_04, velocity_12, and hysteresis
+    
+    Returns:
+        Series with composite stiffness scores
+    """
+    composite = (
+        weights['velocity_04'] * results_df['velocity_04'].fillna(0) +
+        weights['velocity_12'] * results_df['velocity_12'].fillna(0) +
+        weights['hysteresis'] * results_df['hysteresis'].fillna(0)
+    )
+    
+    return composite
+
+
+def age_adjusted_analysis(results_df: pd.DataFrame, stiffness_col: str, 
+                          group_col: str = 'Diabetes') -> Dict:
+    """Perform age-adjusted analysis using ANCOVA/linear regression.
+    
+    SI ~ Group + Age
+    
+    Args:
+        results_df: DataFrame with stiffness metrics
+        stiffness_col: Name of stiffness column to analyze
+        group_col: Name of group column (default: 'Diabetes')
+    
+    Returns:
+        Dictionary with regression results including p-values
+    """
+    # Filter to valid data
+    df_clean = results_df[[stiffness_col, group_col, 'Age']].dropna()
+    
+    if len(df_clean) < 10:
+        return {'error': 'Insufficient data for analysis'}
+    
+    # Create binary group variable
+    if group_col == 'Diabetes':
+        df_clean['Group'] = df_clean[group_col].astype(int)  # 1 = Diabetic, 0 = Control
+    else:
+        df_clean['Group'] = df_clean[group_col].astype(int)
+    
+    # Fit linear regression: SI ~ Group + Age
+    formula = f'{stiffness_col} ~ Group + Age'
+    model = ols(formula, data=df_clean).fit()
+    
+    # Extract results
+    results = {
+        'formula': formula,
+        'n': len(df_clean),
+        'group_coef': model.params['Group'],
+        'group_pvalue': model.pvalues['Group'],
+        'age_coef': model.params['Age'],
+        'age_pvalue': model.pvalues['Age'],
+        'r_squared': model.rsquared,
+        'adj_r_squared': model.rsquared_adj,
+        'f_statistic': model.fvalue,
+        'f_pvalue': model.f_pvalue,
+        'model_summary': str(model.summary())
+    }
+    
+    return results
+
+
 def main():
     """Main function to calculate stiffness coefficients and stopping/restart pressures."""
     print("\nStarting stiffness coefficient calculation...")
@@ -324,6 +656,20 @@ def main():
     # Calculate stiffness metrics
     results_df = calculate_stiffness_metrics(df, velocity_column='Video_Median_Velocity')
     
+    # Calculate composite stiffness using classifier weights
+    print("\nCalculating composite stiffness scores...")
+    weights = get_classifier_weights(df, target='Diabetes')
+    results_df['composite_stiffness'] = calculate_composite_stiffness(results_df, weights)
+    
+    # Calculate log-transformed SI_AUC (log(SI_AUC + 1))
+    for col in ['stiffness_coeff_up_04_12', 'stiffness_coeff_up_02_12',
+                'stiffness_coeff_averaged_04_12', 'stiffness_coeff_averaged_02_12']:
+        if col in results_df.columns:
+            results_df[f'log_{col}'] = np.log1p(results_df[col])  # log1p = log(1 + x)
+    
+    # Also calculate log for composite stiffness
+    results_df['log_composite_stiffness'] = np.log1p(results_df['composite_stiffness'])
+    
     # Create output directory
     output_dir = os.path.join(cap_flow_path, 'results', 'Stiffness')
     os.makedirs(output_dir, exist_ok=True)
@@ -333,17 +679,63 @@ def main():
     results_df.to_csv(output_filepath, index=False)
     print(f"\nResults saved to: {output_filepath}")
     
+    # Perform age-adjusted analysis
+    print("\nPerforming age-adjusted analysis...")
+    age_adjusted_results = {}
+    for stiffness_col in ['stiffness_coeff_averaged_04_12', 'composite_stiffness']:
+        if stiffness_col in results_df.columns:
+            age_results = age_adjusted_analysis(results_df, stiffness_col, group_col='Diabetes')
+            age_adjusted_results[stiffness_col] = age_results
+            if 'error' not in age_results:
+                print(f"\n{stiffness_col} - Age-adjusted analysis:")
+                print(f"  Group coefficient: {age_results['group_coef']:.4f}")
+                print(f"  Group p-value: {age_results['group_pvalue']:.4f}")
+                print(f"  Age coefficient: {age_results['age_coef']:.4f}")
+                print(f"  Age p-value: {age_results['age_pvalue']:.4f}")
+                print(f"  R-squared: {age_results['r_squared']:.4f}")
+    
+    # Save age-adjusted results
+    if age_adjusted_results:
+        age_filepath = os.path.join(output_dir, 'age_adjusted_analysis.json')
+        # Convert numpy types to Python types for JSON serialization
+        age_adjusted_json = {}
+        for key, value in age_adjusted_results.items():
+            if isinstance(value, dict) and 'error' not in value:
+                age_adjusted_json[key] = {
+                    k: float(v) if isinstance(v, (np.integer, np.floating)) else v
+                    for k, v in value.items() if k != 'model_summary'
+                }
+        with open(age_filepath, 'w') as f:
+            json.dump(age_adjusted_json, f, indent=2)
+        print(f"\nAge-adjusted analysis saved to: {age_filepath}")
+    
     # Also calculate for log velocity if available
     if 'Log_Video_Median_Velocity' in df.columns:
         print("\nCalculating stiffness coefficients for log velocity...")
         results_df_log = calculate_stiffness_metrics(df, velocity_column='Log_Video_Median_Velocity')
         
+        # Calculate composite stiffness for log velocity
+        weights_log = get_classifier_weights(df, target='Diabetes')
+        results_df_log['composite_stiffness'] = calculate_composite_stiffness(results_df_log, weights_log)
+        
+        # Calculate log-transformed SI_AUC for log velocity
+        for col in ['stiffness_coeff_up_04_12', 'stiffness_coeff_up_02_12',
+                    'stiffness_coeff_averaged_04_12', 'stiffness_coeff_averaged_02_12']:
+            if col in results_df_log.columns:
+                results_df_log[f'log_{col}'] = np.log1p(results_df_log[col])
+        
+        results_df_log['log_composite_stiffness'] = np.log1p(results_df_log['composite_stiffness'])
+        
         # Rename columns to indicate log velocity
         results_df_log = results_df_log.rename(columns={
-            'stiffness_coeff_up': 'stiffness_coeff_up_log',
-            'stiffness_coeff_averaged': 'stiffness_coeff_averaged_log',
+            'stiffness_coeff_up_04_12': 'stiffness_coeff_up_04_12_log',
+            'stiffness_coeff_up_02_12': 'stiffness_coeff_up_02_12_log',
+            'stiffness_coeff_averaged_04_12': 'stiffness_coeff_averaged_04_12_log',
+            'stiffness_coeff_averaged_02_12': 'stiffness_coeff_averaged_02_12_log',
             'stopping_pressure': 'stopping_pressure_log',
-            'restart_pressure': 'restart_pressure_log'
+            'restart_pressure': 'restart_pressure_log',
+            'composite_stiffness': 'composite_stiffness_log',
+            'log_composite_stiffness': 'log_composite_stiffness_log'
         })
         
         # Save log velocity results
