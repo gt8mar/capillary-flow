@@ -61,7 +61,8 @@ Do NOT use `platform.node()` hostname checks in individual files.
   - `df_pipeline.py` - Orchestrates DataFrame compilation
   - `plot_big.py` - Main visualization module (~5100 lines)
   - `hysteresis.py` / `hysteresis_stats.py` - Pressure-dependent flow analysis
-  - `stiffness_coeff.py` / `plot_stiffness.py` - Capillary stiffness calculations
+  - `stiffness_coeff.py` - Computes per-participant stiffness index (SI) metrics from pressure-velocity curves
+  - `plot_stiffness.py` - Generates comparison plots, boxplots, age-adjusted scatterplots, and summary tables for stiffness metrics
   - `health_classifier.py` - ML-based health condition classification
   - `anova.py` - ANOVA statistical tests
   - `figs_ci.py` - Confidence interval figures
@@ -96,6 +97,34 @@ The main DataFrame (`make_big_df.py`) uses these key columns:
 - **Video metadata**: `Date` (YYMMDD), `Location` (loc##), `Video` (vid##), `Pressure` (psi), `FPS`, `Finger`
 - **Measurements**: `Centerline Length`, `Area`, `Diameter`, `Velocity`, `Corrected Velocity`
 - **Quality flags**: `Correct` (t/f), `Zero`, `Max`, `Drop`
+
+### Stiffness Index Metrics
+
+Two log-transformed stiffness index (SI) metrics quantify capillary mechanical behavior from pressure-velocity curves:
+
+1. **`SI_log1p`** = `log(1 + AUC of raw velocity)` — takes the AUC of raw velocity across pressure, then applies log1p. Compresses the distribution of total area.
+   - Columns: `SI_log1p_up_04_12`, `SI_log1p_averaged_04_12`, etc.
+   - Computed in `stiffness_coeff.py`, stored in `results/Stiffness/stiffness_coefficients.csv`
+
+2. **`SI_logvel`** = `AUC of log(velocity)` — uses the `Log_Video_Median_Velocity` column as input to trapezoidal integration. Integrates log-velocity vs pressure directly, closely related to geometric-mean velocity. Penalizes near-zero (stalled) velocities heavily.
+   - Columns: `SI_logvel_up_04_12`, `SI_logvel_averaged_04_12`, etc.
+   - Computed in `stiffness_coeff.py`, stored in `results/Stiffness/stiffness_coefficients_log.csv`
+
+**Naming convention**: `SI_{transform}_{method}_{range}` where:
+- `transform` = `log1p` (log of AUC) or `logvel` (AUC of log velocity)
+- `method` = `up` (up curve only) or `averaged` (up+down interpolated average)
+- `range` = `04_12` (0.4–1.2 psi) or `02_12` (0.2–1.2 psi)
+
+**Recommended metric**: `SI_logvel_averaged_02_12` — largest effect size (Cohen's d ~0.65), significant after age adjustment (p=0.044), biologically interpretable.
+
+**Biological context**: Stiffer (less healthy/diabetic) capillaries maintain higher flow under external pressure because they resist collapse. Higher SI = stiffer = less healthy.
+
+**Output files**:
+- `results/Stiffness/stiffness_coefficients.csv` — raw velocity SI metrics + `SI_log1p_*` columns
+- `results/Stiffness/stiffness_coefficients_log.csv` — log-velocity SI metrics with `SI_logvel_*` columns
+- `results/Stiffness/stiffness_metric_comparison.csv` — side-by-side effect sizes, p-values, velocity bias
+- `results/Stiffness/plots/` — group boxplots and age-adjusted scatter plots for both metrics
+- `results/Stiffness/plots/stiffness_significance.csv` — full significance table
 
 ## Coding Standards
 

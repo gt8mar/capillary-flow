@@ -881,11 +881,24 @@ def plot_log_stiffness_by_group(results_df: pd.DataFrame, output_dir: str,
                                 stiffness_col: str = 'SI_log1p_averaged_04_12',
                                 figsize: Tuple[float, float] = (2.4, 2.0),
                                 minimal_dir: Optional[str] = None):
-    """Plot boxplot of log-transformed stiffness by group."""
+    """Plot boxplot of log-transformed stiffness by group.
+
+    Handles both SI_log1p (log of AUC of raw velocity) and SI_logvel
+    (AUC of log velocity) columns, setting axis labels and filenames
+    appropriately based on the column prefix.
+
+    Args:
+        results_df: DataFrame containing the stiffness column and Diabetes flag.
+        output_dir: Directory to save figures.
+        stiffness_col: Column name to plot (SI_log1p_* or SI_logvel_*).
+        figsize: Figure size.
+        minimal_dir: If set, save a no-title/no-legend copy here.
+    """
     if stiffness_col not in results_df.columns:
         return
     
-    df_plot = results_df[results_df[stiffness_col].notna()].copy()
+    df_plot = _ensure_diabetes_bool(results_df)
+    df_plot = df_plot[df_plot[stiffness_col].notna()].copy()
     df_plot['Group'] = df_plot['Diabetes'].map({True: 'Diabetic', False: 'Control'})
     
     fig, ax = plt.subplots(figsize=figsize)
@@ -898,9 +911,18 @@ def plot_log_stiffness_by_group(results_df: pd.DataFrame, output_dir: str,
         x_pos = i + np.random.normal(0, 0.05, len(group_data))
         ax.scatter(x_pos, group_data, alpha=0.4, s=10, color='gray', zorder=3)
     
+    # Determine labels based on metric type
+    is_logvel = stiffness_col.startswith('SI_logvel_')
+    if is_logvel:
+        ylabel = 'SI_logvel (AUC of log velocity)'
+        title = 'Log-Velocity Stiffness by Group'
+    else:
+        ylabel = 'Log(AUC + 1)'
+        title = 'Log-Transformed Stiffness by Group'
+    
     ax.set_xlabel('Group', fontproperties=source_sans if source_sans else None)
-    ax.set_ylabel('log(SI_AUC + 1)', fontproperties=source_sans if source_sans else None)
-    ax.set_title('Log-Transformed Stiffness by Group', fontproperties=source_sans if source_sans else None)
+    ax.set_ylabel(ylabel, fontproperties=source_sans if source_sans else None)
+    ax.set_title(title, fontproperties=source_sans if source_sans else None)
     
     control_stiff = df_plot[df_plot['Group'] == 'Control'][stiffness_col]
     diabetic_stiff = df_plot[df_plot['Group'] == 'Diabetic'][stiffness_col]
@@ -924,7 +946,11 @@ def plot_log_stiffness_by_group(results_df: pd.DataFrame, output_dir: str,
     else:
         method_label = 'averaged'
     
-    filename = f'stiffness_fig_log_SI_by_group_{method_label}_{range_label}'
+    # Use distinct filename prefix for logvel vs log1p
+    if is_logvel:
+        filename = f'stiffness_fig_logvel_SI_by_group_{method_label}_{range_label}'
+    else:
+        filename = f'stiffness_fig_log_SI_by_group_{method_label}_{range_label}'
     save_figure(fig, output_dir, filename, minimal_dir=minimal_dir)
     plt.close()
 
@@ -1542,6 +1568,16 @@ def main():
             plot_log_metric_comparison_age_adjusted(
                 results_df, results_df_log, output_dir, range_label=range_label, minimal_dir=minimal_dir
             )
+
+    # Generate standalone boxplots for log velocity AUC (SI_logvel)
+    print("\nGenerating standalone SI_logvel boxplots...")
+    if results_df_log is not None and 'Diabetes' in results_df_log.columns:
+        for col in ['SI_logvel_up_04_12', 'SI_logvel_up_02_12',
+                     'SI_logvel_averaged_04_12', 'SI_logvel_averaged_02_12']:
+            if col in results_df_log.columns:
+                plot_log_stiffness_by_group(results_df_log, output_dir, stiffness_col=col, minimal_dir=minimal_dir)
+    else:
+        print("Warning: Diabetes data not available for log velocity results. Skipping SI_logvel boxplots.")
 
     # Generate age-adjusted analysis plots for log velocity AUC (SI_logvel)
     print("\nGenerating age-adjusted analysis plots for SI_logvel...")
