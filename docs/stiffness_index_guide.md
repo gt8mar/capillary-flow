@@ -20,9 +20,7 @@ The main stiffness index we report is **SI_AUC**: the **area under the velocity�
 
 For a curve with pressure \(p\) (in psi) and velocity \(v(p)\) (in μm/s), we define:
 
-'''math
-\text{SI\_AUC} = \int_{p_{\min}}^{p_{\max}} v(p)\, dp
-'''
+$$\text{SI\_AUC} = \int_{p_{\min}}^{p_{\max}} v(p)\, dp$$
 
 - **Units:** (μm/s) × psi → e.g. **(μm/s)·psi**
 - **Integration:** Implemented with the **trapezoidal rule** over the available (pressure, velocity) points within the chosen range.
