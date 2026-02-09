@@ -42,7 +42,7 @@ So, while we are not defining stiffness as “resistance to deformation” in a 
 
 ### 3.1 Up vs Down Curves
 
-Pressure is typically ramped **up** (e.g., 0.2 → 1.2 psi) and then **down**. We get:
+Pressure is ramped **up** (e.g., 0.2 → 1.2 psi) and then **down**. We get:
 
 - **Up curve:** velocity vs pressure as pressure increases (often flow decreases or stops).
 - **Down curve:** velocity vs pressure as pressure decreases (flow restarts).
