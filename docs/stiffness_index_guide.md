@@ -34,7 +34,7 @@ For a curve with pressure \(p\) (in psi) and velocity \(v(p)\) (in μm/s), we de
 - **Robust to curve shape:** Unlike a single point (e.g., velocity at one pressure), the AUC uses all points in the range, so it is less sensitive to noise at one pressure level.
 - **Interpretation:** Larger SI_AUC → more flow resilient to external pressure, consistent with stiffer vessels; smaller SI_AUC → less flow, consistent with pliable microvasculature.
 
-So, while we are not defining stiffness as “resistance to deformation” in a strict mechanical sense, we *are* defining stiffness as the cumulative resistance of blood flow to applied external pressure.
+So, while we are not defining stiffness as “resistance to deformation” in a strict mechanical sense, we *are* defining stiffness as the cumulative resiliency of blood flow velocity to applied external pressure.
 
 ---
 
