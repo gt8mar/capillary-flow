@@ -41,6 +41,31 @@ COLOR_DIABETES = '#ff7f0e'
 # Alpha for violin fill to mirror the lighter fill (semi-transparent like the light shade)
 VIOLIN_FILL_ALPHA = 0.6
 
+# Palette indices for fill (light) and outline (dark).
+# Control uses a darker fill so it is distinguishable in grayscale.
+_LIGHT_IDX_CONTROL = 2      # mid-tone  (was 4 = lightest)
+_DARK_IDX_CONTROL = 0       # darkest   (was 1)
+_LIGHT_IDX_DEFAULT = 4      # lightest
+_DARK_IDX_DEFAULT = 1       # dark
+
+
+def _get_group_colors():
+    """Return (light_colors, dark_colors) lists in Control / Hypertension / Diabetes order.
+
+    Control uses a darker shade so the group is visible in grayscale print.
+    """
+    base_colors = [COLOR_CONTROL, COLOR_HYPERTENSION, COLOR_DIABETES]
+    light_idx = [_LIGHT_IDX_CONTROL, _LIGHT_IDX_DEFAULT, _LIGHT_IDX_DEFAULT]
+    dark_idx = [_DARK_IDX_CONTROL, _DARK_IDX_DEFAULT, _DARK_IDX_DEFAULT]
+    light_colors = []
+    dark_colors = []
+    for i, base in enumerate(base_colors):
+        pal = create_monochromatic_palette(base, n_colors=5)
+        pal = adjust_brightness_of_colors(pal, brightness_scale=0.1)
+        light_colors.append(pal[light_idx[i]])
+        dark_colors.append(pal[dark_idx[i]])
+    return light_colors, dark_colors
+
 
 def _assign_group(row: pd.Series) -> str:
     """Assign group label from SET. set01=Control, set02=Hypertension, set03=Diabetes."""
@@ -126,7 +151,7 @@ def create_participant_histogram_by_group(
             bins=bins,
             alpha=0.3,
             color=color,
-            label=f'{grp} (n={len(subset)})',
+            label=f'{grp}',
             edgecolor='none',
         )
     # Redraw each group as step outline (opaque) so each distribution stays visible
@@ -206,15 +231,7 @@ def create_participant_violin_by_group(
         return
 
     group_order = ['Control', 'Hypertension', 'Diabetes']
-    base_colors = [COLOR_CONTROL, COLOR_HYPERTENSION, COLOR_DIABETES]
-    # create_monochromatic_palette: index 0 = darkest, index 4 = lightest
-    light_colors = []   # lightest shade  -> violin fill
-    dark_colors = []    # darker shade    -> violin outline
-    for base in base_colors:
-        pal = create_monochromatic_palette(base, n_colors=5)
-        pal = adjust_brightness_of_colors(pal, brightness_scale=0.1)
-        light_colors.append(pal[4])   # lightest
-        dark_colors.append(pal[1])    # dark
+    light_colors, dark_colors = _get_group_colors()
 
     # Build RGBA tuples for fill (with alpha) and edge (opaque)
     fill_rgba = [(r, g, b, VIOLIN_FILL_ALPHA) for r, g, b in light_colors]
@@ -311,14 +328,7 @@ def create_participant_kde_by_group(
         return
 
     group_order = ['Control', 'Hypertension', 'Diabetes']
-    base_colors = [COLOR_CONTROL, COLOR_HYPERTENSION, COLOR_DIABETES]
-    light_colors = []
-    dark_colors = []
-    for base in base_colors:
-        pal = create_monochromatic_palette(base, n_colors=5)
-        pal = adjust_brightness_of_colors(pal, brightness_scale=0.1)
-        light_colors.append(pal[4])
-        dark_colors.append(pal[1])
+    light_colors, dark_colors = _get_group_colors()
 
     # Use 5-year bins (same as histogram)
     age_values = plot_df['Age']
@@ -344,7 +354,7 @@ def create_participant_kde_by_group(
             edgecolor=dark_colors[i],
             linewidth=0.5,
             line_kws=dict(color=dark_colors[i], linewidth=1.2),
-            label=f'{grp} (n={len(subset)})',
+            label=f'{grp}',
         )
 
     if source_sans:
@@ -440,14 +450,7 @@ def create_participant_venn(
 
     # Build light / dark palettes (same as violin)
     # Order: Control, Hypertension, Diabetes
-    base_colors = [COLOR_CONTROL, COLOR_HYPERTENSION, COLOR_DIABETES]
-    light_colors = []
-    dark_colors = []
-    for base in base_colors:
-        pal = create_monochromatic_palette(base, n_colors=5)
-        pal = adjust_brightness_of_colors(pal, brightness_scale=0.1)
-        light_colors.append(pal[4])
-        dark_colors.append(pal[1])
+    light_colors, dark_colors = _get_group_colors()
 
     # venn3 layout: A=upper-left, B=upper-right, C=bottom-center
     # We want: Control=left (A), Diabetes=right (B), Hypertension=bottom (C)
@@ -496,18 +499,32 @@ def create_participant_venn(
         circ.set_alpha(1.0)
 
     # Style set labels (group names around the circles)
+    # Align all labels on the same horizontal line below the diagram
+    label_y_positions = []
     for text in v.set_labels:
         if text is not None:
+            label_y_positions.append(text.get_position()[1])
+    # Use the lowest label position (most negative y) for all labels
+    common_y = min(label_y_positions) if label_y_positions else -0.35
+    # set_labels order: 0=Control (A), 1=Diabetes (B), 2=Hypertension (C)
+    # x-axis is inverted, so subtracting from x moves text visually right
+    label_x_nudge = {1: -0.08}  # nudge Diabetes slightly right
+    for i, text in enumerate(v.set_labels):
+        if text is not None:
+            x, _ = text.get_position()
+            x += label_x_nudge.get(i, 0)
+            text.set_position((x, common_y))
+            text.set_ha('center')
             if source_sans:
                 text.set_fontproperties(source_sans)
-            text.set_fontsize(8)
+            text.set_fontsize(10)
 
     # Style subset labels (counts inside the circles)
     for text in v.subset_labels:
         if text is not None:
             if source_sans:
                 text.set_fontproperties(source_sans)
-            text.set_fontsize(12)
+            text.set_fontsize(14)
 
     if source_sans:
         ax.set_title('Participant cohort overlap', fontproperties=source_sans_title)
@@ -577,14 +594,7 @@ def create_split_histogram_by_group(
     bin_centers = (bins[:-1] + bins[1:]) / 2
 
     # Light / dark palettes (same as violin)
-    base_colors = [COLOR_CONTROL, COLOR_HYPERTENSION, COLOR_DIABETES]
-    light_colors = []
-    dark_colors = []
-    for base in base_colors:
-        pal = create_monochromatic_palette(base, n_colors=5)
-        pal = adjust_brightness_of_colors(pal, brightness_scale=0.1)
-        light_colors.append(pal[4])
-        dark_colors.append(pal[1])
+    light_colors, dark_colors = _get_group_colors()
 
     control_ages = plot_df[plot_df['Group'] == 'Control']['Age']
     hyp_ages = plot_df[plot_df['Group'] == 'Hypertension']['Age']
@@ -605,7 +615,7 @@ def create_split_histogram_by_group(
     ax.bar(
         bin_centers, ctrl_counts, width=bin_width * 0.9,
         color=fill_ctrl, edgecolor=dark_colors[0], linewidth=0.8,
-        label=f'Control (n={len(control_ages)})',
+        label='Control',
     )
 
     # --- Disease bars going DOWN (negative), semi-transparent with dark edges ---
@@ -615,14 +625,14 @@ def create_split_histogram_by_group(
     ax.bar(
         bin_centers, -dia_counts, width=bin_width * 0.9,
         color=fill_dia, edgecolor=dark_colors[2], linewidth=0.8,
-        alpha=0.7, label=f'Diabetes (n={len(dia_ages)})',
+        alpha=0.7, label=f'Diabetes',
     )
 
     fill_hyp = (*light_colors[1], VIOLIN_FILL_ALPHA)
     ax.bar(
         bin_centers, -hyp_counts, width=bin_width * 0.9,
         color=fill_hyp, edgecolor=dark_colors[1], linewidth=0.8,
-        alpha=0.7, label=f'Hypertension (n={len(hyp_ages)})',
+        alpha=0.7, label=f'Hypertension',
     )
 
     # --- Dividing line at y=0 ---
@@ -700,14 +710,7 @@ def create_participant_density_by_group(
         return
 
     group_order = ['Control', 'Hypertension', 'Diabetes']
-    base_colors = [COLOR_CONTROL, COLOR_HYPERTENSION, COLOR_DIABETES]
-    light_colors = []
-    dark_colors = []
-    for base in base_colors:
-        pal = create_monochromatic_palette(base, n_colors=5)
-        pal = adjust_brightness_of_colors(pal, brightness_scale=0.1)
-        light_colors.append(pal[4])
-        dark_colors.append(pal[1])
+    light_colors, dark_colors = _get_group_colors()
 
     fig, ax = plt.subplots(figsize=(4, 2.5))
     for i, grp in enumerate(group_order):
@@ -730,7 +733,7 @@ def create_participant_density_by_group(
             fill=False,
             color=dark_colors[i],
             linewidth=1.2,
-            label=f'{grp} (n={len(subset)})',
+            label=f'{grp}',
         )
 
     if source_sans:
@@ -801,14 +804,7 @@ def create_participant_count_density_by_group(
         return
 
     group_order = ['Control', 'Hypertension', 'Diabetes']
-    base_colors = [COLOR_CONTROL, COLOR_HYPERTENSION, COLOR_DIABETES]
-    light_colors = []
-    dark_colors = []
-    for base in base_colors:
-        pal = create_monochromatic_palette(base, n_colors=5)
-        pal = adjust_brightness_of_colors(pal, brightness_scale=0.1)
-        light_colors.append(pal[4])
-        dark_colors.append(pal[1])
+    light_colors, dark_colors = _get_group_colors()
 
     # Evaluation grid spanning all ages
     age_values = plot_df['Age']
@@ -827,7 +823,7 @@ def create_participant_count_density_by_group(
         fill_color = (*light_colors[i], VIOLIN_FILL_ALPHA)
         ax.fill_between(x_grid, y, color=fill_color)
         ax.plot(x_grid, y, color=dark_colors[i], linewidth=1.2,
-                label=f'{grp} (n={n})')
+                label=f'{grp}')
 
     if source_sans:
         ax.set_title('Age count-density by group', fontproperties=source_sans_title)
@@ -907,14 +903,7 @@ def create_disease_histogram(
     bins = np.arange(bin_start, bin_end + 5, 5)
 
     # Light / dark palettes (indices 1=hyp, 2=dia)
-    base_colors = [COLOR_CONTROL, COLOR_HYPERTENSION, COLOR_DIABETES]
-    light_colors = []
-    dark_colors = []
-    for base in base_colors:
-        pal = create_monochromatic_palette(base, n_colors=5)
-        pal = adjust_brightness_of_colors(pal, brightness_scale=0.1)
-        light_colors.append(pal[4])
-        dark_colors.append(pal[1])
+    light_colors, dark_colors = _get_group_colors()
 
     hyp_ages = plot_df[plot_df['Group'] == 'Hypertension']['Age']
     dia_ages = plot_df[plot_df['Group'] == 'Diabetes']['Age']
@@ -926,13 +915,13 @@ def create_disease_histogram(
     ax.hist(
         dia_ages, bins=bins, alpha=0.7,
         color=fill_dia, edgecolor=dark_colors[2], linewidth=0.8,
-        label=f'Diabetes (n={len(dia_ages)})',
+        label=f'Diabetes',
     )
     fill_hyp = (*light_colors[1], VIOLIN_FILL_ALPHA)
     ax.hist(
         hyp_ages, bins=bins, alpha=0.7,
         color=fill_hyp, edgecolor=dark_colors[1], linewidth=0.8,
-        label=f'Hypertension (n={len(hyp_ages)})',
+        label=f'Hypertension',
     )
 
     if source_sans:
@@ -1010,14 +999,7 @@ def create_disease_histogram_alt(
     bin_end = ((age_max // 5) + 1) * 5
     bins = np.arange(bin_start, bin_end + 5, 5)
 
-    base_colors = [COLOR_CONTROL, COLOR_HYPERTENSION, COLOR_DIABETES]
-    light_colors = []
-    dark_colors = []
-    for base in base_colors:
-        pal = create_monochromatic_palette(base, n_colors=5)
-        pal = adjust_brightness_of_colors(pal, brightness_scale=0.1)
-        light_colors.append(pal[4])
-        dark_colors.append(pal[1])
+    light_colors, dark_colors = _get_group_colors()
 
     hyp_ages = plot_df[plot_df['Group'] == 'Hypertension']['Age']
     dia_ages = plot_df[plot_df['Group'] == 'Diabetes']['Age']
@@ -1029,13 +1011,13 @@ def create_disease_histogram_alt(
     ax.hist(
         hyp_ages, bins=bins, alpha=0.7,
         color=fill_hyp, edgecolor=dark_colors[1], linewidth=0.8,
-        label=f'Hypertension (n={len(hyp_ages)})',
+        label=f'Hypertension',
     )
     fill_dia = (*light_colors[2], VIOLIN_FILL_ALPHA)
     ax.hist(
         dia_ages, bins=bins, alpha=0.7,
         color=fill_dia, edgecolor=dark_colors[2], linewidth=0.8,
-        label=f'Diabetes (n={len(dia_ages)})',
+        label=f'Diabetes',
     )
 
     if source_sans:
@@ -1115,17 +1097,16 @@ def create_control_histogram(
     bins = np.arange(bin_start, bin_end + 5, 5)
 
     # Light / dark palette for control (index 0)
-    pal = create_monochromatic_palette(COLOR_CONTROL, n_colors=5)
-    pal = adjust_brightness_of_colors(pal, brightness_scale=0.1)
-    light = pal[4]
-    dark = pal[1]
+    light_colors, dark_colors = _get_group_colors()
+    light = light_colors[0]
+    dark = dark_colors[0]
 
     fig, ax = plt.subplots(figsize=(4, 2.5))
     fill_color = (*light, VIOLIN_FILL_ALPHA)
     ax.hist(
         age_values, bins=bins,
         color=fill_color, edgecolor=dark, linewidth=0.8,
-        label=f'Control (n={len(control_df)})',
+        label=f'Control',
     )
 
     if source_sans:
@@ -1219,17 +1200,17 @@ def create_single_group_histogram(
 
     age_values = group_df['Age']
 
-    pal = create_monochromatic_palette(color_map[group], n_colors=5)
-    pal = adjust_brightness_of_colors(pal, brightness_scale=0.1)
-    light = pal[4]
-    dark = pal[1]
+    group_idx = {'Control': 0, 'Hypertension': 1, 'Diabetes': 2}[group]
+    light_colors, dark_colors = _get_group_colors()
+    light = light_colors[group_idx]
+    dark = dark_colors[group_idx]
 
     fig, ax = plt.subplots(figsize=(4, 2.5))
     fill_color = (*light, VIOLIN_FILL_ALPHA)
     ax.hist(
         age_values, bins=bins,
         color=fill_color, edgecolor=dark, linewidth=0.8,
-        label=f'{group} (n={len(group_df)})',
+        label=f'{group}',
     )
 
     if shared_ylim is not None:

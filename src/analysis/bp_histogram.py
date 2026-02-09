@@ -258,6 +258,26 @@ COLOR_HYPERTENSION = '#d62728'
 COLOR_DIABETES = '#ff7f0e'
 FILL_ALPHA = 0.6
 
+# Palette indices – Control uses a darker shade for grayscale visibility
+_LIGHT_IDX_CONTROL = 2
+_DARK_IDX_CONTROL = 0
+_LIGHT_IDX_DEFAULT = 4
+_DARK_IDX_DEFAULT = 1
+
+
+def _get_group_colors():
+    """Return (light_colors, dark_colors) in Control / Hypertension / Diabetes order."""
+    base_colors = [COLOR_CONTROL, COLOR_HYPERTENSION, COLOR_DIABETES]
+    light_idx = [_LIGHT_IDX_CONTROL, _LIGHT_IDX_DEFAULT, _LIGHT_IDX_DEFAULT]
+    dark_idx = [_DARK_IDX_CONTROL, _DARK_IDX_DEFAULT, _DARK_IDX_DEFAULT]
+    light_colors, dark_colors = [], []
+    for i, base in enumerate(base_colors):
+        pal = create_monochromatic_palette(base, n_colors=5)
+        pal = adjust_brightness_of_colors(pal, brightness_scale=0.1)
+        light_colors.append(pal[light_idx[i]])
+        dark_colors.append(pal[dark_idx[i]])
+    return light_colors, dark_colors
+
 
 def _assign_group(row: pd.Series) -> str:
     """Assign group label from SET."""
@@ -344,10 +364,10 @@ def create_bp_group_histogram(
         bin_end = ((bp_max // 10) + 1) * 10
         bins = np.arange(bin_start, bin_end + 10, 10)
 
-    pal = create_monochromatic_palette(color_map[group], n_colors=5)
-    pal = adjust_brightness_of_colors(pal, brightness_scale=0.1)
-    light = pal[4]
-    dark = pal[1]
+    group_idx = {'Control': 0, 'Hypertension': 1, 'Diabetes': 2}[group]
+    light_colors, dark_colors = _get_group_colors()
+    light = light_colors[group_idx]
+    dark = dark_colors[group_idx]
 
     fig, ax = plt.subplots(figsize=(4, 2.5))
     fill_color = (*light, FILL_ALPHA)
@@ -421,14 +441,7 @@ def create_bp_all_groups_histogram(
     bins = np.arange(bin_start, bin_end + 10, 10)
 
     group_order = ['Control', 'Hypertension', 'Diabetes']
-    base_colors = [COLOR_CONTROL, COLOR_HYPERTENSION, COLOR_DIABETES]
-    light_colors = []
-    dark_colors = []
-    for base in base_colors:
-        pal = create_monochromatic_palette(base, n_colors=5)
-        pal = adjust_brightness_of_colors(pal, brightness_scale=0.1)
-        light_colors.append(pal[4])
-        dark_colors.append(pal[1])
+    light_colors, dark_colors = _get_group_colors()
 
     fig, ax = plt.subplots(figsize=(4, 2.5))
     for i, grp in enumerate(group_order):
@@ -525,10 +538,10 @@ def create_bp_group_histogram_horizontal(
         bin_end = ((bp_max // 10) + 1) * 10
         bins = np.arange(bin_start, bin_end + 10, 10)
 
-    pal = create_monochromatic_palette(color_map[group], n_colors=5)
-    pal = adjust_brightness_of_colors(pal, brightness_scale=0.1)
-    light = pal[4]
-    dark = pal[1]
+    group_idx = {'Control': 0, 'Hypertension': 1, 'Diabetes': 2}[group]
+    light_colors, dark_colors = _get_group_colors()
+    light = light_colors[group_idx]
+    dark = dark_colors[group_idx]
 
     fig, ax = plt.subplots(figsize=(4, 2.5))
     fill_color = (*light, FILL_ALPHA)
@@ -602,14 +615,7 @@ def create_bp_all_groups_histogram_horizontal(
     bins = np.arange(bin_start, bin_end + 10, 10)
 
     group_order = ['Control', 'Hypertension', 'Diabetes']
-    base_colors = [COLOR_CONTROL, COLOR_HYPERTENSION, COLOR_DIABETES]
-    light_colors = []
-    dark_colors = []
-    for base in base_colors:
-        pal = create_monochromatic_palette(base, n_colors=5)
-        pal = adjust_brightness_of_colors(pal, brightness_scale=0.1)
-        light_colors.append(pal[4])
-        dark_colors.append(pal[1])
+    light_colors, dark_colors = _get_group_colors()
 
     fig, ax = plt.subplots(figsize=(4, 2.5))
     for i, grp in enumerate(group_order):

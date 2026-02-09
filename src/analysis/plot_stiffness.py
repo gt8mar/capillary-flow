@@ -56,14 +56,19 @@ def apply_font(ax, source_sans):
             ax.title.set_fontproperties(source_sans)
 
 
-def save_figure(fig, output_dir: str, filename: str, dpi: int = 300):
+def save_figure(fig, output_dir: str, filename: str, dpi: int = 300,
+                minimal_dir: Optional[str] = None):
     """Save figure as both PDF and PNG.
+    
+    If minimal_dir is set, also saves a copy with title and legend removed
+    to minimal_dir using the same filename (for figure assembly).
     
     Args:
         fig: matplotlib figure object
         output_dir: Directory to save files
         filename: Base filename (without extension)
         dpi: Resolution for PNG (default: 300)
+        minimal_dir: If set, save a no-title/no-legend copy here with same filename.
     """
     # Save PDF
     pdf_path = os.path.join(output_dir, f'{filename}.pdf')
@@ -78,8 +83,27 @@ def save_figure(fig, output_dir: str, filename: str, dpi: int = 300):
     print(f"Saved: {pdf_path}")
     print(f"Saved: {png_path}")
 
+    if minimal_dir is not None:
+        for ax in fig.get_axes():
+            ax.set_title('')
+            leg = ax.get_legend()
+            if leg is not None:
+                leg.set_visible(False)
+            for txt in ax.texts:
+                txt.set_visible(False)
+        os.makedirs(minimal_dir, exist_ok=True)
+        minimal_pdf = os.path.join(minimal_dir, f'{filename}.pdf')
+        fig.savefig(minimal_pdf, dpi=dpi, bbox_inches='tight')
+        minimal_png_dir = os.path.join(minimal_dir, 'png')
+        os.makedirs(minimal_png_dir, exist_ok=True)
+        minimal_png = os.path.join(minimal_png_dir, f'{filename}.png')
+        fig.savefig(minimal_png, dpi=dpi, bbox_inches='tight')
+        print(f"Saved (no annotations): {minimal_pdf}")
+        print(f"Saved (no annotations): {minimal_png}")
 
-def plot_map_by_group(results_df: pd.DataFrame, output_dir: str, figsize: Tuple[float, float] = (2.4, 2.0)):
+
+def plot_map_by_group(results_df: pd.DataFrame, output_dir: str, figsize: Tuple[float, float] = (2.4, 2.0),
+                      minimal_dir: Optional[str] = None):
     """Plot boxplot of MAP by group (Control vs Diabetic).
     
     Panel A: Boxplot showing no difference in MAP between groups.
@@ -118,11 +142,12 @@ def plot_map_by_group(results_df: pd.DataFrame, output_dir: str, figsize: Tuple[
     apply_font(ax, source_sans)
     plt.tight_layout()
     
-    save_figure(fig, output_dir, 'stiffness_fig_MAP_by_group')
+    save_figure(fig, output_dir, 'stiffness_fig_MAP_by_group', minimal_dir=minimal_dir)
     plt.close()
 
 
-def plot_sbp_by_group(results_df: pd.DataFrame, output_dir: str, figsize: Tuple[float, float] = (2.4, 2.0)):
+def plot_sbp_by_group(results_df: pd.DataFrame, output_dir: str, figsize: Tuple[float, float] = (2.4, 2.0),
+                      minimal_dir: Optional[str] = None):
     """Plot boxplot of SBP by group (Control vs Diabetic).
     
     Panel B: Boxplot showing no difference in SBP between groups.
@@ -161,13 +186,14 @@ def plot_sbp_by_group(results_df: pd.DataFrame, output_dir: str, figsize: Tuple[
     apply_font(ax, source_sans)
     plt.tight_layout()
     
-    save_figure(fig, output_dir, 'stiffness_fig_SBP_by_group')
+    save_figure(fig, output_dir, 'stiffness_fig_SBP_by_group', minimal_dir=minimal_dir)
     plt.close()
 
 
 def plot_stiffness_by_group(results_df: pd.DataFrame, output_dir: str, 
                            stiffness_col: str = 'stiffness_coeff_averaged_04_12',
-                           figsize: Tuple[float, float] = (2.4, 2.0)):
+                           figsize: Tuple[float, float] = (2.4, 2.0),
+                           minimal_dir: Optional[str] = None):
     """Plot boxplot of stiffness coefficient by group.
     
     Panel C: Boxplot showing clear difference in stiffness between groups.
@@ -224,7 +250,8 @@ def plot_stiffness_by_group(results_df: pd.DataFrame, output_dir: str,
 
 def plot_stiffness_vs_age(results_df: pd.DataFrame, output_dir: str,
                           stiffness_col: str = 'stiffness_coeff_averaged_04_12',
-                          figsize: Tuple[float, float] = (2.4, 2.0)):
+                          figsize: Tuple[float, float] = (2.4, 2.0),
+                          minimal_dir: Optional[str] = None):
     """Plot stiffness coefficient vs age with regression line.
     
     Shows that age explains variance in stiffness.
@@ -280,13 +307,14 @@ def plot_stiffness_vs_age(results_df: pd.DataFrame, output_dir: str,
         method_label = 'averaged'
     
     filename = f'stiffness_fig_SI_vs_age_{method_label}_{range_label}'
-    save_figure(fig, output_dir, filename)
+    save_figure(fig, output_dir, filename, minimal_dir=minimal_dir)
     plt.close()
 
 
 def plot_stiffness_vs_map(results_df: pd.DataFrame, output_dir: str,
                           stiffness_col: str = 'stiffness_coeff_averaged_04_12',
-                          figsize: Tuple[float, float] = (2.4, 2.0)):
+                          figsize: Tuple[float, float] = (2.4, 2.0),
+                          minimal_dir: Optional[str] = None):
     """Plot stiffness coefficient vs MAP with regression line.
     
     Shows that BP does NOT explain variance in stiffness (slope ~ 0).
@@ -342,13 +370,14 @@ def plot_stiffness_vs_map(results_df: pd.DataFrame, output_dir: str,
         method_label = 'averaged'
     
     filename = f'stiffness_fig_SI_vs_MAP_{method_label}_{range_label}'
-    save_figure(fig, output_dir, filename)
+    save_figure(fig, output_dir, filename, minimal_dir=minimal_dir)
     plt.close()
 
 
 def plot_stiffness_vs_sbp(results_df: pd.DataFrame, output_dir: str,
                           stiffness_col: str = 'stiffness_coeff_averaged_04_12',
-                          figsize: Tuple[float, float] = (2.4, 2.0)):
+                          figsize: Tuple[float, float] = (2.4, 2.0),
+                          minimal_dir: Optional[str] = None):
     """Plot stiffness coefficient vs SBP with regression line.
     
     Shows that BP does NOT explain variance in stiffness (slope ~ 0).
@@ -404,13 +433,14 @@ def plot_stiffness_vs_sbp(results_df: pd.DataFrame, output_dir: str,
         method_label = 'averaged'
     
     filename = f'stiffness_fig_SI_vs_SBP_{method_label}_{range_label}'
-    save_figure(fig, output_dir, filename)
+    save_figure(fig, output_dir, filename, minimal_dir=minimal_dir)
     plt.close()
 
 
 def compare_up_vs_averaged(results_df: pd.DataFrame, output_dir: str,
                            range_label: str = '04_12',
-                           figsize: Tuple[float, float] = (2.4, 2.0)):
+                           figsize: Tuple[float, float] = (2.4, 2.0),
+                           minimal_dir: Optional[str] = None):
     """Compare up-only vs averaged stiffness coefficients.
     
     Scatter plot showing correlation between the two methods.
@@ -467,7 +497,8 @@ def compare_up_vs_averaged(results_df: pd.DataFrame, output_dir: str,
 
 def compare_ranges(results_df: pd.DataFrame, output_dir: str,
                   method: str = 'averaged',
-                  figsize: Tuple[float, float] = (2.4, 2.0)):
+                  figsize: Tuple[float, float] = (2.4, 2.0),
+                  minimal_dir: Optional[str] = None):
     """Compare 0.2-1.2 vs 0.4-1.2 stiffness coefficients.
     
     Scatter plot showing correlation between the two ranges.
@@ -519,7 +550,8 @@ def compare_ranges(results_df: pd.DataFrame, output_dir: str,
 
 def plot_p50_vs_stiffness(results_df: pd.DataFrame, output_dir: str,
                           stiffness_col: str = 'stiffness_coeff_averaged_04_12',
-                          figsize: Tuple[float, float] = (2.4, 2.0)):
+                          figsize: Tuple[float, float] = (2.4, 2.0),
+                          minimal_dir: Optional[str] = None):
     """Plot P50 vs stiffness coefficient to show they tell the same story.
     
     Supplement figure showing P50 as a secondary mechanical metric.
@@ -567,7 +599,8 @@ def plot_p50_vs_stiffness(results_df: pd.DataFrame, output_dir: str,
 
 def plot_ev_lin_vs_stiffness(results_df: pd.DataFrame, output_dir: str,
                              stiffness_col: str = 'stiffness_coeff_averaged_04_12',
-                             figsize: Tuple[float, float] = (2.4, 2.0)):
+                             figsize: Tuple[float, float] = (2.4, 2.0),
+                             minimal_dir: Optional[str] = None):
     """Plot EV_lin vs stiffness coefficient to show they tell the same story.
     
     Supplement figure showing EV_lin as a secondary mechanical metric.
@@ -614,7 +647,8 @@ def plot_ev_lin_vs_stiffness(results_df: pd.DataFrame, output_dir: str,
 
 
 def plot_p50_by_group(results_df: pd.DataFrame, output_dir: str,
-                      figsize: Tuple[float, float] = (2.4, 2.0)):
+                      figsize: Tuple[float, float] = (2.4, 2.0),
+                      minimal_dir: Optional[str] = None):
     """Plot boxplot of P50 by group.
     
     Supplement figure showing P50 separation between groups.
@@ -656,7 +690,8 @@ def plot_p50_by_group(results_df: pd.DataFrame, output_dir: str,
 
 
 def plot_ev_lin_by_group(results_df: pd.DataFrame, output_dir: str,
-                         figsize: Tuple[float, float] = (2.4, 2.0)):
+                         figsize: Tuple[float, float] = (2.4, 2.0),
+                         minimal_dir: Optional[str] = None):
     """Plot boxplot of EV_lin by group.
     
     Supplement figure showing EV_lin separation between groups.
@@ -800,7 +835,8 @@ def calculate_correlations(results_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def plot_composite_stiffness_by_group(results_df: pd.DataFrame, output_dir: str,
-                                     figsize: Tuple[float, float] = (2.4, 2.0)):
+                                     figsize: Tuple[float, float] = (2.4, 2.0),
+                                     minimal_dir: Optional[str] = None):
     """Plot boxplot of composite stiffness by group.
     
     Shows composite stiffness score using classifier weights.
@@ -843,7 +879,8 @@ def plot_composite_stiffness_by_group(results_df: pd.DataFrame, output_dir: str,
 
 def plot_log_stiffness_by_group(results_df: pd.DataFrame, output_dir: str,
                                 stiffness_col: str = 'log_stiffness_coeff_averaged_04_12',
-                                figsize: Tuple[float, float] = (2.4, 2.0)):
+                                figsize: Tuple[float, float] = (2.4, 2.0),
+                                minimal_dir: Optional[str] = None):
     """Plot boxplot of log-transformed stiffness by group."""
     if stiffness_col not in results_df.columns:
         return
@@ -888,7 +925,7 @@ def plot_log_stiffness_by_group(results_df: pd.DataFrame, output_dir: str,
         method_label = 'averaged'
     
     filename = f'stiffness_fig_log_SI_by_group_{method_label}_{range_label}'
-    save_figure(fig, output_dir, filename)
+    save_figure(fig, output_dir, filename, minimal_dir=minimal_dir)
     plt.close()
 
 
@@ -902,12 +939,20 @@ def _ensure_diabetes_bool(results_df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def collect_significance_results(results_df: pd.DataFrame) -> pd.DataFrame:
+def collect_significance_results(results_df: pd.DataFrame,
+                                 results_df_log: Optional[pd.DataFrame] = None) -> pd.DataFrame:
     """Collect all significance test results into a single DataFrame for export.
 
     Includes: group comparisons (Mann-Whitney U), continuous associations
     (Pearson linear regression), and age-adjusted OLS (group p-value, age p-value).
+    If results_df_log is provided and has Age/Diabetes, also adds age-adjusted
+    results for log-velocity stiffness columns (stiffness_coeff_averaged_*_log).
     Saves nothing; returns the DataFrame (caller saves to CSV).
+
+    Args:
+        results_df: Main stiffness results (raw velocity).
+        results_df_log: Optional log-velocity stiffness results; if provided and
+            has Age and Diabetes, age-adjusted rows for _log columns are added.
 
     Returns:
         DataFrame with columns: analysis, test, statistic, p_value, n, n_control, n_diabetic
@@ -1014,12 +1059,41 @@ def collect_significance_results(results_df: pd.DataFrame) -> pd.DataFrame:
             'n_diabetic': None,
         })
 
+    # Age-adjusted results for log-velocity data (if provided)
+    if results_df_log is not None and 'Age' in results_df_log.columns and 'Diabetes' in results_df_log.columns:
+        df_log = _ensure_diabetes_bool(results_df_log)
+        for stiffness_col in ['stiffness_coeff_averaged_04_12_log', 'stiffness_coeff_averaged_02_12_log']:
+            if stiffness_col not in df_log.columns:
+                continue
+            res = age_adjusted_analysis(df_log, stiffness_col, group_col='Diabetes')
+            if 'error' in res:
+                continue
+            rows.append({
+                'analysis': f'{stiffness_col} age-adjusted (group effect)',
+                'test': 'OLS SI ~ Group + Age',
+                'statistic': res.get('group_coef'),
+                'p_value': res['group_pvalue'],
+                'n': res['n'],
+                'n_control': None,
+                'n_diabetic': None,
+            })
+            rows.append({
+                'analysis': f'{stiffness_col} age-adjusted (age effect)',
+                'test': 'OLS SI ~ Group + Age',
+                'statistic': res.get('age_coef'),
+                'p_value': res['age_pvalue'],
+                'n': res['n'],
+                'n_control': None,
+                'n_diabetic': None,
+            })
+
     return pd.DataFrame(rows)
 
 
 def plot_age_adjusted_analysis(results_df: pd.DataFrame, output_dir: str,
                                stiffness_col: str = 'stiffness_coeff_averaged_04_12',
-                               figsize: Tuple[float, float] = (2.4, 2.0)):
+                               figsize: Tuple[float, float] = (2.4, 2.0),
+                               minimal_dir: Optional[str] = None):
     """Plot age-adjusted analysis showing group differences after controlling for age."""
     from src.analysis.stiffness_coeff import age_adjusted_analysis
     
@@ -1092,7 +1166,7 @@ def plot_age_adjusted_analysis(results_df: pd.DataFrame, output_dir: str,
     plt.tight_layout()
     
     filename = f'stiffness_fig_age_adjusted_{stiffness_col}'
-    save_figure(fig, output_dir, filename)
+    save_figure(fig, output_dir, filename, minimal_dir=minimal_dir)
     plt.close()
 
 
@@ -1110,21 +1184,23 @@ def main():
     results_df = pd.read_csv(stiffness_file)
     print(f"Loaded stiffness results for {len(results_df)} participants")
     
-    # Create output directory
+    # Create output directory and minimal (no annotations) subfolder
     output_dir = os.path.join(cap_flow_path, 'results', 'Stiffness', 'plots')
     os.makedirs(output_dir, exist_ok=True)
-    
+    minimal_dir = os.path.join(output_dir, 'no_annotations')
+    os.makedirs(minimal_dir, exist_ok=True)
+
     # Generate main figures
     print("\nGenerating main figures...")
-    plot_map_by_group(results_df, output_dir)
-    plot_sbp_by_group(results_df, output_dir)
+    plot_map_by_group(results_df, output_dir, minimal_dir=minimal_dir)
+    plot_sbp_by_group(results_df, output_dir, minimal_dir=minimal_dir)
     
     # Generate stiffness by group plots for different methods/ranges
     for method in ['up', 'averaged']:
         for range_label in ['04_12', '02_12']:
             col = f'stiffness_coeff_{method}_{range_label}'
             if col in results_df.columns:
-                plot_stiffness_by_group(results_df, output_dir, stiffness_col=col)
+                plot_stiffness_by_group(results_df, output_dir, stiffness_col=col, minimal_dir=minimal_dir)
     
     # Generate regression plots
     print("\nGenerating regression plots...")
@@ -1132,31 +1208,31 @@ def main():
         for range_label in ['04_12', '02_12']:
             col = f'stiffness_coeff_{method}_{range_label}'
             if col in results_df.columns:
-                plot_stiffness_vs_age(results_df, output_dir, stiffness_col=col)
-                plot_stiffness_vs_map(results_df, output_dir, stiffness_col=col)
-                plot_stiffness_vs_sbp(results_df, output_dir, stiffness_col=col)
+                plot_stiffness_vs_age(results_df, output_dir, stiffness_col=col, minimal_dir=minimal_dir)
+                plot_stiffness_vs_map(results_df, output_dir, stiffness_col=col, minimal_dir=minimal_dir)
+                plot_stiffness_vs_sbp(results_df, output_dir, stiffness_col=col, minimal_dir=minimal_dir)
     
     # Generate comparison plots
     print("\nGenerating comparison plots...")
     for range_label in ['04_12', '02_12']:
-        compare_up_vs_averaged(results_df, output_dir, range_label=range_label)
+        compare_up_vs_averaged(results_df, output_dir, range_label=range_label, minimal_dir=minimal_dir)
     
     for method in ['up', 'averaged']:
-        compare_ranges(results_df, output_dir, method=method)
+        compare_ranges(results_df, output_dir, method=method, minimal_dir=minimal_dir)
     
     # Generate supplement figures for secondary metrics
     print("\nGenerating supplement figures...")
     if 'P50' in results_df.columns:
-        plot_p50_vs_stiffness(results_df, output_dir)
-        plot_p50_by_group(results_df, output_dir)
+        plot_p50_vs_stiffness(results_df, output_dir, minimal_dir=minimal_dir)
+        plot_p50_by_group(results_df, output_dir, minimal_dir=minimal_dir)
     if 'EV_lin' in results_df.columns:
-        plot_ev_lin_vs_stiffness(results_df, output_dir)
-        plot_ev_lin_by_group(results_df, output_dir)
+        plot_ev_lin_vs_stiffness(results_df, output_dir, minimal_dir=minimal_dir)
+        plot_ev_lin_by_group(results_df, output_dir, minimal_dir=minimal_dir)
     
     # Generate composite stiffness plots
     print("\nGenerating composite stiffness plots...")
     if 'composite_stiffness' in results_df.columns:
-        plot_composite_stiffness_by_group(results_df, output_dir)
+        plot_composite_stiffness_by_group(results_df, output_dir, minimal_dir=minimal_dir)
     
     # Generate log-transformed stiffness plots
     print("\nGenerating log-transformed stiffness plots...")
@@ -1164,23 +1240,20 @@ def main():
                 'log_stiffness_coeff_averaged_04_12', 'log_stiffness_coeff_averaged_02_12',
                 'log_composite_stiffness']:
         if col in results_df.columns:
-            plot_log_stiffness_by_group(results_df, output_dir, stiffness_col=col)
+            plot_log_stiffness_by_group(results_df, output_dir, stiffness_col=col, minimal_dir=minimal_dir)
     
     # Generate age-adjusted analysis plots
     print("\nGenerating age-adjusted analysis plots...")
     for stiffness_col in ['stiffness_coeff_averaged_04_12', 'stiffness_coeff_averaged_02_12', 'composite_stiffness']:
         if stiffness_col in results_df.columns:
-            plot_age_adjusted_analysis(results_df, output_dir, stiffness_col=stiffness_col)
+            plot_age_adjusted_analysis(results_df, output_dir, stiffness_col=stiffness_col, minimal_dir=minimal_dir)
     
-    # Generate age-adjusted analysis plots for log velocity data
-    print("\nGenerating age-adjusted analysis plots for log velocity...")
+    # Load log velocity results if present (for plots and for significance CSV)
+    results_df_log = None
     log_stiffness_file = os.path.join(cap_flow_path, 'results', 'Stiffness', 'stiffness_coefficients_log.csv')
     if os.path.exists(log_stiffness_file):
         results_df_log = pd.read_csv(log_stiffness_file)
         print(f"Loaded log velocity stiffness results for {len(results_df_log)} participants")
-        
-        # Check if Age and Diabetes are already in the log results (they should be from calculate_stiffness_metrics)
-        # If not, merge with age and diabetes data from main results
         if 'Age' not in results_df_log.columns or 'Diabetes' not in results_df_log.columns:
             if 'Age' in results_df.columns and 'Diabetes' in results_df.columns:
                 age_diabetes = results_df[['Participant', 'Age', 'Diabetes']].copy()
@@ -1189,15 +1262,16 @@ def main():
             else:
                 print("Warning: Age and Diabetes columns not found. Skipping log velocity age-adjusted plots.")
                 results_df_log = None
-        
-        if results_df_log is not None and 'Age' in results_df_log.columns and 'Diabetes' in results_df_log.columns:
-            # Use the log velocity stiffness metrics (not the log-transformed ones)
-            for stiffness_col in ['stiffness_coeff_averaged_04_12_log', 'stiffness_coeff_averaged_02_12_log']:
-                if stiffness_col in results_df_log.columns:
-                    plot_age_adjusted_analysis(results_df_log, output_dir, stiffness_col=stiffness_col)
-        else:
-            print("Warning: Age and Diabetes data not available for log velocity results. Skipping age-adjusted plots.")
-    
+
+    # Generate age-adjusted analysis plots for log velocity data
+    print("\nGenerating age-adjusted analysis plots for log velocity...")
+    if results_df_log is not None and 'Age' in results_df_log.columns and 'Diabetes' in results_df_log.columns:
+        for stiffness_col in ['stiffness_coeff_averaged_04_12_log', 'stiffness_coeff_averaged_02_12_log']:
+            if stiffness_col in results_df_log.columns:
+                plot_age_adjusted_analysis(results_df_log, output_dir, stiffness_col=stiffness_col, minimal_dir=minimal_dir)
+    else:
+        print("Warning: Age and Diabetes data not available for log velocity results. Skipping age-adjusted plots.")
+
     # Calculate and save correlation table
     print("\nCalculating correlations...")
     corr_df = calculate_correlations(results_df)
@@ -1207,9 +1281,9 @@ def main():
     print("\nCorrelation Summary:")
     print(corr_df.to_string())
 
-    # Collect and save all significance test results
+    # Collect and save all significance test results (main + log velocity age-adjusted)
     print("\nCollecting significance results...")
-    sig_df = collect_significance_results(results_df)
+    sig_df = collect_significance_results(results_df, results_df_log=results_df_log)
     sig_file = os.path.join(output_dir, 'stiffness_significance.csv')
     sig_df.to_csv(sig_file, index=False)
     print(f"Saved significance results to: {sig_file}")
