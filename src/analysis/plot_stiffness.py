@@ -878,7 +878,7 @@ def plot_composite_stiffness_by_group(results_df: pd.DataFrame, output_dir: str,
 
 
 def plot_log_stiffness_by_group(results_df: pd.DataFrame, output_dir: str,
-                                stiffness_col: str = 'log_stiffness_coeff_averaged_04_12',
+                                stiffness_col: str = 'SI_log1p_averaged_04_12',
                                 figsize: Tuple[float, float] = (2.4, 2.0),
                                 minimal_dir: Optional[str] = None):
     """Plot boxplot of log-transformed stiffness by group."""
@@ -929,6 +929,70 @@ def plot_log_stiffness_by_group(results_df: pd.DataFrame, output_dir: str,
     plt.close()
 
 
+def _plot_group_boxplot(ax, df_plot: pd.DataFrame, y_col: str, ylabel: str, title: str) -> None:
+    """Shared helper for group boxplots with scatter and p-value."""
+    box_colors = [CONTROL_COLOR, DIABETES_COLOR]
+    sns.boxplot(data=df_plot, x='Group', y=y_col, ax=ax, palette=box_colors, width=0.6)
+    for i, group in enumerate(['Control', 'Diabetic']):
+        group_data = df_plot[df_plot['Group'] == group][y_col]
+        x_pos = i + np.random.normal(0, 0.05, len(group_data))
+        ax.scatter(x_pos, group_data, alpha=0.4, s=10, color='gray', zorder=3)
+    control_vals = df_plot[df_plot['Group'] == 'Control'][y_col]
+    diabetic_vals = df_plot[df_plot['Group'] == 'Diabetic'][y_col]
+    if len(control_vals) > 0 and len(diabetic_vals) > 0:
+        stat, pval = stats.mannwhitneyu(control_vals, diabetic_vals, alternative='two-sided')
+        ax.text(0.5, 0.95, f'p = {pval:.4f}', transform=ax.transAxes,
+                ha='center', va='top', fontsize=6, fontproperties=source_sans if source_sans else None,
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+    ax.set_xlabel('Group', fontproperties=source_sans if source_sans else None)
+    ax.set_ylabel(ylabel, fontproperties=source_sans if source_sans else None)
+    ax.set_title(title, fontproperties=source_sans if source_sans else None)
+    apply_font(ax, source_sans)
+
+
+def plot_log_metric_comparison_by_group(results_df: pd.DataFrame,
+                                        results_df_log: pd.DataFrame,
+                                        output_dir: str,
+                                        range_label: str = '04_12',
+                                        figsize: Tuple[float, float] = (4.8, 2.0),
+                                        minimal_dir: Optional[str] = None):
+    """Compare SI_log1p (log of AUC of raw velocity) vs SI_logvel (AUC of log velocity) by group.
+
+    Args:
+        results_df: Main stiffness results (contains SI_log1p_* columns).
+        results_df_log: Log-velocity stiffness results (contains SI_logvel_* columns).
+        output_dir: Directory to save figures.
+        range_label: Pressure range label ('04_12' or '02_12').
+        figsize: Figure size for the side-by-side panels.
+        minimal_dir: If set, save a no-title/no-legend copy here.
+    """
+    metrics = []
+    log1p_col = f'SI_log1p_averaged_{range_label}'
+    if log1p_col in results_df.columns:
+        df_raw = _ensure_diabetes_bool(results_df)
+        df_plot = df_raw[[log1p_col, 'Diabetes']].dropna().copy()
+        df_plot['Group'] = df_plot['Diabetes'].map({True: 'Diabetic', False: 'Control'})
+        metrics.append((df_plot, log1p_col, 'SI_log1p', 'log1p(AUC raw vel)'))
+    logvel_col = f'SI_logvel_averaged_{range_label}'
+    if results_df_log is not None and logvel_col in results_df_log.columns:
+        df_log = _ensure_diabetes_bool(results_df_log)
+        df_plot = df_log[[logvel_col, 'Diabetes']].dropna().copy()
+        df_plot['Group'] = df_plot['Diabetes'].map({True: 'Diabetic', False: 'Control'})
+        metrics.append((df_plot, logvel_col, 'SI_logvel', 'AUC of log velocity'))
+
+    if len(metrics) == 0:
+        return
+
+    fig, axes = plt.subplots(1, len(metrics), figsize=figsize, squeeze=False)
+    for idx, (df_plot, col, ylabel, title) in enumerate(metrics):
+        _plot_group_boxplot(axes[0, idx], df_plot, col, ylabel, title)
+
+    plt.tight_layout()
+    filename = f'stiffness_fig_log_metric_compare_by_group_{range_label}'
+    save_figure(fig, output_dir, filename, minimal_dir=minimal_dir)
+    plt.close()
+
+
 def _ensure_diabetes_bool(results_df: pd.DataFrame) -> pd.DataFrame:
     """Ensure Diabetes column is boolean for group comparisons."""
     df = results_df.copy()
@@ -946,13 +1010,12 @@ def collect_significance_results(results_df: pd.DataFrame,
     Includes: group comparisons (Mann-Whitney U), continuous associations
     (Pearson linear regression), and age-adjusted OLS (group p-value, age p-value).
     If results_df_log is provided and has Age/Diabetes, also adds age-adjusted
-    results for log-velocity stiffness columns (stiffness_coeff_averaged_*_log).
+    results for SI_logvel_* columns.
     Saves nothing; returns the DataFrame (caller saves to CSV).
 
     Args:
-        results_df: Main stiffness results (raw velocity).
-        results_df_log: Optional log-velocity stiffness results; if provided and
-            has Age and Diabetes, age-adjusted rows for _log columns are added.
+        results_df: Main stiffness results (raw velocity, contains SI_log1p_* columns).
+        results_df_log: Optional log-velocity stiffness results (contains SI_logvel_* columns).
 
     Returns:
         DataFrame with columns: analysis, test, statistic, p_value, n, n_control, n_diabetic
@@ -963,9 +1026,9 @@ def collect_significance_results(results_df: pd.DataFrame,
     rows = []
     df = _ensure_diabetes_bool(results_df)
 
-    def _mw_group(col_name: str, var_col: str, label: str) -> None:
-        control = df[(df['Diabetes'] == False) & (df[var_col].notna())][var_col]
-        diabetic = df[(df['Diabetes'] == True) & (df[var_col].notna())][var_col]
+    def _mw_group(df_context: pd.DataFrame, var_col: str, label: str) -> None:
+        control = df_context[(df_context['Diabetes'] == False) & (df_context[var_col].notna())][var_col]
+        diabetic = df_context[(df_context['Diabetes'] == True) & (df_context[var_col].notna())][var_col]
         if len(control) > 0 and len(diabetic) > 0:
             stat, p = stats.mannwhitneyu(control, diabetic, alternative='two-sided')
             rows.append({
@@ -997,28 +1060,28 @@ def collect_significance_results(results_df: pd.DataFrame,
 
     # Group comparisons
     if 'MAP' in df.columns:
-        _mw_group('MAP', 'MAP', 'MAP by group (Control vs Diabetic)')
+        _mw_group(df, 'MAP', 'MAP by group (Control vs Diabetic)')
     if 'SYS_BP' in df.columns:
-        _mw_group('SYS_BP', 'SYS_BP', 'SBP by group (Control vs Diabetic)')
+        _mw_group(df, 'SYS_BP', 'SBP by group (Control vs Diabetic)')
 
     for col in ['stiffness_coeff_up_04_12', 'stiffness_coeff_up_02_12',
                 'stiffness_coeff_averaged_04_12', 'stiffness_coeff_averaged_02_12']:
         if col in df.columns:
-            _mw_group(col, col, f'{col} by group (Control vs Diabetic)')
+            _mw_group(df, col, f'{col} by group (Control vs Diabetic)')
 
     if 'P50' in df.columns:
-        _mw_group('P50', 'P50', 'P50 by group (Control vs Diabetic)')
+        _mw_group(df, 'P50', 'P50 by group (Control vs Diabetic)')
     if 'EV_lin' in df.columns:
-        _mw_group('EV_lin', 'EV_lin', 'EV_lin by group (Control vs Diabetic)')
+        _mw_group(df, 'EV_lin', 'EV_lin by group (Control vs Diabetic)')
     if 'composite_stiffness' in df.columns:
-        _mw_group('composite_stiffness', 'composite_stiffness',
+        _mw_group(df, 'composite_stiffness',
                   'composite_stiffness by group (Control vs Diabetic)')
 
-    for log_col in ['log_stiffness_coeff_up_04_12', 'log_stiffness_coeff_up_02_12',
-                    'log_stiffness_coeff_averaged_04_12', 'log_stiffness_coeff_averaged_02_12',
-                    'log_composite_stiffness']:
+    for log_col in ['SI_log1p_up_04_12', 'SI_log1p_up_02_12',
+                    'SI_log1p_averaged_04_12', 'SI_log1p_averaged_02_12',
+                    'SI_log1p_composite']:
         if log_col in df.columns:
-            _mw_group(log_col, log_col, f'{log_col} by group (Control vs Diabetic)')
+            _mw_group(df, log_col, f'{log_col} by group (Control vs Diabetic)')
 
     # Continuous associations (SI vs Age, MAP, SBP)
     for col in ['stiffness_coeff_up_04_12', 'stiffness_coeff_up_02_12',
@@ -1059,10 +1122,17 @@ def collect_significance_results(results_df: pd.DataFrame,
             'n_diabetic': None,
         })
 
-    # Age-adjusted results for log-velocity data (if provided)
+    # Age-adjusted results for log-velocity AUC data (SI_logvel_*)
     if results_df_log is not None and 'Age' in results_df_log.columns and 'Diabetes' in results_df_log.columns:
         df_log = _ensure_diabetes_bool(results_df_log)
-        for stiffness_col in ['stiffness_coeff_averaged_04_12_log', 'stiffness_coeff_averaged_02_12_log']:
+        # Group comparisons for SI_logvel columns
+        for logvel_col in ['SI_logvel_up_04_12', 'SI_logvel_up_02_12',
+                           'SI_logvel_averaged_04_12', 'SI_logvel_averaged_02_12']:
+            if logvel_col in df_log.columns:
+                _mw_group(df_log, logvel_col, f'{logvel_col} by group (Control vs Diabetic)')
+
+        # Age-adjusted analysis for SI_logvel columns
+        for stiffness_col in ['SI_logvel_averaged_04_12', 'SI_logvel_averaged_02_12']:
             if stiffness_col not in df_log.columns:
                 continue
             res = age_adjusted_analysis(df_log, stiffness_col, group_col='Diabetes')
@@ -1141,17 +1211,21 @@ def plot_age_adjusted_analysis(results_df: pd.DataFrame, output_dir: str,
             fontproperties=source_sans if source_sans else None,
             bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
     
-    # Determine range label and whether it's log velocity
-    is_log = '_log' in stiffness_col or 'log_' in stiffness_col
+    # Determine range label and metric type
+    is_logvel = stiffness_col.startswith('SI_logvel_')
+    is_log1p = stiffness_col.startswith('SI_log1p_')
     if '02_12' in stiffness_col:
         range_label = '0.2-1.2'
     else:
         range_label = '0.4-1.2'
     
-    # Set labels based on whether it's log velocity
-    if is_log:
-        ylabel = f'Log Stiffness Index (log SI_AUC)'
-        title = f'Age-Adjusted Group Comparison (Log Velocity, {range_label} psi)'
+    # Set labels based on metric type
+    if is_logvel:
+        ylabel = 'SI_logvel (AUC of log velocity)'
+        title = f'Age-Adjusted (SI_logvel, {range_label} psi)'
+    elif is_log1p:
+        ylabel = 'SI_log1p (log(AUC + 1))'
+        title = f'Age-Adjusted (SI_log1p, {range_label} psi)'
     else:
         ylabel = 'Stiffness Index (SI_AUC)'
         title = f'Age-Adjusted Group Comparison ({range_label} psi)'
@@ -1168,6 +1242,201 @@ def plot_age_adjusted_analysis(results_df: pd.DataFrame, output_dir: str,
     filename = f'stiffness_fig_age_adjusted_{stiffness_col}'
     save_figure(fig, output_dir, filename, minimal_dir=minimal_dir)
     plt.close()
+
+
+def _plot_age_adjusted_panel(ax, df_plot: pd.DataFrame, stiffness_col: str,
+                             title: str, ylabel: str) -> None:
+    """Plot age-adjusted scatter with group lines and p-value annotation."""
+    from src.analysis.stiffness_coeff import age_adjusted_analysis
+
+    df_plot = df_plot[[stiffness_col, 'Diabetes', 'Age']].dropna().copy()
+    if df_plot.empty:
+        return
+    df_plot['Group'] = df_plot['Diabetes'].map({True: 'Diabetic', False: 'Control'})
+
+    age_results = age_adjusted_analysis(df_plot, stiffness_col, group_col='Diabetes')
+    if 'error' in age_results:
+        return
+
+    for group, color in [('Control', CONTROL_COLOR), ('Diabetic', DIABETES_COLOR)]:
+        group_data = df_plot[df_plot['Group'] == group]
+        ax.scatter(group_data['Age'], group_data[stiffness_col],
+                   alpha=0.6, s=20, color=color, label=group, zorder=3)
+        if len(group_data) > 2:
+            x = group_data['Age'].values
+            y = group_data[stiffness_col].values
+            slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
+            x_line = np.linspace(x.min(), x.max(), 100)
+            y_line = slope * x_line + intercept
+            ax.plot(x_line, y_line, '--', linewidth=1, alpha=0.7, color=color)
+
+    ax.text(0.05, 0.95,
+            f'Age-adjusted p = {age_results["group_pvalue"]:.4f}\n'
+            f'R² = {age_results["r_squared"]:.3f}',
+            transform=ax.transAxes, ha='left', va='top', fontsize=6,
+            fontproperties=source_sans if source_sans else None,
+            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+    ax.set_xlabel('Age (years)', fontproperties=source_sans if source_sans else None)
+    ax.set_ylabel(ylabel, fontproperties=source_sans if source_sans else None)
+    ax.set_title(title, fontproperties=source_sans if source_sans else None)
+    ax.legend(loc='best', fontsize=5, prop=source_sans if source_sans else None)
+    ax.grid(True, alpha=0.3)
+    apply_font(ax, source_sans)
+
+
+def plot_log_metric_comparison_age_adjusted(results_df: pd.DataFrame,
+                                            results_df_log: pd.DataFrame,
+                                            output_dir: str,
+                                            range_label: str = '04_12',
+                                            figsize: Tuple[float, float] = (4.8, 2.0),
+                                            minimal_dir: Optional[str] = None):
+    """Compare age-adjusted trends for SI_log1p vs SI_logvel.
+
+    Args:
+        results_df: Main stiffness results (contains SI_log1p_* columns).
+        results_df_log: Log-velocity stiffness results (contains SI_logvel_* columns).
+        output_dir: Directory to save figures.
+        range_label: Pressure range label ('04_12' or '02_12').
+        figsize: Figure size for the side-by-side panels.
+        minimal_dir: If set, save a no-title/no-legend copy here.
+    """
+    if results_df_log is None:
+        return
+
+    # Build a merged frame that has both metrics + Age/Diabetes
+    keep_cols = ['Participant', 'Age', 'Diabetes']
+    log1p_col = f'SI_log1p_averaged_{range_label}'
+    if log1p_col in results_df.columns:
+        keep_cols.append(log1p_col)
+    df_merge = results_df[keep_cols].merge(
+        results_df_log, on='Participant', how='inner', suffixes=('', '_logdf')
+    )
+    # Resolve any duplicate Age/Diabetes columns
+    for c in ['Age', 'Diabetes']:
+        dup = f'{c}_logdf'
+        if dup in df_merge.columns:
+            df_merge.drop(columns=[dup], inplace=True)
+
+    metrics = []
+    if log1p_col in df_merge.columns:
+        metrics.append((log1p_col, 'SI_log1p', 'log1p(AUC raw vel)'))
+    logvel_col = f'SI_logvel_averaged_{range_label}'
+    if logvel_col in df_merge.columns:
+        metrics.append((logvel_col, 'SI_logvel', 'AUC of log velocity'))
+
+    if len(metrics) == 0:
+        return
+
+    fig, axes = plt.subplots(1, len(metrics), figsize=figsize, squeeze=False)
+    for idx, (col, ylabel, title) in enumerate(metrics):
+        _plot_age_adjusted_panel(axes[0, idx], df_merge, col, title, ylabel)
+
+    plt.tight_layout()
+    filename = f'stiffness_fig_log_metric_compare_age_adjusted_{range_label}'
+    save_figure(fig, output_dir, filename, minimal_dir=minimal_dir)
+    plt.close()
+
+
+def _cohens_d(control: pd.Series, diabetic: pd.Series) -> Optional[float]:
+    """Compute Cohen's d for two groups."""
+    if len(control) < 2 or len(diabetic) < 2:
+        return np.nan
+    n1, n2 = len(control), len(diabetic)
+    s1, s2 = np.var(control, ddof=1), np.var(diabetic, ddof=1)
+    pooled = ((n1 - 1) * s1 + (n2 - 1) * s2) / (n1 + n2 - 2)
+    if pooled <= 0:
+        return np.nan
+    return float((np.mean(diabetic) - np.mean(control)) / np.sqrt(pooled))
+
+
+def _safe_corr(x: pd.Series, y: pd.Series) -> Optional[float]:
+    """Compute Pearson correlation if data are sufficient."""
+    valid = pd.concat([x, y], axis=1).dropna()
+    if len(valid) < 3:
+        return np.nan
+    return float(valid.corr().iloc[0, 1])
+
+
+def build_log_metric_comparison_table(results_df: pd.DataFrame,
+                                      results_df_log: Optional[pd.DataFrame]) -> pd.DataFrame:
+    """Build a comparison table: SI_log1p vs SI_logvel for each pressure range.
+
+    Args:
+        results_df: Main stiffness results (contains SI_log1p_* columns).
+        results_df_log: Log-velocity stiffness results (contains SI_logvel_* columns).
+
+    Returns:
+        DataFrame with effect sizes, p-values, and velocity-bias flags.
+    """
+    from src.analysis.stiffness_coeff import age_adjusted_analysis
+
+    rows = []
+    for range_label in ['04_12', '02_12']:
+        metric_specs = [
+            ('SI_log1p', results_df, f'SI_log1p_averaged_{range_label}', 'raw'),
+        ]
+        if results_df_log is not None:
+            metric_specs.extend([
+                ('SI_logvel', results_df_log, f'SI_logvel_averaged_{range_label}', 'log'),
+            ])
+
+        for metric_name, df, col, source in metric_specs:
+            if col not in df.columns or 'Diabetes' not in df.columns:
+                continue
+            df_metric = _ensure_diabetes_bool(df)
+            control = df_metric[(df_metric['Diabetes'] == False) & (df_metric[col].notna())][col]
+            diabetic = df_metric[(df_metric['Diabetes'] == True) & (df_metric[col].notna())][col]
+
+            stat, pval = (np.nan, np.nan)
+            if len(control) > 0 and len(diabetic) > 0:
+                stat, pval = stats.mannwhitneyu(control, diabetic, alternative='two-sided')
+
+            age_coef = age_p = r2 = n = np.nan
+            if 'Age' in df_metric.columns:
+                res = age_adjusted_analysis(df_metric, col, group_col='Diabetes')
+                if 'error' not in res:
+                    age_coef = res.get('group_coef')
+                    age_p = res.get('group_pvalue')
+                    r2 = res.get('r_squared')
+                    n = res.get('n')
+
+            corr_04 = corr_12 = np.nan
+            if 'velocity_04' in df_metric.columns and 'velocity_12' in df_metric.columns:
+                corr_04 = _safe_corr(df_metric[col], df_metric['velocity_04'])
+                corr_12 = _safe_corr(df_metric[col], df_metric['velocity_12'])
+            delta = corr_04 - corr_12 if pd.notna(corr_04) and pd.notna(corr_12) else np.nan
+            if pd.isna(delta):
+                bias = None
+            elif delta > 0.05:
+                bias = 'low'
+            elif delta < -0.05:
+                bias = 'high'
+            else:
+                bias = 'balanced'
+
+            rows.append({
+                'metric': metric_name,
+                'range': range_label,
+                'source': source,
+                'n_control': len(control),
+                'n_diabetic': len(diabetic),
+                'mean_control': float(np.mean(control)) if len(control) else np.nan,
+                'mean_diabetic': float(np.mean(diabetic)) if len(diabetic) else np.nan,
+                'median_control': float(np.median(control)) if len(control) else np.nan,
+                'median_diabetic': float(np.median(diabetic)) if len(diabetic) else np.nan,
+                'cohens_d': _cohens_d(control, diabetic),
+                'mwu_stat': stat,
+                'mwu_p': pval,
+                'age_adj_group_coef': age_coef,
+                'age_adj_group_p': age_p,
+                'age_adj_r2': r2,
+                'corr_velocity_04': corr_04,
+                'corr_velocity_12': corr_12,
+                'velocity_bias': bias,
+            })
+
+    return pd.DataFrame(rows)
 
 
 def main():
@@ -1234,11 +1503,11 @@ def main():
     if 'composite_stiffness' in results_df.columns:
         plot_composite_stiffness_by_group(results_df, output_dir, minimal_dir=minimal_dir)
     
-    # Generate log-transformed stiffness plots
+    # Generate log-transformed stiffness plots (SI_log1p)
     print("\nGenerating log-transformed stiffness plots...")
-    for col in ['log_stiffness_coeff_up_04_12', 'log_stiffness_coeff_up_02_12',
-                'log_stiffness_coeff_averaged_04_12', 'log_stiffness_coeff_averaged_02_12',
-                'log_composite_stiffness']:
+    for col in ['SI_log1p_up_04_12', 'SI_log1p_up_02_12',
+                'SI_log1p_averaged_04_12', 'SI_log1p_averaged_02_12',
+                'SI_log1p_composite']:
         if col in results_df.columns:
             plot_log_stiffness_by_group(results_df, output_dir, stiffness_col=col, minimal_dir=minimal_dir)
     
@@ -1263,10 +1532,21 @@ def main():
                 print("Warning: Age and Diabetes columns not found. Skipping log velocity age-adjusted plots.")
                 results_df_log = None
 
-    # Generate age-adjusted analysis plots for log velocity data
-    print("\nGenerating age-adjusted analysis plots for log velocity...")
+    # Generate side-by-side comparisons for log-related metrics
+    print("\nGenerating log metric comparison plots...")
+    if results_df_log is not None:
+        for range_label in ['04_12', '02_12']:
+            plot_log_metric_comparison_by_group(
+                results_df, results_df_log, output_dir, range_label=range_label, minimal_dir=minimal_dir
+            )
+            plot_log_metric_comparison_age_adjusted(
+                results_df, results_df_log, output_dir, range_label=range_label, minimal_dir=minimal_dir
+            )
+
+    # Generate age-adjusted analysis plots for log velocity AUC (SI_logvel)
+    print("\nGenerating age-adjusted analysis plots for SI_logvel...")
     if results_df_log is not None and 'Age' in results_df_log.columns and 'Diabetes' in results_df_log.columns:
-        for stiffness_col in ['stiffness_coeff_averaged_04_12_log', 'stiffness_coeff_averaged_02_12_log']:
+        for stiffness_col in ['SI_logvel_averaged_04_12', 'SI_logvel_averaged_02_12']:
             if stiffness_col in results_df_log.columns:
                 plot_age_adjusted_analysis(results_df_log, output_dir, stiffness_col=stiffness_col, minimal_dir=minimal_dir)
     else:
@@ -1287,6 +1567,13 @@ def main():
     sig_file = os.path.join(output_dir, 'stiffness_significance.csv')
     sig_df.to_csv(sig_file, index=False)
     print(f"Saved significance results to: {sig_file}")
+
+    # Save log metric comparison table
+    print("\nSaving log metric comparison table...")
+    comparison_df = build_log_metric_comparison_table(results_df, results_df_log)
+    comparison_file = os.path.join(cap_flow_path, 'results', 'Stiffness', 'stiffness_metric_comparison.csv')
+    comparison_df.to_csv(comparison_file, index=False)
+    print(f"Saved log metric comparison to: {comparison_file}")
 
     print("\nAll plots generated successfully!")
     return 0

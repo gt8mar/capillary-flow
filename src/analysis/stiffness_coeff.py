@@ -345,7 +345,7 @@ def calculate_stiffness_metrics(df: pd.DataFrame,
             up_pressures, up_velocities, down_pressures, down_velocities,
             pressure_min=0.2, pressure_max=1.2
         )
-        
+
         # Calculate stopping and restart pressures
         stopping_pressure = calculate_stopping_pressure(up_pressures, up_velocities)
         restart_pressure = calculate_restart_pressure(down_pressures, down_velocities)
@@ -661,14 +661,15 @@ def main():
     weights = get_classifier_weights(df, target='Diabetes')
     results_df['composite_stiffness'] = calculate_composite_stiffness(results_df, weights)
     
-    # Calculate log-transformed SI_AUC (log(SI_AUC + 1))
-    for col in ['stiffness_coeff_up_04_12', 'stiffness_coeff_up_02_12',
-                'stiffness_coeff_averaged_04_12', 'stiffness_coeff_averaged_02_12']:
-        if col in results_df.columns:
-            results_df[f'log_{col}'] = np.log1p(results_df[col])  # log1p = log(1 + x)
+    # Calculate log-transformed SI_AUC: SI_log1p = log(SI_AUC + 1)
+    for method in ['up', 'averaged']:
+        for rng in ['04_12', '02_12']:
+            raw_col = f'stiffness_coeff_{method}_{rng}'
+            if raw_col in results_df.columns:
+                results_df[f'SI_log1p_{method}_{rng}'] = np.log1p(results_df[raw_col])
     
     # Also calculate log for composite stiffness
-    results_df['log_composite_stiffness'] = np.log1p(results_df['composite_stiffness'])
+    results_df['SI_log1p_composite'] = np.log1p(results_df['composite_stiffness'])
     
     # Create output directory
     output_dir = os.path.join(cap_flow_path, 'results', 'Stiffness')
@@ -714,29 +715,18 @@ def main():
         print("\nCalculating stiffness coefficients for log velocity...")
         results_df_log = calculate_stiffness_metrics(df, velocity_column='Log_Video_Median_Velocity')
         
-        # Calculate composite stiffness for log velocity
-        weights_log = get_classifier_weights(df, target='Diabetes')
-        results_df_log['composite_stiffness'] = calculate_composite_stiffness(results_df_log, weights_log)
-        
-        # Calculate log-transformed SI_AUC for log velocity
-        for col in ['stiffness_coeff_up_04_12', 'stiffness_coeff_up_02_12',
-                    'stiffness_coeff_averaged_04_12', 'stiffness_coeff_averaged_02_12']:
-            if col in results_df_log.columns:
-                results_df_log[f'log_{col}'] = np.log1p(results_df_log[col])
-        
-        results_df_log['log_composite_stiffness'] = np.log1p(results_df_log['composite_stiffness'])
-        
-        # Rename columns to indicate log velocity
-        results_df_log = results_df_log.rename(columns={
-            'stiffness_coeff_up_04_12': 'stiffness_coeff_up_04_12_log',
-            'stiffness_coeff_up_02_12': 'stiffness_coeff_up_02_12_log',
-            'stiffness_coeff_averaged_04_12': 'stiffness_coeff_averaged_04_12_log',
-            'stiffness_coeff_averaged_02_12': 'stiffness_coeff_averaged_02_12_log',
-            'stopping_pressure': 'stopping_pressure_log',
-            'restart_pressure': 'restart_pressure_log',
-            'composite_stiffness': 'composite_stiffness_log',
-            'log_composite_stiffness': 'log_composite_stiffness_log'
-        })
+        # Rename AUC columns to SI_logvel_* (AUC of log-velocity curve)
+        # These are AUC computed with log(velocity) as input, via the same
+        # trapezoidal integration used for raw velocity.
+        rename_map = {}
+        for method in ['up', 'averaged']:
+            for rng in ['04_12', '02_12']:
+                raw_col = f'stiffness_coeff_{method}_{rng}'
+                if raw_col in results_df_log.columns:
+                    rename_map[raw_col] = f'SI_logvel_{method}_{rng}'
+        rename_map['stopping_pressure'] = 'stopping_pressure_logvel'
+        rename_map['restart_pressure'] = 'restart_pressure_logvel'
+        results_df_log = results_df_log.rename(columns=rename_map)
         
         # Save log velocity results
         output_filepath_log = os.path.join(output_dir, 'stiffness_coefficients_log.csv')
