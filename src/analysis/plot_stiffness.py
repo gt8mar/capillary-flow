@@ -18,6 +18,9 @@ import warnings
 
 # Import paths and font from config
 from src.config import PATHS, load_source_sans
+from src.tools.plotting_utils import create_monochromatic_palette, adjust_brightness_of_colors
+from matplotlib.colors import rgb2hex
+from src.analysis.hysteresis import calculate_velocity_hysteresis
 
 cap_flow_path = PATHS['cap_flow']
 source_sans = load_source_sans()
@@ -41,6 +44,48 @@ sns.set_style("whitegrid")
 # Color scheme
 CONTROL_COLOR = '#1f77b4'  # Blue
 DIABETES_COLOR = '#ff7f0e'  # Orange
+
+# Base colors for monochromatic palettes (matching plotting_utils / hysteresis conventions)
+AGE_BASE_COLOR = '#1f77b4'       # Blue for age
+BP_BASE_COLOR = '#2ca02c'        # Green for blood pressure
+DISEASE_BASE_COLOR = '#00CED1'   # Teal for control-vs-any-disease
+
+
+def _make_binary_palette(base_color: str):
+    """Create a two-colour palette (darker, lighter) from a base hex colour.
+
+    Uses the same monochromatic approach as hysteresis.py for grayscale
+    readability: palette[4] (darker) for the first group and palette[1]
+    (lighter) for the second group.
+
+    Args:
+        base_color: Hex colour string, e.g. '#1f77b4'.
+
+    Returns:
+        List of two hex colour strings [darker, lighter].
+    """
+    palette = create_monochromatic_palette(base_color)
+    palette = adjust_brightness_of_colors(palette, brightness_scale=0.1)
+    return [rgb2hex(palette[4]), rgb2hex(palette[1])]
+
+
+def _ensure_healthy_flag(df: pd.DataFrame) -> pd.DataFrame:
+    """Ensure *is_healthy* column exists (True for controls, False otherwise).
+
+    Derives from SET column when available; otherwise falls back to Diabetes
+    and Hypertension booleans.
+    """
+    out = df.copy()
+    if 'is_healthy' not in out.columns:
+        if 'SET' in out.columns:
+            out['is_healthy'] = out['SET'].astype(str).str.startswith('set01')
+        elif 'Diabetes' in out.columns and 'Hypertension' in out.columns:
+            out['is_healthy'] = ~(out['Diabetes'].astype(bool) | out['Hypertension'].astype(bool))
+        elif 'Diabetes' in out.columns:
+            out['is_healthy'] = ~out['Diabetes'].astype(bool)
+        else:
+            warnings.warn("Cannot derive is_healthy flag – no SET, Diabetes, or Hypertension column.")
+    return out
 
 
 def apply_font(ax, source_sans):
@@ -437,12 +482,728 @@ def plot_stiffness_vs_sbp(results_df: pd.DataFrame, output_dir: str,
     plt.close()
 
 
+# ---------------------------------------------------------------------------
+# Hysteresis vs Age scatterplots
+# ---------------------------------------------------------------------------
+
+def plot_hysteresis_vs_age_control(hysteresis_df: pd.DataFrame, output_dir: str,
+                                   figsize: Tuple[float, float] = (2.4, 2.0),
+                                   minimal_dir: Optional[str] = None):
+    """Plot hysteresis vs age for control group only with regression line.
+
+    Args:
+        hysteresis_df: DataFrame with 'up_down_diff', 'Age', and 'is_healthy' columns.
+        output_dir: Directory to save figures.
+        figsize: Figure size.
+        minimal_dir: If set, save a no-title/no-legend copy here.
+
+    Returns:
+        List of dicts with significance results.
+    """
+    sig_rows = []
+
+    if 'up_down_diff' not in hysteresis_df.columns:
+        print("Warning: up_down_diff not found. Skipping hysteresis vs age control plot.")
+        return sig_rows
+    if 'Age' not in hysteresis_df.columns:
+        print("Warning: Age not found. Skipping hysteresis vs age control plot.")
+        return sig_rows
+
+    # Ensure is_healthy flag
+    df = _ensure_healthy_flag(hysteresis_df)
+
+    # Filter to controls with valid data
+    df_plot = df[(df['is_healthy'] == True) &
+                 df['up_down_diff'].notna() &
+                 df['Age'].notna()].copy()
+
+    if len(df_plot) < 3:
+        print("Warning: Too few control participants for hysteresis vs age plot.")
+        return sig_rows
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # Plot points
+    ax.scatter(df_plot['Age'], df_plot['up_down_diff'],
+               alpha=0.6, s=20, color=CONTROL_COLOR, label='Control', zorder=3)
+
+    # Fit regression line
+    x = df_plot['Age'].values
+    y = df_plot['up_down_diff'].values
+    valid = ~(np.isnan(x) | np.isnan(y))
+    if np.sum(valid) > 2:
+        slope, intercept, r_value, p_value, std_err = stats.linregress(x[valid], y[valid])
+        x_line = np.linspace(x[valid].min(), x[valid].max(), 100)
+        y_line = slope * x_line + intercept
+        ax.plot(x_line, y_line, 'k--', linewidth=1, alpha=0.7)
+
+        # Add correlation text
+        ax.text(0.05, 0.95, f'R = {r_value:.3f}\np = {p_value:.4f}\nn = {len(df_plot)}',
+                transform=ax.transAxes, ha='left', va='top', fontsize=6,
+                fontproperties=source_sans if source_sans else None,
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+        sig_rows.append({
+            'analysis': 'Hysteresis vs Age (controls)',
+            'test': 'Pearson correlation',
+            'group1': 'Control', 'group2': 'N/A',
+            'n1': len(df_plot), 'n2': np.nan,
+            'statistic': r_value, 'p_value': p_value,
+            'cohens_d': np.nan,
+        })
+
+    ax.set_xlabel('Age (years)', fontproperties=source_sans if source_sans else None)
+    ax.set_ylabel('Velocity Hysteresis (up-down)', fontproperties=source_sans if source_sans else None)
+    ax.set_title('Hysteresis vs Age (Controls)', fontproperties=source_sans if source_sans else None)
+    ax.grid(True, alpha=0.3)
+
+    apply_font(ax, source_sans)
+    plt.tight_layout()
+
+    save_figure(fig, output_dir, 'hysteresis_vs_age_control', minimal_dir=minimal_dir)
+    plt.close()
+
+    return sig_rows
+
+
+def plot_hysteresis_vs_age_all(hysteresis_df: pd.DataFrame, output_dir: str,
+                               figsize: Tuple[float, float] = (2.4, 2.0),
+                               minimal_dir: Optional[str] = None):
+    """Plot hysteresis vs age for control, diabetic, and hypertensive groups.
+
+    Args:
+        hysteresis_df: DataFrame with 'up_down_diff', 'Age', 'Diabetes', 'Hypertension' columns.
+        output_dir: Directory to save figures.
+        figsize: Figure size.
+        minimal_dir: If set, save a no-title/no-legend copy here.
+
+    Returns:
+        List of dicts with significance results.
+    """
+    sig_rows = []
+
+    if 'up_down_diff' not in hysteresis_df.columns:
+        print("Warning: up_down_diff not found. Skipping hysteresis vs age all plot.")
+        return sig_rows
+    if 'Age' not in hysteresis_df.columns:
+        print("Warning: Age not found. Skipping hysteresis vs age all plot.")
+        return sig_rows
+
+    # Ensure boolean columns
+    df = _ensure_diabetes_bool(hysteresis_df.copy())
+    if 'Hypertension' in df.columns:
+        if df['Hypertension'].dtype == object or df['Hypertension'].dtype.name == 'str':
+            df['Hypertension'] = df['Hypertension'].astype(str).str.upper() == 'TRUE'
+
+    # Filter to valid data
+    df_plot = df[df['up_down_diff'].notna() & df['Age'].notna()].copy()
+
+    if len(df_plot) < 3:
+        print("Warning: Too few participants for hysteresis vs age all plot.")
+        return sig_rows
+
+    # Create group labels: prioritize Diabetes > Hypertension > Control
+    def assign_group(row):
+        if row.get('Diabetes', False):
+            return 'Diabetic'
+        elif row.get('Hypertension', False):
+            return 'Hypertensive'
+        else:
+            return 'Control'
+
+    df_plot['Group'] = df_plot.apply(assign_group, axis=1)
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # Define colors for each group
+    group_colors = {
+        'Control': CONTROL_COLOR,
+        'Diabetic': DIABETES_COLOR,
+        'Hypertensive': '#d62728',  # Red for hypertension
+    }
+
+    # Plot points by group
+    for group in ['Control', 'Diabetic', 'Hypertensive']:
+        group_data = df_plot[df_plot['Group'] == group]
+        if len(group_data) > 0:
+            ax.scatter(group_data['Age'], group_data['up_down_diff'],
+                       alpha=0.6, s=20, color=group_colors[group], label=group, zorder=3)
+
+    # Fit overall regression line
+    x = df_plot['Age'].values
+    y = df_plot['up_down_diff'].values
+    valid = ~(np.isnan(x) | np.isnan(y))
+    if np.sum(valid) > 2:
+        slope, intercept, r_value, p_value, std_err = stats.linregress(x[valid], y[valid])
+        x_line = np.linspace(x[valid].min(), x[valid].max(), 100)
+        y_line = slope * x_line + intercept
+        ax.plot(x_line, y_line, 'k--', linewidth=1, alpha=0.7)
+
+        # Add correlation text
+        ax.text(0.05, 0.95, f'R = {r_value:.3f}\np = {p_value:.4f}\nn = {len(df_plot)}',
+                transform=ax.transAxes, ha='left', va='top', fontsize=6,
+                fontproperties=source_sans if source_sans else None,
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+        sig_rows.append({
+            'analysis': 'Hysteresis vs Age (all participants)',
+            'test': 'Pearson correlation',
+            'group1': 'All', 'group2': 'N/A',
+            'n1': len(df_plot), 'n2': np.nan,
+            'statistic': r_value, 'p_value': p_value,
+            'cohens_d': np.nan,
+        })
+
+    ax.set_xlabel('Age (years)', fontproperties=source_sans if source_sans else None)
+    ax.set_ylabel('Velocity Hysteresis (up-down)', fontproperties=source_sans if source_sans else None)
+    ax.set_title('Hysteresis vs Age', fontproperties=source_sans if source_sans else None)
+    ax.legend(loc='best', fontsize=5, prop=source_sans if source_sans else None)
+    ax.grid(True, alpha=0.3)
+
+    apply_font(ax, source_sans)
+    plt.tight_layout()
+
+    save_figure(fig, output_dir, 'hysteresis_vs_age_all', minimal_dir=minimal_dir)
+    plt.close()
+
+    return sig_rows
+
+
+def plot_abs_hysteresis_vs_age_control(hysteresis_df: pd.DataFrame, output_dir: str,
+                                      figsize: Tuple[float, float] = (2.4, 2.0),
+                                      minimal_dir: Optional[str] = None):
+    """Plot absolute value of hysteresis vs age for control group only with regression line.
+
+    Args:
+        hysteresis_df: DataFrame with 'up_down_diff', 'Age', and 'is_healthy' columns.
+        output_dir: Directory to save figures.
+        figsize: Figure size.
+        minimal_dir: If set, save a no-title/no-legend copy here.
+
+    Returns:
+        List of dicts with significance results.
+    """
+    sig_rows = []
+
+    if 'up_down_diff' not in hysteresis_df.columns:
+        print("Warning: up_down_diff not found. Skipping |hysteresis| vs age control plot.")
+        return sig_rows
+    if 'Age' not in hysteresis_df.columns:
+        print("Warning: Age not found. Skipping |hysteresis| vs age control plot.")
+        return sig_rows
+
+    df = _ensure_healthy_flag(hysteresis_df)
+    df_plot = df[(df['is_healthy'] == True) &
+                 df['up_down_diff'].notna() &
+                 df['Age'].notna()].copy()
+    df_plot['abs_up_down_diff'] = df_plot['up_down_diff'].abs()
+
+    if len(df_plot) < 3:
+        print("Warning: Too few control participants for |hysteresis| vs age plot.")
+        return sig_rows
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    ax.scatter(df_plot['Age'], df_plot['abs_up_down_diff'],
+               alpha=0.6, s=20, color=CONTROL_COLOR, label='Control', zorder=3)
+
+    x = df_plot['Age'].values
+    y = df_plot['abs_up_down_diff'].values
+    valid = ~(np.isnan(x) | np.isnan(y))
+    if np.sum(valid) > 2:
+        slope, intercept, r_value, p_value, std_err = stats.linregress(x[valid], y[valid])
+        x_line = np.linspace(x[valid].min(), x[valid].max(), 100)
+        y_line = slope * x_line + intercept
+        ax.plot(x_line, y_line, 'k--', linewidth=1, alpha=0.7)
+
+        ax.text(0.05, 0.95, f'R = {r_value:.3f}\np = {p_value:.4f}\nn = {len(df_plot)}',
+                transform=ax.transAxes, ha='left', va='top', fontsize=6,
+                fontproperties=source_sans if source_sans else None,
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+        sig_rows.append({
+            'analysis': '|Hysteresis| vs Age (controls)',
+            'test': 'Pearson correlation',
+            'group1': 'Control', 'group2': 'N/A',
+            'n1': len(df_plot), 'n2': np.nan,
+            'statistic': r_value, 'p_value': p_value,
+            'cohens_d': np.nan,
+        })
+
+    ax.set_xlabel('Age (years)', fontproperties=source_sans if source_sans else None)
+    ax.set_ylabel('|Velocity Hysteresis| (up-down)', fontproperties=source_sans if source_sans else None)
+    ax.set_title('|Hysteresis| vs Age (Controls)', fontproperties=source_sans if source_sans else None)
+    ax.grid(True, alpha=0.3)
+
+    apply_font(ax, source_sans)
+    plt.tight_layout()
+
+    save_figure(fig, output_dir, 'abs_hysteresis_vs_age_control', minimal_dir=minimal_dir)
+    plt.close()
+
+    return sig_rows
+
+
+def plot_abs_hysteresis_vs_age_all(hysteresis_df: pd.DataFrame, output_dir: str,
+                                  figsize: Tuple[float, float] = (2.4, 2.0),
+                                  minimal_dir: Optional[str] = None):
+    """Plot absolute value of hysteresis vs age for control, diabetic, and hypertensive groups.
+
+    Args:
+        hysteresis_df: DataFrame with 'up_down_diff', 'Age', 'Diabetes', 'Hypertension' columns.
+        output_dir: Directory to save figures.
+        figsize: Figure size.
+        minimal_dir: If set, save a no-title/no-legend copy here.
+
+    Returns:
+        List of dicts with significance results.
+    """
+    sig_rows = []
+
+    if 'up_down_diff' not in hysteresis_df.columns:
+        print("Warning: up_down_diff not found. Skipping |hysteresis| vs age all plot.")
+        return sig_rows
+    if 'Age' not in hysteresis_df.columns:
+        print("Warning: Age not found. Skipping |hysteresis| vs age all plot.")
+        return sig_rows
+
+    df = _ensure_diabetes_bool(hysteresis_df.copy())
+    if 'Hypertension' in df.columns:
+        if df['Hypertension'].dtype == object or df['Hypertension'].dtype.name == 'str':
+            df['Hypertension'] = df['Hypertension'].astype(str).str.upper() == 'TRUE'
+
+    df_plot = df[df['up_down_diff'].notna() & df['Age'].notna()].copy()
+    df_plot['abs_up_down_diff'] = df_plot['up_down_diff'].abs()
+
+    if len(df_plot) < 3:
+        print("Warning: Too few participants for |hysteresis| vs age all plot.")
+        return sig_rows
+
+    def assign_group(row):
+        if row.get('Diabetes', False):
+            return 'Diabetic'
+        elif row.get('Hypertension', False):
+            return 'Hypertensive'
+        else:
+            return 'Control'
+
+    df_plot['Group'] = df_plot.apply(assign_group, axis=1)
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    group_colors = {
+        'Control': CONTROL_COLOR,
+        'Diabetic': DIABETES_COLOR,
+        'Hypertensive': '#d62728',
+    }
+
+    for group in ['Control', 'Diabetic', 'Hypertensive']:
+        group_data = df_plot[df_plot['Group'] == group]
+        if len(group_data) > 0:
+            ax.scatter(group_data['Age'], group_data['abs_up_down_diff'],
+                       alpha=0.6, s=20, color=group_colors[group], label=group, zorder=3)
+
+    x = df_plot['Age'].values
+    y = df_plot['abs_up_down_diff'].values
+    valid = ~(np.isnan(x) | np.isnan(y))
+    if np.sum(valid) > 2:
+        slope, intercept, r_value, p_value, std_err = stats.linregress(x[valid], y[valid])
+        x_line = np.linspace(x[valid].min(), x[valid].max(), 100)
+        y_line = slope * x_line + intercept
+        ax.plot(x_line, y_line, 'k--', linewidth=1, alpha=0.7)
+
+        ax.text(0.05, 0.95, f'R = {r_value:.3f}\np = {p_value:.4f}\nn = {len(df_plot)}',
+                transform=ax.transAxes, ha='left', va='top', fontsize=6,
+                fontproperties=source_sans if source_sans else None,
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+        sig_rows.append({
+            'analysis': '|Hysteresis| vs Age (all participants)',
+            'test': 'Pearson correlation',
+            'group1': 'All', 'group2': 'N/A',
+            'n1': len(df_plot), 'n2': np.nan,
+            'statistic': r_value, 'p_value': p_value,
+            'cohens_d': np.nan,
+        })
+
+    ax.set_xlabel('Age (years)', fontproperties=source_sans if source_sans else None)
+    ax.set_ylabel('|Velocity Hysteresis| (up-down)', fontproperties=source_sans if source_sans else None)
+    ax.set_title('|Hysteresis| vs Age', fontproperties=source_sans if source_sans else None)
+    ax.legend(loc='best', fontsize=5, prop=source_sans if source_sans else None)
+    ax.grid(True, alpha=0.3)
+
+    apply_font(ax, source_sans)
+    plt.tight_layout()
+
+    save_figure(fig, output_dir, 'abs_hysteresis_vs_age_all', minimal_dir=minimal_dir)
+    plt.close()
+
+    return sig_rows
+
+
+def plot_hysteresis_vs_age_hypertension(hysteresis_df: pd.DataFrame, output_dir: str,
+                                        figsize: Tuple[float, float] = (2.4, 2.0),
+                                        minimal_dir: Optional[str] = None):
+    """Plot hysteresis vs age for Control vs Hypertensive groups.
+
+    Args:
+        hysteresis_df: DataFrame with 'up_down_diff', 'Age', 'Hypertension' columns.
+        output_dir: Directory to save figures.
+        figsize: Figure size.
+        minimal_dir: If set, save a no-title/no-legend copy here.
+
+    Returns:
+        List of dicts with significance results.
+    """
+    sig_rows = []
+    HYPERTENSION_COLOR = '#d62728'  # Red
+
+    if 'up_down_diff' not in hysteresis_df.columns:
+        print("Warning: up_down_diff not found. Skipping hysteresis vs age hypertension plot.")
+        return sig_rows
+    if 'Age' not in hysteresis_df.columns:
+        print("Warning: Age not found. Skipping hysteresis vs age hypertension plot.")
+        return sig_rows
+    if 'Hypertension' not in hysteresis_df.columns:
+        print("Warning: Hypertension not found. Skipping hysteresis vs age hypertension plot.")
+        return sig_rows
+
+    # Ensure boolean column
+    df = hysteresis_df.copy()
+    if df['Hypertension'].dtype == object or df['Hypertension'].dtype.name == 'str':
+        df['Hypertension'] = df['Hypertension'].astype(str).str.upper() == 'TRUE'
+
+    # Filter to valid data (exclude diabetics to isolate hypertension effect)
+    df = _ensure_diabetes_bool(df)
+    df_plot = df[df['up_down_diff'].notna() & df['Age'].notna()].copy()
+    # Exclude diabetics
+    if 'Diabetes' in df_plot.columns:
+        df_plot = df_plot[df_plot['Diabetes'] == False]
+
+    if len(df_plot) < 3:
+        print("Warning: Too few participants for hysteresis vs age hypertension plot.")
+        return sig_rows
+
+    # Create group labels
+    df_plot['Group'] = df_plot['Hypertension'].map({True: 'Hypertensive', False: 'Control'})
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # Plot points by group
+    for group, color in [('Control', CONTROL_COLOR), ('Hypertensive', HYPERTENSION_COLOR)]:
+        group_data = df_plot[df_plot['Group'] == group]
+        if len(group_data) > 0:
+            ax.scatter(group_data['Age'], group_data['up_down_diff'],
+                       alpha=0.6, s=20, color=color, label=group, zorder=3)
+
+    # Fit overall regression line
+    x = df_plot['Age'].values
+    y = df_plot['up_down_diff'].values
+    valid = ~(np.isnan(x) | np.isnan(y))
+    if np.sum(valid) > 2:
+        slope, intercept, r_value, p_value, std_err = stats.linregress(x[valid], y[valid])
+        x_line = np.linspace(x[valid].min(), x[valid].max(), 100)
+        y_line = slope * x_line + intercept
+        ax.plot(x_line, y_line, 'k--', linewidth=1, alpha=0.7)
+
+        ax.text(0.05, 0.95, f'R = {r_value:.3f}\np = {p_value:.4f}\nn = {len(df_plot)}',
+                transform=ax.transAxes, ha='left', va='top', fontsize=6,
+                fontproperties=source_sans if source_sans else None,
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+        sig_rows.append({
+            'analysis': 'Hysteresis vs Age (Control vs Hypertensive)',
+            'test': 'Pearson correlation',
+            'group1': 'All (excl. diabetics)', 'group2': 'N/A',
+            'n1': len(df_plot), 'n2': np.nan,
+            'statistic': r_value, 'p_value': p_value,
+            'cohens_d': np.nan,
+        })
+
+    ax.set_xlabel('Age (years)', fontproperties=source_sans if source_sans else None)
+    ax.set_ylabel('Velocity Hysteresis (up-down)', fontproperties=source_sans if source_sans else None)
+    ax.set_title('Hysteresis vs Age (Hypertension)', fontproperties=source_sans if source_sans else None)
+    ax.legend(loc='best', fontsize=5, prop=source_sans if source_sans else None)
+    ax.grid(True, alpha=0.3)
+
+    apply_font(ax, source_sans)
+    plt.tight_layout()
+
+    save_figure(fig, output_dir, 'hysteresis_vs_age_hypertension', minimal_dir=minimal_dir)
+    plt.close()
+
+    return sig_rows
+
+
+def plot_hysteresis_vs_age_diabetes(hysteresis_df: pd.DataFrame, output_dir: str,
+                                    figsize: Tuple[float, float] = (2.4, 2.0),
+                                    minimal_dir: Optional[str] = None):
+    """Plot hysteresis vs age for Control vs Diabetic groups.
+
+    Args:
+        hysteresis_df: DataFrame with 'up_down_diff', 'Age', 'Diabetes' columns.
+        output_dir: Directory to save figures.
+        figsize: Figure size.
+        minimal_dir: If set, save a no-title/no-legend copy here.
+
+    Returns:
+        List of dicts with significance results.
+    """
+    sig_rows = []
+
+    if 'up_down_diff' not in hysteresis_df.columns:
+        print("Warning: up_down_diff not found. Skipping hysteresis vs age diabetes plot.")
+        return sig_rows
+    if 'Age' not in hysteresis_df.columns:
+        print("Warning: Age not found. Skipping hysteresis vs age diabetes plot.")
+        return sig_rows
+
+    # Ensure boolean column
+    df = _ensure_diabetes_bool(hysteresis_df.copy())
+
+    # Filter to valid data
+    df_plot = df[df['up_down_diff'].notna() & df['Age'].notna()].copy()
+
+    if len(df_plot) < 3:
+        print("Warning: Too few participants for hysteresis vs age diabetes plot.")
+        return sig_rows
+
+    # Create group labels
+    df_plot['Group'] = df_plot['Diabetes'].map({True: 'Diabetic', False: 'Control'})
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # Plot points by group
+    for group, color in [('Control', CONTROL_COLOR), ('Diabetic', DIABETES_COLOR)]:
+        group_data = df_plot[df_plot['Group'] == group]
+        if len(group_data) > 0:
+            ax.scatter(group_data['Age'], group_data['up_down_diff'],
+                       alpha=0.6, s=20, color=color, label=group, zorder=3)
+
+    # Fit overall regression line
+    x = df_plot['Age'].values
+    y = df_plot['up_down_diff'].values
+    valid = ~(np.isnan(x) | np.isnan(y))
+    if np.sum(valid) > 2:
+        slope, intercept, r_value, p_value, std_err = stats.linregress(x[valid], y[valid])
+        x_line = np.linspace(x[valid].min(), x[valid].max(), 100)
+        y_line = slope * x_line + intercept
+        ax.plot(x_line, y_line, 'k--', linewidth=1, alpha=0.7)
+
+        ax.text(0.05, 0.95, f'R = {r_value:.3f}\np = {p_value:.4f}\nn = {len(df_plot)}',
+                transform=ax.transAxes, ha='left', va='top', fontsize=6,
+                fontproperties=source_sans if source_sans else None,
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+        sig_rows.append({
+            'analysis': 'Hysteresis vs Age (Control vs Diabetic)',
+            'test': 'Pearson correlation',
+            'group1': 'All', 'group2': 'N/A',
+            'n1': len(df_plot), 'n2': np.nan,
+            'statistic': r_value, 'p_value': p_value,
+            'cohens_d': np.nan,
+        })
+
+    ax.set_xlabel('Age (years)', fontproperties=source_sans if source_sans else None)
+    ax.set_ylabel('Velocity Hysteresis (up-down)', fontproperties=source_sans if source_sans else None)
+    ax.set_title('Hysteresis vs Age (Diabetes)', fontproperties=source_sans if source_sans else None)
+    ax.legend(loc='best', fontsize=5, prop=source_sans if source_sans else None)
+    ax.grid(True, alpha=0.3)
+
+    apply_font(ax, source_sans)
+    plt.tight_layout()
+
+    save_figure(fig, output_dir, 'hysteresis_vs_age_diabetes', minimal_dir=minimal_dir)
+    plt.close()
+
+    return sig_rows
+
+
+def plot_hysteresis_boxplot_hypertension(hysteresis_df: pd.DataFrame, output_dir: str,
+                                         figsize: Tuple[float, float] = (2.4, 2.0),
+                                         minimal_dir: Optional[str] = None):
+    """Boxplot of hysteresis comparing Control vs Hypertensive groups.
+
+    Args:
+        hysteresis_df: DataFrame with 'up_down_diff' and 'Hypertension' columns.
+        output_dir: Directory to save figures.
+        figsize: Figure size.
+        minimal_dir: If set, save a no-title/no-legend copy here.
+
+    Returns:
+        List of dicts with significance results.
+    """
+    sig_rows = []
+    HYPERTENSION_COLOR = '#d62728'  # Red
+
+    if 'up_down_diff' not in hysteresis_df.columns:
+        print("Warning: up_down_diff not found. Skipping hysteresis boxplot hypertension.")
+        return sig_rows
+    if 'Hypertension' not in hysteresis_df.columns:
+        print("Warning: Hypertension not found. Skipping hysteresis boxplot hypertension.")
+        return sig_rows
+
+    # Ensure boolean column
+    df = hysteresis_df.copy()
+    if df['Hypertension'].dtype == object or df['Hypertension'].dtype.name == 'str':
+        df['Hypertension'] = df['Hypertension'].astype(str).str.upper() == 'TRUE'
+
+    # Filter to valid data (exclude diabetics to isolate hypertension effect)
+    df = _ensure_diabetes_bool(df)
+    df_plot = df[df['up_down_diff'].notna()].copy()
+    if 'Diabetes' in df_plot.columns:
+        df_plot = df_plot[df_plot['Diabetes'] == False]
+
+    if len(df_plot) < 3:
+        print("Warning: Too few participants for hysteresis boxplot hypertension.")
+        return sig_rows
+
+    # Create group labels
+    df_plot['Group'] = df_plot['Hypertension'].map({True: 'Hypertensive', False: 'Control'})
+    group_labels = ['Control', 'Hypertensive']
+    palette = [CONTROL_COLOR, HYPERTENSION_COLOR]
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    sns.boxplot(data=df_plot, x='Group', y='up_down_diff', ax=ax,
+                order=group_labels, palette=palette, width=0.6)
+
+    # Add jittered individual points
+    for i, grp in enumerate(group_labels):
+        grp_vals = df_plot[df_plot['Group'] == grp]['up_down_diff']
+        x_pos = i + np.random.normal(0, 0.04, len(grp_vals))
+        ax.scatter(x_pos, grp_vals, alpha=0.4, s=15, color='black', zorder=3)
+
+    # Statistical test
+    ctrl_vals = df_plot[df_plot['Group'] == 'Control']['up_down_diff']
+    hyp_vals = df_plot[df_plot['Group'] == 'Hypertensive']['up_down_diff']
+    stat_text_parts = [f'n = {len(ctrl_vals)}, {len(hyp_vals)}']
+
+    if len(ctrl_vals) > 0 and len(hyp_vals) > 0:
+        stat_val, pval = stats.mannwhitneyu(ctrl_vals, hyp_vals, alternative='two-sided')
+        d = _cohens_d(ctrl_vals, hyp_vals)
+        stat_text_parts.append(f'p = {pval:.4f}')
+        if d is not None and not np.isnan(d):
+            stat_text_parts.append(f'd = {d:.2f}')
+        sig_rows.append({
+            'analysis': 'Hysteresis by Hypertension',
+            'test': 'Mann-Whitney U',
+            'group1': 'Control', 'group2': 'Hypertensive',
+            'n1': len(ctrl_vals), 'n2': len(hyp_vals),
+            'statistic': stat_val, 'p_value': pval,
+            'cohens_d': d if d is not None else np.nan,
+        })
+
+    ax.text(0.5, 0.95, '\n'.join(stat_text_parts), transform=ax.transAxes,
+            ha='center', va='top', fontsize=6,
+            fontproperties=source_sans if source_sans else None,
+            bbox=dict(boxstyle='round', facecolor='white', alpha=0.8,
+                      edgecolor='black', linewidth=0.5))
+
+    ax.set_xlabel('Group', fontproperties=source_sans if source_sans else None)
+    ax.set_ylabel('Velocity Hysteresis (up-down)', fontproperties=source_sans if source_sans else None)
+    ax.set_title('Hysteresis by Hypertension', fontproperties=source_sans if source_sans else None)
+
+    apply_font(ax, source_sans)
+    plt.tight_layout()
+
+    save_figure(fig, output_dir, 'hysteresis_boxplot_hypertension', minimal_dir=minimal_dir)
+    plt.close()
+
+    return sig_rows
+
+
+def plot_hysteresis_boxplot_diabetes(hysteresis_df: pd.DataFrame, output_dir: str,
+                                     figsize: Tuple[float, float] = (2.4, 2.0),
+                                     minimal_dir: Optional[str] = None):
+    """Boxplot of hysteresis comparing Control vs Diabetic groups.
+
+    Args:
+        hysteresis_df: DataFrame with 'up_down_diff' and 'Diabetes' columns.
+        output_dir: Directory to save figures.
+        figsize: Figure size.
+        minimal_dir: If set, save a no-title/no-legend copy here.
+
+    Returns:
+        List of dicts with significance results.
+    """
+    sig_rows = []
+
+    if 'up_down_diff' not in hysteresis_df.columns:
+        print("Warning: up_down_diff not found. Skipping hysteresis boxplot diabetes.")
+        return sig_rows
+
+    # Ensure boolean column
+    df = _ensure_diabetes_bool(hysteresis_df.copy())
+
+    # Filter to valid data
+    df_plot = df[df['up_down_diff'].notna()].copy()
+
+    if len(df_plot) < 3:
+        print("Warning: Too few participants for hysteresis boxplot diabetes.")
+        return sig_rows
+
+    # Create group labels
+    df_plot['Group'] = df_plot['Diabetes'].map({True: 'Diabetic', False: 'Control'})
+    group_labels = ['Control', 'Diabetic']
+    palette = [CONTROL_COLOR, DIABETES_COLOR]
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    sns.boxplot(data=df_plot, x='Group', y='up_down_diff', ax=ax,
+                order=group_labels, palette=palette, width=0.6)
+
+    # Add jittered individual points
+    for i, grp in enumerate(group_labels):
+        grp_vals = df_plot[df_plot['Group'] == grp]['up_down_diff']
+        x_pos = i + np.random.normal(0, 0.04, len(grp_vals))
+        ax.scatter(x_pos, grp_vals, alpha=0.4, s=15, color='black', zorder=3)
+
+    # Statistical test
+    ctrl_vals = df_plot[df_plot['Group'] == 'Control']['up_down_diff']
+    diab_vals = df_plot[df_plot['Group'] == 'Diabetic']['up_down_diff']
+    stat_text_parts = [f'n = {len(ctrl_vals)}, {len(diab_vals)}']
+
+    if len(ctrl_vals) > 0 and len(diab_vals) > 0:
+        stat_val, pval = stats.mannwhitneyu(ctrl_vals, diab_vals, alternative='two-sided')
+        d = _cohens_d(ctrl_vals, diab_vals)
+        stat_text_parts.append(f'p = {pval:.4f}')
+        if d is not None and not np.isnan(d):
+            stat_text_parts.append(f'd = {d:.2f}')
+        sig_rows.append({
+            'analysis': 'Hysteresis by Diabetes',
+            'test': 'Mann-Whitney U',
+            'group1': 'Control', 'group2': 'Diabetic',
+            'n1': len(ctrl_vals), 'n2': len(diab_vals),
+            'statistic': stat_val, 'p_value': pval,
+            'cohens_d': d if d is not None else np.nan,
+        })
+
+    ax.text(0.5, 0.95, '\n'.join(stat_text_parts), transform=ax.transAxes,
+            ha='center', va='top', fontsize=6,
+            fontproperties=source_sans if source_sans else None,
+            bbox=dict(boxstyle='round', facecolor='white', alpha=0.8,
+                      edgecolor='black', linewidth=0.5))
+
+    ax.set_xlabel('Group', fontproperties=source_sans if source_sans else None)
+    ax.set_ylabel('Velocity Hysteresis (up-down)', fontproperties=source_sans if source_sans else None)
+    ax.set_title('Hysteresis by Diabetes', fontproperties=source_sans if source_sans else None)
+
+    apply_font(ax, source_sans)
+    plt.tight_layout()
+
+    save_figure(fig, output_dir, 'hysteresis_boxplot_diabetes', minimal_dir=minimal_dir)
+    plt.close()
+
+    return sig_rows
+
+
 def compare_up_vs_averaged(results_df: pd.DataFrame, output_dir: str,
                            range_label: str = '04_12',
                            figsize: Tuple[float, float] = (2.4, 2.0),
                            minimal_dir: Optional[str] = None):
     """Compare up-only vs averaged stiffness coefficients.
-    
+
     Scatter plot showing correlation between the two methods.
     """
     up_col = f'stiffness_coeff_up_{range_label}'
@@ -1019,6 +1780,856 @@ def plot_log_metric_comparison_by_group(results_df: pd.DataFrame,
     plt.close()
 
 
+def plot_bp_si_by_condition(results_df: pd.DataFrame,
+                            results_df_log: pd.DataFrame,
+                            output_dir: str,
+                            stiffness_col: str = 'SI_logvel_averaged_02_12',
+                            bp_col: str = 'SYS_BP',
+                            figsize: Tuple[float, float] = (4.8, 4.0),
+                            minimal_dir: Optional[str] = None):
+    """Create 2x2 boxplot comparing BP and SI_logvel for Diabetes and Hypertension.
+
+    Panel layout:
+        (0,0) BP for Diabetes (Control vs Diabetic)
+        (0,1) BP for Hypertension (Control vs Hypertensive)
+        (1,0) SI_logvel for Diabetes (Control vs Diabetic)
+        (1,1) SI_logvel for Hypertension (Control vs Hypertensive)
+
+    Args:
+        results_df: Main stiffness results with BP and Diabetes/Hypertension columns.
+        results_df_log: Log-velocity stiffness results with SI_logvel columns.
+        output_dir: Directory to save figures.
+        stiffness_col: SI_logvel column to plot (default SI_logvel_averaged_02_12).
+        bp_col: Blood pressure column (default SYS_BP).
+        figsize: Figure size for the 2x2 grid.
+        minimal_dir: If set, save a no-title/no-legend copy here.
+
+    Returns:
+        List of dicts with significance results for each panel.
+    """
+    sig_rows = []
+
+    # Ensure boolean columns
+    df_main = _ensure_diabetes_bool(results_df.copy())
+    if 'Hypertension' in df_main.columns:
+        if df_main['Hypertension'].dtype == object or df_main['Hypertension'].dtype.name == 'str':
+            df_main['Hypertension'] = df_main['Hypertension'].astype(str).str.upper() == 'TRUE'
+
+    # Use log results for SI_logvel if available
+    if results_df_log is not None and stiffness_col in results_df_log.columns:
+        df_si = _ensure_diabetes_bool(results_df_log.copy())
+        if 'Hypertension' in df_si.columns:
+            if df_si['Hypertension'].dtype == object or df_si['Hypertension'].dtype.name == 'str':
+                df_si['Hypertension'] = df_si['Hypertension'].astype(str).str.upper() == 'TRUE'
+    else:
+        df_si = df_main
+
+    # Check required columns
+    if bp_col not in df_main.columns:
+        print(f"Warning: {bp_col} not found. Skipping BP vs SI condition comparison.")
+        return sig_rows
+    if stiffness_col not in df_si.columns:
+        print(f"Warning: {stiffness_col} not found. Skipping BP vs SI condition comparison.")
+        return sig_rows
+    if 'Diabetes' not in df_main.columns or 'Hypertension' not in df_main.columns:
+        print("Warning: Diabetes or Hypertension column not found. Skipping.")
+        return sig_rows
+
+    fig, axes = plt.subplots(2, 2, figsize=figsize)
+
+    # Define the 4 panels: (row, col, df, y_col, condition_col, ylabel, title_suffix)
+    bp_label = 'Systolic BP (mmHg)' if bp_col == 'SYS_BP' else 'Diastolic BP (mmHg)'
+    si_label = 'SI_logvel (AUC of log velocity)'
+
+    panels = [
+        (0, 0, df_main, bp_col, 'Diabetes', bp_label, 'Diabetes'),
+        (0, 1, df_main, bp_col, 'Hypertension', bp_label, 'Hypertension'),
+        (1, 0, df_si, stiffness_col, 'Diabetes', si_label, 'Diabetes'),
+        (1, 1, df_si, stiffness_col, 'Hypertension', si_label, 'Hypertension'),
+    ]
+
+    for row, col, df, y_col, cond_col, ylabel, cond_name in panels:
+        ax = axes[row, col]
+
+        # Filter to valid data
+        df_plot = df[df[y_col].notna() & df[cond_col].notna()].copy()
+
+        # Create group labels
+        if cond_col == 'Diabetes':
+            df_plot['Group'] = df_plot[cond_col].map({True: 'Diabetic', False: 'Control'})
+            group_labels = ['Control', 'Diabetic']
+            palette = [CONTROL_COLOR, DIABETES_COLOR]
+        else:  # Hypertension
+            df_plot['Group'] = df_plot[cond_col].map({True: 'Hypertensive', False: 'Control'})
+            group_labels = ['Control', 'Hypertensive']
+            # Use a distinct color for hypertension (purple)
+            palette = [CONTROL_COLOR, '#d62728']  # Red for hypertension
+
+        # Create boxplot
+        sns.boxplot(data=df_plot, x='Group', y=y_col, ax=ax,
+                    order=group_labels, palette=palette, width=0.6)
+
+        # Add jittered individual points
+        for i, grp in enumerate(group_labels):
+            grp_vals = df_plot[df_plot['Group'] == grp][y_col]
+            x_pos = i + np.random.normal(0, 0.04, len(grp_vals))
+            ax.scatter(x_pos, grp_vals, alpha=0.4, s=15, color='black', zorder=3)
+
+        # Statistical test
+        ctrl_vals = df_plot[df_plot['Group'] == group_labels[0]][y_col]
+        cond_vals = df_plot[df_plot['Group'] == group_labels[1]][y_col]
+        stat_text_parts = [f'n = {len(ctrl_vals)}, {len(cond_vals)}']
+
+        if len(ctrl_vals) > 0 and len(cond_vals) > 0:
+            stat_val, pval = stats.mannwhitneyu(ctrl_vals, cond_vals, alternative='two-sided')
+            d = _cohens_d(ctrl_vals, cond_vals)
+            stat_text_parts.append(f'p = {pval:.4f}')
+            if d is not None and not np.isnan(d):
+                stat_text_parts.append(f'd = {d:.2f}')
+            sig_rows.append({
+                'analysis': f'{y_col} by {cond_name}',
+                'test': 'Mann-Whitney U',
+                'group1': group_labels[0], 'group2': group_labels[1],
+                'n1': len(ctrl_vals), 'n2': len(cond_vals),
+                'statistic': stat_val, 'p_value': pval,
+                'cohens_d': d if d is not None else np.nan,
+            })
+
+        ax.text(0.5, 0.95, '\n'.join(stat_text_parts), transform=ax.transAxes,
+                ha='center', va='top', fontsize=6,
+                fontproperties=source_sans if source_sans else None,
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8,
+                          edgecolor='black', linewidth=0.5))
+
+        ax.set_xlabel('Group', fontproperties=source_sans if source_sans else None)
+        ax.set_ylabel(ylabel, fontproperties=source_sans if source_sans else None)
+        ax.set_title(f'{ylabel.split(" (")[0]} by {cond_name}',
+                     fontproperties=source_sans if source_sans else None)
+        apply_font(ax, source_sans)
+
+    plt.tight_layout()
+    filename = 'stiffness_fig_BP_SI_by_condition_comparison'
+    save_figure(fig, output_dir, filename, minimal_dir=minimal_dir)
+    plt.close()
+
+    return sig_rows
+
+
+# ---------------------------------------------------------------------------
+# Age-group and blood-pressure comparison functions
+# ---------------------------------------------------------------------------
+
+def plot_si_by_age_group_control(results_df: pd.DataFrame, output_dir: str,
+                                  stiffness_col: str = 'SI_logvel_averaged_02_12',
+                                  age_thresholds: list = None,
+                                  figsize: Tuple[float, float] = (2.4, 2.0),
+                                  minimal_dir: Optional[str] = None):
+    """Box plots of SI_logvel comparing age groups within the control cohort.
+
+    For each age threshold a binary split is created (<threshold vs
+    >=threshold) and a box plot is produced with Mann-Whitney U p-value
+    and Cohen's d.
+
+    Args:
+        results_df: DataFrame containing SI_logvel column, Age, and is_healthy.
+        output_dir: Directory to save figures.
+        stiffness_col: SI column to plot (default SI_logvel_averaged_02_12).
+        age_thresholds: List of integer thresholds (default [30, 50, 60]).
+        figsize: Figure size.
+        minimal_dir: If set, save minimal copies.
+
+    Returns:
+        List of dicts with significance results for each threshold.
+    """
+    sig_rows = []
+    if stiffness_col not in results_df.columns:
+        print(f"Warning: {stiffness_col} not found. Skipping SI age-group control plots.")
+        return sig_rows
+
+    if age_thresholds is None:
+        age_thresholds = [30, 50, 60]
+
+    df = _ensure_healthy_flag(results_df)
+    controls = df[(df['is_healthy'] == True) & df[stiffness_col].notna() & df['Age'].notna()].copy()
+    if len(controls) < 4:
+        print("Warning: Too few control participants for age-group SI analysis.")
+        return sig_rows
+
+    palette_hex = _make_binary_palette(AGE_BASE_COLOR)
+
+    for threshold in age_thresholds:
+        controls['Age_Group'] = np.where(controls['Age'] < threshold,
+                                         f'<{threshold}', f'\u2265{threshold}')
+        group_labels = [f'<{threshold}', f'\u2265{threshold}']
+
+        fig, ax = plt.subplots(figsize=figsize)
+        sns.boxplot(data=controls, x='Age_Group', y=stiffness_col, ax=ax,
+                    order=group_labels, palette=palette_hex, width=0.6)
+
+        # Jittered individual points
+        for i, grp in enumerate(group_labels):
+            grp_data = controls[controls['Age_Group'] == grp][stiffness_col]
+            x_pos = i + np.random.normal(0, 0.04, len(grp_data))
+            ax.scatter(x_pos, grp_data, alpha=0.4, s=20, color='black', zorder=3)
+
+        # Stats
+        young = controls[controls['Age_Group'] == group_labels[0]][stiffness_col]
+        old = controls[controls['Age_Group'] == group_labels[1]][stiffness_col]
+        stat_text_parts = [f'n = {len(young)}, {len(old)}']
+        if len(young) > 0 and len(old) > 0:
+            stat_val, pval = stats.mannwhitneyu(young, old, alternative='two-sided')
+            d = _cohens_d(young, old)
+            stat_text_parts.append(f'p = {pval:.4f}')
+            if d is not None and not np.isnan(d):
+                stat_text_parts.append(f'd = {d:.2f}')
+            sig_rows.append({
+                'analysis': f'SI_logvel by age (controls, threshold {threshold})',
+                'test': 'Mann-Whitney U',
+                'group1': group_labels[0], 'group2': group_labels[1],
+                'n1': len(young), 'n2': len(old),
+                'statistic': stat_val, 'p_value': pval,
+                'cohens_d': d if d is not None else np.nan,
+            })
+        ax.text(0.5, 0.95, '\n'.join(stat_text_parts), transform=ax.transAxes,
+                ha='center', va='top', fontsize=6,
+                fontproperties=source_sans if source_sans else None,
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8, edgecolor='black', linewidth=0.5))
+
+        ax.set_xlabel('Age Group', fontproperties=source_sans if source_sans else None)
+        ax.set_ylabel('SI_logvel (AUC of log velocity)', fontproperties=source_sans if source_sans else None)
+        ax.set_title(f'SI_logvel by Age (Controls, threshold {threshold})',
+                     fontproperties=source_sans if source_sans else None)
+        apply_font(ax, source_sans)
+        plt.tight_layout()
+
+        save_figure(fig, output_dir,
+                    f'stiffness_fig_SI_logvel_by_age_{threshold}_control',
+                    minimal_dir=minimal_dir)
+        plt.close()
+
+    return sig_rows
+
+
+def plot_si_by_age_brackets_control(results_df: pd.DataFrame, output_dir: str,
+                                     stiffness_col: str = 'SI_logvel_averaged_02_12',
+                                     figsize: Tuple[float, float] = (2.4, 2.0),
+                                     minimal_dir: Optional[str] = None):
+    """Box plot of SI_logvel across multiple age brackets within controls.
+
+    Mirrors the hysteresis multi-age-group box plot: bins
+    [0, 30, 50, 60, 70, 100] with labels ['<30', '30-49', '50-59', '60-69', '70+'].
+    Pairwise Mann-Whitney U tests are performed for each bracket vs the <30
+    reference group, with significance brackets drawn for p < 0.05.
+
+    Args:
+        results_df: DataFrame with SI_logvel, Age, and is_healthy.
+        output_dir: Directory to save figures.
+        stiffness_col: SI column (default SI_logvel_averaged_02_12).
+        figsize: Figure size.
+        minimal_dir: If set, save minimal copies.
+
+    Returns:
+        List of dicts with significance results for each pairwise comparison.
+    """
+    sig_rows = []
+    if stiffness_col not in results_df.columns:
+        print(f"Warning: {stiffness_col} not found. Skipping SI age-brackets control plot.")
+        return sig_rows
+
+    df = _ensure_healthy_flag(results_df)
+    controls = df[(df['is_healthy'] == True) & df[stiffness_col].notna() & df['Age'].notna()].copy()
+    if len(controls) < 4:
+        print("Warning: Too few control participants for age-bracket SI analysis.")
+        return sig_rows
+
+    # Age bins matching hysteresis.py
+    bins = [0, 30, 50, 60, 70, 100]
+    labels = ['<30', '30-49', '50-59', '60-69', '70+']
+    controls['Age_Bracket'] = pd.cut(controls['Age'], bins=bins, labels=labels,
+                                     include_lowest=True)
+
+    # Drop brackets with no data and determine order
+    present_labels = [lbl for lbl in labels if (controls['Age_Bracket'] == lbl).sum() > 0]
+    if len(present_labels) < 2:
+        print("Warning: Fewer than 2 age brackets with data. Skipping.")
+        return sig_rows
+
+    # 5-shade blue monochromatic palette
+    full_palette = create_monochromatic_palette(AGE_BASE_COLOR, n_colors=len(labels))
+    full_palette = adjust_brightness_of_colors(full_palette, brightness_scale=0.1)
+    palette_hex = [rgb2hex(c) for c in full_palette]
+    # Keep only colours for present labels
+    color_map = {lbl: palette_hex[i] for i, lbl in enumerate(labels) if lbl in present_labels}
+    ordered_colors = [color_map[lbl] for lbl in present_labels]
+
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.boxplot(data=controls, x='Age_Bracket', y=stiffness_col, ax=ax,
+                order=present_labels, palette=ordered_colors, width=0.6, fliersize=3)
+
+    # Jittered individual points
+    for i, lbl in enumerate(present_labels):
+        grp_data = controls[controls['Age_Bracket'] == lbl][stiffness_col]
+        x_pos = i + np.random.normal(0, 0.04, len(grp_data))
+        ax.scatter(x_pos, grp_data, alpha=0.4, s=20, color='black', zorder=3)
+
+    # Sample-size tick labels
+    counts = controls['Age_Bracket'].value_counts()
+    tick_labels = [f'{lbl}\n(n={counts.get(lbl, 0)})' for lbl in present_labels]
+    ax.set_xticklabels(tick_labels)
+
+    # Pairwise tests vs <30 reference group (matching hysteresis.py pattern)
+    reference = '<30'
+    if reference in present_labels:
+        ref_vals = controls[controls['Age_Bracket'] == reference][stiffness_col]
+        ref_pos = present_labels.index(reference)
+
+        significant_comparisons = []
+        for lbl in present_labels:
+            if lbl == reference:
+                continue
+            other_vals = controls[controls['Age_Bracket'] == lbl][stiffness_col]
+            if len(ref_vals) < 3 or len(other_vals) < 3:
+                continue
+            stat_val, pval = stats.mannwhitneyu(ref_vals, other_vals, alternative='two-sided')
+            d = _cohens_d(ref_vals, other_vals)
+
+            # Significance marker
+            if pval < 0.001:
+                sig_marker = '***'
+            elif pval < 0.01:
+                sig_marker = '**'
+            elif pval < 0.05:
+                sig_marker = '*'
+            else:
+                sig_marker = None
+
+            sig_rows.append({
+                'analysis': f'SI_logvel age brackets (controls, {lbl} vs {reference})',
+                'test': 'Mann-Whitney U',
+                'group1': reference, 'group2': lbl,
+                'n1': len(ref_vals), 'n2': len(other_vals),
+                'statistic': stat_val, 'p_value': pval,
+                'cohens_d': d if d is not None else np.nan,
+            })
+
+            if sig_marker is not None:
+                significant_comparisons.append({
+                    'group': lbl,
+                    'pos_ref': ref_pos,
+                    'pos_other': present_labels.index(lbl),
+                    'p_value': pval,
+                    'sig_marker': sig_marker,
+                })
+
+        # Draw significance brackets (matching hysteresis.py lines 1696-1717)
+        if significant_comparisons:
+            y_min, y_max = ax.get_ylim()
+            y_range = y_max - y_min
+            significant_comparisons = sorted(significant_comparisons,
+                                             key=lambda c: c['pos_other'])
+            for idx, comp in enumerate(significant_comparisons):
+                bracket_height = y_max - (y_range * (0.05 + idx * 0.10))
+                pos_ref = comp['pos_ref']
+                pos_other = comp['pos_other']
+                ax.plot([pos_ref, pos_ref, pos_other, pos_other],
+                        [bracket_height - (y_range * 0.02), bracket_height,
+                         bracket_height, bracket_height - (y_range * 0.02)],
+                        'k-', linewidth=0.8)
+                ax.text((pos_ref + pos_other) / 2,
+                        bracket_height + (y_range * 0.01),
+                        comp['sig_marker'],
+                        ha='center', va='bottom', fontsize=8, fontweight='bold')
+
+    ax.set_xlabel('Age Group', fontproperties=source_sans if source_sans else None)
+    ax.set_ylabel('SI_logvel (AUC of log velocity)',
+                  fontproperties=source_sans if source_sans else None)
+    ax.set_title('SI_logvel by Age Brackets (Controls)',
+                 fontproperties=source_sans if source_sans else None)
+    apply_font(ax, source_sans)
+    plt.tight_layout()
+
+    save_figure(fig, output_dir,
+                'stiffness_fig_SI_logvel_by_age_brackets_control',
+                minimal_dir=minimal_dir)
+    plt.close()
+
+    return sig_rows
+
+
+def plot_bp_by_age_group_control(results_df: pd.DataFrame, output_dir: str,
+                                  bp_cols: list = None,
+                                  age_thresholds: list = None,
+                                  figsize: Tuple[float, float] = (2.4, 2.0),
+                                  minimal_dir: Optional[str] = None):
+    """Box plots of blood pressure comparing age groups within the control cohort.
+
+    Args:
+        results_df: DataFrame with SYS_BP / DIA_BP, Age, and is_healthy.
+        output_dir: Directory to save figures.
+        bp_cols: List of BP columns to plot (default ['SYS_BP', 'DIA_BP']).
+        age_thresholds: List of integer thresholds (default [30, 50, 60]).
+        figsize: Figure size.
+        minimal_dir: If set, save minimal copies.
+
+    Returns:
+        List of dicts with significance results for each threshold/BP column.
+    """
+    sig_rows = []
+    if bp_cols is None:
+        bp_cols = ['SYS_BP', 'DIA_BP']
+    if age_thresholds is None:
+        age_thresholds = [30, 50, 60]
+
+    df = _ensure_healthy_flag(results_df)
+    controls = df[(df['is_healthy'] == True) & df['Age'].notna()].copy()
+    if len(controls) < 4:
+        print("Warning: Too few control participants for age-group BP analysis.")
+        return sig_rows
+
+    palette_hex = _make_binary_palette(BP_BASE_COLOR)
+
+    for bp_col in bp_cols:
+        if bp_col not in controls.columns:
+            print(f"Warning: {bp_col} not found. Skipping.")
+            continue
+        bp_data = controls[controls[bp_col].notna()].copy()
+
+        bp_label = 'Systolic BP (mmHg)' if bp_col == 'SYS_BP' else 'Diastolic BP (mmHg)'
+        bp_short = 'SBP' if bp_col == 'SYS_BP' else 'DBP'
+
+        for threshold in age_thresholds:
+            bp_data['Age_Group'] = np.where(bp_data['Age'] < threshold,
+                                            f'<{threshold}', f'\u2265{threshold}')
+            group_labels = [f'<{threshold}', f'\u2265{threshold}']
+
+            fig, ax = plt.subplots(figsize=figsize)
+            sns.boxplot(data=bp_data, x='Age_Group', y=bp_col, ax=ax,
+                        order=group_labels, palette=palette_hex, width=0.6)
+
+            for i, grp in enumerate(group_labels):
+                grp_vals = bp_data[bp_data['Age_Group'] == grp][bp_col]
+                x_pos = i + np.random.normal(0, 0.04, len(grp_vals))
+                ax.scatter(x_pos, grp_vals, alpha=0.4, s=20, color='black', zorder=3)
+
+            young = bp_data[bp_data['Age_Group'] == group_labels[0]][bp_col]
+            old = bp_data[bp_data['Age_Group'] == group_labels[1]][bp_col]
+            stat_text_parts = [f'n = {len(young)}, {len(old)}']
+            if len(young) > 0 and len(old) > 0:
+                stat_val, pval = stats.mannwhitneyu(young, old, alternative='two-sided')
+                d = _cohens_d(young, old)
+                stat_text_parts.append(f'p = {pval:.4f}')
+                if d is not None and not np.isnan(d):
+                    stat_text_parts.append(f'd = {d:.2f}')
+                sig_rows.append({
+                    'analysis': f'{bp_short} by age (controls, threshold {threshold})',
+                    'test': 'Mann-Whitney U',
+                    'group1': group_labels[0], 'group2': group_labels[1],
+                    'n1': len(young), 'n2': len(old),
+                    'statistic': stat_val, 'p_value': pval,
+                    'cohens_d': d if d is not None else np.nan,
+                })
+            ax.text(0.5, 0.95, '\n'.join(stat_text_parts), transform=ax.transAxes,
+                    ha='center', va='top', fontsize=6,
+                    fontproperties=source_sans if source_sans else None,
+                    bbox=dict(boxstyle='round', facecolor='white', alpha=0.8, edgecolor='black', linewidth=0.5))
+
+            ax.set_xlabel('Age Group', fontproperties=source_sans if source_sans else None)
+            ax.set_ylabel(bp_label, fontproperties=source_sans if source_sans else None)
+            ax.set_title(f'{bp_short} by Age (Controls, threshold {threshold})',
+                         fontproperties=source_sans if source_sans else None)
+            apply_font(ax, source_sans)
+            plt.tight_layout()
+
+            save_figure(fig, output_dir,
+                        f'stiffness_fig_{bp_short}_by_age_{threshold}_control',
+                        minimal_dir=minimal_dir)
+            plt.close()
+
+    return sig_rows
+
+
+def plot_bp_by_disease_group(results_df: pd.DataFrame, output_dir: str,
+                              bp_cols: list = None,
+                              figsize: Tuple[float, float] = (2.4, 2.0),
+                              minimal_dir: Optional[str] = None):
+    """Box plots of blood pressure comparing control vs any-disease group.
+
+    Generates two versions for each BP column:
+    * All ages
+    * Age >= 50 only
+
+    Args:
+        results_df: DataFrame with SYS_BP / DIA_BP, Age, and is_healthy.
+        output_dir: Directory to save figures.
+        bp_cols: List of BP columns (default ['SYS_BP', 'DIA_BP']).
+        figsize: Figure size.
+        minimal_dir: If set, save minimal copies.
+
+    Returns:
+        List of dicts with significance results for each BP column / subset.
+    """
+    sig_rows = []
+    if bp_cols is None:
+        bp_cols = ['SYS_BP', 'DIA_BP']
+
+    df = _ensure_healthy_flag(results_df)
+    palette_hex = _make_binary_palette(DISEASE_BASE_COLOR)
+    group_labels = ['Control', 'Disease']
+
+    subsets = [
+        ('all', df.copy()),
+    ]
+    if 'Age' in df.columns:
+        subsets.append(('50plus', df[df['Age'] >= 50].copy()))
+
+    for bp_col in bp_cols:
+        if bp_col not in df.columns:
+            print(f"Warning: {bp_col} not found. Skipping disease-group BP plot.")
+            continue
+        bp_label = 'Systolic BP (mmHg)' if bp_col == 'SYS_BP' else 'Diastolic BP (mmHg)'
+        bp_short = 'SBP' if bp_col == 'SYS_BP' else 'DBP'
+
+        for tag, subset in subsets:
+            sub = subset[subset[bp_col].notna()].copy()
+            sub['Group'] = np.where(sub['is_healthy'] == True, 'Control', 'Disease')
+
+            if sub['Group'].nunique() < 2:
+                print(f"Warning: fewer than 2 groups for {bp_short} ({tag}). Skipping.")
+                continue
+
+            fig, ax = plt.subplots(figsize=figsize)
+            sns.boxplot(data=sub, x='Group', y=bp_col, ax=ax,
+                        order=group_labels, palette=palette_hex, width=0.6)
+
+            for i, grp in enumerate(group_labels):
+                grp_vals = sub[sub['Group'] == grp][bp_col]
+                x_pos = i + np.random.normal(0, 0.04, len(grp_vals))
+                ax.scatter(x_pos, grp_vals, alpha=0.4, s=20, color='black', zorder=3)
+
+            ctrl = sub[sub['Group'] == 'Control'][bp_col]
+            dis = sub[sub['Group'] == 'Disease'][bp_col]
+            stat_text_parts = [f'n = {len(ctrl)}, {len(dis)}']
+            if len(ctrl) > 0 and len(dis) > 0:
+                stat_val, pval = stats.mannwhitneyu(ctrl, dis, alternative='two-sided')
+                d = _cohens_d(ctrl, dis)
+                stat_text_parts.append(f'p = {pval:.4f}')
+                if d is not None and not np.isnan(d):
+                    stat_text_parts.append(f'd = {d:.2f}')
+                tag_label = 'all ages' if tag == 'all' else 'age>=50'
+                sig_rows.append({
+                    'analysis': f'{bp_short} control vs disease ({tag_label})',
+                    'test': 'Mann-Whitney U',
+                    'group1': 'Control', 'group2': 'Disease',
+                    'n1': len(ctrl), 'n2': len(dis),
+                    'statistic': stat_val, 'p_value': pval,
+                    'cohens_d': d if d is not None else np.nan,
+                })
+            ax.text(0.5, 0.95, '\n'.join(stat_text_parts), transform=ax.transAxes,
+                    ha='center', va='top', fontsize=6,
+                    fontproperties=source_sans if source_sans else None,
+                    bbox=dict(boxstyle='round', facecolor='white', alpha=0.8, edgecolor='black', linewidth=0.5))
+
+            suffix = '' if tag == 'all' else f'_{tag}'
+            title_suffix = '' if tag == 'all' else ' (Age \u226550)'
+            ax.set_xlabel('Group', fontproperties=source_sans if source_sans else None)
+            ax.set_ylabel(bp_label, fontproperties=source_sans if source_sans else None)
+            ax.set_title(f'{bp_short}: Control vs Disease{title_suffix}',
+                         fontproperties=source_sans if source_sans else None)
+            apply_font(ax, source_sans)
+            plt.tight_layout()
+
+            save_figure(fig, output_dir,
+                        f'stiffness_fig_{bp_short}_control_vs_disease{suffix}',
+                        minimal_dir=minimal_dir)
+            plt.close()
+
+    return sig_rows
+
+
+def plot_si_by_disease_group(results_df: pd.DataFrame, output_dir: str,
+                             stiffness_col: str = 'SI_logvel_averaged_02_12',
+                             figsize: Tuple[float, float] = (2.4, 2.0),
+                             minimal_dir: Optional[str] = None):
+    """Box plots of SI_logvel comparing control vs any-disease group.
+
+    Generates two versions:
+    * All ages
+    * Age >= 50 only (if Age is available)
+
+    Args:
+        results_df: DataFrame with SI_logvel, Age, and is_healthy.
+        output_dir: Directory to save figures.
+        stiffness_col: SI column to plot (default SI_logvel_averaged_02_12).
+        figsize: Figure size.
+        minimal_dir: If set, save minimal copies.
+
+    Returns:
+        List of dicts with significance results for each subset.
+    """
+    sig_rows = []
+    if stiffness_col not in results_df.columns:
+        print(f"Warning: {stiffness_col} not found. Skipping SI_logvel disease-group plot.")
+        return sig_rows
+
+    df = _ensure_healthy_flag(results_df)
+    palette_hex = _make_binary_palette(DISEASE_BASE_COLOR)
+    group_labels = ['Control', 'Disease']
+
+    subsets = [
+        ('all', df.copy()),
+    ]
+    if 'Age' in df.columns:
+        subsets.append(('50plus', df[df['Age'] >= 50].copy()))
+
+    for tag, subset in subsets:
+        sub = subset[subset[stiffness_col].notna()].copy()
+        sub['Group'] = np.where(sub['is_healthy'] == True, 'Control', 'Disease')
+
+        if sub['Group'].nunique() < 2:
+            print(f"Warning: fewer than 2 groups for SI_logvel ({tag}). Skipping.")
+            continue
+
+        fig, ax = plt.subplots(figsize=figsize)
+        sns.boxplot(
+            data=sub,
+            x='Group',
+            y=stiffness_col,
+            ax=ax,
+            order=group_labels,
+            palette=palette_hex,
+            width=0.6,
+        )
+
+        for i, grp in enumerate(group_labels):
+            grp_vals = sub[sub['Group'] == grp][stiffness_col]
+            x_pos = i + np.random.normal(0, 0.04, len(grp_vals))
+            ax.scatter(x_pos, grp_vals, alpha=0.4, s=20, color='black', zorder=3)
+
+        ctrl = sub[sub['Group'] == 'Control'][stiffness_col]
+        dis = sub[sub['Group'] == 'Disease'][stiffness_col]
+        stat_text_parts = [f'n = {len(ctrl)}, {len(dis)}']
+        if len(ctrl) > 0 and len(dis) > 0:
+            stat_val, pval = stats.mannwhitneyu(ctrl, dis, alternative='two-sided')
+            d = _cohens_d(ctrl, dis)
+            stat_text_parts.append(f'p = {pval:.4f}')
+            if d is not None and not np.isnan(d):
+                stat_text_parts.append(f'd = {d:.2f}')
+            tag_label = 'all ages' if tag == 'all' else 'age>=50'
+            sig_rows.append({
+                'analysis': f'SI_logvel control vs disease ({tag_label})',
+                'test': 'Mann-Whitney U',
+                'group1': 'Control', 'group2': 'Disease',
+                'n1': len(ctrl), 'n2': len(dis),
+                'statistic': stat_val, 'p_value': pval,
+                'cohens_d': d if d is not None else np.nan,
+            })
+
+        ax.text(0.5, 0.95, '\n'.join(stat_text_parts), transform=ax.transAxes,
+                ha='center', va='top', fontsize=6,
+                fontproperties=source_sans if source_sans else None,
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8,
+                          edgecolor='black', linewidth=0.5))
+
+        suffix = '' if tag == 'all' else f'_{tag}'
+        title_suffix = '' if tag == 'all' else ' (Age \u226550)'
+        ax.set_xlabel('Group', fontproperties=source_sans if source_sans else None)
+        ax.set_ylabel('SI_logvel (AUC of log velocity)',
+                      fontproperties=source_sans if source_sans else None)
+        ax.set_title(f'SI_logvel: Control vs Disease{title_suffix}',
+                     fontproperties=source_sans if source_sans else None)
+        apply_font(ax, source_sans)
+        plt.tight_layout()
+
+        save_figure(fig, output_dir,
+                    f'stiffness_fig_SI_logvel_control_vs_disease{suffix}',
+                    minimal_dir=minimal_dir)
+        plt.close()
+
+    return sig_rows
+
+
+def plot_si_correlation_control(results_df: pd.DataFrame, output_dir: str,
+                                 stiffness_col: str = 'SI_logvel_averaged_02_12',
+                                 figsize: Tuple[float, float] = (2.4, 2.0),
+                                 minimal_dir: Optional[str] = None):
+    """Scatter/regression of SI_logvel vs Age, SYS_BP, DIA_BP within controls.
+
+    Args:
+        results_df: DataFrame with SI_logvel, Age, SYS_BP, DIA_BP, is_healthy.
+        output_dir: Directory to save figures.
+        stiffness_col: SI column (default SI_logvel_averaged_02_12).
+        figsize: Figure size.
+        minimal_dir: If set, save minimal copies.
+
+    Returns:
+        List of dicts with correlation/regression results.
+    """
+    sig_rows = []
+    if stiffness_col not in results_df.columns:
+        print(f"Warning: {stiffness_col} not found. Skipping SI correlation control plots.")
+        return sig_rows
+
+    df = _ensure_healthy_flag(results_df)
+    controls = df[(df['is_healthy'] == True) & df[stiffness_col].notna()].copy()
+
+    x_vars = [
+        ('Age', 'Age (years)'),
+        ('SYS_BP', 'Systolic BP (mmHg)'),
+        ('DIA_BP', 'Diastolic BP (mmHg)'),
+    ]
+
+    for x_col, x_label in x_vars:
+        if x_col not in controls.columns:
+            continue
+        plot_data = controls[controls[x_col].notna()].copy()
+        if len(plot_data) < 4:
+            continue
+
+        fig, ax = plt.subplots(figsize=figsize)
+        ax.scatter(plot_data[x_col], plot_data[stiffness_col],
+                   alpha=0.6, s=20, color=CONTROL_COLOR, zorder=3)
+
+        x = plot_data[x_col].values
+        y = plot_data[stiffness_col].values
+        valid = ~(np.isnan(x) | np.isnan(y))
+        if np.sum(valid) > 2:
+            slope, intercept, r_value, p_value, std_err = stats.linregress(x[valid], y[valid])
+            x_line = np.linspace(x[valid].min(), x[valid].max(), 100)
+            y_line = slope * x_line + intercept
+            ax.plot(x_line, y_line, 'k--', linewidth=1, alpha=0.7,
+                    label=f'R\u00b2 = {r_value**2:.3f}')
+            ax.text(0.05, 0.95,
+                    f'n = {int(np.sum(valid))}\nR = {r_value:.3f}\np = {p_value:.4f}',
+                    transform=ax.transAxes, ha='left', va='top', fontsize=6,
+                    fontproperties=source_sans if source_sans else None,
+                    bbox=dict(boxstyle='round', facecolor='white', alpha=0.8, edgecolor='black', linewidth=0.5))
+            sig_rows.append({
+                'analysis': f'SI_logvel vs {x_col} (controls)',
+                'test': 'Linear regression',
+                'group1': 'SI_logvel', 'group2': x_col,
+                'n1': int(np.sum(valid)), 'n2': int(np.sum(valid)),
+                'statistic': r_value,
+                'p_value': p_value,
+                'cohens_d': np.nan,
+                'R': r_value,
+                'R_squared': r_value ** 2,
+                'slope': slope,
+            })
+
+        ax.set_xlabel(x_label, fontproperties=source_sans if source_sans else None)
+        ax.set_ylabel('SI_logvel (AUC of log velocity)',
+                      fontproperties=source_sans if source_sans else None)
+        ax.set_title(f'SI_logvel vs {x_col} (Controls)',
+                     fontproperties=source_sans if source_sans else None)
+        ax.legend(loc='best', fontsize=5, prop=source_sans if source_sans else None)
+        ax.grid(True, alpha=0.3)
+        apply_font(ax, source_sans)
+        plt.tight_layout()
+
+        save_figure(fig, output_dir,
+                    f'stiffness_fig_SI_logvel_vs_{x_col}_control',
+                    minimal_dir=minimal_dir)
+        plt.close()
+
+    return sig_rows
+
+
+def plot_bp_si_correlation_all(results_df: pd.DataFrame, output_dir: str,
+                                stiffness_col: str = 'SI_logvel_averaged_02_12',
+                                figsize: Tuple[float, float] = (2.4, 2.0),
+                                minimal_dir: Optional[str] = None):
+    """Scatter/regression plots coloured by health group for all participants.
+
+    Generates:
+    * SI_logvel vs SYS_BP
+    * SI_logvel vs Age
+    * SYS_BP vs Age
+
+    Args:
+        results_df: DataFrame with SI_logvel, Age, SYS_BP, is_healthy.
+        output_dir: Directory to save figures.
+        stiffness_col: SI column (default SI_logvel_averaged_02_12).
+        figsize: Figure size.
+        minimal_dir: If set, save minimal copies.
+
+    Returns:
+        List of dicts with correlation/regression results.
+    """
+    sig_rows = []
+    df = _ensure_healthy_flag(results_df)
+    palette_hex = _make_binary_palette(DISEASE_BASE_COLOR)
+    group_colors = {'Control': palette_hex[0], 'Disease': palette_hex[1]}
+    df['HealthGroup'] = np.where(df['is_healthy'] == True, 'Control', 'Disease')
+
+    pairs = [
+        (stiffness_col, 'SYS_BP', 'SI_logvel (AUC of log velocity)', 'Systolic BP (mmHg)'),
+        (stiffness_col, 'Age', 'SI_logvel (AUC of log velocity)', 'Age (years)'),
+        ('SYS_BP', 'Age', 'Systolic BP (mmHg)', 'Age (years)'),
+    ]
+
+    for y_col, x_col, y_label, x_label in pairs:
+        if y_col not in df.columns or x_col not in df.columns:
+            continue
+        plot_data = df[df[y_col].notna() & df[x_col].notna()].copy()
+        if len(plot_data) < 4:
+            continue
+
+        fig, ax = plt.subplots(figsize=figsize)
+
+        for grp in ['Control', 'Disease']:
+            gd = plot_data[plot_data['HealthGroup'] == grp]
+            ax.scatter(gd[x_col], gd[y_col], alpha=0.6, s=20,
+                       color=group_colors[grp], label=grp, zorder=3)
+
+        # Overall regression line
+        x = plot_data[x_col].values
+        y = plot_data[y_col].values
+        valid = ~(np.isnan(x) | np.isnan(y))
+        if np.sum(valid) > 2:
+            slope, intercept, r_value, p_value, std_err = stats.linregress(x[valid], y[valid])
+            x_line = np.linspace(x[valid].min(), x[valid].max(), 100)
+            y_line = slope * x_line + intercept
+            ax.plot(x_line, y_line, 'k--', linewidth=1, alpha=0.7,
+                    label=f'R\u00b2 = {r_value**2:.3f}')
+            ax.text(0.05, 0.95,
+                    f'n = {int(np.sum(valid))}\nR = {r_value:.3f}\np = {p_value:.4f}',
+                    transform=ax.transAxes, ha='left', va='top', fontsize=6,
+                    fontproperties=source_sans if source_sans else None,
+                    bbox=dict(boxstyle='round', facecolor='white', alpha=0.8, edgecolor='black', linewidth=0.5))
+            y_short = y_col.replace('SI_logvel_averaged_02_12', 'SI_logvel')
+            sig_rows.append({
+                'analysis': f'{y_short} vs {x_col} (all participants)',
+                'test': 'Linear regression',
+                'group1': y_short, 'group2': x_col,
+                'n1': int(np.sum(valid)), 'n2': int(np.sum(valid)),
+                'statistic': r_value,
+                'p_value': p_value,
+                'cohens_d': np.nan,
+                'R': r_value,
+                'R_squared': r_value ** 2,
+                'slope': slope,
+            })
+
+        y_col_short = y_col.replace('SI_logvel_averaged_02_12', 'SI_logvel')
+        ax.set_xlabel(x_label, fontproperties=source_sans if source_sans else None)
+        ax.set_ylabel(y_label, fontproperties=source_sans if source_sans else None)
+        ax.set_title(f'{y_col_short} vs {x_col} (All)',
+                     fontproperties=source_sans if source_sans else None)
+        ax.legend(loc='best', fontsize=5, prop=source_sans if source_sans else None)
+        ax.grid(True, alpha=0.3)
+        apply_font(ax, source_sans)
+        plt.tight_layout()
+
+        fname_y = 'SI_logvel' if stiffness_col in y_col else y_col
+        fname_x = x_col
+        save_figure(fig, output_dir,
+                    f'stiffness_fig_{fname_y}_vs_{fname_x}_all',
+                    minimal_dir=minimal_dir)
+        plt.close()
+
+    return sig_rows
+
+
 def _ensure_diabetes_bool(results_df: pd.DataFrame) -> pd.DataFrame:
     """Ensure Diabetes column is boolean for group comparisons."""
     df = results_df.copy()
@@ -1549,14 +3160,23 @@ def main():
     if os.path.exists(log_stiffness_file):
         results_df_log = pd.read_csv(log_stiffness_file)
         print(f"Loaded log velocity stiffness results for {len(results_df_log)} participants")
+        # Merge all demographic columns needed for downstream analyses
+        merge_cols = ['Participant', 'Age', 'Diabetes', 'Hypertension', 'SET',
+                      'is_healthy', 'SYS_BP', 'DIA_BP', 'MAP']
+        available = [c for c in merge_cols if c in results_df.columns]
+        # Only merge columns not already present in the log DataFrame
+        cols_to_merge = [c for c in available if c not in results_df_log.columns or c == 'Participant']
+        if len(cols_to_merge) > 1:  # more than just 'Participant'
+            results_df_log = results_df_log.merge(
+                results_df[cols_to_merge].drop_duplicates(subset='Participant'),
+                on='Participant', how='left'
+            )
+            print(f"Merged demographic columns into log results: {[c for c in cols_to_merge if c != 'Participant']}")
+        # Ensure is_healthy flag exists
+        results_df_log = _ensure_healthy_flag(results_df_log)
         if 'Age' not in results_df_log.columns or 'Diabetes' not in results_df_log.columns:
-            if 'Age' in results_df.columns and 'Diabetes' in results_df.columns:
-                age_diabetes = results_df[['Participant', 'Age', 'Diabetes']].copy()
-                results_df_log = results_df_log.merge(age_diabetes, on='Participant', how='left')
-                print("Merged Age and Diabetes data from main results")
-            else:
-                print("Warning: Age and Diabetes columns not found. Skipping log velocity age-adjusted plots.")
-                results_df_log = None
+            print("Warning: Age and Diabetes columns not found. Skipping log velocity age-adjusted plots.")
+            results_df_log = None
 
     # Generate side-by-side comparisons for log-related metrics
     print("\nGenerating log metric comparison plots...")
@@ -1568,6 +3188,18 @@ def main():
             plot_log_metric_comparison_age_adjusted(
                 results_df, results_df_log, output_dir, range_label=range_label, minimal_dir=minimal_dir
             )
+
+    # Generate BP vs SI comparison by condition (Diabetes and Hypertension)
+    print("\nGenerating BP vs SI condition comparison plot...")
+    if results_df_log is not None:
+        bp_si_sig = plot_bp_si_by_condition(
+            results_df, results_df_log, output_dir,
+            stiffness_col='SI_logvel_averaged_02_12',
+            bp_col='SYS_BP',
+            minimal_dir=minimal_dir
+        )
+        if bp_si_sig:
+            print(f"  Generated 2x2 comparison: {len(bp_si_sig)} statistical tests")
 
     # Generate standalone boxplots for log velocity AUC (SI_logvel)
     print("\nGenerating standalone SI_logvel boxplots...")
@@ -1587,6 +3219,7 @@ def main():
                 plot_age_adjusted_analysis(results_df_log, output_dir, stiffness_col=stiffness_col, minimal_dir=minimal_dir)
     else:
         print("Warning: Age and Diabetes data not available for log velocity results. Skipping age-adjusted plots.")
+
 
     # Calculate and save correlation table
     print("\nCalculating correlations...")
@@ -1610,6 +3243,65 @@ def main():
     comparison_file = os.path.join(cap_flow_path, 'results', 'Stiffness', 'stiffness_metric_comparison.csv')
     comparison_df.to_csv(comparison_file, index=False)
     print(f"Saved log metric comparison to: {comparison_file}")
+
+    # ------------------------------------------------------------------
+    # Age-group and blood-pressure comparisons (SI_logvel)
+    # ------------------------------------------------------------------
+
+    # Ensure is_healthy flag on both DataFrames
+    results_df = _ensure_healthy_flag(results_df)
+    all_sig_rows = []
+
+    print("\nGenerating SI_logvel age-group box plots (controls only)...")
+    si_source = results_df_log if results_df_log is not None else results_df
+    all_sig_rows.extend(plot_si_by_age_group_control(si_source, output_dir, minimal_dir=minimal_dir) or [])
+
+    print("\nGenerating SI_logvel age-bracket box plot (controls only)...")
+    all_sig_rows.extend(plot_si_by_age_brackets_control(si_source, output_dir, minimal_dir=minimal_dir) or [])
+
+    print("\nGenerating BP age-group box plots (controls only)...")
+    # Use main results_df which always has SYS_BP / DIA_BP
+    all_sig_rows.extend(plot_bp_by_age_group_control(results_df, output_dir, minimal_dir=minimal_dir) or [])
+
+    print("\nGenerating BP control-vs-disease box plots...")
+    all_sig_rows.extend(plot_bp_by_disease_group(results_df, output_dir, minimal_dir=minimal_dir) or [])
+
+    print("\nGenerating SI_logvel control-vs-disease box plots...")
+    all_sig_rows.extend(plot_si_by_disease_group(si_source, output_dir, minimal_dir=minimal_dir) or [])
+
+    print("\nGenerating SI_logvel correlation plots (controls only)...")
+    all_sig_rows.extend(plot_si_correlation_control(si_source, output_dir, minimal_dir=minimal_dir) or [])
+
+    print("\nGenerating correlation plots (all participants)...")
+    all_sig_rows.extend(plot_bp_si_correlation_all(si_source, output_dir, minimal_dir=minimal_dir) or [])
+
+    # Generate hysteresis vs age scatterplots
+    print("\nGenerating hysteresis vs age scatterplots...")
+    data_filepath = os.path.join(cap_flow_path, 'summary_df_nhp_video_stats.csv')
+    if os.path.exists(data_filepath):
+        raw_df = pd.read_csv(data_filepath)
+        hysteresis_df = calculate_velocity_hysteresis(raw_df, use_log_velocity=False)
+        # Scatterplots
+        all_sig_rows.extend(plot_hysteresis_vs_age_control(hysteresis_df, output_dir, minimal_dir=minimal_dir) or [])
+        all_sig_rows.extend(plot_hysteresis_vs_age_all(hysteresis_df, output_dir, minimal_dir=minimal_dir) or [])
+        all_sig_rows.extend(plot_hysteresis_vs_age_diabetes(hysteresis_df, output_dir, minimal_dir=minimal_dir) or [])
+        all_sig_rows.extend(plot_hysteresis_vs_age_hypertension(hysteresis_df, output_dir, minimal_dir=minimal_dir) or [])
+        # Scatterplots of absolute value of hysteresis
+        all_sig_rows.extend(plot_abs_hysteresis_vs_age_control(hysteresis_df, output_dir, minimal_dir=minimal_dir) or [])
+        all_sig_rows.extend(plot_abs_hysteresis_vs_age_all(hysteresis_df, output_dir, minimal_dir=minimal_dir) or [])
+        # Boxplots
+        all_sig_rows.extend(plot_hysteresis_boxplot_diabetes(hysteresis_df, output_dir, minimal_dir=minimal_dir) or [])
+        all_sig_rows.extend(plot_hysteresis_boxplot_hypertension(hysteresis_df, output_dir, minimal_dir=minimal_dir) or [])
+    else:
+        print(f"Warning: {data_filepath} not found. Skipping hysteresis plots.")
+
+    # Save significance results from all age-group/BP analyses
+    if all_sig_rows:
+        age_sig_df = pd.DataFrame(all_sig_rows)
+        age_sig_file = os.path.join(output_dir, 'age_group_analysis_significance.csv')
+        age_sig_df.to_csv(age_sig_file, index=False)
+        print(f"\nSaved age-group analysis significance to: {age_sig_file}")
+        print(age_sig_df.to_string())
 
     print("\nAll plots generated successfully!")
     return 0

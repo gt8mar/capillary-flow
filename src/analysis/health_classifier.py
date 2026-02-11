@@ -269,9 +269,57 @@ def prepare_data_log(df) -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray, np.n
     return processed_df, target_dict
 
 
+def _save_roc_figure(fig, output_dir: str, filename: str, dpi: int = 400,
+                     save_minimal: bool = True):
+    """Save ROC figure as both PDF and PNG, with optional no-annotations version.
+
+    Args:
+        fig: matplotlib figure object
+        output_dir: Directory to save files
+        filename: Base filename (without extension)
+        dpi: Resolution for PNG (default: 400)
+        save_minimal: If True, save a no-title/no-legend copy in no_annotations subfolder
+    """
+    # Save PDF
+    pdf_path = os.path.join(output_dir, f'{filename}.pdf')
+    fig.savefig(pdf_path, dpi=dpi, bbox_inches='tight')
+
+    # Save PNG
+    png_path = os.path.join(output_dir, f'{filename}.png')
+    fig.savefig(png_path, dpi=dpi, bbox_inches='tight')
+
+    print(f"Saved: {pdf_path}")
+    print(f"Saved: {png_path}")
+
+    if save_minimal:
+        # Create no-annotations version
+        for ax in fig.get_axes():
+            ax.set_title('')
+            leg = ax.get_legend()
+            if leg is not None:
+                leg.set_visible(False)
+            for txt in ax.texts:
+                txt.set_visible(False)
+
+        minimal_dir = os.path.join(output_dir, 'no_annotations')
+        os.makedirs(minimal_dir, exist_ok=True)
+
+        minimal_pdf = os.path.join(minimal_dir, f'{filename}.pdf')
+        fig.savefig(minimal_pdf, dpi=dpi, bbox_inches='tight')
+
+        minimal_png = os.path.join(minimal_dir, f'{filename}.png')
+        fig.savefig(minimal_png, dpi=dpi, bbox_inches='tight')
+
+        print(f"Saved (no annotations): {minimal_pdf}")
+        print(f"Saved (no annotations): {minimal_png}")
+
+
 def plot_auc_curves(results: Dict, condition: str, output_dir: str):
     """Plot ROC curves with AUC for all classifiers.
-    
+
+    Creates both a combined plot with all classifiers and individual plots
+    for each classifier. Each plot is saved with and without annotations.
+
     Args:
         results: Dictionary containing classifier results
         condition: Name of health condition being classified
@@ -280,14 +328,14 @@ def plot_auc_curves(results: Dict, condition: str, output_dir: str):
     plt.close()
     # Set up style and font
     sns.set_style("whitegrid")
-    
+
     # Try to use Source Sans font if available, otherwise use default
     try:
-        source_sans = FontProperties(fname=os.path.join(PATHS['downloads'], 'Source_Sans_3\\static\\SourceSans3-Regular.ttf'))
+        source_sans_local = FontProperties(fname=os.path.join(PATHS['downloads'], 'Source_Sans_3\\static\\SourceSans3-Regular.ttf'))
     except:
         print("Source Sans font not found, using default font")
-        source_sans = None
-    
+        source_sans_local = None
+
     plt.rcParams.update({
         'pdf.fonttype': 42, 'ps.fonttype': 42,
         'font.size': 7, 'axes.labelsize': 7,
@@ -295,11 +343,10 @@ def plot_auc_curves(results: Dict, condition: str, output_dir: str):
         'legend.fontsize': 5, 'lines.linewidth': 0.5
     })
 
-    plt.figure(figsize=(2.4, 2))
-
     colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
-    
-    # Plot ROC curve for each classifier
+
+    # Store computed ROC data for reuse
+    roc_data = {}
     for (name, res), color in zip(results.items(), colors):
         try:
             # Get predictions for test set
@@ -307,36 +354,68 @@ def plot_auc_curves(results: Dict, condition: str, output_dir: str):
                 y_pred = res['classifier'].predict_proba(res['X_test'])[:, 1]
             else:
                 y_pred = res['classifier'].predict(res['X_test'])
-            
+
             # Calculate ROC curve
             fpr, tpr, _ = roc_curve(res['y_test'], y_pred)
             roc_auc = auc(fpr, tpr)
-            
-            # Plot ROC curve
-            plt.plot(fpr, tpr, color=color, lw=2,
-                    label=f'{name} (AUC = {roc_auc:.2f})')
+            roc_data[name] = {'fpr': fpr, 'tpr': tpr, 'auc': roc_auc, 'color': color}
         except Exception as e:
-            print(f"Warning: Could not plot ROC curve for {name}: {str(e)}")
+            print(f"Warning: Could not compute ROC curve for {name}: {str(e)}")
             continue
-    
+
+    # --- Combined plot with all classifiers ---
+    fig, ax = plt.subplots(figsize=(2.4, 2))
+
+    for name, data in roc_data.items():
+        ax.plot(data['fpr'], data['tpr'], color=data['color'], lw=2,
+                label=f'{name} (AUC = {data["auc"]:.2f})')
+
     # Plot random guess line
-    plt.plot([0, 1], [0, 1], color='gray', linestyle='--')
-    
+    ax.plot([0, 1], [0, 1], color='gray', linestyle='--')
+
     # Customize plot
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate', fontproperties=source_sans if source_sans else None)
-    plt.ylabel('True Positive Rate', fontproperties=source_sans if source_sans else None)
-    plt.title(f'ROC Curves for {condition} Classification', fontproperties=source_sans if source_sans else None)
-    plt.legend(loc="lower right", prop=source_sans if source_sans else None)
-    
-    # Save plot directly to output_dir
+    ax.set_xlim([0.0, 1.0])
+    ax.set_ylim([0.0, 1.05])
+    ax.set_xlabel('False Positive Rate', fontproperties=source_sans_local if source_sans_local else None)
+    ax.set_ylabel('True Positive Rate', fontproperties=source_sans_local if source_sans_local else None)
+    ax.set_title(f'ROC Curves for {condition} Classification', fontproperties=source_sans_local if source_sans_local else None)
+    ax.legend(loc="lower right", prop=source_sans_local if source_sans_local else None)
+
     plt.tight_layout()
     try:
-        plt.savefig(os.path.join(output_dir, 'roc_curves.png'), dpi=400, bbox_inches='tight')
+        _save_roc_figure(fig, output_dir, 'roc_curves', dpi=400, save_minimal=True)
     except Exception as e:
-        print(f"Warning: Could not save ROC curve plot: {str(e)}")
+        print(f"Warning: Could not save combined ROC curve plot: {str(e)}")
     plt.close()
+
+    # --- Individual plots for each classifier ---
+    for name, data in roc_data.items():
+        fig, ax = plt.subplots(figsize=(2.4, 2))
+
+        ax.plot(data['fpr'], data['tpr'], color=data['color'], lw=2,
+                label=f'AUC = {data["auc"]:.2f}')
+
+        # Plot random guess line
+        ax.plot([0, 1], [0, 1], color='gray', linestyle='--')
+
+        # Customize plot
+        ax.set_xlim([0.0, 1.0])
+        ax.set_ylim([0.0, 1.05])
+        ax.set_xlabel('False Positive Rate', fontproperties=source_sans_local if source_sans_local else None)
+        ax.set_ylabel('True Positive Rate', fontproperties=source_sans_local if source_sans_local else None)
+        ax.set_title(f'{name} ROC for {condition}', fontproperties=source_sans_local if source_sans_local else None)
+        ax.legend(loc="lower right", prop=source_sans_local if source_sans_local else None)
+
+        plt.tight_layout()
+
+        # Create safe filename from classifier name
+        safe_name = name.replace(' ', '_').replace('/', '_')
+        try:
+            _save_roc_figure(fig, output_dir, f'roc_{safe_name}', dpi=400, save_minimal=True)
+        except Exception as e:
+            print(f"Warning: Could not save ROC curve plot for {name}: {str(e)}")
+        plt.close()
+
     return 0
 
 def plot_3D_features(processed_df, results, feature_cols, condition, output_dir):
