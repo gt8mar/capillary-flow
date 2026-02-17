@@ -1033,7 +1033,7 @@ def calculate_hysteresis_pvalues(processed_df: pd.DataFrame, use_absolute: bool 
             'name': 'Age Group',
             'column': 'Age',
             'is_categorical': False,
-            'bins': [0, 30, 50, 60, 70, 100],
+            'bins': [0, 30, 50, 60, 70, 101],
             'labels': ['<30', '30-49', '50-59', '60-69', '70+']
         },
         {
@@ -1066,10 +1066,10 @@ def calculate_hysteresis_pvalues(processed_df: pd.DataFrame, use_absolute: bool 
             group_col = factor.get('group_column', f"{factor['column']}_Group")
             # Create age groups
             plot_df[group_col] = pd.cut(
-                plot_df[factor['column']], 
-                bins=factor['bins'], 
+                plot_df[factor['column']],
+                bins=factor['bins'],
                 labels=factor['labels'],
-                include_lowest=True
+                right=False
             )
         else:
             group_col = factor.get('group_column', factor['column'])
@@ -1444,6 +1444,52 @@ def plot_under30_vs_over30(processed_df: pd.DataFrame, use_absolute: bool = Fals
     return 0
 
 
+def print_age_bins(processed_df: pd.DataFrame, scheme: str = 'age_group') -> None:
+    """Print each age bin and the ages of the participants in it.
+
+    Uses the same bin edges and labels as the hysteresis age grouping
+    (right=False so bins match labels: <30 = 0-29, 30-49 = 30-49, etc.).
+
+    Args:
+        processed_df: DataFrame with an 'Age' column (e.g. participant-level or row-level).
+        scheme: 'age_group' (5 bins: <30, 30-49, 50-59, 60-69, 70+),
+            'age_brackets' (3 bins: <30, 30-60, 60+), or 'both' to print both.
+    """
+    if 'Age' not in processed_df.columns:
+        print("Error: DataFrame has no 'Age' column")
+        return
+    age = processed_df['Age'].dropna()
+    if age.empty:
+        print("Error: No non-null ages in DataFrame")
+        return
+    schemes = {
+        'age_group': {
+            'bins': [0, 30, 50, 60, 70, 101],
+            'labels': ['<30', '30-49', '50-59', '60-69', '70+'],
+        },
+        'age_brackets': {
+            'bins': [0, 30, 60, 121],
+            'labels': ['<30', '30-60', '60+'],
+        },
+    }
+    to_run = []
+    if scheme == 'both':
+        to_run = [('Age Group', schemes['age_group']), ('Age Brackets', schemes['age_brackets'])]
+    elif scheme in schemes:
+        to_run = [(scheme, schemes[scheme])]
+    else:
+        print(f"Error: scheme must be 'age_group', 'age_brackets', or 'both', got {scheme!r}")
+        return
+    for name, cfg in to_run:
+        binned = pd.cut(age, bins=cfg['bins'], labels=cfg['labels'], right=False)
+        print(f"\n{name}:")
+        for label in cfg['labels']:
+            ages_in_bin = age[binned == label].unique()
+            ages_in_bin = sorted(int(a) for a in ages_in_bin)
+            n = (binned == label).sum()
+            print(f"  {label}: n={n}, ages = {ages_in_bin}")
+
+
 def plot_up_down_diff_boxplots(processed_df: pd.DataFrame, use_absolute: bool = False, output_dir: str = None, use_log_velocity: bool = False) -> int:
     """Creates boxplots of up_down_diff (velocity hysteresis) grouped by different factors.
     
@@ -1503,7 +1549,7 @@ def plot_up_down_diff_boxplots(processed_df: pd.DataFrame, use_absolute: bool = 
         {
             'column': 'Age',
             'is_categorical': False,
-            'bins': [0, 30, 50, 60, 70, 100],
+            'bins': [0, 30, 50, 60, 70, 101],
             'labels': ['<30', '30-49', '50-59', '60-69', '70+'],
             'group_column': 'Age_Group',
             'title': f'Absolute {"Log " if use_log_velocity else ""}Velocity Hysteresis by Age Group' if use_absolute else f'{"Log " if use_log_velocity else ""}Velocity Hysteresis by Age Group',
@@ -1513,7 +1559,7 @@ def plot_up_down_diff_boxplots(processed_df: pd.DataFrame, use_absolute: bool = 
         {
             'column': 'Age',
             'is_categorical': False,
-            'bins': [0, 30, 60, 120],
+            'bins': [0, 30, 60, 121],
             'labels': ['<30', '30-60', '60+'],
             'group_column': 'Age_Bracket_Group',
             'title': f'Absolute {"Log " if use_log_velocity else ""}Velocity Hysteresis by Age Brackets' if use_absolute else f'{"Log " if use_log_velocity else ""}Velocity Hysteresis by Age Brackets',
@@ -1566,10 +1612,10 @@ def plot_up_down_diff_boxplots(processed_df: pd.DataFrame, use_absolute: bool = 
         if not factor['is_categorical']:
             # Create age groups
             plot_df[f"{factor['column']}_Group"] = pd.cut(
-                plot_df[factor['column']], 
-                bins=factor['bins'], 
+                plot_df[factor['column']],
+                bins=factor['bins'],
                 labels=factor['labels'],
-                include_lowest=True
+                right=False
             )
             group_col = f"{factor['column']}_Group"
         else:

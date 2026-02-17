@@ -153,3 +153,27 @@ Google-style with type hints. See `docs/coding_standards.md` for templates.
 - `metadata/` - Experiment metadata files
 - `docs/pipeline_explanation.md` - Detailed pipeline documentation
 - `docs/coding_standards.md` - Full coding standards reference
+
+## Basler Camera Pipeline
+
+### Overview
+
+Separate from the main fingernail capillary pipeline, the Basler pipeline processes higher-resolution microscopy video (1080x1440) captured with a Basler camera. Data lives in `C:\Users\gt8ma\Basler\` with subdirectories `vid01`–`vid08`, each containing TIFF frame stacks.
+
+### Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/preprocess_basler.py` | Main preprocessing: load TIFF stacks, register frames with moco-py, save stabilized output |
+| `scripts/diagnose_basler.py` | Diagnostic: inspect frame quality, shifts, RMS errors |
+| `scripts/annotate_shifts.py` | GUI for creating ground truth frame-pair shift annotations |
+| `scripts/benchmark_registration.py` | Benchmark 8 registration algorithms against ground truth |
+
+### Registration Benchmark (as of 2026-02-11)
+
+Ground truth for vid08 (16 pairs, typical shifts 9–15px). **All 8 algorithms fail** — mean errors 10–16px:
+
+- **Global methods** (phaseCorrelate, ECC, moco-py): capillaries are too sparse in the full frame; signal diluted by background
+- **CLAHE-enhanced variants**: marginal improvement (~0.03px)
+- **ORB+RANSAC**: features land on noise/texture, not capillary edges
+- **Open problem**: need ROI cropping, template matching, or segmentation-guided masking to focus on capillary regions
