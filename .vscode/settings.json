@@ -2,5 +2,9 @@
     "python.analysis.extraPaths": [
         "./capillary-flow",
         "./capillary-flow/tools"
+    ],
+    "cursorpyright.analysis.extraPaths": [
+        "./capillary-flow",
+        "./capillary-flow/tools"
     ]
 }
