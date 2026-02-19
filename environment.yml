@@ -40,4 +40,3 @@ dependencies:
     - six==1.16.0
     - statsmodels==0.13.5
     - tifffile==2022.10.10
-prefix: C:\Users\gt8mar\miniconda3\envs\capillary-flow
