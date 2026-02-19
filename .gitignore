@@ -161,7 +161,7 @@ src/__pycache__/__init__.cpython-310.pyc
 test_output/*
 *.png
 *.pdf
-*.py
+/*.py
 thesis.tex
 *.md
 *.avi
