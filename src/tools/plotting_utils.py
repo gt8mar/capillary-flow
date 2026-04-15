@@ -65,6 +65,43 @@ def get_source_sans_font():
 # Set up source_sans for backward compatibility with other functions
 source_sans = get_source_sans_font()
 
+
+def _get_ci_unlabeled_dir() -> str:
+    """Return the standalone directory for stripped CI figure exports."""
+    output_dir = os.path.join(PATHS.get('cap_flow', '.'), 'results', 'CI_unlabeled')
+    os.makedirs(output_dir, exist_ok=True)
+    return output_dir
+
+
+def _save_unlabeled_ci_figure(fig, ax, filename: str, extra_artists=None, save_pdf: bool = False) -> None:
+    """Save a CI figure without title, labels, legend, or extra annotations.
+
+    Tick labels remain visible so the plot scale is preserved.
+    """
+    legend = ax.get_legend()
+    if legend is not None:
+        legend.remove()
+
+    for artist in extra_artists or []:
+        if artist is None:
+            continue
+        try:
+            artist.remove()
+        except ValueError:
+            pass
+
+    ax.set_title('')
+    ax.set_xlabel('')
+    ax.set_ylabel('')
+
+    out_dir = _get_ci_unlabeled_dir()
+    png_path = os.path.join(out_dir, f'{filename}.png')
+    fig.tight_layout()
+    fig.savefig(png_path, dpi=600, bbox_inches='tight')
+    if save_pdf:
+        pdf_path = os.path.join(out_dir, f'{filename}.pdf')
+        fig.savefig(pdf_path, bbox_inches='tight')
+
 def plot_PCA(participant_medians):
     """
     Perform Principal Component Analysis on participant median data and create visualizations.
@@ -645,6 +682,8 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
         if participant_weighting:
             output_path = os.path.join(output_cap_flow_path, 'results', f'{variable}_participant_weighted_CI_new.png')
         plt.savefig(output_path, dpi=600)
+        unlabeled_filename = os.path.splitext(os.path.basename(output_path))[0]
+        _save_unlabeled_ci_figure(fig, ax, unlabeled_filename)
         print(f"Plot saved to: {output_path}")
     else:
         plt.show()
@@ -1874,10 +1913,11 @@ def plot_CI_multiple_bands(df, thresholds=[29, 49], variable='Age', method='boot
             filename += '_log'
         
         # Save as PNG and PDF
-        plt.savefig(os.path.join(output_dir, f'{filename}.png'), 
-                   dpi=300, bbox_inches='tight')
-        plt.savefig(os.path.join(output_dir, f'{filename}.pdf'), 
-                   dpi=300, bbox_inches='tight')
+        fig.savefig(os.path.join(output_dir, f'{filename}.png'),
+                    dpi=300, bbox_inches='tight')
+        fig.savefig(os.path.join(output_dir, f'{filename}.pdf'),
+                    dpi=300, bbox_inches='tight')
+        _save_unlabeled_ci_figure(fig, ax, filename, save_pdf=True)
     
     plt.show()
     return 0
@@ -2035,8 +2075,13 @@ def plot_participant_velocity_profiles(df, method='bootstrap', n_iterations=1000
     
     # Add annotation with sample size
     sample_size = len(participants)
-    ax.annotate(f'n = {sample_size} participants', xy=(0.02, 0.95), xycoords='axes fraction',
-               fontsize=5, fontproperties=source_sans)
+    sample_annotation = ax.annotate(
+        f'n = {sample_size} participants',
+        xy=(0.02, 0.95),
+        xycoords='axes fraction',
+        fontsize=5,
+        fontproperties=source_sans
+    )
     
     ax.grid(True, linewidth=0.3)
     plt.tight_layout()
@@ -2056,8 +2101,9 @@ def plot_participant_velocity_profiles(df, method='bootstrap', n_iterations=1000
             filename += "_log"
         
         # Save as PNG and PDF
-        plt.savefig(os.path.join(save_dir, f"{filename}.png"), dpi=600, bbox_inches='tight')
-        plt.savefig(os.path.join(save_dir, f"{filename}.pdf"), bbox_inches='tight')
+        fig.savefig(os.path.join(save_dir, f"{filename}.png"), dpi=600, bbox_inches='tight')
+        fig.savefig(os.path.join(save_dir, f"{filename}.pdf"), bbox_inches='tight')
+        _save_unlabeled_ci_figure(fig, ax, filename, extra_artists=[sample_annotation], save_pdf=True)
     
     plt.close()
     
@@ -2339,8 +2385,9 @@ def plot_participant_velocity_profiles_by_group(df, variable='Age', method='boot
             filename += "_log"
         
         # Save as PNG and PDF
-        plt.savefig(os.path.join(save_dir, f"{filename}.png"), dpi=600, bbox_inches='tight')
-        plt.savefig(os.path.join(save_dir, f"{filename}.pdf"), bbox_inches='tight')
+        fig.savefig(os.path.join(save_dir, f"{filename}.png"), dpi=600, bbox_inches='tight')
+        fig.savefig(os.path.join(save_dir, f"{filename}.pdf"), bbox_inches='tight')
+        _save_unlabeled_ci_figure(fig, ax, filename, save_pdf=True)
     
     plt.close()
     
