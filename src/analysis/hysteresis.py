@@ -36,6 +36,40 @@ from src.tools.plotting_utils import create_monochromatic_palette, adjust_bright
 cap_flow_path = PATHS['cap_flow']
 source_sans = load_source_sans()    
 
+
+def _get_unlabeled_output_dir(output_dir: str) -> str:
+    """Return the directory used for stripped-down companion figures."""
+    unlabeled_dir = os.path.join(output_dir, 'unlabeled')
+    os.makedirs(unlabeled_dir, exist_ok=True)
+    return unlabeled_dir
+
+
+def _save_unlabeled_figure(fig, ax, output_dir: str, filename: str, annotation_artists: List = None) -> None:
+    """Save a copy of a figure without labels or significance annotations."""
+    for artist in annotation_artists or []:
+        if artist is None:
+            continue
+        if isinstance(artist, (list, tuple)):
+            for sub_artist in artist:
+                try:
+                    sub_artist.remove()
+                except ValueError:
+                    pass
+        else:
+            try:
+                artist.remove()
+            except ValueError:
+                pass
+
+    ax.set_title('')
+    ax.set_xlabel('')
+    ax.set_ylabel('')
+    ax.tick_params(axis='x', which='both', labelbottom=False)
+    ax.tick_params(axis='y', which='both', labelleft=True)
+
+    fig.tight_layout()
+    fig.savefig(os.path.join(_get_unlabeled_output_dir(output_dir), filename), dpi=300, bbox_inches='tight')
+
 def prepare_data() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray, np.ndarray]]]:
     """Load and prepare data for classification, focusing on velocity measurements.
     
@@ -1033,7 +1067,7 @@ def calculate_hysteresis_pvalues(processed_df: pd.DataFrame, use_absolute: bool 
             'name': 'Age Group',
             'column': 'Age',
             'is_categorical': False,
-            'bins': [0, 30, 50, 60, 70, 100],
+            'bins': [0, 30, 50, 60, 70, 101],
             'labels': ['<30', '30-49', '50-59', '60-69', '70+']
         },
         {
@@ -1066,10 +1100,10 @@ def calculate_hysteresis_pvalues(processed_df: pd.DataFrame, use_absolute: bool 
             group_col = factor.get('group_column', f"{factor['column']}_Group")
             # Create age groups
             plot_df[group_col] = pd.cut(
-                plot_df[factor['column']], 
-                bins=factor['bins'], 
+                plot_df[factor['column']],
+                bins=factor['bins'],
                 labels=factor['labels'],
-                include_lowest=True
+                right=False
             )
         else:
             group_col = factor.get('group_column', factor['column'])
@@ -1324,7 +1358,7 @@ def plot_under30_vs_over30(processed_df: pd.DataFrame, use_absolute: bool = Fals
     palette_hex = [rgb2hex(palette[4]), rgb2hex(palette[1])]
     
     # Create figure
-    plt.figure(figsize=(3.0, 2.5))
+    fig = plt.figure(figsize=(3.0, 2.5))
     
     # Create boxplot
     ax = sns.boxplot(
@@ -1335,6 +1369,7 @@ def plot_under30_vs_over30(processed_df: pd.DataFrame, use_absolute: bool = Fals
         width=0.6,
         fliersize=3
     )
+    annotation_artists = []
     
     # # Set alpha (transparency) for boxplot boxes only
     # for patch in ax.patches:
@@ -1372,13 +1407,17 @@ def plot_under30_vs_over30(processed_df: pd.DataFrame, use_absolute: bool = Fals
     bracket_height = y_max - (y_range * 0.08)
     
     # Draw bracket
-    ax.plot([0, 0, 1, 1], 
-           [bracket_height - (y_range * 0.02), bracket_height, bracket_height, bracket_height - (y_range * 0.02)], 
-           'k-', linewidth=1.0)
+    annotation_artists.append(
+        ax.plot([0, 0, 1, 1],
+               [bracket_height - (y_range * 0.02), bracket_height, bracket_height, bracket_height - (y_range * 0.02)],
+               'k-', linewidth=1.0)
+    )
     
     # Add asterisks
-    ax.text(0.5, bracket_height + (y_range * 0.01), sig_marker, 
-           ha='center', va='bottom', fontsize=12, fontweight='bold')
+    annotation_artists.append(
+        ax.text(0.5, bracket_height + (y_range * 0.01), sig_marker,
+               ha='center', va='bottom', fontsize=12, fontweight='bold')
+    )
     
     # # Add p-value text box
     # p_text = (f"Mann-Whitney U: p={p_value_mw:.4f} {sig_marker}\n"
@@ -1436,12 +1475,321 @@ def plot_under30_vs_over30(processed_df: pd.DataFrame, use_absolute: bool = Fals
     abs_str = "abs_" if use_absolute else ""
     filename = f'{log_str}{abs_str}hysteresis_under30_vs_over30.png'
     
-    plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, filename), dpi=300, bbox_inches='tight')
-    plt.close()
+    fig.tight_layout()
+    fig.savefig(os.path.join(output_dir, filename), dpi=300, bbox_inches='tight')
+    _save_unlabeled_figure(fig, ax, output_dir, filename, annotation_artists)
+    plt.close(fig)
     
     print(f"Under-30 vs Over-30 plot saved: {filename}")
     return 0
+
+
+def calculate_absolute_hysteresis_age_bracket_pvalues(processed_df: pd.DataFrame,
+                                                      use_anova: bool = True) -> pd.DataFrame:
+    """Calculate absolute hysteresis p-values for the <30, 30-60, and 60+ age brackets."""
+    from scipy.stats import mannwhitneyu, kruskal, f_oneway, ttest_ind
+
+    if 'up_down_diff' not in processed_df.columns or 'Age' not in processed_df.columns:
+        raise ValueError("Required columns (up_down_diff, Age) not found")
+
+    plot_df = processed_df.copy()
+    plot_df['up_down_diff'] = plot_df['up_down_diff'].abs()
+    plot_df = plot_df.dropna(subset=['up_down_diff', 'Age'])
+    plot_df['Age_Bracket'] = pd.cut(
+        plot_df['Age'],
+        bins=[0, 30, 60, 121],
+        labels=['<30', '30-60', '60+'],
+        right=False
+    )
+
+    groups = (
+        plot_df.groupby('Age_Bracket', observed=False)['up_down_diff']
+        .apply(list)
+        .to_dict()
+    )
+    ordered_labels = ['<30', '30-60', '60+']
+    valid_groups = {label: groups.get(label, []) for label in ordered_labels if len(groups.get(label, [])) >= 3}
+
+    if len(valid_groups) < 2:
+        print("Warning: Not enough age bracket groups with sufficient data for p-value analysis")
+        return pd.DataFrame()
+
+    results = []
+    if len(valid_groups) > 2:
+        group_values = [valid_groups[label] for label in ordered_labels if label in valid_groups]
+        h_stat, p_value_kw = kruskal(*group_values)
+        results.append({
+            'grouping_factor': 'Age Brackets',
+            'group1': 'All',
+            'group2': 'All',
+            'test_type': 'Kruskal-Wallis',
+            'statistic': h_stat,
+            'p_value': p_value_kw,
+            'n1': sum(len(vals) for vals in group_values),
+            'n2': np.nan,
+            'significant': 'Yes' if p_value_kw < 0.05 else 'No'
+        })
+
+        if use_anova:
+            f_stat, p_value_anova = f_oneway(*group_values)
+            results.append({
+                'grouping_factor': 'Age Brackets',
+                'group1': 'All',
+                'group2': 'All',
+                'test_type': 'One-way ANOVA',
+                'statistic': f_stat,
+                'p_value': p_value_anova,
+                'n1': sum(len(vals) for vals in group_values),
+                'n2': np.nan,
+                'significant': 'Yes' if p_value_anova < 0.05 else 'No'
+            })
+
+    reference_group = '<30'
+    comparison_groups = ['30-60', '60+']
+    if reference_group in valid_groups:
+        for other_group in comparison_groups:
+            if other_group not in valid_groups:
+                continue
+
+            ref_values = valid_groups[reference_group]
+            other_values = valid_groups[other_group]
+
+            stat_mw, p_value_mw = mannwhitneyu(ref_values, other_values, alternative='two-sided')
+            results.append({
+                'grouping_factor': 'Age Brackets',
+                'group1': reference_group,
+                'group2': other_group,
+                'test_type': 'Mann-Whitney U',
+                'statistic': stat_mw,
+                'p_value': p_value_mw,
+                'n1': len(ref_values),
+                'n2': len(other_values),
+                'significant': 'Yes' if p_value_mw < 0.05 else 'No'
+            })
+
+            if use_anova:
+                stat_t, p_value_t = ttest_ind(ref_values, other_values)
+                results.append({
+                    'grouping_factor': 'Age Brackets',
+                    'group1': reference_group,
+                    'group2': other_group,
+                    'test_type': 'Independent t-test',
+                    'statistic': stat_t,
+                    'p_value': p_value_t,
+                    'n1': len(ref_values),
+                    'n2': len(other_values),
+                    'significant': 'Yes' if p_value_t < 0.05 else 'No'
+                })
+
+    return pd.DataFrame(results)
+
+
+def plot_absolute_hysteresis_three_age_groups(processed_df: pd.DataFrame,
+                                              output_dir: str = None,
+                                              use_log_velocity: bool = False) -> int:
+    """Plot absolute hysteresis for <30, 30-60, and 60+ using the existing under-30 plot style."""
+    if output_dir is None:
+        output_dir = os.path.join(cap_flow_path, 'results', 'Hysteresis')
+        os.makedirs(output_dir, exist_ok=True)
+
+    if 'up_down_diff' not in processed_df.columns or 'Age' not in processed_df.columns:
+        print("Error: Required columns (up_down_diff, Age) not found")
+        return 1
+
+    sns.set_style("whitegrid")
+
+    def get_source_sans_font():
+        try:
+            font_path = os.path.join(PATHS['downloads'], 'Source_Sans_3', 'static', 'SourceSans3-Regular.ttf')
+            if os.path.exists(font_path):
+                return FontProperties(fname=font_path)
+            return None
+        except Exception:
+            return None
+
+    source_sans = get_source_sans_font()
+
+    plt.rcParams.update({
+        'pdf.fonttype': 42,
+        'ps.fonttype': 42,
+        'font.size': 9,
+        'axes.labelsize': 9,
+        'xtick.labelsize': 8,
+        'ytick.labelsize': 8,
+        'legend.fontsize': 7,
+        'lines.linewidth': 0.5
+    })
+
+    plot_df = processed_df.copy()
+    plot_df['up_down_diff'] = plot_df['up_down_diff'].abs()
+    plot_df['Age_Bracket'] = pd.cut(
+        plot_df['Age'],
+        bins=[0, 30, 60, 121],
+        labels=['<30', '30-60', '60+'],
+        right=False
+    )
+    plot_df = plot_df.dropna(subset=['up_down_diff', 'Age_Bracket'])
+
+    group_order = ['<30', '30-60', '60+']
+    present_order = [group for group in group_order if (plot_df['Age_Bracket'] == group).any()]
+    if len(present_order) < 2:
+        print("Warning: Not enough age bracket groups with data for plotting")
+        return 1
+
+    base_color = '#1f77b4'
+    palette = create_monochromatic_palette(base_color)
+    palette = adjust_brightness_of_colors(palette, brightness_scale=0.1)
+    palette_map = {
+        '<30': rgb2hex(palette[4]),
+        '30-60': rgb2hex(palette[2]),
+        '60+': rgb2hex(palette[0]),
+    }
+    palette_hex = [palette_map[group] for group in present_order]
+
+    fig = plt.figure(figsize=(3.4, 2.5))
+    ax = sns.boxplot(
+        x='Age_Bracket',
+        y='up_down_diff',
+        data=plot_df,
+        order=present_order,
+        palette=palette_hex,
+        width=0.6,
+        fliersize=3
+    )
+    annotation_artists = []
+
+    for i, age_group in enumerate(present_order):
+        group_data = plot_df.loc[plot_df['Age_Bracket'] == age_group, 'up_down_diff']
+        x_jitter = np.random.normal(i, 0.04, size=len(group_data))
+        plt.scatter(x_jitter, group_data, alpha=0.4, s=20, color='black', zorder=3)
+
+    ax.axhline(y=0, color='grey', linestyle='--', linewidth=0.8, alpha=0.7)
+
+    groups = {
+        group: plot_df.loc[plot_df['Age_Bracket'] == group, 'up_down_diff'].values
+        for group in present_order
+    }
+    significant_comparisons = []
+    reference_group = '<30'
+    if reference_group in groups and len(groups[reference_group]) >= 3:
+        for other_group in ['30-60', '60+']:
+            if other_group not in groups or len(groups[other_group]) < 3:
+                continue
+
+            _, p_value = stats.mannwhitneyu(groups[reference_group], groups[other_group], alternative='two-sided')
+            if p_value < 0.001:
+                sig_marker = "***"
+            elif p_value < 0.01:
+                sig_marker = "**"
+            elif p_value < 0.05:
+                sig_marker = "*"
+            else:
+                sig_marker = None
+
+            if sig_marker:
+                significant_comparisons.append({
+                    'other_group': other_group,
+                    'p_value': p_value,
+                    'sig_marker': sig_marker,
+                    'pos_ref': present_order.index(reference_group),
+                    'pos_other': present_order.index(other_group)
+                })
+
+    if significant_comparisons:
+        y_min, y_max = ax.get_ylim()
+        y_range = y_max - y_min
+        for idx, comp in enumerate(sorted(significant_comparisons, key=lambda row: row['pos_other'])):
+            bracket_height = y_max - (y_range * (0.08 + idx * 0.10))
+            annotation_artists.append(
+                ax.plot(
+                    [comp['pos_ref'], comp['pos_ref'], comp['pos_other'], comp['pos_other']],
+                    [bracket_height - (y_range * 0.02), bracket_height, bracket_height, bracket_height - (y_range * 0.02)],
+                    'k-',
+                    linewidth=1.0
+                )
+            )
+            annotation_artists.append(
+                ax.text(
+                    (comp['pos_ref'] + comp['pos_other']) / 2,
+                    bracket_height + (y_range * 0.01),
+                    comp['sig_marker'],
+                    ha='center',
+                    va='bottom',
+                    fontsize=12,
+                    fontweight='bold'
+                )
+            )
+
+    counts = plot_df['Age_Bracket'].value_counts()
+    ax.set_xticklabels([f'{group}\n(n={counts[group]})' for group in present_order])
+
+    log_prefix = "Log " if use_log_velocity else ""
+    title = f'Absolute {log_prefix}Velocity Hysteresis:\nYoung vs Older Age Brackets'
+    ylabel = '|Velocity Hysteresis| (up-down)'
+
+    if source_sans:
+        ax.set_title(title, fontproperties=source_sans, fontsize=10, fontweight='bold')
+        ax.set_xlabel('Age Group', fontproperties=source_sans, fontsize=9)
+        ax.set_ylabel(ylabel, fontproperties=source_sans, fontsize=9)
+    else:
+        ax.set_title(title, fontsize=10, fontweight='bold')
+        ax.set_xlabel('Age Group', fontsize=9)
+        ax.set_ylabel(ylabel, fontsize=9)
+
+    filename = f'{"log_" if use_log_velocity else ""}abs_hysteresis_under30_30to60_over60.png'
+    fig.tight_layout()
+    fig.savefig(os.path.join(output_dir, filename), dpi=300, bbox_inches='tight')
+    _save_unlabeled_figure(fig, ax, output_dir, filename, annotation_artists)
+    plt.close(fig)
+
+    print(f"Three-age-group absolute hysteresis plot saved: {filename}")
+    return 0
+
+
+def print_age_bins(processed_df: pd.DataFrame, scheme: str = 'age_group') -> None:
+    """Print each age bin and the ages of the participants in it.
+
+    Uses the same bin edges and labels as the hysteresis age grouping
+    (right=False so bins match labels: <30 = 0-29, 30-49 = 30-49, etc.).
+
+    Args:
+        processed_df: DataFrame with an 'Age' column (e.g. participant-level or row-level).
+        scheme: 'age_group' (5 bins: <30, 30-49, 50-59, 60-69, 70+),
+            'age_brackets' (3 bins: <30, 30-60, 60+), or 'both' to print both.
+    """
+    if 'Age' not in processed_df.columns:
+        print("Error: DataFrame has no 'Age' column")
+        return
+    age = processed_df['Age'].dropna()
+    if age.empty:
+        print("Error: No non-null ages in DataFrame")
+        return
+    schemes = {
+        'age_group': {
+            'bins': [0, 30, 50, 60, 70, 101],
+            'labels': ['<30', '30-49', '50-59', '60-69', '70+'],
+        },
+        'age_brackets': {
+            'bins': [0, 30, 60, 121],
+            'labels': ['<30', '30-60', '60+'],
+        },
+    }
+    to_run = []
+    if scheme == 'both':
+        to_run = [('Age Group', schemes['age_group']), ('Age Brackets', schemes['age_brackets'])]
+    elif scheme in schemes:
+        to_run = [(scheme, schemes[scheme])]
+    else:
+        print(f"Error: scheme must be 'age_group', 'age_brackets', or 'both', got {scheme!r}")
+        return
+    for name, cfg in to_run:
+        binned = pd.cut(age, bins=cfg['bins'], labels=cfg['labels'], right=False)
+        print(f"\n{name}:")
+        for label in cfg['labels']:
+            ages_in_bin = age[binned == label].unique()
+            ages_in_bin = sorted(int(a) for a in ages_in_bin)
+            n = (binned == label).sum()
+            print(f"  {label}: n={n}, ages = {ages_in_bin}")
 
 
 def plot_up_down_diff_boxplots(processed_df: pd.DataFrame, use_absolute: bool = False, output_dir: str = None, use_log_velocity: bool = False) -> int:
@@ -1503,7 +1851,7 @@ def plot_up_down_diff_boxplots(processed_df: pd.DataFrame, use_absolute: bool = 
         {
             'column': 'Age',
             'is_categorical': False,
-            'bins': [0, 30, 50, 60, 70, 100],
+            'bins': [0, 30, 50, 60, 70, 101],
             'labels': ['<30', '30-49', '50-59', '60-69', '70+'],
             'group_column': 'Age_Group',
             'title': f'Absolute {"Log " if use_log_velocity else ""}Velocity Hysteresis by Age Group' if use_absolute else f'{"Log " if use_log_velocity else ""}Velocity Hysteresis by Age Group',
@@ -1513,7 +1861,7 @@ def plot_up_down_diff_boxplots(processed_df: pd.DataFrame, use_absolute: bool = 
         {
             'column': 'Age',
             'is_categorical': False,
-            'bins': [0, 30, 60, 120],
+            'bins': [0, 30, 60, 121],
             'labels': ['<30', '30-60', '60+'],
             'group_column': 'Age_Bracket_Group',
             'title': f'Absolute {"Log " if use_log_velocity else ""}Velocity Hysteresis by Age Brackets' if use_absolute else f'{"Log " if use_log_velocity else ""}Velocity Hysteresis by Age Brackets',
@@ -1553,7 +1901,7 @@ def plot_up_down_diff_boxplots(processed_df: pd.DataFrame, use_absolute: bool = 
     
     # Create a boxplot for each grouping factor
     for factor in grouping_factors:
-        plt.figure(figsize=(2.4, 2.0))
+        fig = plt.figure(figsize=(2.4, 2.0))
         
         # Create a copy of the dataframe to avoid modifying the original
         plot_df = processed_df.copy()
@@ -1566,10 +1914,10 @@ def plot_up_down_diff_boxplots(processed_df: pd.DataFrame, use_absolute: bool = 
         if not factor['is_categorical']:
             # Create age groups
             plot_df[f"{factor['column']}_Group"] = pd.cut(
-                plot_df[factor['column']], 
-                bins=factor['bins'], 
+                plot_df[factor['column']],
+                bins=factor['bins'],
                 labels=factor['labels'],
-                include_lowest=True
+                right=False
             )
             group_col = f"{factor['column']}_Group"
         else:
@@ -1584,6 +1932,7 @@ def plot_up_down_diff_boxplots(processed_df: pd.DataFrame, use_absolute: bool = 
             width=0.6,
             fliersize=3
         )
+        annotation_artists = []
         
         # Add a horizontal line at y=0 for reference
         ax.axhline(y=0, color='grey', linestyle='--', linewidth=0.5, alpha=0.7)
@@ -1628,13 +1977,17 @@ def plot_up_down_diff_boxplots(processed_df: pd.DataFrame, use_absolute: bool = 
                 
                 # Add p-value annotation at the top
                 if source_sans:
-                    ax.text(0.5, 0.95, p_text, transform=ax.transAxes, 
-                           ha='center', fontproperties=source_sans, fontsize=6,
-                           bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+                    annotation_artists.append(
+                        ax.text(0.5, 0.95, p_text, transform=ax.transAxes,
+                               ha='center', fontproperties=source_sans, fontsize=6,
+                               bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+                    )
                 else:
-                    ax.text(0.5, 0.95, p_text, transform=ax.transAxes, 
-                           ha='center', fontsize=6,
-                           bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+                    annotation_artists.append(
+                        ax.text(0.5, 0.95, p_text, transform=ax.transAxes,
+                               ha='center', fontsize=6,
+                               bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+                    )
                 
                 # Draw significance bracket if significant
                 if p_value < 0.05:
@@ -1644,13 +1997,17 @@ def plot_up_down_diff_boxplots(processed_df: pd.DataFrame, use_absolute: bool = 
                     bracket_height = y_max - (y_range * 0.05)
                     
                     # Draw horizontal line connecting the two boxes
-                    ax.plot([1, 1, 2, 2], 
-                           [bracket_height - (y_range * 0.02), bracket_height, bracket_height, bracket_height - (y_range * 0.02)], 
-                           'k-', linewidth=0.8)
+                    annotation_artists.append(
+                        ax.plot([1, 1, 2, 2],
+                               [bracket_height - (y_range * 0.02), bracket_height, bracket_height, bracket_height - (y_range * 0.02)],
+                               'k-', linewidth=0.8)
+                    )
                     
                     # Add asterisks above the bracket
-                    ax.text(1.5, bracket_height + (y_range * 0.01), sig_marker, 
-                           ha='center', va='bottom', fontsize=8, fontweight='bold')
+                    annotation_artists.append(
+                        ax.text(1.5, bracket_height + (y_range * 0.01), sig_marker,
+                               ha='center', va='bottom', fontsize=8, fontweight='bold')
+                    )
         else:
             # For multi-group variables (age groups), test comparisons ONLY with <30 group
             ordered_keys = []
@@ -1707,14 +2064,18 @@ def plot_up_down_diff_boxplots(processed_df: pd.DataFrame, use_absolute: bool = 
                         pos_other = comp['pos_other']
                         
                         # Draw bracket (positions are already 0-indexed for matplotlib)
-                        ax.plot([pos_ref, pos_ref, pos_other, pos_other], 
-                               [bracket_height - (y_range * 0.02), bracket_height, bracket_height, bracket_height - (y_range * 0.02)], 
-                               'k-', linewidth=0.8)
+                        annotation_artists.append(
+                            ax.plot([pos_ref, pos_ref, pos_other, pos_other],
+                                   [bracket_height - (y_range * 0.02), bracket_height, bracket_height, bracket_height - (y_range * 0.02)],
+                                   'k-', linewidth=0.8)
+                        )
                         
                         # Add asterisks
-                        ax.text((pos_ref + pos_other) / 2, bracket_height + (y_range * 0.01), 
-                               comp['sig_marker'], 
-                               ha='center', va='bottom', fontsize=8, fontweight='bold')
+                        annotation_artists.append(
+                            ax.text((pos_ref + pos_other) / 2, bracket_height + (y_range * 0.01),
+                                   comp['sig_marker'],
+                                   ha='center', va='bottom', fontsize=8, fontweight='bold')
+                        )
                     
                     # # Add summary text box
                     # summary_lines = [f"{comp['group']} vs <30: p={comp['p_value']:.3f}{comp['sig_marker']}" 
@@ -1751,9 +2112,10 @@ def plot_up_down_diff_boxplots(processed_df: pd.DataFrame, use_absolute: bool = 
             ax.set_xticklabels(xtick_labels)
         
         # Save the figure
-        plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, factor['filename']), dpi=300, bbox_inches='tight')
-        plt.close()
+        fig.tight_layout()
+        fig.savefig(os.path.join(output_dir, factor['filename']), dpi=300, bbox_inches='tight')
+        _save_unlabeled_figure(fig, ax, output_dir, factor['filename'], annotation_artists)
+        plt.close(fig)
     
     print(f"Boxplots saved to {output_dir}")
     return 0
@@ -1884,6 +2246,19 @@ def main():
     pvalue_filepath = os.path.join(output_dir, 'hysteresis_pvalues.csv')
     all_pvalues.to_csv(pvalue_filepath, index=False)
     print(f"\nP-values saved to: {pvalue_filepath}")
+
+    # Calculate and save p-values for the dedicated absolute age-bracket analysis
+    absolute_age_bracket_pvalues = calculate_absolute_hysteresis_age_bracket_pvalues(
+        processed_df,
+        use_anova=True
+    )
+    if not absolute_age_bracket_pvalues.empty:
+        absolute_age_bracket_pvalue_filepath = os.path.join(
+            output_dir,
+            'abs_hysteresis_age_brackets_pvalues.csv'
+        )
+        absolute_age_bracket_pvalues.to_csv(absolute_age_bracket_pvalue_filepath, index=False)
+        print(f"Absolute age-bracket p-values saved to: {absolute_age_bracket_pvalue_filepath}")
     
     # Print summary of significant findings
     print("\n" + "="*70)
@@ -1919,6 +2294,11 @@ def main():
                           output_dir=output_dir, use_log_velocity=False)
     plot_under30_vs_over30(processed_df, use_absolute=True, 
                           output_dir=output_dir, use_log_velocity=False)
+    plot_absolute_hysteresis_three_age_groups(
+        processed_df,
+        output_dir=output_dir,
+        use_log_velocity=False
+    )
     
     # # Log velocity plots
     # plot_up_down_diff_boxplots(processed_df_log, use_absolute=False, 

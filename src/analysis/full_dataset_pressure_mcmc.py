@@ -35,6 +35,23 @@ default_folder_path = "/hpc/projects/capillary-flow"
 cap_flow_path = cap_flow_folder_paths.get(hostname, default_folder_path)
 
 
+def _get_ci_unlabeled_dir():
+    output_dir = os.path.join(cap_flow_path, 'results', 'CI_unlabeled')
+    os.makedirs(output_dir, exist_ok=True)
+    return output_dir
+
+
+def _save_unlabeled_ci_figure(fig, ax, filename):
+    legend = ax.get_legend()
+    if legend is not None:
+        legend.remove()
+    ax.set_title('')
+    ax.set_xlabel('')
+    ax.set_ylabel('')
+    fig.tight_layout()
+    fig.savefig(os.path.join(_get_ci_unlabeled_dir(), f'{filename}.png'), dpi=600, bbox_inches='tight')
+
+
 def plot_CI(df, method='bootstrap', n_iterations=1000, 
             ci_percentile=99.5, write=True, dimensionless=False, video_median=False, log_scale=False, log_velocity=False):
     """Plots the mean/median and CI for a single dataset."""
@@ -121,9 +138,12 @@ def plot_CI(df, method='bootstrap', n_iterations=1000,
     plt.tight_layout()
     if write:
         if video_median:
-            plt.savefig(os.path.join(cap_flow_path, 'results', f'single_dataset_videomedians_CI.png'), dpi=600)
+            output_filename = 'single_dataset_videomedians_CI'
+            fig.savefig(os.path.join(cap_flow_path, 'results', f'{output_filename}.png'), dpi=600)
         else:
-            plt.savefig(os.path.join(cap_flow_path, 'results', f'single_dataset_CI.png'), dpi=600)
+            output_filename = 'single_dataset_CI'
+            fig.savefig(os.path.join(cap_flow_path, 'results', f'{output_filename}.png'), dpi=600)
+        _save_unlabeled_ci_figure(fig, ax, output_filename)
     else:
         plt.show()
     return 0

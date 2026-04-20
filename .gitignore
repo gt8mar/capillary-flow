@@ -167,3 +167,4 @@ thesis.tex
 *.md
 *.avi
 src/__pycache__
+/*.py
