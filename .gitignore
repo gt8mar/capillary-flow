@@ -162,6 +162,7 @@ test_output/*
 *.png
 *.pdf
 *.py
+!src/analysis/build_master_summary.py
 thesis.tex
 *.md
 *.avi

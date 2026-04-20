@@ -26,6 +26,10 @@ def get_paths():
             'cap_flow': "C:\\Users\\Luke\\capillary-flow",
             'downloads': 'C:\\Users\\Luke\\Downloads'
         },
+        "Olric": {
+            'cap_flow': "C:\\Users\\Marcus\\capillary-flow",
+            'downloads': 'C:\\Users\\Marcus\\Downloads'
+        },
     }
     
     default_paths = {

@@ -71,7 +71,7 @@ def summarize_participants(df: pd.DataFrame, age_threshold: int = 50) -> pd.Data
         
     # Create categorical variables for grouping
     participant_medians['Age_Group'] = participant_medians['Age'].apply(
-        lambda x: f'Above {age_threshold}' if x >= age_threshold else f'Below {age_threshold}'
+        lambda x: f'>={age_threshold}' if x >= age_threshold else f'<{age_threshold}'
     )
     participant_medians['BP_Group'] = participant_medians['SYS_BP'].apply(
         lambda x: 'High BP (≥120)' if x >= 120 else 'Normal BP (<120)'
@@ -222,8 +222,8 @@ def plot_main_effects(df: pd.DataFrame, output_dir: str, log_transform: bool = F
     ax.set_xticklabels(xtick_labels)
     
     # Add p-value from t-test
-    group1 = df[df['Age_Group'].str.startswith('Below')][dependent_var]
-    group2 = df[df['Age_Group'].str.startswith('Above')][dependent_var]
+    group1 = df[df['Age_Group'].str.startswith('<')][dependent_var]
+    group2 = df[df['Age_Group'].str.startswith('>=')][dependent_var]
     _, p_value = stats.ttest_ind(group1, group2, equal_var=False)
     p_text = f"p = {p_value:.3f}" if p_value >= 0.001 else "p < 0.001"
     
