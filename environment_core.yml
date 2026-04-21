@@ -1,0 +1,39 @@
+name: capillary-flow-core
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Core runtime. Python 3.10 keeps compatibility with the image-analysis stack
+  # used by the centerline, kymograph, and velocity pipeline scripts.
+  - python=3.10
+  - pip
+
+  # Numeric, tabular, and plotting stack.
+  - numpy>=1.23,<2
+  - pandas>=1.5,<3
+  - scipy>=1.9
+  - matplotlib>=3.6
+  - seaborn>=0.12
+  - statsmodels>=0.13
+  - openpyxl>=3.1
+
+  # Image processing and computer vision used by src/find_centerline.py,
+  # src/make_kymograph.py, src/analysis/make_velocities.py, and size tools.
+  - opencv
+  - scikit-image>=0.19
+  - scikit-learn>=1.1
+  - pillow>=9
+  - imageio>=2.22
+  - tifffile>=2022.10
+
+  # Graphs, units, and config helpers.
+  - networkx>=2.8
+  - astropy>=5.1
+  - pyyaml>=6
+
+  - pip:
+      # Provides `from fil_finder import FilFinder2D` for centerline tracing.
+      - fil_finder>=1.7
+      # Install this repository as an editable package so `import src...`
+      # works after cloning the repo and creating the environment from repo root.
+      - -e .
