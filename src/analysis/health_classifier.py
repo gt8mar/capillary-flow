@@ -34,6 +34,8 @@ from src.config import PATHS, load_source_sans
 cap_flow_path = PATHS['cap_flow']
 source_sans = load_source_sans()
 
+DIABETES_COLOR = '#ff7f0e'
+
 def prepare_data() -> Tuple[pd.DataFrame, Dict[str, Tuple[np.ndarray, np.ndarray]]]:
     """Load and prepare data for classification, focusing on velocity measurements.
     
@@ -417,6 +419,70 @@ def plot_auc_curves(results: Dict, condition: str, output_dir: str):
         plt.close()
 
     return 0
+
+
+def plot_xgboost_only_roc(results: Dict, condition: str, output_dir: str):
+    """Save a ROC figure containing only the XGBoost classifier."""
+    if results is None or 'XGBoost' not in results:
+        print(f"No XGBoost result available for {condition}")
+        return
+
+    plt.close()
+    sns.set_style("whitegrid")
+
+    font_path = os.path.join(
+        PATHS['downloads'],
+        'Source_Sans_3\\static\\SourceSans3-Regular.ttf'
+    )
+    source_sans_local = FontProperties(fname=font_path) if os.path.exists(font_path) else None
+    if source_sans_local is None:
+        print("Source Sans font not found, using default font")
+
+    plt.rcParams.update({
+        'pdf.fonttype': 42, 'ps.fonttype': 42,
+        'font.size': 7, 'axes.labelsize': 7,
+        'xtick.labelsize': 6, 'ytick.labelsize': 6,
+        'legend.fontsize': 5, 'lines.linewidth': 0.5
+    })
+
+    res = results['XGBoost']
+    if hasattr(res['classifier'], 'predict_proba'):
+        y_pred = res['classifier'].predict_proba(res['X_test'])[:, 1]
+    else:
+        y_pred = res['classifier'].predict(res['X_test'])
+
+    fpr, tpr, _ = roc_curve(res['y_test'], y_pred)
+    roc_auc = auc(fpr, tpr)
+
+    fig, ax = plt.subplots(figsize=(2.4, 2))
+    ax.plot(fpr, tpr, color=DIABETES_COLOR, lw=2,
+            label=f'XGBoost (AUC = {roc_auc:.2f})')
+    ax.plot([0, 1], [0, 1], color='gray', linestyle='--')
+
+    ax.set_xlim([0.0, 1.0])
+    ax.set_ylim([0.0, 1.05])
+    ax.set_xlabel('False Positive Rate',
+                  fontproperties=source_sans_local if source_sans_local else None)
+    ax.set_ylabel('True Positive Rate',
+                  fontproperties=source_sans_local if source_sans_local else None)
+    ax.set_title(f'XGBoost ROC for {condition}',
+                 fontproperties=source_sans_local if source_sans_local else None)
+    ax.legend(loc="lower right",
+              prop=source_sans_local if source_sans_local else None)
+
+    plt.tight_layout()
+    safe_condition = condition.lower().replace(' ', '_').replace('/', '_')
+    try:
+        _save_roc_figure(
+            fig,
+            output_dir,
+            f'roc_{safe_condition}_xgboost_only',
+            dpi=400,
+            save_minimal=True
+        )
+    except Exception as e:
+        print(f"Warning: Could not save XGBoost-only ROC curve plot: {str(e)}")
+    plt.close()
 
 def plot_3D_features(processed_df, results, feature_cols, condition, output_dir):
     """
@@ -1529,6 +1595,8 @@ def main():
             # Plot results directly in the condition directory
             plot_results(results, condition, condition_dir)
             plot_auc_curves(results, condition, condition_dir)
+            if condition == 'Diabetes':
+                plot_xgboost_only_roc(results, condition, condition_dir)
             
             # Save classification reports with descriptive filenames
             report_path = os.path.join(condition_dir, f'velocity_based_{condition}_classification_report.txt')
@@ -1632,4 +1700,4 @@ def main():
     return processed_df, target_dict
 
 if __name__ == "__main__":
-    processed_df, target_dict = main() 
+    processed_df, target_dict = main()

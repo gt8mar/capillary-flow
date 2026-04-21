@@ -22,6 +22,8 @@ dependencies:
   - opencv
   - scikit-image>=0.19
   - scikit-learn>=1.1
+  - imbalanced-learn>=0.10
+  - xgboost>=1.7
   - pillow>=9
   - imageio>=2.22
   - tifffile>=2022.10
