@@ -161,7 +161,6 @@ src/__pycache__/__init__.cpython-310.pyc
 test_output/*
 *.png
 *.pdf
-*.py
 !src/analysis/build_master_summary.py
 thesis.tex
 *.md
