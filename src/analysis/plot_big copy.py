@@ -3133,11 +3133,11 @@ def plot_medians_pvals(summary_df_nhp_video_medians):
     merged_data = merged_data.drop_duplicates().reset_index(drop=True)
 
     # Define age groups
-    merged_data['Age_Group'] = merged_data['Age'].apply(lambda x: 'Above 50' if x >= 50 else 'Below 50')
+    merged_data['Age_Group'] = merged_data['Age'].apply(lambda x: '>=50' if x >= 50 else '<50')
 
     # Statistical test
-    above_50 = merged_data[merged_data['Age_Group'] == 'Above 50']['Video_Median_Velocity']
-    below_50 = merged_data[merged_data['Age_Group'] == 'Below 50']['Video_Median_Velocity']
+    above_50 = merged_data[merged_data['Age_Group'] == '>=50']['Video_Median_Velocity']
+    below_50 = merged_data[merged_data['Age_Group'] == '<50']['Video_Median_Velocity']
     stat, p_value = mannwhitneyu(above_50, below_50)
 
     # Visualization
@@ -3195,7 +3195,7 @@ def plot_results_with_annotations(data):
 #     summary_df = summary_df.rename(columns={'Video Median Velocity': 'Video_Median_Velocity'})
 
 #     # Define age groups
-#     summary_df['Age_Group'] = summary_df['Age'].apply(lambda x: 'Above 50' if x >= 50 else 'Below 50')
+#     summary_df['Age_Group'] = summary_df['Age'].apply(lambda x: '>=50' if x >= 50 else '<50')
 
 #     # Fit the ANOVA model with SYS_BP included
 #     model = ols('Video_Median_Velocity ~ C(Age_Group) + C(Sex) + SYS_BP + C(Age_Group):C(Sex) + C(Age_Group):SYS_BP + C(Sex):SYS_BP', data=summary_df).fit()
@@ -3244,7 +3244,7 @@ def perform_anova_analysis(df, variable ='Age', log = False, plot = True):
 
     # Assuming 'participant_medians' is the DataFrame prepared earlier with median velocities and demographic data
     # Reclassify 'Age' into 'Above 50' and 'Below 50'
-    participant_medians['Age_Group'] = participant_medians['Age'].apply(lambda x: 'Above 50' if x >= 50 else 'Below 50')
+    participant_medians['Age_Group'] = participant_medians['Age'].apply(lambda x: '>=50' if x >= 50 else '<50')
 
     # # Plotting
     # plt.figure(figsize=(12, 8))
@@ -3263,30 +3263,30 @@ def perform_anova_analysis(df, variable ='Age', log = False, plot = True):
 
     # Assuming 'participant_medians' is your DataFrame with median velocities and other demographic data
     # Adjust the age column to create two groups: Above 50 and Below 50
-    participant_medians['Age_Group'] = participant_medians['Age'].apply(lambda x: 'Above 50' if x >= 50 else 'Below 50')
+    participant_medians['Age_Group'] = participant_medians['Age'].apply(lambda x: '>=50' if x >= 50 else '<50')
     participant_medians['SYS_BP_Group'] = np.where(participant_medians['SYS_BP'] < 120, '<120', '≥120')
     participant_medians['Sex_Group'] = np.where(participant_medians['Sex'] == 'M', 'M', 'F')
 
     # print the two group medians
     # Calculate the two group medians
-    above_50_median = participant_medians.loc[participant_medians['Age_Group'] == 'Above 50', median_variable].median()
-    below_50_median = participant_medians.loc[participant_medians['Age_Group'] == 'Below 50', median_variable].median()
+    above_50_median = participant_medians.loc[participant_medians['Age_Group'] == '>=50', median_variable].median()
+    below_50_median = participant_medians.loc[participant_medians['Age_Group'] == '<50', median_variable].median()
     above_120_median = participant_medians.loc[participant_medians['SYS_BP_Group'] == '≥120', median_variable].median()
     below_120_median = participant_medians.loc[participant_medians['SYS_BP_Group'] == '<120', median_variable].median()
     male_median = participant_medians.loc[participant_medians['Sex_Group'] == 'M', median_variable].median()
     female_median = participant_medians.loc[participant_medians['Sex_Group'] == 'F', median_variable].median()
 
     # Calculate standard deviations for different groups
-    above_50_std = participant_medians.loc[participant_medians['Age_Group'] == 'Above 50', median_variable].std()
-    below_50_std = participant_medians.loc[participant_medians['Age_Group'] == 'Below 50', median_variable].std()
+    above_50_std = participant_medians.loc[participant_medians['Age_Group'] == '>=50', median_variable].std()
+    below_50_std = participant_medians.loc[participant_medians['Age_Group'] == '<50', median_variable].std()
     above_120_std = participant_medians.loc[participant_medians['SYS_BP_Group'] == '≥120', median_variable].std()
     below_120_std = participant_medians.loc[participant_medians['SYS_BP_Group'] == '<120', median_variable].std()
     male_std = participant_medians.loc[participant_medians['Sex_Group'] == 'M', median_variable].std()
     female_std = participant_medians.loc[participant_medians['Sex_Group'] == 'F', median_variable].std()
 
     # Print the two group medians and standard deviations
-    print(f"{median_variable} for Age Group Above 50: {above_50_median:.2f} (Std: {above_50_std:.2f})")
-    print(f"{median_variable} for Age Group Below 50: {below_50_median:.2f} (Std: {below_50_std:.2f})")
+    print(f"{median_variable} for Age Group >=50: {above_50_median:.2f} (Std: {above_50_std:.2f})")
+    print(f"{median_variable} for Age Group <50: {below_50_median:.2f} (Std: {below_50_std:.2f})")
     print(f"Difference in {median_variable}: {above_50_median - below_50_median:.2f}")
     print(f"Percentage Increase: {((above_50_median - below_50_median) / below_50_median) * 100:.2f}%")
 
@@ -4033,3 +4033,4 @@ if __name__ == '__main__':
     # merge_vel_size(verbose=True)
 
     
+

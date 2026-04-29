@@ -181,7 +181,8 @@ def create_age_groups_histogram(df: pd.DataFrame, output_dir: Optional[str] = No
         age_df['Age'], 
         bins=bins, 
         labels=labels,
-        include_lowest=True
+        include_lowest=True,
+        right=False
     )
     
     # Create figure
