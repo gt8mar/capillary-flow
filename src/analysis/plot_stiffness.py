@@ -1835,22 +1835,19 @@ def plot_bp_si_by_condition(results_df: pd.DataFrame,
         print("Warning: Diabetes or Hypertension column not found. Skipping.")
         return sig_rows
 
-    fig, axes = plt.subplots(2, 2, figsize=figsize)
-
     # Define the 4 panels: (row, col, df, y_col, condition_col, ylabel, title_suffix)
     bp_label = 'Systolic BP (mmHg)' if bp_col == 'SYS_BP' else 'Diastolic BP (mmHg)'
     si_label = 'SI_logvel (AUC of log velocity)'
 
     panels = [
-        (0, 0, df_main, bp_col, 'Diabetes', bp_label, 'Diabetes'),
-        (0, 1, df_main, bp_col, 'Hypertension', bp_label, 'Hypertension'),
-        (1, 0, df_si, stiffness_col, 'Diabetes', si_label, 'Diabetes'),
-        (1, 1, df_si, stiffness_col, 'Hypertension', si_label, 'Hypertension'),
+        (0, 0, df_main, bp_col, 'Diabetes', bp_label, 'Diabetes', 'SBP_by_diabetes'),
+        (0, 1, df_main, bp_col, 'Hypertension', bp_label, 'Hypertension', 'SBP_by_hypertension'),
+        (1, 0, df_si, stiffness_col, 'Diabetes', si_label, 'Diabetes', 'SI_logvel_by_diabetes'),
+        (1, 1, df_si, stiffness_col, 'Hypertension', si_label, 'Hypertension', 'SI_logvel_by_hypertension'),
     ]
 
-    for row, col, df, y_col, cond_col, ylabel, cond_name in panels:
-        ax = axes[row, col]
-
+    def draw_panel(ax, df, y_col, cond_col, ylabel, cond_name,
+                   collect_stats=True, show_stats_box=True):
         # Filter to valid data
         df_plot = df[df[y_col].notna() & df[cond_col].notna()].copy()
 
@@ -1886,20 +1883,22 @@ def plot_bp_si_by_condition(results_df: pd.DataFrame,
             stat_text_parts.append(f'p = {pval:.4f}')
             if d is not None and not np.isnan(d):
                 stat_text_parts.append(f'd = {d:.2f}')
-            sig_rows.append({
-                'analysis': f'{y_col} by {cond_name}',
-                'test': 'Mann-Whitney U',
-                'group1': group_labels[0], 'group2': group_labels[1],
-                'n1': len(ctrl_vals), 'n2': len(cond_vals),
-                'statistic': stat_val, 'p_value': pval,
-                'cohens_d': d if d is not None else np.nan,
-            })
+            if collect_stats:
+                sig_rows.append({
+                    'analysis': f'{y_col} by {cond_name}',
+                    'test': 'Mann-Whitney U',
+                    'group1': group_labels[0], 'group2': group_labels[1],
+                    'n1': len(ctrl_vals), 'n2': len(cond_vals),
+                    'statistic': stat_val, 'p_value': pval,
+                    'cohens_d': d if d is not None else np.nan,
+                })
 
-        ax.text(0.5, 0.95, '\n'.join(stat_text_parts), transform=ax.transAxes,
-                ha='center', va='top', fontsize=6,
-                fontproperties=source_sans if source_sans else None,
-                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8,
-                          edgecolor='black', linewidth=0.5))
+        if show_stats_box:
+            ax.text(0.5, 0.95, '\n'.join(stat_text_parts), transform=ax.transAxes,
+                    ha='center', va='top', fontsize=6,
+                    fontproperties=source_sans if source_sans else None,
+                    bbox=dict(boxstyle='round', facecolor='white', alpha=0.8,
+                              edgecolor='black', linewidth=0.5))
 
         ax.set_xlabel('Group', fontproperties=source_sans if source_sans else None)
         ax.set_ylabel(ylabel, fontproperties=source_sans if source_sans else None)
@@ -1907,10 +1906,24 @@ def plot_bp_si_by_condition(results_df: pd.DataFrame,
                      fontproperties=source_sans if source_sans else None)
         apply_font(ax, source_sans)
 
+    fig, axes = plt.subplots(2, 2, figsize=figsize)
+    for row, col, df, y_col, cond_col, ylabel, cond_name, _slug in panels:
+        draw_panel(axes[row, col], df, y_col, cond_col, ylabel, cond_name,
+                   collect_stats=True, show_stats_box=True)
+
     plt.tight_layout()
     filename = 'stiffness_fig_BP_SI_by_condition_comparison'
     save_figure(fig, output_dir, filename, minimal_dir=minimal_dir)
     plt.close()
+
+    single_figsize = (figsize[0] / 2, figsize[1] / 2)
+    for _row, _col, df, y_col, cond_col, ylabel, cond_name, slug in panels:
+        single_fig, single_ax = plt.subplots(1, 1, figsize=single_figsize)
+        draw_panel(single_ax, df, y_col, cond_col, ylabel, cond_name,
+                   collect_stats=False, show_stats_box=False)
+        plt.tight_layout()
+        save_figure(single_fig, output_dir, f'{filename}_{slug}', minimal_dir=minimal_dir)
+        plt.close()
 
     return sig_rows
 
@@ -2630,6 +2643,264 @@ def plot_bp_si_correlation_all(results_df: pd.DataFrame, output_dir: str,
     return sig_rows
 
 
+def _add_age_group_column(df: pd.DataFrame) -> pd.DataFrame:
+    """Add age groups matching the hysteresis age-bracket plots."""
+    out = df.copy()
+    if 'Age' in out.columns:
+        out['AgeGroup'] = pd.cut(
+            pd.to_numeric(out['Age'], errors='coerce'),
+            bins=[0, 30, 60, np.inf],
+            labels=['<30', '30-60', '60+'],
+            right=False,
+        )
+    return out
+
+
+def _format_yes_no(series: pd.Series) -> pd.Series:
+    """Normalize boolean-like values to Yes/No labels for legends."""
+    return series.map(lambda val: 'Yes' if str(val).strip().upper() in {'TRUE', '1', 'YES'} or val is True else 'No')
+
+
+def _continuous_scatter_with_colorbar(ax, plot_data: pd.DataFrame, x_col: str, y_col: str,
+                                      color_col: str, base_color: str, label: str,
+                                      cmap_name: Optional[str] = None,
+                                      show_colorbar: bool = True):
+    """Draw a continuous-color scatter with the project monochromatic palette."""
+    cmap = plt.get_cmap(cmap_name) if cmap_name else sns.light_palette(base_color, as_cmap=True)
+    values = pd.to_numeric(plot_data[color_col], errors='coerce')
+    scatter = ax.scatter(
+        plot_data[x_col], plot_data[y_col],
+        c=values, cmap=cmap, alpha=0.75, s=22,
+        edgecolor='white', linewidth=0.3, zorder=3,
+    )
+    if show_colorbar:
+        cbar = plt.colorbar(scatter, ax=ax)
+        cbar.set_label(label, fontproperties=source_sans if source_sans else None)
+        if source_sans:
+            for tick in cbar.ax.get_yticklabels():
+                tick.set_fontproperties(source_sans)
+    return scatter
+
+
+def _categorical_scatter(ax, plot_data: pd.DataFrame, x_col: str, y_col: str,
+                         color_col: str, palette: dict):
+    """Draw a categorical scatter using a provided label-to-color palette."""
+    for label, color in palette.items():
+        group_data = plot_data[plot_data[color_col] == label]
+        if len(group_data) == 0:
+            continue
+        ax.scatter(
+            group_data[x_col], group_data[y_col],
+            alpha=0.75, s=22, color=color, label=str(label),
+            edgecolor='white', linewidth=0.3, zorder=3,
+        )
+
+
+def plot_cri_vs_hysteresis_colored(cri_df: pd.DataFrame, hysteresis_df: pd.DataFrame,
+                                   output_dir: str,
+                                   stiffness_col: str = 'SI_logvel_averaged_02_12',
+                                   figsize: Tuple[float, float] = (2.6, 2.2),
+                                   minimal_dir: Optional[str] = None):
+    """Plot CRI versus velocity hysteresis with multiple metadata color encodings."""
+    sig_rows = []
+    if stiffness_col not in cri_df.columns:
+        print(f"Warning: {stiffness_col} not found. Skipping CRI vs hysteresis plots.")
+        return sig_rows
+    if 'up_down_diff' not in hysteresis_df.columns:
+        print("Warning: up_down_diff not found. Skipping CRI vs hysteresis plots.")
+        return sig_rows
+
+    metadata_cols = [
+        'Participant', 'Age', 'Sex', 'Diabetes', 'Hypertension', 'SET',
+        'is_healthy', 'SYS_BP', 'DIA_BP', 'MAP',
+    ]
+    available_metadata = [col for col in metadata_cols if col in cri_df.columns]
+    merged = hysteresis_df.merge(
+        cri_df[available_metadata + [stiffness_col]].drop_duplicates(subset='Participant'),
+        on='Participant',
+        how='inner',
+        suffixes=('', '_cri'),
+    )
+
+    # Fill metadata from CRI results when calculate_velocity_hysteresis already carried the same column.
+    for col in metadata_cols:
+        cri_col = f'{col}_cri'
+        if cri_col in merged.columns:
+            if col in merged.columns:
+                merged[col] = merged[col].combine_first(merged[cri_col])
+            else:
+                merged[col] = merged[cri_col]
+
+    merged = _ensure_healthy_flag(_ensure_diabetes_bool(merged))
+    merged = _add_age_group_column(merged)
+    if 'Hypertension' in merged.columns:
+        merged['Hypertension'] = _format_yes_no(merged['Hypertension'])
+    if 'Diabetes' in merged.columns:
+        merged['Diabetes'] = _format_yes_no(merged['Diabetes'])
+    if 'is_healthy' in merged.columns:
+        merged['HealthGroup'] = np.where(merged['is_healthy'] == True, 'Control', 'Disease')
+    if 'SYS_BP' in merged.columns and 'DIA_BP' in merged.columns and 'BP_Category' not in merged.columns:
+        sys_bp = pd.to_numeric(merged['SYS_BP'], errors='coerce')
+        dia_bp = pd.to_numeric(merged['DIA_BP'], errors='coerce')
+        merged['BP_Category'] = np.select(
+            [sys_bp >= 130, dia_bp >= 80],
+            ['High SBP', 'High DBP'],
+            default='Normal/Elevated',
+        )
+        merged.loc[sys_bp.isna() & dia_bp.isna(), 'BP_Category'] = np.nan
+
+    plot_data = merged[
+        merged[stiffness_col].notna() & merged['up_down_diff'].notna()
+    ].copy()
+    if len(plot_data) < 4:
+        print("Warning: Too few matched CRI/hysteresis records for scatter plots.")
+        return sig_rows
+
+    x_col = 'up_down_diff'
+    y_col = stiffness_col
+    x_label = 'Velocity hysteresis (mean up - mean down)'
+    y_label = 'CRI (SI_logvel 0.2-1.2 psi)'
+
+    color_specs = [
+        {'col': None, 'label': 'None', 'filename': 'plain', 'title': 'CRI vs Hysteresis'},
+        {'col': 'Age', 'label': 'Age (years)', 'filename': 'age', 'kind': 'continuous', 'base': AGE_BASE_COLOR},
+        {'col': 'AgeGroup', 'label': 'Age group', 'filename': 'age_group', 'kind': 'categorical',
+         'palette': dict(zip(['<30', '30-60', '60+'], _make_binary_palette(AGE_BASE_COLOR) + [AGE_BASE_COLOR]))},
+        {'col': 'Diabetes', 'label': 'Diabetes', 'filename': 'diabetes', 'kind': 'categorical',
+         'palette': {'No': CONTROL_COLOR, 'Yes': DIABETES_COLOR}},
+        {'col': 'Hypertension', 'label': 'Hypertension', 'filename': 'hypertension', 'kind': 'categorical',
+         'palette': {'No': _make_binary_palette(BP_BASE_COLOR)[0], 'Yes': _make_binary_palette(BP_BASE_COLOR)[1]}},
+        {'col': 'SYS_BP', 'label': 'Systolic BP (mmHg)', 'filename': 'sbp', 'kind': 'continuous', 'base': BP_BASE_COLOR},
+        {'col': 'DIA_BP', 'label': 'Diastolic BP (mmHg)', 'filename': 'dbp', 'kind': 'continuous', 'base': BP_BASE_COLOR},
+        {'col': 'MAP', 'label': 'Mean arterial pressure (mmHg)', 'filename': 'map', 'kind': 'continuous', 'base': BP_BASE_COLOR},
+        {'col': 'Sex', 'label': 'Sex', 'filename': 'sex', 'kind': 'categorical',
+         'palette': {'F': '#9467bd', 'M': '#8c564b', 'Female': '#9467bd', 'Male': '#8c564b'}},
+        {'col': 'HealthGroup', 'label': 'Health group', 'filename': 'health_group', 'kind': 'categorical',
+         'palette': {'Control': _make_binary_palette(DISEASE_BASE_COLOR)[0],
+                     'Disease': _make_binary_palette(DISEASE_BASE_COLOR)[1]}},
+        {'col': 'BP_Category', 'label': 'BP category', 'filename': 'bp_category', 'kind': 'categorical',
+         'palette': {'Normal/Elevated': _make_binary_palette(BP_BASE_COLOR)[0],
+                     'High SBP': BP_BASE_COLOR,
+                     'High DBP': _make_binary_palette(BP_BASE_COLOR)[1]}},
+    ]
+
+    x = plot_data[x_col].astype(float).values
+    y = plot_data[y_col].astype(float).values
+    valid = ~(np.isnan(x) | np.isnan(y))
+    regression = None
+    if np.sum(valid) > 2:
+        regression = stats.linregress(x[valid], y[valid])
+        sig_rows.append({
+            'analysis': 'CRI vs hysteresis',
+            'test': 'Linear regression',
+            'group1': 'CRI',
+            'group2': 'up_down_diff',
+            'n1': int(np.sum(valid)),
+            'n2': int(np.sum(valid)),
+            'statistic': regression.rvalue,
+            'p_value': regression.pvalue,
+            'cohens_d': np.nan,
+            'R': regression.rvalue,
+            'R_squared': regression.rvalue ** 2,
+            'slope': regression.slope,
+        })
+
+    def _save_cri_hysteresis_variant(spec: dict, this_data: pd.DataFrame,
+                                     filename_suffix: str = '',
+                                     cmap_name: Optional[str] = None,
+                                     no_overlays: bool = False) -> None:
+        color_col = spec.get('col')
+        fig, ax = plt.subplots(figsize=figsize)
+        if color_col is None:
+            ax.scatter(this_data[x_col], this_data[y_col], alpha=0.75, s=22,
+                       color=CONTROL_COLOR, edgecolor='white', linewidth=0.3, zorder=3)
+        elif spec['kind'] == 'continuous':
+            _continuous_scatter_with_colorbar(
+                ax, this_data, x_col, y_col, color_col,
+                spec['base'], spec['label'],
+                cmap_name=cmap_name,
+                show_colorbar=not no_overlays,
+            )
+        else:
+            observed = list(pd.Series(this_data[color_col]).dropna().unique())
+            fallback_colors = sns.color_palette('tab10', n_colors=max(len(observed), 1)).as_hex()
+            palette = {
+                value: spec['palette'].get(value, fallback_colors[idx % len(fallback_colors)])
+                for idx, value in enumerate(observed)
+            }
+            _categorical_scatter(ax, this_data, x_col, y_col, color_col, palette)
+            if not no_overlays:
+                ax.legend(title=spec['label'], loc='best', fontsize=5,
+                          prop=source_sans if source_sans else None)
+
+        if regression is not None and not no_overlays:
+            x_line = np.linspace(plot_data[x_col].min(), plot_data[x_col].max(), 100)
+            y_line = regression.slope * x_line + regression.intercept
+            ax.plot(x_line, y_line, 'k--', linewidth=1, alpha=0.7)
+            ax.text(0.05, 0.95,
+                    f'n = {int(np.sum(valid))}\nR = {regression.rvalue:.3f}\np = {regression.pvalue:.4f}',
+                    transform=ax.transAxes, ha='left', va='top', fontsize=6,
+                    fontproperties=source_sans if source_sans else None,
+                    bbox=dict(boxstyle='round', facecolor='white', alpha=0.8,
+                              edgecolor='black', linewidth=0.5))
+
+        if not no_overlays:
+            title_suffix = '' if color_col is None else f" by {spec['label']}"
+            ax.set_title(f'CRI vs Hysteresis{title_suffix}',
+                         fontproperties=source_sans if source_sans else None)
+        ax.set_xlabel(x_label, fontproperties=source_sans if source_sans else None)
+        ax.set_ylabel(y_label, fontproperties=source_sans if source_sans else None)
+        ax.grid(True, alpha=0.3)
+        apply_font(ax, source_sans)
+        plt.tight_layout()
+
+        base_filename = f'stiffness_fig_CRI_vs_hysteresis_color_{spec["filename"]}{filename_suffix}'
+        if no_overlays:
+            no_overlay_dir = os.path.join(output_dir, 'no_overlays')
+            os.makedirs(no_overlay_dir, exist_ok=True)
+            fig.savefig(os.path.join(no_overlay_dir, f'{base_filename}.pdf'),
+                        dpi=300, bbox_inches='tight')
+            no_overlay_png_dir = os.path.join(no_overlay_dir, 'png')
+            os.makedirs(no_overlay_png_dir, exist_ok=True)
+            fig.savefig(os.path.join(no_overlay_png_dir, f'{base_filename}.png'),
+                        dpi=300, bbox_inches='tight')
+            print(f"Saved (no overlays): {os.path.join(no_overlay_dir, f'{base_filename}.pdf')}")
+            print(f"Saved (no overlays): {os.path.join(no_overlay_png_dir, f'{base_filename}.png')}")
+        else:
+            save_figure(fig, output_dir, base_filename, minimal_dir=minimal_dir)
+        plt.close()
+
+    for spec in color_specs:
+        color_col = spec.get('col')
+        this_data = plot_data.copy()
+        if color_col is not None:
+            if color_col not in this_data.columns:
+                continue
+            this_data = this_data[this_data[color_col].notna()].copy()
+            if len(this_data) < 4:
+                continue
+
+        _save_cri_hysteresis_variant(spec, this_data)
+        _save_cri_hysteresis_variant(spec, this_data, filename_suffix='_no_overlays',
+                                     no_overlays=True)
+
+        if spec.get('kind') == 'continuous':
+            for cmap_name in ['viridis', 'magma']:
+                _save_cri_hysteresis_variant(
+                    spec, this_data,
+                    filename_suffix=f'_{cmap_name}',
+                    cmap_name=cmap_name,
+                )
+                _save_cri_hysteresis_variant(
+                    spec, this_data,
+                    filename_suffix=f'_{cmap_name}_no_overlays',
+                    cmap_name=cmap_name,
+                    no_overlays=True,
+                )
+
+    return sig_rows
+
+
 def _ensure_diabetes_bool(results_df: pd.DataFrame) -> pd.DataFrame:
     """Ensure Diabetes column is boolean for group comparisons."""
     df = results_df.copy()
@@ -3161,7 +3432,7 @@ def main():
         results_df_log = pd.read_csv(log_stiffness_file)
         print(f"Loaded log velocity stiffness results for {len(results_df_log)} participants")
         # Merge all demographic columns needed for downstream analyses
-        merge_cols = ['Participant', 'Age', 'Diabetes', 'Hypertension', 'SET',
+        merge_cols = ['Participant', 'Age', 'Sex', 'Diabetes', 'Hypertension', 'SET',
                       'is_healthy', 'SYS_BP', 'DIA_BP', 'MAP']
         available = [c for c in merge_cols if c in results_df.columns]
         # Only merge columns not already present in the log DataFrame
@@ -3292,6 +3563,14 @@ def main():
         # Boxplots
         all_sig_rows.extend(plot_hysteresis_boxplot_diabetes(hysteresis_df, output_dir, minimal_dir=minimal_dir) or [])
         all_sig_rows.extend(plot_hysteresis_boxplot_hypertension(hysteresis_df, output_dir, minimal_dir=minimal_dir) or [])
+        # CRI versus hysteresis, with the same demographic and BP color encodings.
+        all_sig_rows.extend(
+            plot_cri_vs_hysteresis_colored(
+                si_source, hysteresis_df, output_dir,
+                stiffness_col='SI_logvel_averaged_02_12',
+                minimal_dir=minimal_dir,
+            ) or []
+        )
     else:
         print(f"Warning: {data_filepath} not found. Skipping hysteresis plots.")
 
@@ -3309,4 +3588,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

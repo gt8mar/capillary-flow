@@ -73,6 +73,28 @@ def _get_ci_unlabeled_dir() -> str:
     return output_dir
 
 
+def _get_ci_no_legend_dir() -> str:
+    """Return the standalone directory for CI figures with legends removed."""
+    output_dir = os.path.join(PATHS.get('cap_flow', '.'), 'results', 'CI_no_legend')
+    os.makedirs(output_dir, exist_ok=True)
+    return output_dir
+
+
+def _save_ci_no_legend_figure(fig, ax, filename: str, save_pdf: bool = False) -> None:
+    """Save a CI figure with the legend removed but all labels/titles preserved."""
+    legend = ax.get_legend()
+    if legend is not None:
+        legend.remove()
+
+    out_dir = _get_ci_no_legend_dir()
+    png_path = os.path.join(out_dir, f'{filename}.png')
+    fig.tight_layout()
+    fig.savefig(png_path, dpi=600, bbox_inches='tight')
+    if save_pdf:
+        pdf_path = os.path.join(out_dir, f'{filename}.pdf')
+        fig.savefig(pdf_path, bbox_inches='tight')
+
+
 def _save_unlabeled_ci_figure(fig, ax, filename: str, extra_artists=None, save_pdf: bool = False) -> None:
     """Save a CI figure without title, labels, legend, or extra annotations.
 
@@ -341,7 +363,7 @@ def plot_PCA(participant_medians):
 def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000, 
             ci_percentile=99.5, write=True, dimensionless=False, video_median=False, 
             log_scale=False, old = False, velocity_variable = 'Corrected Velocity',
-            participant_weighting=False):
+            participant_weighting=False, age_threshold=60):
     """
     Plots the mean/median and CI for the variable of interest, 
     with KS statistic. 
@@ -378,11 +400,17 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
     #     affected_df = df[df['SET']=='set03']
     #     affected_df = affected_df.append(df[df['SET']=='set02'])
 
+    age_group_title = None
+    age_filename_suffix = ''
+
     # Set color palette based on variable
     if variable == 'Age':
         base_color = '#1f77b4'
-        conditions = [df[variable] <= 59, df[variable] > 59]
+        conditions = [df[variable] < age_threshold, df[variable] >= age_threshold]
         choices = ['≤59', '>59']
+        choices = [f'<{age_threshold}', f'>={age_threshold}']
+        age_group_title = f'Age split: <{age_threshold} vs >={age_threshold}'
+        age_filename_suffix = f'_split{age_threshold}'
     elif variable == 'SYS_BP':
         base_color = '2ca02c'
         conditions = [df[variable] < 120, df[variable] >= 120]
@@ -617,29 +645,35 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
     if dimensionless:
         if source_sans:
             ax.set_ylabel('Dimensionless Velocity', fontproperties=source_sans)
-            ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Dimensionless Velocity vs. Pressure with {ci_percentile}% CI', 
+            ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Dimensionless Velocity vs. Pressure with {ci_percentile}% CI'
+                        + (f'\n{age_group_title}' if age_group_title else ''), 
                         fontproperties=source_sans, fontsize=8)
         else:
             ax.set_ylabel('Dimensionless Velocity')
-            ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Dimensionless Velocity vs. Pressure with {ci_percentile}% CI', 
+            ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Dimensionless Velocity vs. Pressure with {ci_percentile}% CI'
+                        + (f'\n{age_group_title}' if age_group_title else ''), 
                         fontsize=8)
     elif velocity_variable == 'Shear_Rate':
         if source_sans:
             ax.set_ylabel('Shear Rate (1/s)', fontproperties=source_sans)
-            ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Shear Rate vs. Pressure with {ci_percentile}% CI', 
+            ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Shear Rate vs. Pressure with {ci_percentile}% CI'
+                        + (f'\n{age_group_title}' if age_group_title else ''), 
                         fontproperties=source_sans, fontsize=8)
         else:
             ax.set_ylabel('Shear Rate (1/s)')
-            ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Shear Rate vs. Pressure with {ci_percentile}% CI', 
+            ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Shear Rate vs. Pressure with {ci_percentile}% CI'
+                        + (f'\n{age_group_title}' if age_group_title else ''), 
                         fontsize=8)
     else:
         if source_sans:
             ax.set_ylabel('Velocity (um/s)', fontproperties=source_sans)
-            ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Velocity vs. Pressure with {ci_percentile}% CI', 
+            ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Velocity vs. Pressure with {ci_percentile}% CI'
+                        + (f'\n{age_group_title}' if age_group_title else ''), 
                         fontproperties=source_sans, fontsize=8)
         else:
             ax.set_ylabel('Velocity (um/s)')
-            ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Velocity vs. Pressure with {ci_percentile}% CI', 
+            ax.set_title(f'{"Median" if method == "bootstrap" else "Mean"} Velocity vs. Pressure with {ci_percentile}% CI'
+                        + (f'\n{age_group_title}' if age_group_title else ''), 
                         fontsize=8)
     
     # Handle font properties for legend
@@ -668,21 +702,22 @@ def plot_CI(df, variable='Age', method='bootstrap', n_iterations=1000,
             
         if video_median:
             if old:
-                output_path = os.path.join(output_cap_flow_path, 'results', f'{variable}_videomedians_CI_old.png')
+                output_path = os.path.join(output_cap_flow_path, 'results', f'{variable}_videomedians_CI_old{age_filename_suffix}.png')
             else:
                 if velocity_variable == 'Shear_Rate':
-                    output_path = os.path.join(output_cap_flow_path, 'results', 'shear', f'{variable}_videomedians_CI_shear_rate.png')
+                    output_path = os.path.join(output_cap_flow_path, 'results', 'shear', f'{variable}_videomedians_CI_shear_rate{age_filename_suffix}.png')
                 else:
-                    output_path = os.path.join(output_cap_flow_path, 'results', f'{variable}_videomedians_CI_new.png')
+                    output_path = os.path.join(output_cap_flow_path, 'results', f'{variable}_videomedians_CI_new{age_filename_suffix}.png')
         else:
             if velocity_variable == 'Shear_Rate':
-                output_path = os.path.join(output_cap_flow_path, 'results', 'shear', f'{variable}_CI_shear_rate.png')
+                output_path = os.path.join(output_cap_flow_path, 'results', 'shear', f'{variable}_CI_shear_rate{age_filename_suffix}.png')
             else:
-                output_path = os.path.join(output_cap_flow_path, 'results', f'{variable}_CI_new.png')
+                output_path = os.path.join(output_cap_flow_path, 'results', f'{variable}_CI_new{age_filename_suffix}.png')
         if participant_weighting:
-            output_path = os.path.join(output_cap_flow_path, 'results', f'{variable}_participant_weighted_CI_new.png')
+            output_path = os.path.join(output_cap_flow_path, 'results', f'{variable}_participant_weighted_CI_new{age_filename_suffix}.png')
         plt.savefig(output_path, dpi=600)
         unlabeled_filename = os.path.splitext(os.path.basename(output_path))[0]
+        _save_ci_no_legend_figure(fig, ax, unlabeled_filename)
         _save_unlabeled_ci_figure(fig, ax, unlabeled_filename)
         print(f"Plot saved to: {output_path}")
     else:
@@ -1835,8 +1870,9 @@ def plot_CI_multiple_bands(df, thresholds=[29, 49], variable='Age', method='boot
         if not group_results['pressures']:
             continue
         
-        # Get color for this group
-        color = base_colors[group_idx*(3)]
+        # Use progressively darker bands for older age groups.
+        color_idx = (len(group_labels) - 1 - group_idx) * 3
+        color = base_colors[color_idx]
         
         # Plot median line
         line, = ax.plot(
@@ -1861,6 +1897,8 @@ def plot_CI_multiple_bands(df, thresholds=[29, 49], variable='Age', method='boot
         # Store handle for legend
         legend_handles[group_label] = line
     
+    age_group_title = f'Velocity by Pressure and Age Group ({", ".join(group_labels)})'
+
     # Set labels and title
     if source_sans:
         ax.set_xlabel('Pressure (PSI)', fontproperties=source_sans)
@@ -1868,14 +1906,14 @@ def plot_CI_multiple_bands(df, thresholds=[29, 49], variable='Age', method='boot
             ax.set_ylabel('Dimensionless Velocity', fontproperties=source_sans)
         else:
             ax.set_ylabel('Velocity (µm/s)', fontproperties=source_sans)
-        ax.set_title('Velocity by Pressure and Age Group', fontproperties=source_sans)
+        ax.set_title(age_group_title, fontproperties=source_sans)
     else:
         ax.set_xlabel('Pressure (PSI)')
         if dimensionless:
             ax.set_ylabel('Dimensionless Velocity')
         else:
             ax.set_ylabel('Velocity (µm/s)')
-        ax.set_title('Velocity by Pressure and Age Group')
+        ax.set_title(age_group_title)
     
     # Set log scale if requested
     if log_scale:

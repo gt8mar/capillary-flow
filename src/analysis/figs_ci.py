@@ -53,16 +53,28 @@ def main(plot_participant_profiles=False, plot_group_profiles=False):
     # Filter for affected
     df['Set_affected'] = np.where(df['SET'] == 'set01', 'set01', 'set04')
     
-    # plot_CI_multiple_bands(controls_df, thresholds=[29, 49], variable='Age', method='bootstrap', 
-    #                        n_iterations=1000, ci_percentile=95, write=True, dimensionless=False, 
-    #                        video_median=False, log_scale=False, velocity_variable='Corrected Velocity')
-    # Age
-
-    # print any rows in controls_df that don't have a value for 'Age'
+    plot_CI_multiple_bands(
+        controls_df,
+        thresholds=[29, 59],
+        variable='Age',
+        method='bootstrap',
+        n_iterations=1000,
+        ci_percentile=95,
+        write=True,
+        dimensionless=False,
+        video_median=False,
+        log_scale=False,
+        velocity_variable='Corrected Velocity'
+    )
 
     plot_CI(controls_df, variable='Age', method='bootstrap', n_iterations=1000, 
             ci_percentile=95, write=True, dimensionless=False, video_median=False, 
-            log_scale=False, old = False, velocity_variable = 'Corrected Velocity')
+            log_scale=False, old = False, velocity_variable = 'Corrected Velocity',
+            age_threshold=30)
+    plot_CI(controls_df, variable='Age', method='bootstrap', n_iterations=1000, 
+            ci_percentile=95, write=True, dimensionless=False, video_median=False, 
+            log_scale=False, old = False, velocity_variable = 'Corrected Velocity',
+            age_threshold=60)
     # Sex
     plot_CI(controls_df, variable='Sex', method='bootstrap', n_iterations=1000, 
             ci_percentile=95, write=True, dimensionless=False, video_median=False, 
@@ -237,9 +249,6 @@ def main(plot_participant_profiles=False, plot_group_profiles=False):
 
 if __name__ == '__main__':
     main(plot_participant_profiles=False, plot_group_profiles=False)  # Set parameters to False to skip respective plots
-
-
-
 
 
 

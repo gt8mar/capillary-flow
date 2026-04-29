@@ -16,8 +16,7 @@ This document outlines the complete data processing pipeline for capillary flow 
    - [Velocity Calculation](#velocity-calculation)
    - [Velocity Validation](#velocity-validation)
 4. [Stiffness Analysis](#stiffness-analysis)
-   - [Stiffness Coefficient Calculation](#stiffness-coefficient-calculation)
-   - [Stiffness Plotting](#stiffness-plotting)
+   - [Compression Resistance Index Calculation](#compression-resistance-index-calculation)
 
 ## Image Preprocessing
 
@@ -501,83 +500,78 @@ This tool generates the dataset used for analyzing the accuracy of automated vel
 
 ## Stiffness Analysis
 
-### Stiffness Coefficient Calculation
+### Compression Resistance Index Calculation
 
 **Script**: `src/analysis/stiffness_coeff.py`
 
 #### Purpose
-This script computes per-participant stiffness index (SI) metrics from capillary pressure-velocity curves. The stiffness index quantifies how much flow a capillary maintains under increasing external pressure — stiffer (less healthy) capillaries resist collapse and maintain higher flow, yielding a higher SI value.
+This script computes the paper stiffness metric, the **Compression Resistance Index (CRI)**. CRI quantifies how much capillary flow resists externally applied compression across the pressure ramp.
+
+#### Definition
+CRI is the AUC of the averaged up/down log-velocity curve from 0.2 to 1.2 psi:
+
+```text
+CRI = SI_logvel_averaged_02_12
+```
+
+The script writes both `CRI` and the compatibility column `SI_logvel_averaged_02_12`.
 
 #### Key Functions
 
-1. **`get_up_down_curves(participant_df, velocity_column)`**
-   - Extracts up (increasing pressure) and down (decreasing pressure) velocity curves for a participant
-   - Groups by pressure and computes mean velocity at each pressure step
+1. **`get_up_down_curves(participant_df)`**
+   - Extracts up and down pressure-log velocity curves for one participant.
 
-2. **`calculate_stiffness_coefficient_up(up_pressures, up_velocities, pressure_min, pressure_max)`**
-   - Computes area under the up curve using trapezoidal integration between specified pressure bounds
+2. **`calculate_cri_from_curves(up_pressures, up_velocities, down_pressures, down_velocities)`**
+   - Averages the up/down log-velocity curves and integrates from 0.2 to 1.2 psi.
 
-3. **`calculate_stiffness_coefficient_averaged(up_pressures, up_velocities, down_pressures, down_velocities, ...)`**
-   - Averages the up and down curves (with interpolation for missing values) before integrating
+3. **`calculate_cri_metrics(df)`**
+   - Iterates over participants and returns one CRI row per participant with demographics and blood pressure.
 
-4. **`calculate_stiffness_metrics(df, velocity_column)`**
-   - Main computation function: iterates over all participants, computes SI values for both pressure ranges (0.4–1.2 psi and 0.2–1.2 psi), stopping/restart pressures, P50, EV_lin, and hysteresis
+4. **`generate_cri_paper_plots(results_df, output_dir)`**
+   - Generates the paper plots that use CRI and supporting blood-pressure comparisons.
 
 5. **`age_adjusted_analysis(results_df, stiffness_col, group_col)`**
-   - Performs OLS regression (SI ~ Group + Age) to test whether group differences survive age adjustment
+   - Performs OLS regression (`CRI ~ Group + Age`) for age-adjusted group comparisons.
 
-#### Two Log-Transformed Metrics
+#### Statistical Analysis
 
-The script produces two distinct log-transformed SI metrics:
+The primary CRI diabetes comparison accounts for age with an OLS model:
 
-1. **SI_log1p** = `log(1 + AUC of raw velocity)` — takes the AUC of raw velocity across pressure, then applies log1p. This compresses the distribution of the total area.
-   - Columns: `SI_log1p_up_04_12`, `SI_log1p_averaged_04_12`, etc.
-   - Stored in `results/Stiffness/stiffness_coefficients.csv`
+```text
+SI_logvel_averaged_02_12 ~ Group + Age
+```
 
-2. **SI_logvel** = `AUC of log(velocity)` — uses the `Log_Video_Median_Velocity` column as input to the same trapezoidal integration. This integrates log-velocity vs pressure directly, which is closely related to geometric-mean velocity and penalizes near-zero (stalled) velocities heavily.
-   - Columns: `SI_logvel_up_04_12`, `SI_logvel_averaged_04_12`, etc.
-   - Stored in `results/Stiffness/stiffness_coefficients_log.csv`
+where `Group = 1` for diabetic participants and `Group = 0` for controls. The
+diabetes p-value shown on the CRI versus age scatterplot is the p-value for the
+`Group` coefficient after including age as a covariate. The separate trend lines
+drawn for each group are visual summaries, not the source of the adjusted
+p-value.
 
-**SI_logvel is the stronger metric**: it produces larger effect sizes (Cohen's d ~0.61–0.65 vs 0.44–0.48 for SI_log1p), and survives age adjustment in the 0.2–1.2 range.
+The current saved age-adjusted CRI result is `p = 0.0367` for the diabetes group
+effect (`n = 72`). The unadjusted diabetic versus control comparison uses a
+two-sided Mann-Whitney U test and gives `p = 0.0218`.
 
-#### Naming Convention
-
-- `SI_{transform}_{method}_{range}`
-- `transform`: `log1p` (log of AUC) or `logvel` (AUC of log velocity)
-- `method`: `up` (up curve only) or `averaged` (up+down interpolated average)
-- `range`: `04_12` (0.4–1.2 psi) or `02_12` (0.2–1.2 psi)
-
-#### Output Files
-
-- `results/Stiffness/stiffness_coefficients.csv` — raw velocity SI metrics + SI_log1p columns
-- `results/Stiffness/stiffness_coefficients_log.csv` — log-velocity SI metrics with SI_logvel columns
-- `results/Stiffness/age_adjusted_analysis.json` — age-adjusted regression results
-
-### Stiffness Plotting
-
-**Script**: `src/analysis/plot_stiffness.py`
-
-#### Purpose
-This script generates publication-quality plots comparing stiffness metrics between Control and Diabetic groups, including boxplots, age-adjusted scatter plots, method comparisons, and significance tables.
-
-#### Key Plot Functions
-
-1. **`plot_stiffness_by_group`** — Boxplot of raw SI_AUC by group (Control vs Diabetic)
-2. **`plot_log_stiffness_by_group`** — Standalone boxplot of log-transformed SI by group; handles both SI_log1p and SI_logvel columns with appropriate axis labels
-3. **`plot_stiffness_vs_age`** / **`plot_stiffness_vs_map`** / **`plot_stiffness_vs_sbp`** — Regression scatter plots
-4. **`plot_age_adjusted_analysis`** — Scatter plot of SI vs Age with group regression lines and age-adjusted p-value
-5. **`plot_log_metric_comparison_by_group`** — Side-by-side comparison of SI_log1p vs SI_logvel boxplots
-6. **`plot_log_metric_comparison_age_adjusted`** — Side-by-side age-adjusted scatter plots for both metrics
-7. **`collect_significance_results`** — Aggregates all statistical tests into a single CSV
-8. **`build_log_metric_comparison_table`** — Builds a comparison table of effect sizes, p-values, and velocity bias for both metrics
+A separate controls-only predictor analysis is implemented in
+`src/analysis/cri_predictor_analysis.py`. It fits Type-II ANOVA/OLS models for
+`CRI ~ Age + C(Sex) + SYS_BP` and the corresponding two-way interaction model.
+In the current complete control dataset (`n = 35`), age is the only significant
+CRI predictor (`p = 0.000165` in the main model); sex and systolic blood pressure
+are not significant, and no tested interaction is significant. A mixed-effects
+CRI model is not fit because CRI is one participant-level row per participant.
 
 #### Output Files
 
-- `results/Stiffness/plots/` — All plots as PDF and PNG
-- `results/Stiffness/plots/no_annotations/` — Same plots with titles, legends, and annotations removed (for figure assembly)
-- `results/Stiffness/plots/stiffness_significance.csv` — Full significance table
-- `results/Stiffness/plots/stiffness_correlations.csv` — Correlation summary
-- `results/Stiffness/stiffness_metric_comparison.csv` — Side-by-side metric comparison
+- `results/Stiffness/cri_metrics.csv` - CRI participant-level output.
+- `results/Stiffness/stiffness_coefficients_log.csv` - compatibility output for scripts expecting `SI_logvel_averaged_02_12`.
+- `results/Stiffness/plots/` - CRI paper plots as PDF and PNG.
+- `results/Stiffness/plots/no_annotations/` - no-title/no-legend copies for figure assembly.
+- `results/Stiffness/plots/cri_paper_plot_significance.csv` - significance tests from CRI paper plots.
+- `results/Stiffness/plots/stiffness_significance.csv` - age-adjusted and unadjusted CRI significance rows.
+- `results/CRI_Analysis/` - controls-only CRI predictor ANOVA/OLS outputs and diagnostics.
+
+#### Archived Methods
+
+Older stiffness methods are documented in `docs/stiffness_methods_archive.md`, and the legacy multi-metric calculator is archived at `src/analysis/archive/stiffness_coeff_legacy.py`.
 
 ## Complete Pipeline Workflow
 
@@ -607,7 +601,8 @@ This script generates publication-quality plots comparing stiffness metrics betw
    - Perform comparative analyses
 
 6. **Stiffness Analysis**:
-   - Calculate stiffness indices from pressure-velocity curves (`stiffness_coeff.py`)
-   - Compute SI_log1p (log of AUC) and SI_logvel (AUC of log velocity) metrics
-   - Generate boxplots, age-adjusted scatter plots, and metric comparisons (`plot_stiffness.py`)
-   - Perform age-adjusted OLS regression to control for confounders
+   - Calculate CRI from averaged up/down log-velocity curves over 0.2-1.2 psi (`stiffness_coeff.py`)
+   - Save participant-level CRI as both `CRI` and `SI_logvel_averaged_02_12`
+   - Generate the CRI paper plots and supporting blood-pressure comparison plots
+   - Perform age-adjusted OLS regression to control for age when evaluating diabetes group differences
+   - Run controls-only CRI predictor ANOVA/OLS for age, sex, systolic blood pressure, and their two-way interactions

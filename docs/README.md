@@ -6,6 +6,8 @@ This folder contains documentation for the capillary flow analysis project, whic
 
 - **figure_generation.md**: Detailed explanation of how all figures in the paper were generated
 - **pipeline_explanation.md**: Documentation of the full data processing pipeline for capillary flow analysis
+- **stiffness_index_guide.md**: Current CRI definition and paper stiffness workflow
+- **stiffness_methods_archive.md**: Archived stiffness metrics evaluated before choosing CRI
 - **paper_preprints/**: Contains preprint versions of our paper
   - `2025.02.24.25322798v1.full-methods.pdf`: The latest preprint with complete methods section
 
