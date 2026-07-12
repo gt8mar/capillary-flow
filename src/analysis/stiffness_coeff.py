@@ -204,7 +204,9 @@ def generate_cri_paper_plots(results_df: pd.DataFrame, output_dir: str) -> None:
     """Generate the paper plots that use the selected CRI metric."""
     from src.analysis.plot_stiffness import (
         _ensure_healthy_flag,
+        _archive_legacy_logvel_plot_outputs,
         plot_age_adjusted_analysis,
+        plot_bp_cri_by_condition_vs_controls,
         plot_bp_by_age_group_control,
         plot_bp_by_disease_group,
         plot_bp_si_by_condition,
@@ -237,6 +239,17 @@ def generate_cri_paper_plots(results_df: pd.DataFrame, output_dir: str) -> None:
     )
     significance_rows.extend(
         plot_bp_si_by_condition(
+            plot_df,
+            plot_df,
+            output_dir,
+            stiffness_col=CRI_LEGACY_COLUMN,
+            bp_col="SYS_BP",
+            minimal_dir=minimal_dir,
+        )
+        or []
+    )
+    significance_rows.extend(
+        plot_bp_cri_by_condition_vs_controls(
             plot_df,
             plot_df,
             output_dir,
@@ -302,6 +315,11 @@ def generate_cri_paper_plots(results_df: pd.DataFrame, output_dir: str) -> None:
         sig_path = os.path.join(output_dir, "cri_paper_plot_significance.csv")
         pd.DataFrame(significance_rows).to_csv(sig_path, index=False)
         print(f"Saved CRI paper plot significance to: {sig_path}")
+
+    archived_count = _archive_legacy_logvel_plot_outputs(output_dir)
+    if archived_count:
+        archive_dir = os.path.join(output_dir, "archive", "legacy_logvel_labels")
+        print(f"Archived {archived_count} legacy logvel/SI plot files to: {archive_dir}")
 
 
 def main() -> int:

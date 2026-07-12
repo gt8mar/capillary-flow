@@ -4,6 +4,28 @@ This document provides a detailed explanation of how the figures for the paper a
 
 ## Table of Contents
 
+### Shared Manuscript Plot Style
+
+Manuscript-facing analysis plots should use the shared style definitions in `src/config.py`:
+
+- `MANUSCRIPT_COLORS` is the source of truth for control blue, diabetes orange, hypertension red, BP green, sex purple, and age blue.
+- `MANUSCRIPT_PLOT_STYLE` sets the publication rcParams used by the stiffness figures: embedded editable PDF text, 12 pt titles, 10 pt axis labels and tick labels, 8 pt legends, 0.5 pt axes/lines, and 0.3 pt grid lines.
+- `MANUSCRIPT_BOX_STYLE` sets the standard standalone boxplot dimensions and point styling: `figsize=(2.4, 2.0)`, box width `0.6`, black jittered points, 15 pt point size, alpha `0.4`, jitter SD `0.04`, and 300 dpi export.
+
+Use `apply_manuscript_plot_style()` before creating manuscript figures and `save_manuscript_figure()` to save matching PDF/PNG outputs with tight bounding boxes. Stiffness plots use this source through `src/analysis/plot_stiffness.py`; PressureFlowResponse participant metric boxplots use the same source through `src/analysis/pressure_flow_response_analysis.py`.
+
+To regenerate the PressureFlowResponse manuscript plots, run:
+
+```bash
+python -m src.analysis.pressure_flow_response_analysis --cap-flow-path . --output-dir results/manuscript/PressureFlowResponse
+```
+
+The individual diabetes/control participant metric boxplots are written to:
+
+```text
+results/manuscript/PressureFlowResponse/individual_boxplots_stiffness_style
+```
+
 ### Figures and Supplemental Figures:
 1. [Profile Calibration](#profile-calibration)
 2. [Compare LEDs](#compare-leds)
@@ -414,4 +436,3 @@ The finger size threshold analysis works as follows:
 
 #### Figure Output in Paper
 This analysis generates supplementary figures showing how finger size relates to capillary velocity measurements. In the paper, these figures demonstrate the importance of accounting for finger size as a potential confounding factor when analyzing capillary velocity data, especially in studies with participants of varying ages or physical characteristics.
-

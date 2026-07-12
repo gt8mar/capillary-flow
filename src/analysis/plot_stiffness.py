@@ -16,8 +16,8 @@ from scipy.stats import pearsonr
 from typing import Optional, Tuple
 import warnings
 
-# Import paths and font from config
-from src.config import PATHS, load_source_sans
+# Import paths and shared manuscript plotting style from config
+from src.config import MANUSCRIPT_COLORS, PATHS, apply_manuscript_plot_style, load_source_sans
 from src.tools.plotting_utils import create_monochromatic_palette, adjust_brightness_of_colors
 from matplotlib.colors import rgb2hex
 from src.analysis.hysteresis import calculate_velocity_hysteresis
@@ -25,30 +25,16 @@ from src.analysis.hysteresis import calculate_velocity_hysteresis
 cap_flow_path = PATHS['cap_flow']
 source_sans = load_source_sans()
 
-# Set up publication-quality plotting style
-plt.rcParams.update({
-    'pdf.fonttype': 42,
-    'ps.fonttype': 42,
-    'font.size': 7,
-    'axes.labelsize': 7,
-    'xtick.labelsize': 6,
-    'ytick.labelsize': 6,
-    'legend.fontsize': 5,
-    'lines.linewidth': 0.5,
-    'axes.linewidth': 0.5,
-    'grid.linewidth': 0.3
-})
-
-sns.set_style("whitegrid")
+apply_manuscript_plot_style()
 
 # Color scheme
-CONTROL_COLOR = '#1f77b4'  # Blue
-DIABETES_COLOR = '#ff7f0e'  # Orange
+CONTROL_COLOR = MANUSCRIPT_COLORS['control']  # Blue
+DIABETES_COLOR = MANUSCRIPT_COLORS['diabetes']  # Orange
 
 # Base colors for monochromatic palettes (matching plotting_utils / hysteresis conventions)
-AGE_BASE_COLOR = '#1f77b4'       # Blue for age
-BP_BASE_COLOR = '#2ca02c'        # Green for blood pressure
-DISEASE_BASE_COLOR = '#00CED1'   # Teal for control-vs-any-disease
+AGE_BASE_COLOR = MANUSCRIPT_COLORS['age']       # Blue for age
+BP_BASE_COLOR = MANUSCRIPT_COLORS['bp']         # Green for blood pressure
+DISEASE_BASE_COLOR = MANUSCRIPT_COLORS['disease']  # Teal for control-vs-any-disease
 
 
 def _make_binary_palette(base_color: str):
@@ -86,6 +72,41 @@ def _ensure_healthy_flag(df: pd.DataFrame) -> pd.DataFrame:
         else:
             warnings.warn("Cannot derive is_healthy flag – no SET, Diabetes, or Hypertension column.")
     return out
+
+
+def _archive_legacy_logvel_plot_outputs(output_dir: str) -> int:
+    """Move legacy logvel/SI-named plot outputs out of active plot folders."""
+    archive_dir = os.path.join(output_dir, 'archive', 'legacy_logvel_labels')
+    legacy_patterns = (
+        'SI_logvel',
+        'logvel',
+        'BP_SI_by_condition',
+        'boxplot_SI',
+        'roc_SI',
+        'scatter_SI',
+        '_SI_',
+        '_SI.',
+        '_vs_SI',
+    )
+    moved = 0
+
+    for root, _, files in os.walk(output_dir):
+        archive_root = os.path.normpath(os.path.join(output_dir, 'archive'))
+        if os.path.normpath(root).startswith(archive_root):
+            continue
+
+        for filename in files:
+            if not any(pattern in filename for pattern in legacy_patterns):
+                continue
+
+            source_path = os.path.join(root, filename)
+            relative_dir = os.path.relpath(root, output_dir)
+            dest_dir = archive_dir if relative_dir == '.' else os.path.join(archive_dir, relative_dir)
+            os.makedirs(dest_dir, exist_ok=True)
+            os.replace(source_path, os.path.join(dest_dir, filename))
+            moved += 1
+
+    return moved
 
 
 def apply_font(ax, source_sans):
@@ -1198,6 +1219,197 @@ def plot_hysteresis_boxplot_diabetes(hysteresis_df: pd.DataFrame, output_dir: st
     return sig_rows
 
 
+def plot_hysteresis_by_age_bins(hysteresis_df: pd.DataFrame, output_dir: str,
+                                cohort: str = 'controls',
+                                figsize: Tuple[float, float] = (2.4, 2.0),
+                                no_xlabels_figsize: Tuple[float, float] = (2.4, 2.4),
+                                minimal_dir: Optional[str] = None):
+    """Boxplot signed hysteresis by age bins and save location/spread stats."""
+    sig_rows = []
+    summary_rows = []
+    spread_rows = []
+
+    if 'up_down_diff' not in hysteresis_df.columns:
+        print("Warning: up_down_diff not found. Skipping hysteresis age-bin plot.")
+        return sig_rows
+    if 'Age' not in hysteresis_df.columns:
+        print("Warning: Age not found. Skipping hysteresis age-bin plot.")
+        return sig_rows
+
+    df = _ensure_healthy_flag(hysteresis_df)
+    df = df[df['up_down_diff'].notna() & df['Age'].notna()].copy()
+    if cohort == 'controls':
+        df = df[df['is_healthy'] == True].copy()
+        cohort_label = 'Controls'
+    elif cohort == 'all':
+        cohort_label = 'All participants'
+    else:
+        raise ValueError("cohort must be 'controls' or 'all'")
+
+    df['Age_Bin'] = pd.cut(
+        pd.to_numeric(df['Age'], errors='coerce'),
+        bins=[0, 30, 60, np.inf],
+        labels=['<30', '30-<60', '>=60'],
+        right=False,
+    )
+    df = df[df['Age_Bin'].notna()].copy()
+    group_labels = ['<30', '30-<60', '>=60']
+
+    if df['Age_Bin'].nunique() < 2:
+        print(f"Warning: fewer than 2 age bins for hysteresis ({cohort}). Skipping.")
+        return sig_rows
+
+    for label in group_labels:
+        values = df[df['Age_Bin'] == label]['up_down_diff'].dropna()
+        if len(values) == 0:
+            continue
+        q1 = values.quantile(0.25)
+        q3 = values.quantile(0.75)
+        median = values.median()
+        summary_rows.append({
+            'cohort': cohort,
+            'age_bin': label,
+            'n': len(values),
+            'median': median,
+            'q1': q1,
+            'q3': q3,
+            'iqr': q3 - q1,
+            'median_absolute_deviation_from_group_median': (values - median).abs().median(),
+            'mean_absolute_deviation_from_group_median': (values - median).abs().mean(),
+            'variance': values.var(ddof=1),
+            'std': values.std(ddof=1),
+        })
+
+    groups = [df[df['Age_Bin'] == label]['up_down_diff'].dropna() for label in group_labels]
+    nonempty_groups = [group for group in groups if len(group) > 0]
+
+    if len(nonempty_groups) >= 2:
+        kruskal = stats.kruskal(*nonempty_groups)
+        sig_rows.append({
+            'analysis': f'Hysteresis by age bins ({cohort})',
+            'test': 'Kruskal-Wallis',
+            'group1': 'all age bins', 'group2': 'N/A',
+            'n1': len(df), 'n2': np.nan,
+            'statistic': kruskal.statistic, 'p_value': kruskal.pvalue,
+            'cohens_d': np.nan,
+        })
+
+        for test_name, result in [
+            ('Brown-Forsythe Levene test for equal spread',
+             stats.levene(*nonempty_groups, center='median')),
+            ('Fligner-Killeen test for equal spread',
+             stats.fligner(*nonempty_groups)),
+        ]:
+            spread_rows.append({
+                'cohort': cohort,
+                'comparison': 'all age bins',
+                'test': test_name,
+                'statistic': result.statistic,
+                'p_value': result.pvalue,
+            })
+            sig_rows.append({
+                'analysis': f'Hysteresis spread by age bins ({cohort})',
+                'test': test_name,
+                'group1': 'all age bins', 'group2': 'N/A',
+                'n1': len(df), 'n2': np.nan,
+                'statistic': result.statistic, 'p_value': result.pvalue,
+                'cohens_d': np.nan,
+            })
+
+    for i, label1 in enumerate(group_labels):
+        vals1 = df[df['Age_Bin'] == label1]['up_down_diff'].dropna()
+        if len(vals1) == 0:
+            continue
+        for label2 in group_labels[i + 1:]:
+            vals2 = df[df['Age_Bin'] == label2]['up_down_diff'].dropna()
+            if len(vals2) == 0:
+                continue
+            mwu = stats.mannwhitneyu(vals1, vals2, alternative='two-sided')
+            d = _cohens_d(vals1, vals2)
+            sig_rows.append({
+                'analysis': f'Hysteresis by age bins ({cohort}, {label1} vs {label2})',
+                'test': 'Mann-Whitney U',
+                'group1': label1, 'group2': label2,
+                'n1': len(vals1), 'n2': len(vals2),
+                'statistic': mwu.statistic, 'p_value': mwu.pvalue,
+                'cohens_d': d if d is not None else np.nan,
+            })
+
+            for test_name, result in [
+                ('Brown-Forsythe Levene test for equal spread',
+                 stats.levene(vals1, vals2, center='median')),
+                ('Fligner-Killeen test for equal spread',
+                 stats.fligner(vals1, vals2)),
+            ]:
+                spread_rows.append({
+                    'cohort': cohort,
+                    'comparison': f'{label1} vs {label2}',
+                    'test': test_name,
+                    'statistic': result.statistic,
+                    'p_value': result.pvalue,
+                })
+
+    pd.DataFrame(summary_rows).to_csv(
+        os.path.join(output_dir, f'hysteresis_age_bins_summary_{cohort}.csv'),
+        index=False,
+    )
+    pd.DataFrame(spread_rows).to_csv(
+        os.path.join(output_dir, f'hysteresis_age_bins_spread_tests_{cohort}.csv'),
+        index=False,
+    )
+
+    colors = create_monochromatic_palette(AGE_BASE_COLOR, n_colors=5)
+    colors = adjust_brightness_of_colors(colors, brightness_scale=0.1)
+    palette = {
+        '<30': rgb2hex(colors[4]),
+        '30-<60': rgb2hex(colors[2]),
+        '>=60': rgb2hex(colors[0]),
+    }
+
+    fig, ax = plt.subplots(figsize=figsize)
+    sns.boxplot(data=df, x='Age_Bin', y='up_down_diff', ax=ax,
+                order=group_labels, palette=palette, width=0.6, showfliers=False)
+    for i, label in enumerate(group_labels):
+        values = df[df['Age_Bin'] == label]['up_down_diff']
+        x_pos = i + np.random.normal(0, 0.04, len(values))
+        ax.scatter(x_pos, values, alpha=0.45, s=18, color='black', zorder=3)
+
+    counts = df['Age_Bin'].value_counts()
+    ax.set_xticklabels([f'{label}\n(n={counts.get(label, 0)})' for label in group_labels])
+    ax.axhline(0, color='black', linewidth=0.8, linestyle='--', alpha=0.5)
+    ax.set_xlabel('Age Group', fontproperties=source_sans if source_sans else None)
+    ax.set_ylabel('Velocity Hysteresis (up-down)', fontproperties=source_sans if source_sans else None)
+    ax.set_title(f'Hysteresis by Age Group ({cohort_label})',
+                 fontproperties=source_sans if source_sans else None)
+    apply_font(ax, source_sans)
+    plt.tight_layout()
+
+    save_figure(fig, output_dir, f'hysteresis_age_bins_{cohort}', minimal_dir=minimal_dir)
+    plt.close(fig)
+
+    fig_no_x, ax_no_x = plt.subplots(figsize=no_xlabels_figsize)
+    sns.boxplot(data=df, x='Age_Bin', y='up_down_diff', ax=ax_no_x,
+                order=group_labels, palette=palette, width=0.6, showfliers=False)
+    for i, label in enumerate(group_labels):
+        values = df[df['Age_Bin'] == label]['up_down_diff']
+        x_pos = i + np.random.normal(0, 0.04, len(values))
+        ax_no_x.scatter(x_pos, values, alpha=0.45, s=18, color='black', zorder=3)
+
+    ax_no_x.axhline(0, color='black', linewidth=0.8, linestyle='--', alpha=0.5)
+    ax_no_x.set_xlabel('')
+    ax_no_x.set_xticklabels([])
+    ax_no_x.tick_params(axis='x', which='both', length=0)
+    ax_no_x.set_ylabel('Velocity Hysteresis (up-down)', fontproperties=source_sans if source_sans else None)
+    ax_no_x.set_title(f'Hysteresis by Age Group ({cohort_label})',
+                      fontproperties=source_sans if source_sans else None)
+    apply_font(ax_no_x, source_sans)
+    fig_no_x.subplots_adjust(left=0.22, right=0.96, top=0.88, bottom=0.12)
+    save_figure(fig_no_x, output_dir, f'hysteresis_age_bins_{cohort}_no_xlabels', minimal_dir=minimal_dir)
+    plt.close(fig_no_x)
+
+    return sig_rows
+
+
 def compare_up_vs_averaged(results_df: pd.DataFrame, output_dir: str,
                            range_label: str = '04_12',
                            figsize: Tuple[float, float] = (2.4, 2.0),
@@ -1787,19 +1999,19 @@ def plot_bp_si_by_condition(results_df: pd.DataFrame,
                             bp_col: str = 'SYS_BP',
                             figsize: Tuple[float, float] = (4.8, 4.0),
                             minimal_dir: Optional[str] = None):
-    """Create 2x2 boxplot comparing BP and SI_logvel for Diabetes and Hypertension.
+    """Create 2x2 boxplot comparing BP and CRI for Diabetes and Hypertension.
 
     Panel layout:
         (0,0) BP for Diabetes (Control vs Diabetic)
         (0,1) BP for Hypertension (Control vs Hypertensive)
-        (1,0) SI_logvel for Diabetes (Control vs Diabetic)
-        (1,1) SI_logvel for Hypertension (Control vs Hypertensive)
+        (1,0) CRI for Diabetes (Control vs Diabetic)
+        (1,1) CRI for Hypertension (Control vs Hypertensive)
 
     Args:
         results_df: Main stiffness results with BP and Diabetes/Hypertension columns.
-        results_df_log: Log-velocity stiffness results with SI_logvel columns.
+        results_df_log: Participant-level CRI results.
         output_dir: Directory to save figures.
-        stiffness_col: SI_logvel column to plot (default SI_logvel_averaged_02_12).
+        stiffness_col: CRI source column to plot (default SI_logvel_averaged_02_12).
         bp_col: Blood pressure column (default SYS_BP).
         figsize: Figure size for the 2x2 grid.
         minimal_dir: If set, save a no-title/no-legend copy here.
@@ -1815,7 +2027,7 @@ def plot_bp_si_by_condition(results_df: pd.DataFrame,
         if df_main['Hypertension'].dtype == object or df_main['Hypertension'].dtype.name == 'str':
             df_main['Hypertension'] = df_main['Hypertension'].astype(str).str.upper() == 'TRUE'
 
-    # Use log results for SI_logvel if available
+    # Use CRI/log-velocity AUC results if available.
     if results_df_log is not None and stiffness_col in results_df_log.columns:
         df_si = _ensure_diabetes_bool(results_df_log.copy())
         if 'Hypertension' in df_si.columns:
@@ -1826,10 +2038,10 @@ def plot_bp_si_by_condition(results_df: pd.DataFrame,
 
     # Check required columns
     if bp_col not in df_main.columns:
-        print(f"Warning: {bp_col} not found. Skipping BP vs SI condition comparison.")
+        print(f"Warning: {bp_col} not found. Skipping BP vs CRI condition comparison.")
         return sig_rows
     if stiffness_col not in df_si.columns:
-        print(f"Warning: {stiffness_col} not found. Skipping BP vs SI condition comparison.")
+        print(f"Warning: {stiffness_col} not found. Skipping BP vs CRI condition comparison.")
         return sig_rows
     if 'Diabetes' not in df_main.columns or 'Hypertension' not in df_main.columns:
         print("Warning: Diabetes or Hypertension column not found. Skipping.")
@@ -1837,13 +2049,13 @@ def plot_bp_si_by_condition(results_df: pd.DataFrame,
 
     # Define the 4 panels: (row, col, df, y_col, condition_col, ylabel, title_suffix)
     bp_label = 'Systolic BP (mmHg)' if bp_col == 'SYS_BP' else 'Diastolic BP (mmHg)'
-    si_label = 'SI_logvel (AUC of log velocity)'
+    cri_label = 'CRI (AUC of log velocity)'
 
     panels = [
         (0, 0, df_main, bp_col, 'Diabetes', bp_label, 'Diabetes', 'SBP_by_diabetes'),
         (0, 1, df_main, bp_col, 'Hypertension', bp_label, 'Hypertension', 'SBP_by_hypertension'),
-        (1, 0, df_si, stiffness_col, 'Diabetes', si_label, 'Diabetes', 'SI_logvel_by_diabetes'),
-        (1, 1, df_si, stiffness_col, 'Hypertension', si_label, 'Hypertension', 'SI_logvel_by_hypertension'),
+        (1, 0, df_si, stiffness_col, 'Diabetes', cri_label, 'Diabetes', 'CRI_by_diabetes'),
+        (1, 1, df_si, stiffness_col, 'Hypertension', cri_label, 'Hypertension', 'CRI_by_hypertension'),
     ]
 
     def draw_panel(ax, df, y_col, cond_col, ylabel, cond_name,
@@ -1884,8 +2096,9 @@ def plot_bp_si_by_condition(results_df: pd.DataFrame,
             if d is not None and not np.isnan(d):
                 stat_text_parts.append(f'd = {d:.2f}')
             if collect_stats:
+                analysis_y_col = 'CRI' if y_col == stiffness_col else y_col
                 sig_rows.append({
-                    'analysis': f'{y_col} by {cond_name}',
+                    'analysis': f'{analysis_y_col} by {cond_name}',
                     'test': 'Mann-Whitney U',
                     'group1': group_labels[0], 'group2': group_labels[1],
                     'n1': len(ctrl_vals), 'n2': len(cond_vals),
@@ -1912,7 +2125,7 @@ def plot_bp_si_by_condition(results_df: pd.DataFrame,
                    collect_stats=True, show_stats_box=True)
 
     plt.tight_layout()
-    filename = 'stiffness_fig_BP_SI_by_condition_comparison'
+    filename = 'stiffness_fig_BP_CRI_by_condition_comparison'
     save_figure(fig, output_dir, filename, minimal_dir=minimal_dir)
     plt.close()
 
@@ -1921,6 +2134,137 @@ def plot_bp_si_by_condition(results_df: pd.DataFrame,
         single_fig, single_ax = plt.subplots(1, 1, figsize=single_figsize)
         draw_panel(single_ax, df, y_col, cond_col, ylabel, cond_name,
                    collect_stats=False, show_stats_box=False)
+        plt.tight_layout()
+        save_figure(single_fig, output_dir, f'{filename}_{slug}', minimal_dir=minimal_dir)
+        plt.close()
+
+    return sig_rows
+
+
+def plot_bp_cri_by_condition_vs_controls(results_df: pd.DataFrame,
+                                         results_df_log: pd.DataFrame,
+                                         output_dir: str,
+                                         stiffness_col: str = 'SI_logvel_averaged_02_12',
+                                         bp_col: str = 'SYS_BP',
+                                         figsize: Tuple[float, float] = (4.8, 4.0),
+                                         minimal_dir: Optional[str] = None):
+    """Create boxplots comparing disease cohorts directly against healthy controls.
+
+    This complements plot_bp_si_by_condition(), which compares each condition
+    against everyone without that condition. Here, controls are only SET == set01
+    / is_healthy participants, diabetes is SET == set03, and hypertension is
+    SET == set02.
+    """
+    sig_rows = []
+
+    df_main = _ensure_healthy_flag(results_df.copy())
+    df_main = _ensure_diabetes_bool(df_main)
+    if 'Hypertension' in df_main.columns:
+        if df_main['Hypertension'].dtype == object or df_main['Hypertension'].dtype.name == 'str':
+            df_main['Hypertension'] = df_main['Hypertension'].astype(str).str.upper() == 'TRUE'
+
+    if results_df_log is not None and stiffness_col in results_df_log.columns:
+        df_si = _ensure_healthy_flag(results_df_log.copy())
+        df_si = _ensure_diabetes_bool(df_si)
+        if 'Hypertension' in df_si.columns:
+            if df_si['Hypertension'].dtype == object or df_si['Hypertension'].dtype.name == 'str':
+                df_si['Hypertension'] = df_si['Hypertension'].astype(str).str.upper() == 'TRUE'
+    else:
+        df_si = df_main
+
+    if bp_col not in df_main.columns:
+        print(f"Warning: {bp_col} not found. Skipping condition-vs-control BP/CRI plots.")
+        return sig_rows
+    if stiffness_col not in df_si.columns:
+        print(f"Warning: {stiffness_col} not found. Skipping condition-vs-control BP/CRI plots.")
+        return sig_rows
+
+    bp_label = 'Systolic BP (mmHg)' if bp_col == 'SYS_BP' else 'Diastolic BP (mmHg)'
+    cri_label = 'CRI (AUC of log velocity)'
+
+    panels = [
+        (0, 0, df_main, bp_col, 'Diabetes', 'Diabetic', bp_label, 'SBP_control_vs_diabetes', DIABETES_COLOR),
+        (0, 1, df_main, bp_col, 'Hypertension', 'Hypertensive', bp_label, 'SBP_control_vs_hypertension', '#d62728'),
+        (1, 0, df_si, stiffness_col, 'Diabetes', 'Diabetic', cri_label, 'CRI_control_vs_diabetes', DIABETES_COLOR),
+        (1, 1, df_si, stiffness_col, 'Hypertension', 'Hypertensive', cri_label, 'CRI_control_vs_hypertension', '#d62728'),
+    ]
+
+    def cohort_mask(df: pd.DataFrame, condition_col: str) -> pd.Series:
+        if condition_col == 'Diabetes':
+            if 'SET' in df.columns:
+                return (df[condition_col] == True) & (df['SET'] == 'set03')
+            return (df[condition_col] == True) & (df['is_healthy'] == False)
+        if 'SET' in df.columns:
+            return (df[condition_col] == True) & (df['SET'] == 'set02')
+        return (df[condition_col] == True) & (df['is_healthy'] == False)
+
+    def draw_panel(ax, df, y_col, condition_col, condition_label, ylabel,
+                   disease_color, collect_stats=True, show_stats_box=True):
+        controls = df[(df['is_healthy'] == True) & df[y_col].notna()].copy()
+        disease = df[cohort_mask(df, condition_col) & df[y_col].notna()].copy()
+
+        controls['Group'] = 'Control'
+        disease['Group'] = condition_label
+        df_plot = pd.concat([controls, disease], ignore_index=True)
+        group_labels = ['Control', condition_label]
+        palette = [CONTROL_COLOR, disease_color]
+
+        sns.boxplot(data=df_plot, x='Group', y=y_col, ax=ax,
+                    order=group_labels, palette=palette, width=0.6)
+
+        for i, grp in enumerate(group_labels):
+            grp_vals = df_plot[df_plot['Group'] == grp][y_col]
+            x_pos = i + np.random.normal(0, 0.04, len(grp_vals))
+            ax.scatter(x_pos, grp_vals, alpha=0.4, s=15, color='black', zorder=3)
+
+        ctrl_vals = df_plot[df_plot['Group'] == 'Control'][y_col]
+        cond_vals = df_plot[df_plot['Group'] == condition_label][y_col]
+        stat_text_parts = [f'n = {len(ctrl_vals)}, {len(cond_vals)}']
+
+        if len(ctrl_vals) > 0 and len(cond_vals) > 0:
+            stat_val, pval = stats.mannwhitneyu(ctrl_vals, cond_vals, alternative='two-sided')
+            d = _cohens_d(ctrl_vals, cond_vals)
+            stat_text_parts.append(f'p = {pval:.4f}')
+            if d is not None and not np.isnan(d):
+                stat_text_parts.append(f'd = {d:.2f}')
+            if collect_stats:
+                sig_rows.append({
+                    'analysis': f'{y_col} {condition_label} vs healthy controls',
+                    'test': 'Mann-Whitney U',
+                    'group1': 'Control', 'group2': condition_label,
+                    'n1': len(ctrl_vals), 'n2': len(cond_vals),
+                    'statistic': stat_val, 'p_value': pval,
+                    'cohens_d': d if d is not None else np.nan,
+                })
+
+        if show_stats_box:
+            ax.text(0.5, 0.95, '\n'.join(stat_text_parts), transform=ax.transAxes,
+                    ha='center', va='top', fontsize=6,
+                    fontproperties=source_sans if source_sans else None,
+                    bbox=dict(boxstyle='round', facecolor='white', alpha=0.8,
+                              edgecolor='black', linewidth=0.5))
+
+        ax.set_xlabel('Group', fontproperties=source_sans if source_sans else None)
+        ax.set_ylabel(ylabel, fontproperties=source_sans if source_sans else None)
+        ax.set_title(f'{ylabel.split(" (")[0]}: Control vs {condition_label}',
+                     fontproperties=source_sans if source_sans else None)
+        apply_font(ax, source_sans)
+
+    fig, axes = plt.subplots(2, 2, figsize=figsize)
+    for row, col, df, y_col, condition_col, condition_label, ylabel, _slug, disease_color in panels:
+        draw_panel(axes[row, col], df, y_col, condition_col, condition_label, ylabel,
+                   disease_color, collect_stats=True, show_stats_box=True)
+
+    plt.tight_layout()
+    filename = 'stiffness_fig_BP_CRI_condition_vs_controls'
+    save_figure(fig, output_dir, filename, minimal_dir=minimal_dir)
+    plt.close()
+
+    single_figsize = (figsize[0] / 2, figsize[1] / 2)
+    for _row, _col, df, y_col, condition_col, condition_label, ylabel, slug, disease_color in panels:
+        single_fig, single_ax = plt.subplots(1, 1, figsize=single_figsize)
+        draw_panel(single_ax, df, y_col, condition_col, condition_label, ylabel,
+                   disease_color, collect_stats=False, show_stats_box=False)
         plt.tight_layout()
         save_figure(single_fig, output_dir, f'{filename}_{slug}', minimal_dir=minimal_dir)
         plt.close()
@@ -3460,8 +3804,8 @@ def main():
                 results_df, results_df_log, output_dir, range_label=range_label, minimal_dir=minimal_dir
             )
 
-    # Generate BP vs SI comparison by condition (Diabetes and Hypertension)
-    print("\nGenerating BP vs SI condition comparison plot...")
+    # Generate BP vs CRI comparison by condition (Diabetes and Hypertension)
+    print("\nGenerating BP vs CRI condition comparison plot...")
     if results_df_log is not None:
         bp_si_sig = plot_bp_si_by_condition(
             results_df, results_df_log, output_dir,
@@ -3472,18 +3816,27 @@ def main():
         if bp_si_sig:
             print(f"  Generated 2x2 comparison: {len(bp_si_sig)} statistical tests")
 
-    # Generate standalone boxplots for log velocity AUC (SI_logvel)
-    print("\nGenerating standalone SI_logvel boxplots...")
+        bp_cri_control_sig = plot_bp_cri_by_condition_vs_controls(
+            results_df, results_df_log, output_dir,
+            stiffness_col='SI_logvel_averaged_02_12',
+            bp_col='SYS_BP',
+            minimal_dir=minimal_dir
+        )
+        if bp_cri_control_sig:
+            print(f"  Generated control-only 2x2 comparison: {len(bp_cri_control_sig)} statistical tests")
+
+    # Generate standalone boxplots for legacy log-velocity AUC metrics.
+    print("\nGenerating standalone legacy log-velocity boxplots...")
     if results_df_log is not None and 'Diabetes' in results_df_log.columns:
         for col in ['SI_logvel_up_04_12', 'SI_logvel_up_02_12',
                      'SI_logvel_averaged_04_12', 'SI_logvel_averaged_02_12']:
             if col in results_df_log.columns:
                 plot_log_stiffness_by_group(results_df_log, output_dir, stiffness_col=col, minimal_dir=minimal_dir)
     else:
-        print("Warning: Diabetes data not available for log velocity results. Skipping SI_logvel boxplots.")
+        print("Warning: Diabetes data not available for log velocity results. Skipping legacy log-velocity boxplots.")
 
-    # Generate age-adjusted analysis plots for log velocity AUC (SI_logvel)
-    print("\nGenerating age-adjusted analysis plots for SI_logvel...")
+    # Generate age-adjusted analysis plots for legacy log-velocity AUC metrics.
+    print("\nGenerating age-adjusted analysis plots for legacy log-velocity metrics...")
     if results_df_log is not None and 'Age' in results_df_log.columns and 'Diabetes' in results_df_log.columns:
         for stiffness_col in ['SI_logvel_averaged_04_12', 'SI_logvel_averaged_02_12']:
             if stiffness_col in results_df_log.columns:
@@ -3523,11 +3876,11 @@ def main():
     results_df = _ensure_healthy_flag(results_df)
     all_sig_rows = []
 
-    print("\nGenerating SI_logvel age-group box plots (controls only)...")
+    print("\nGenerating CRI age-group box plots (controls only)...")
     si_source = results_df_log if results_df_log is not None else results_df
     all_sig_rows.extend(plot_si_by_age_group_control(si_source, output_dir, minimal_dir=minimal_dir) or [])
 
-    print("\nGenerating SI_logvel age-bracket box plot (controls only)...")
+    print("\nGenerating CRI age-bracket box plot (controls only)...")
     all_sig_rows.extend(plot_si_by_age_brackets_control(si_source, output_dir, minimal_dir=minimal_dir) or [])
 
     print("\nGenerating BP age-group box plots (controls only)...")
@@ -3537,10 +3890,23 @@ def main():
     print("\nGenerating BP control-vs-disease box plots...")
     all_sig_rows.extend(plot_bp_by_disease_group(results_df, output_dir, minimal_dir=minimal_dir) or [])
 
-    print("\nGenerating SI_logvel control-vs-disease box plots...")
+    print("\nGenerating CRI control-vs-disease box plots...")
     all_sig_rows.extend(plot_si_by_disease_group(si_source, output_dir, minimal_dir=minimal_dir) or [])
 
-    print("\nGenerating SI_logvel correlation plots (controls only)...")
+    print("\nGenerating BP/CRI condition-vs-control box plots...")
+    if results_df_log is not None:
+        all_sig_rows.extend(
+            plot_bp_cri_by_condition_vs_controls(
+                results_df,
+                results_df_log,
+                output_dir,
+                stiffness_col='SI_logvel_averaged_02_12',
+                bp_col='SYS_BP',
+                minimal_dir=minimal_dir,
+            ) or []
+        )
+
+    print("\nGenerating CRI correlation plots (controls only)...")
     all_sig_rows.extend(plot_si_correlation_control(si_source, output_dir, minimal_dir=minimal_dir) or [])
 
     print("\nGenerating correlation plots (all participants)...")
@@ -3550,27 +3916,41 @@ def main():
     print("\nGenerating hysteresis vs age scatterplots...")
     data_filepath = os.path.join(cap_flow_path, 'summary_df_nhp_video_stats.csv')
     if os.path.exists(data_filepath):
+        hysteresis_output_dir = os.path.join(cap_flow_path, 'results', 'Hysteresis', 'plots')
+        os.makedirs(hysteresis_output_dir, exist_ok=True)
+        hysteresis_minimal_dir = os.path.join(hysteresis_output_dir, 'no_annotations')
+        os.makedirs(hysteresis_minimal_dir, exist_ok=True)
+
         raw_df = pd.read_csv(data_filepath)
         hysteresis_df = calculate_velocity_hysteresis(raw_df, use_log_velocity=False)
+        hysteresis_sig_rows = []
         # Scatterplots
-        all_sig_rows.extend(plot_hysteresis_vs_age_control(hysteresis_df, output_dir, minimal_dir=minimal_dir) or [])
-        all_sig_rows.extend(plot_hysteresis_vs_age_all(hysteresis_df, output_dir, minimal_dir=minimal_dir) or [])
-        all_sig_rows.extend(plot_hysteresis_vs_age_diabetes(hysteresis_df, output_dir, minimal_dir=minimal_dir) or [])
-        all_sig_rows.extend(plot_hysteresis_vs_age_hypertension(hysteresis_df, output_dir, minimal_dir=minimal_dir) or [])
+        hysteresis_sig_rows.extend(plot_hysteresis_vs_age_control(hysteresis_df, hysteresis_output_dir, minimal_dir=hysteresis_minimal_dir) or [])
+        hysteresis_sig_rows.extend(plot_hysteresis_vs_age_all(hysteresis_df, hysteresis_output_dir, minimal_dir=hysteresis_minimal_dir) or [])
+        hysteresis_sig_rows.extend(plot_hysteresis_vs_age_diabetes(hysteresis_df, hysteresis_output_dir, minimal_dir=hysteresis_minimal_dir) or [])
+        hysteresis_sig_rows.extend(plot_hysteresis_vs_age_hypertension(hysteresis_df, hysteresis_output_dir, minimal_dir=hysteresis_minimal_dir) or [])
         # Scatterplots of absolute value of hysteresis
-        all_sig_rows.extend(plot_abs_hysteresis_vs_age_control(hysteresis_df, output_dir, minimal_dir=minimal_dir) or [])
-        all_sig_rows.extend(plot_abs_hysteresis_vs_age_all(hysteresis_df, output_dir, minimal_dir=minimal_dir) or [])
+        hysteresis_sig_rows.extend(plot_abs_hysteresis_vs_age_control(hysteresis_df, hysteresis_output_dir, minimal_dir=hysteresis_minimal_dir) or [])
+        hysteresis_sig_rows.extend(plot_abs_hysteresis_vs_age_all(hysteresis_df, hysteresis_output_dir, minimal_dir=hysteresis_minimal_dir) or [])
         # Boxplots
-        all_sig_rows.extend(plot_hysteresis_boxplot_diabetes(hysteresis_df, output_dir, minimal_dir=minimal_dir) or [])
-        all_sig_rows.extend(plot_hysteresis_boxplot_hypertension(hysteresis_df, output_dir, minimal_dir=minimal_dir) or [])
+        hysteresis_sig_rows.extend(plot_hysteresis_boxplot_diabetes(hysteresis_df, hysteresis_output_dir, minimal_dir=hysteresis_minimal_dir) or [])
+        hysteresis_sig_rows.extend(plot_hysteresis_boxplot_hypertension(hysteresis_df, hysteresis_output_dir, minimal_dir=hysteresis_minimal_dir) or [])
+        hysteresis_sig_rows.extend(plot_hysteresis_by_age_bins(hysteresis_df, hysteresis_output_dir, cohort='controls', minimal_dir=hysteresis_minimal_dir) or [])
+        hysteresis_sig_rows.extend(plot_hysteresis_by_age_bins(hysteresis_df, hysteresis_output_dir, cohort='all', minimal_dir=hysteresis_minimal_dir) or [])
         # CRI versus hysteresis, with the same demographic and BP color encodings.
-        all_sig_rows.extend(
+        hysteresis_sig_rows.extend(
             plot_cri_vs_hysteresis_colored(
-                si_source, hysteresis_df, output_dir,
+                si_source, hysteresis_df, hysteresis_output_dir,
                 stiffness_col='SI_logvel_averaged_02_12',
-                minimal_dir=minimal_dir,
+                minimal_dir=hysteresis_minimal_dir,
             ) or []
         )
+        all_sig_rows.extend(hysteresis_sig_rows)
+        if hysteresis_sig_rows:
+            hysteresis_sig_df = pd.DataFrame(hysteresis_sig_rows)
+            hysteresis_sig_file = os.path.join(hysteresis_output_dir, 'hysteresis_analysis_significance.csv')
+            hysteresis_sig_df.to_csv(hysteresis_sig_file, index=False)
+            print(f"\nSaved hysteresis analysis significance to: {hysteresis_sig_file}")
     else:
         print(f"Warning: {data_filepath} not found. Skipping hysteresis plots.")
 
@@ -3581,6 +3961,11 @@ def main():
         age_sig_df.to_csv(age_sig_file, index=False)
         print(f"\nSaved age-group analysis significance to: {age_sig_file}")
         print(age_sig_df.to_string())
+
+    archived_count = _archive_legacy_logvel_plot_outputs(output_dir)
+    if archived_count:
+        archive_dir = os.path.join(output_dir, 'archive', 'legacy_logvel_labels')
+        print(f"\nArchived {archived_count} legacy logvel/SI plot files to: {archive_dir}")
 
     print("\nAll plots generated successfully!")
     return 0

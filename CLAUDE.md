@@ -16,6 +16,14 @@ python setup.py install                    # Install src package for cross-modul
 
 There is no formal test suite or test runner. Validation is done by running pipeline scripts and checking outputs.
 
+## Manuscript Calculation Guardrails
+
+The current draft in `docs/current_draft` is in manuscript-polishing mode. Do not change core manuscript calculations, labels, or statistical definitions without explicit user approval.
+
+Core calculations include cohort assignment, participant inclusion/exclusion, age-bin definitions, pressure ranges, pressure weighting, velocity transforms, CRI, hysteresis, absolute hysteresis, age-score, classifier feature sets, statistical tests, model formulas, covariates, and multiple-comparison handling.
+
+If exploring an alternative calculation, label it explicitly as exploratory, write outputs to a separate clearly named file, and do not update manuscript replacement text until the user approves that definition. Before producing final manuscript-facing numbers, state the exact definition being used, including cohort, pressure range, weighting, transform, and test.
+
 ## Pipeline Order
 
 Scripts are run in this order (see `docs/pipeline_explanation.md` for details):

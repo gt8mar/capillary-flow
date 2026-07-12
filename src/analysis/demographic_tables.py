@@ -30,9 +30,10 @@ def _load_merged_dataframe() -> pd.DataFrame:
                 df[col] = df[x_col].fillna(df[y_col])
                 df.drop(columns=[x_col, y_col], inplace=True)
 
-    # Clean Height/Weight
-    df = df.dropna(subset=["Height", "Weight"])  # keep only rows with both
-    
+    # Keep participants even when height/weight are missing. Those variables are
+    # summarized using available values only, while cohort N remains the actual
+    # number of participants in the analysis set.
+
     # Remove participants with missing SET values (e.g., part24 - excluded for bad video quality)
     print(f"Participants before SET filtering: {df['Participant'].nunique()}")
     excluded_participants = df[df["SET"].isna()]["Participant"].unique()
